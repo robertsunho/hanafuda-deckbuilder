@@ -346,6 +346,58 @@ export default class GameRoundManager {
     this._phase = "idle";
   }
 
+  /**
+   * Discard selected hand cards and draw replacements from the deck.
+   * Costs 1 play (decrements _playsRemaining).
+   * Only callable during the 'idle' phase.
+   *
+   * @param {string[]} cardIds  IDs of cards currently in hand to discard.
+   * @returns {{ status: 'ok'|'round_over', removed: object[], drawn: object[], ... }}
+   */
+  discardCards(cardIds) {
+    if (this._phase !== "idle") {
+      throw new Error(`discardCards() called while phase is "${this._phase}".`);
+    }
+
+    const removed = this._hand.removeMany(cardIds);
+    if (removed.length === 0) {
+      return { status: "ok", removed: [], drawn: [], playsRemaining: this._playsRemaining };
+    }
+
+    this._playsRemaining--;
+
+    // Draw replacements (capped by deck size and remaining hand capacity).
+    const drawCount = Math.min(removed.length, this._deck.drawPileSize, this._hand.availableSlots);
+    const drawn     = drawCount > 0 ? this._deck.draw(drawCount) : [];
+    if (drawn.length > 0) this._hand.add(drawn);
+
+    const roundOver = this._hand.isEmpty() || this._playsRemaining <= 0;
+
+    if (roundOver) {
+      this._phase = "round_over";
+      const allYaku         = this._scoring.evaluate(this._capture.getAll());
+      const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
+      const penaltyApplied  = this._pushPenaltyActive;
+      const finalScore      = Math.round(
+        this._basePoints * totalMultiplier * (penaltyApplied ? 0.5 : 1.0)
+      );
+      return {
+        status: "round_over",
+        removed, drawn,
+        newYaku:      [],
+        allYaku,
+        totalMultiplier,
+        basePoints:   this._basePoints,
+        finalScore,
+        penaltyApplied,
+        turn:         this._turn,
+        deckCard:     null,
+      };
+    }
+
+    return { status: "ok", removed, drawn, playsRemaining: this._playsRemaining };
+  }
+
   // ── Snapshot ───────────────────────────────────────────────────────────────
 
   /**

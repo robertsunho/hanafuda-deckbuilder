@@ -70,6 +70,10 @@ export class GameScene extends Phaser.Scene {
     this._captureObjs   = [];
     this._overlayObjs   = [];
     this._yakuGuideObjs = [];
+    this._actionBtnObjs = [];
+
+    /** IDs of hand cards currently selected by the player. */
+    this._selectedCardIds = new Set();
 
     this._createCardBackTexture();
     this._buildStaticUI();
@@ -194,9 +198,11 @@ export class GameScene extends Phaser.Scene {
     this._clearObjs(this._handObjs);
     this._clearObjs(this._fieldObjs);
     this._clearObjs(this._captureObjs);
+    this._clearObjs(this._actionBtnObjs);
     this._renderHand();
     this._renderField();
     this._renderCaptures();
+    this._renderActionButtons();
     this._updateInfoTexts();
   }
 
@@ -210,15 +216,20 @@ export class GameScene extends Phaser.Scene {
     const startX = PLAY_CX - ((n - 1) * HAND_STEP) / 2;
 
     for (let i = 0; i < n; i++) {
-      const card = cards[i];
-      const x    = startX + i * HAND_STEP;
-      const spr  = this.add.image(x, HAND_Y, card.id).setScale(CARD_SCALE);
+      const card     = cards[i];
+      const selected = this._selectedCardIds.has(card.id);
+      const x        = startX + i * HAND_STEP;
+      // Selected cards rise 20 px above the normal hand row.
+      const y        = HAND_Y - (selected ? 20 : 0);
+      const spr      = this.add.image(x, y, card.id).setScale(CARD_SCALE);
 
       if (idle) {
         spr.setInteractive({ useHandCursor: true });
+        // Selected cards show the highlight tint permanently.
+        if (selected) spr.setTint(TINT_HOVER);
         spr.on('pointerover',  () => spr.setTint(TINT_HOVER));
-        spr.on('pointerout',   () => spr.clearTint());
-        spr.on('pointerdown',  () => this._onHandClick(card.id));
+        spr.on('pointerout',   () => { if (!selected) spr.clearTint(); });
+        spr.on('pointerdown',  () => this._toggleCardSelection(card.id));
       } else {
         spr.setTint(TINT_DIM);
       }
@@ -287,9 +298,96 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // ── Click handler ─────────────────────────────────────────────────────────
+  // ── Card selection ─────────────────────────────────────────────────────────
 
-  _onHandClick(cardId) {
+  _toggleCardSelection(cardId) {
+    if (this._selectedCardIds.has(cardId)) {
+      this._selectedCardIds.delete(cardId);
+    } else {
+      this._selectedCardIds.add(cardId);
+    }
+    this._clearObjs(this._handObjs);
+    this._clearObjs(this._actionBtnObjs);
+    this._renderHand();
+    this._renderActionButtons();
+  }
+
+  _renderActionButtons() {
+    const idle  = this._round.phase === 'idle' && !this._animating && !this._yakuGuideOpen;
+    const count = this._selectedCardIds.size;
+    if (!idle || count === 0) return;
+
+    const y           = 700;
+    const playEnabled = count === 1;
+
+    // ── Play button ───────────────────────────────────────────────────────
+    const playBtn = this.add.rectangle(PLAY_CX - 90, y, 160, 40,
+      playEnabled ? 0x1a6a1a : 0x222a22)
+      .setStrokeStyle(2, playEnabled ? 0x44aa44 : 0x334433)
+      .setDepth(5);
+    if (playEnabled) {
+      playBtn.setInteractive({ useHandCursor: true });
+      playBtn.on('pointerover',  () => playBtn.setFillStyle(0x2a9a2a));
+      playBtn.on('pointerout',   () => playBtn.setFillStyle(0x1a6a1a));
+      playBtn.on('pointerdown',  () => this._onPlayButton());
+    }
+    this._actionBtnObjs.push(playBtn);
+    this._actionBtnObjs.push(
+      this.add.text(PLAY_CX - 90, y, 'Play', {
+        fontSize: '16px', color: playEnabled ? '#ffffff' : '#445544',
+      }).setOrigin(0.5).setDepth(5)
+    );
+
+    // ── Discard button ────────────────────────────────────────────────────
+    const discardBtn = this.add.rectangle(PLAY_CX + 90, y, 160, 40, 0x6a3a1a)
+      .setStrokeStyle(2, 0xaa7744)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(5);
+    discardBtn.on('pointerover',  () => discardBtn.setFillStyle(0x9a5a2a));
+    discardBtn.on('pointerout',   () => discardBtn.setFillStyle(0x6a3a1a));
+    discardBtn.on('pointerdown',  () => this._onDiscardButton());
+    this._actionBtnObjs.push(discardBtn);
+    this._actionBtnObjs.push(
+      this.add.text(PLAY_CX + 90, y, 'Discard', {
+        fontSize: '16px', color: '#ffffff',
+      }).setOrigin(0.5).setDepth(5)
+    );
+  }
+
+  _onPlayButton() {
+    const [cardId] = [...this._selectedCardIds];
+    this._selectedCardIds.clear();
+    this._clearObjs(this._actionBtnObjs);
+    this._playCard(cardId);
+  }
+
+  _onDiscardButton() {
+    if (this._animating) return;
+    const cardIds = [...this._selectedCardIds];
+    this._selectedCardIds.clear();
+    this._clearObjs(this._actionBtnObjs);
+
+    let result;
+    try {
+      result = this._round.discardCards(cardIds);
+    } catch (e) {
+      console.error('[GameScene] discardCards error:', e.message);
+      return;
+    }
+
+    if (result.status === 'round_over') {
+      this._renderAll();
+      this._showEndScreen(result);
+    } else {
+      const n = result.removed.length;
+      this._setStatus(`Discarded ${n} card${n > 1 ? 's' : ''}  —  play your next card.`);
+      this._renderAll();
+    }
+  }
+
+  // ── Play a card (Phase 1 + Phase 2) ───────────────────────────────────────
+
+  _playCard(cardId) {
     if (this._animating) return;
 
     // ── Phase 1: hand phase ───────────────────────────────────────────────
@@ -550,6 +648,7 @@ export class GameScene extends Phaser.Scene {
   _restartRound() {
     this._closeYakuGuide();
     this._clearObjs(this._overlayObjs);
+    this._selectedCardIds.clear();
     this._round.startRound();
     this._afterRoundStart();
     this._renderAll();
