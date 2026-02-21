@@ -90,6 +90,7 @@ export default class ScoringEngine {
    * @returns {{ name: string, multiplier: number, cards: object[] }[]}
    */
   evaluate(capturedCards) {
+    console.log('[ScoringEngine] v2 — 7-yaku system');
     const results = [];
     const byType  = this._partition(capturedCards);
 

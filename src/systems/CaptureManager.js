@@ -232,11 +232,12 @@ export default class CaptureManager {
   }
 
   /**
-   * Sum of points from all matched yaku (what actually goes on the scoreboard).
+   * Compound multiplier from all matched yaku (product of every yaku's multiplier).
+   * Returns 1.0 when no yaku are active.
    * @returns {number}
    */
   yakuPoints() {
-    return _engine.totalPoints(this.getAll());
+    return _engine.calculateTotalMultiplier(_engine.evaluate(this.getAll()));
   }
 
   /**

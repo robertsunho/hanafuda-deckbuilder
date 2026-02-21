@@ -528,6 +528,25 @@ export default class GameRoundManager {
     this._turn++;
     this._capture.recordTurn();
 
+    // ── TEMPORARY SCORING DIAGNOSTICS ────────────────────────────────────────
+    const capturedCards = this._capture.getAll();
+    const byType = { bright: 0, animal: 0, ribbon: 0, plain: 0 };
+    const byMonth = {};
+    for (const c of capturedCards) {
+      if (byType[c.type] !== undefined) byType[c.type]++;
+      byMonth[c.month] = (byMonth[c.month] ?? 0) + 1;
+    }
+    console.log(
+      `[Scoring T${this._turn}] captured=${capturedCards.length}`,
+      `| types:`, byType,
+      `| months:`, byMonth,
+    );
+    console.log(
+      `[Scoring T${this._turn}] evaluate() →`,
+      this._scoring.evaluate(capturedCards).map(y => `${y.name} ×${y.multiplier.toFixed(2)}`),
+    );
+    // ── END DIAGNOSTICS ───────────────────────────────────────────────────────
+
     const allYaku         = this._scoring.evaluate(this._capture.getAll());
     const newYaku         = allYaku.filter(y => !this._yakuBeforeTurn.has(y.name));
     const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
