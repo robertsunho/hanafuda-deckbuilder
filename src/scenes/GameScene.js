@@ -1,5 +1,6 @@
 import GameRoundManager      from '../systems/GameRoundManager.js';
 import { YAKU_INFO }         from '../systems/ScoringEngine.js';
+import run                   from '../systems/RunManager.js';
 
 // ── Layout constants ───────────────────────────────────────────────────────────
 // Canvas is 1280 × 720.
@@ -169,6 +170,12 @@ export class GameScene extends Phaser.Scene {
       fontSize: '13px',
       color: '#556677',
     });
+
+    // ── Ki balance (top-right) ─────────────────────────────────────────────
+    this._kiText = this.add.text(1270, 10, '', {
+      fontSize: '13px',
+      color: '#ffee88',
+    }).setOrigin(1, 0);
 
     // ── Deck display ─────────────────────────────────────────────────────
     // Card-back sprite (hidden when deck is empty).
@@ -537,6 +544,7 @@ export class GameScene extends Phaser.Scene {
 
     this._turnText.setText(`Turn: ${this._round.turn}`);
     this._playsText.setText(`Plays: ${this._round.playsRemaining}`);
+    this._kiText.setText(`Ki: ${run.ki}`);
 
     // Deck visual
     this._deckSprite.setVisible(drawSize > 0);
@@ -628,20 +636,34 @@ export class GameScene extends Phaser.Scene {
         strokeThickness: 3,
       }).setOrigin(0.5)
     );
+    y += 36;
 
-    // ── Play Again button ─────────────────────────────────────────────────
+    // ── Ki reward ─────────────────────────────────────────────────────────
+    const kiEarned = run.calculateKiReward(result, 100);
+    this._overlayObjs.push(
+      this.add.text(cx, y, `Ki earned: +${kiEarned}`, {
+        fontSize: '16px', color: '#ffee88',
+        stroke: '#000000', strokeThickness: 2,
+      }).setOrigin(0.5)
+    );
+
+    // ── Visit Shrine button ───────────────────────────────────────────────
     const btnY = cy + 188;
     const btn  = this.add
-      .rectangle(cx, btnY, 210, 46, 0x1a4a6a)
+      .rectangle(cx, btnY, 230, 46, 0x1a4a6a)
       .setStrokeStyle(2, 0x4488aa)
       .setInteractive({ useHandCursor: true });
     btn.on('pointerover',  () => btn.setFillStyle(0x2a6a9a));
     btn.on('pointerout',   () => btn.setFillStyle(0x1a4a6a));
-    btn.on('pointerdown',  () => this._restartRound());
+    btn.on('pointerdown',  () => {
+      run.addKi(kiEarned);
+      run.advanceRound(result.finalScore);
+      this.scene.start('ShrineScene');
+    });
     this._overlayObjs.push(btn);
 
     this._overlayObjs.push(
-      this.add.text(cx, btnY, 'Play Again', {
+      this.add.text(cx, btnY, 'Visit Shrine', {
         fontSize: '18px', color: '#ffffff',
       }).setOrigin(0.5)
     );

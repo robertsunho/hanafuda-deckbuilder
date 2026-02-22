@@ -338,6 +338,7 @@ export default class GameRoundManager {
       finalScore,
       penaltyApplied: false,
       penaltyRate:    0,
+      pushCount:      this._pushCount,
       turn:           this._turn,
       deckCard:       this._lastDeckCard,
     };
@@ -617,6 +618,7 @@ export default class GameRoundManager {
       finalScore,
       penaltyApplied,
       penaltyRate:         penaltyApplied ? this._pushPenaltyRate : 0,
+      pushCount:           this._pushCount,
       nextPushPenaltyPct,
       turn:                this._turn,
       deckCard:            this._lastDeckCard,
