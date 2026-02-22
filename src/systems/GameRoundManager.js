@@ -45,11 +45,12 @@
 //   'round_over'    → hand is empty; call startRound() to begin again
 // ─────────────────────────────────────────────────────────────────────────────
 
-import DeckManager    from "./DeckManager.js";
-import HandManager    from "./HandManager.js";
-import FieldManager   from "./FieldManager.js";
-import CaptureManager from "./CaptureManager.js";
-import ScoringEngine  from "./ScoringEngine.js";
+import DeckManager      from "./DeckManager.js";
+import HandManager      from "./HandManager.js";
+import FieldManager     from "./FieldManager.js";
+import CaptureManager   from "./CaptureManager.js";
+import ScoringEngine    from "./ScoringEngine.js";
+import ConsumableEffects from "./ConsumableEffects.js";
 
 export default class GameRoundManager {
 
@@ -143,6 +144,19 @@ export default class GameRoundManager {
      *   pushOn()    → clears flag, resets plays/hand, continues play.
      */
     this._roundEndingAfterDecision = false;
+
+    /** Set by Dog consumable; suppresses the push penalty for this round. */
+    this._dogProtection = false;
+
+    /** Set by Pig consumable; doubles ki earned at round end. */
+    this._pigDoubleKi = false;
+
+    /**
+     * Active spirit loadout for this round — used by ScoringEngine to run
+     * spirit scoring hooks.  Set via setSpirits() before startRound().
+     * @type {object[]}
+     */
+    this._spirits = [];
   }
 
   // ── Read-only accessors ────────────────────────────────────────────────────
@@ -170,6 +184,18 @@ export default class GameRoundManager {
    */
   get naturalCaptures() { return this._naturalCaptures; }
 
+  /** True when the Dog consumable has nullified the push penalty. */
+  get dogProtection() { return this._dogProtection; }
+
+  /** True when the Pig consumable has queued a ki-reward double. */
+  get pigDoubleKi()   { return this._pigDoubleKi; }
+
+  /**
+   * Set the active spirit loadout for scoring.  Call before startRound().
+   * @param {object[]} spirits  Spirit objects from RunManager.spirits.
+   */
+  setSpirits(spirits) { this._spirits = [...spirits]; }
+
   /**
    * Live scoring snapshot — evaluates the current capture pile and returns
    * the full picture needed to render the score HUD.
@@ -178,7 +204,7 @@ export default class GameRoundManager {
    *             basePoints: number, finalScore: number }}
    */
   getCurrentScoring() {
-    const allYaku         = this._scoring.evaluate(this._capture.getAll());
+    const allYaku         = this._scoring.evaluate(this._capture.getAll(), this._spirits);
     const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
     return {
       allYaku,
@@ -221,6 +247,8 @@ export default class GameRoundManager {
     this._pushCount                = 0;
     this._pushPenaltyRate          = 0;
     this._roundEndingAfterDecision = false;
+    this._dogProtection            = false;
+    this._pigDoubleKi              = false;
 
     this._hand.add(this._deck.draw(GameRoundManager.HAND_SIZE));
 
@@ -265,7 +293,7 @@ export default class GameRoundManager {
 
     // Snapshot active yaku (name → multiplier) so _finalizeTurn() can diff.
     this._yakuBeforeTurn = new Map(
-      this._scoring.evaluate(this._capture.getAll()).map(y => [y.name, y.multiplier])
+      this._scoring.evaluate(this._capture.getAll(), this._spirits).map(y => [y.name, y.multiplier])
     );
 
     this._discardedThisTurn = [];   // reset each turn
@@ -324,7 +352,7 @@ export default class GameRoundManager {
     if (this._phase !== "yaku_decision") {
       throw new Error(`bankScore() called while phase is "${this._phase}".`);
     }
-    const allYaku         = this._scoring.evaluate(this._capture.getAll());
+    const allYaku         = this._scoring.evaluate(this._capture.getAll(), this._spirits);
     const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
     const finalScore      = Math.round(this._basePoints * totalMultiplier);
     this._roundEndingAfterDecision = false;
@@ -339,6 +367,7 @@ export default class GameRoundManager {
       penaltyApplied: false,
       penaltyRate:    0,
       pushCount:      this._pushCount,
+      pigDoubleKi:    this._pigDoubleKi,
       turn:           this._turn,
       deckCard:       this._lastDeckCard,
     };
@@ -365,7 +394,7 @@ export default class GameRoundManager {
     this._pushCount++;
     this._pushPenaltyRate   = Math.min(0.9, 0.3 + (this._pushCount - 1) * 0.2);
 
-    const allYaku         = this._scoring.evaluate(this._capture.getAll());
+    const allYaku         = this._scoring.evaluate(this._capture.getAll(), this._spirits);
     const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
     this._atRiskScore       = Math.round(this._basePoints * totalMultiplier);
     this._pushPenaltyActive = true;
@@ -411,7 +440,7 @@ export default class GameRoundManager {
 
     if (roundOver) {
       this._phase = "round_over";
-      const allYaku         = this._scoring.evaluate(this._capture.getAll());
+      const allYaku         = this._scoring.evaluate(this._capture.getAll(), this._spirits);
       const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
       const penaltyApplied  = this._pushPenaltyActive;
       const finalScore      = Math.round(
@@ -433,6 +462,21 @@ export default class GameRoundManager {
     }
 
     return { status: "ok", removed, drawn, playsRemaining: this._playsRemaining };
+  }
+
+  /**
+   * Execute a consumable's effect and return the result.
+   * The caller is responsible for removing the consumable from RunManager
+   * inventory after this call succeeds.
+   *
+   * @param {object} consumable  A consumable object from consumables.js.
+   * @param {object} [params={}] Optional extra data forwarded to the effect.
+   * @returns {{ success: boolean, message?: string, [extra]?: any }}
+   */
+  useConsumable(consumable, params = {}) {
+    const effect = ConsumableEffects.get(consumable.id);
+    if (!effect) return { success: false, message: `Unknown consumable: ${consumable.id}` };
+    return effect.execute({ roundManager: this, params });
   }
 
   // ── Snapshot ───────────────────────────────────────────────────────────────
@@ -565,7 +609,7 @@ export default class GameRoundManager {
     this._turn++;
     this._capture.recordTurn();
 
-    const allYaku = this._scoring.evaluate(this._capture.getAll());
+    const allYaku = this._scoring.evaluate(this._capture.getAll(), this._spirits);
     // A yaku counts as "new" if its name wasn't present before, OR if its
     // multiplier jumped by more than the largest single incremental step
     // (+0.3 for Hikari).  Subset bonuses (Inoshikacho +0.5, Akatan/Aotan
@@ -588,7 +632,8 @@ export default class GameRoundManager {
     const roundOver = this._hand.isEmpty() || this._playsRemaining <= 0;
 
     // Apply the escalating penalty only when the round ends under penalty.
-    const penaltyApplied = roundOver && this._pushPenaltyActive;
+    // Dog consumable suppresses the penalty entirely.
+    const penaltyApplied = roundOver && this._pushPenaltyActive && !this._dogProtection;
     const finalScore     = Math.round(
       this._basePoints * totalMultiplier * (penaltyApplied ? (1 - this._pushPenaltyRate) : 1.0)
     );
@@ -619,6 +664,7 @@ export default class GameRoundManager {
       penaltyApplied,
       penaltyRate:         penaltyApplied ? this._pushPenaltyRate : 0,
       pushCount:           this._pushCount,
+      pigDoubleKi:         this._pigDoubleKi,
       nextPushPenaltyPct,
       turn:                this._turn,
       deckCard:            this._lastDeckCard,

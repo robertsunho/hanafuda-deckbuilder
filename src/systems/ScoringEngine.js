@@ -79,17 +79,21 @@ export const YAKU_INFO = {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+import SpiritEffects from './SpiritEffects.js';
+
 export default class ScoringEngine {
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
   /**
-   * Evaluate an array of captured cards against all yaku.
+   * Evaluate an array of captured cards against all yaku, then apply any
+   * spirit scoring hooks from the provided loadout.
    *
    * @param {object[]} capturedCards  Card objects from cards.js
+   * @param {object[]} [spirits=[]]   Spirit objects from the active loadout
    * @returns {{ name: string, multiplier: number, cards: object[] }[]}
    */
-  evaluate(capturedCards) {
+  evaluate(capturedCards, spirits = []) {
     const results = [];
     const byType  = this._partition(capturedCards);
 
@@ -103,6 +107,17 @@ export default class ScoringEngine {
     // Full Month can fire for multiple months simultaneously.
     for (const entry of this._checkFullMonth(capturedCards)) {
       results.push(entry);
+    }
+
+    // Spirit scoring hooks — appended after all standard yaku so hooks can
+    // inspect allYaku (e.g. threshold spirits skip if standard yaku fired).
+    for (const spirit of spirits) {
+      const hook = SpiritEffects.get(spirit.id)?.modifyScoring;
+      if (hook) {
+        for (const extra of hook(capturedCards, results)) {
+          results.push(extra);
+        }
+      }
     }
 
     return results;

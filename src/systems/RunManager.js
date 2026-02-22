@@ -167,17 +167,19 @@ class RunManager {
    *   raw total       = base + unique yaku + surplus bonus
    *   × push mult     = × (1.0 + 0.25 × successfulPushCount) on success
    *                     × 0.5 if penaltyApplied (failed push)
+   *   × pig double    = × 2 if result.pigDoubleKi is true (Pig consumable)
    *   → round to nearest integer
    *
    * @param {{ allYaku: object[], finalScore: number,
-   *            penaltyApplied: boolean, pushCount: number }} result
+   *            penaltyApplied: boolean, pushCount: number,
+   *            pigDoubleKi?: boolean }} result
    * @param {number} threshold  Score threshold for surplus bonus (typically
    *                            the round's base point total before multipliers,
    *                            or a fixed per-round target).
    * @returns {number}  Ki earned (integer ≥ 0).
    */
   calculateKiReward(result, threshold) {
-    const { allYaku, finalScore, penaltyApplied, pushCount } = result;
+    const { allYaku, finalScore, penaltyApplied, pushCount, pigDoubleKi } = result;
 
     const base         = 3;
     const yakuBonus    = allYaku.length;
@@ -191,7 +193,9 @@ class RunManager {
       ? 0.5
       : 1.0 + 0.25 * (pushCount ?? 0);
 
-    return Math.round(raw * pushMultiplier);
+    const pigMultiplier = pigDoubleKi ? 2 : 1;
+
+    return Math.round(raw * pushMultiplier * pigMultiplier);
   }
 
   // ── Snapshot ───────────────────────────────────────────────────────────────

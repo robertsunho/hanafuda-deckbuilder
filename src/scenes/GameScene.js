@@ -114,6 +114,7 @@ export class GameScene extends Phaser.Scene {
     this._createCardBackTexture();
     this._buildStaticUI();
 
+    this._round.setSpirits(run.spirits);
     this._round.startRound();
     this._afterRoundStart();
     this._renderAll();
@@ -502,6 +503,53 @@ export class GameScene extends Phaser.Scene {
     this._renderHand();
   }
 
+  // ── Rooster overlay ────────────────────────────────────────────────────────
+
+  /**
+   * Show a simple overlay listing the draw-pile cards revealed by Rooster.
+   * The player dismisses it manually so they have time to read the names.
+   * @param {object[]} cards  Revealed card objects (may be empty).
+   * @param {string}   msg    Status message from the effect.
+   */
+  _showRoosterOverlay(cards, msg) {
+    this._setStatus(msg);
+
+    const objs = [];
+    const W = 420, H = Math.min(380, 60 + cards.length * 22 + 50);
+    const cx = PLAY_CX, cy = 360;
+
+    const bg = this.add.rectangle(cx, cy, W, H, 0x0a1a2e, 0.95)
+      .setStrokeStyle(2, 0x4488cc).setDepth(20);
+    objs.push(bg);
+    objs.push(this.add.text(cx, cy - H / 2 + 18, 'Rooster — Deck Reveal', {
+      fontSize: '15px', color: '#88ccff', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(20));
+
+    if (cards.length === 0) {
+      objs.push(this.add.text(cx, cy, '(no matching cards)', {
+        fontSize: '13px', color: '#888888',
+      }).setOrigin(0.5).setDepth(20));
+    } else {
+      cards.forEach((card, i) => {
+        objs.push(this.add.text(
+          cx, cy - H / 2 + 44 + i * 22,
+          `${card.name ?? card.id}  [${card.type}]`,
+          { fontSize: '13px', color: '#dddddd' }
+        ).setOrigin(0.5).setDepth(20));
+      });
+    }
+
+    const closeBtn = this.add.rectangle(cx, cy + H / 2 - 22, 100, 28, 0x1a4a6a)
+      .setStrokeStyle(1, 0x88ccff).setInteractive({ useHandCursor: true }).setDepth(20);
+    closeBtn.on('pointerover', () => closeBtn.setFillStyle(0x2a6a9a));
+    closeBtn.on('pointerout',  () => closeBtn.setFillStyle(0x1a4a6a));
+    closeBtn.on('pointerdown', () => { objs.forEach(o => o.destroy()); });
+    objs.push(closeBtn);
+    objs.push(this.add.text(cx, cy + H / 2 - 22, 'Close', {
+      fontSize: '13px', color: '#aaddff',
+    }).setOrigin(0.5).setDepth(20));
+  }
+
   // ── Card selection ─────────────────────────────────────────────────────────
 
   _toggleCardSelection(cardId) {
@@ -553,12 +601,17 @@ export class GameScene extends Phaser.Scene {
         useBtn.on('pointerover',  () => useBtn.setFillStyle(0x2a4a8a));
         useBtn.on('pointerout',   () => useBtn.setFillStyle(0x1a2a5a));
         useBtn.on('pointerdown',  () => {
-          const idx = this._selectedConsumableIndex;
+          const idx    = this._selectedConsumableIndex;
+          const result = this._round.useConsumable(cons);
           this._selectedConsumableIndex = null;
-          console.log(`Used ${cons.name}`);
           run.useConsumable(idx);
           this._clearObjs(this._consumableObjs);
           this._clearObjs(this._actionBtnObjs);
+          if (result.revealedCards) {
+            this._showRoosterOverlay(result.revealedCards, result.message);
+          } else {
+            this._setStatus(result.message ?? `Used ${cons.name}.`);
+          }
           this._renderConsumables();
           this._renderActionButtons();
         });
@@ -859,6 +912,7 @@ export class GameScene extends Phaser.Scene {
     this._clearObjs(this._overlayObjs);
     this._selectedCardIds.clear();
     this._selectedConsumableIndex = null;
+    this._round.setSpirits(run.spirits);
     this._round.startRound();
     this._afterRoundStart();
     this._renderAll();
