@@ -220,11 +220,16 @@ export default class ScoringEngine {
    * @returns {{ name, multiplier, cards }[]}  Zero or more entries.
    */
   _checkFullMonth(capturedCards) {
+    console.log('[ScoringEngine] _checkFullMonth — checking', capturedCards.length,
+      'cards:', capturedCards.map(c => c.id));
     const byMonth = new Map();
     for (const card of capturedCards) {
       if (!byMonth.has(card.month)) byMonth.set(card.month, []);
       byMonth.get(card.month).push(card);
     }
+    const groups = {};
+    for (const [month, cards] of byMonth) groups[month] = cards.length;
+    console.log('[ScoringEngine] _checkFullMonth — month → count:', groups);
     const entries = [];
     for (const [, cards] of byMonth) {
       if (cards.length === 4) {

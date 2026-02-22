@@ -69,11 +69,12 @@ export default class GameRoundManager {
     this._phase = "idle";
 
     /**
-     * Yaku names that were active at the start of the current turn.
-     * Used to diff against post-turn evaluation and surface only new yaku.
-     * @type {Set<string>}
+     * Yaku name → multiplier snapshot taken at the start of the current turn.
+     * Used to diff against post-turn evaluation: a yaku is "new" if its name
+     * was absent OR its multiplier grew by ≥0.3 (subset bonus activated).
+     * @type {Map<string, number>}
      */
-    this._yakuBeforeTurn = new Set();
+    this._yakuBeforeTurn = new Map();
 
     /** 1-based turn counter, incremented after each complete turn. */
     this._turn = 0;
@@ -121,9 +122,27 @@ export default class GameRoundManager {
     /**
      * True while the player is exposed to the push penalty.
      * Set by pushOn(); cleared the next time a new yaku is completed.
-     * If the round ends while this is true the final score is halved.
      */
     this._pushPenaltyActive = false;
+
+    /** Number of times the player has pushed this round. */
+    this._pushCount = 0;
+
+    /**
+     * Fraction of the final score lost when the round ends under penalty.
+     * Escalates with each push: push 1 = 0.3, push 2 = 0.5, push 3 = 0.7, …
+     * Capped at 0.9.
+     */
+    this._pushPenaltyRate = 0;
+
+    /**
+     * True when the round would normally end (hand empty or plays exhausted)
+     * but a new yaku was also completed on that same turn.  The round-over
+     * transition is deferred until the player resolves the Bank/Push decision:
+     *   bankScore() → clears flag, moves to 'round_over' as usual.
+     *   pushOn()    → clears flag, resets plays/hand, continues play.
+     */
+    this._roundEndingAfterDecision = false;
   }
 
   // ── Read-only accessors ────────────────────────────────────────────────────
@@ -141,6 +160,8 @@ export default class GameRoundManager {
   get playsRemaining() { return this._playsRemaining; }
   /** Running base capture points earned so far this round. */
   get basePoints()     { return this._basePoints; }
+  /** Number of times the player has pushed this round. */
+  get pushCount()      { return this._pushCount; }
   /**
    * Cards auto-captured at round start due to a natural full month in hand.
    * Each element is an array of 4 cards (one group per captured month).
@@ -187,7 +208,7 @@ export default class GameRoundManager {
     this._capture.clear();
 
     this._phase              = "idle";
-    this._yakuBeforeTurn     = new Set();
+    this._yakuBeforeTurn     = new Map();
     this._turn               = 0;
     this._lastDeckCard       = null;
     this._discardCount       = 0;
@@ -196,7 +217,10 @@ export default class GameRoundManager {
     this._basePoints         = 0;
     this._naturalCaptures    = [];
     this._atRiskScore        = 0;
-    this._pushPenaltyActive  = false;
+    this._pushPenaltyActive        = false;
+    this._pushCount                = 0;
+    this._pushPenaltyRate          = 0;
+    this._roundEndingAfterDecision = false;
 
     this._hand.add(this._deck.draw(GameRoundManager.HAND_SIZE));
 
@@ -239,9 +263,9 @@ export default class GameRoundManager {
     // Count this play against the round limit.
     this._playsRemaining--;
 
-    // Snapshot active yaku so _finalizeTurn() can diff for new completions.
-    this._yakuBeforeTurn = new Set(
-      this._scoring.evaluate(this._capture.getAll()).map(y => y.name)
+    // Snapshot active yaku (name → multiplier) so _finalizeTurn() can diff.
+    this._yakuBeforeTurn = new Map(
+      this._scoring.evaluate(this._capture.getAll()).map(y => [y.name, y.multiplier])
     );
 
     this._discardedThisTurn = [];   // reset each turn
@@ -303,6 +327,7 @@ export default class GameRoundManager {
     const allYaku         = this._scoring.evaluate(this._capture.getAll());
     const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
     const finalScore      = Math.round(this._basePoints * totalMultiplier);
+    this._roundEndingAfterDecision = false;
     this._phase = "round_over";
     return {
       status:         "banked",
@@ -312,6 +337,7 @@ export default class GameRoundManager {
       basePoints:     this._basePoints,
       finalScore,
       penaltyApplied: false,
+      penaltyRate:    0,
       turn:           this._turn,
       deckCard:       this._lastDeckCard,
     };
@@ -319,31 +345,40 @@ export default class GameRoundManager {
 
   /**
    * Push decision: accept the risk and continue playing.
-   * Records the current score as the at-risk amount, activates the 50%
-   * penalty flag, and returns the phase to 'idle'.
-   * Only callable during the 'yaku_decision' phase.
+   * Each successive push shrinks the hand dealt, reduces available plays,
+   * and escalates the penalty rate.
+   *
+   * Scaling (pushCount after increment):
+   *   Hand cards  = max(2, HAND_SIZE − pushCount × 2)   → 6, 4, 2, 2, …
+   *   Plays       = max(2, PLAYS_PER_ROUND − pushCount)  → 4, 3, 2, 2, …
+   *   Penalty     = min(0.9, 0.3 + (pushCount−1) × 0.2) → 30%, 50%, 70%, 90%
+   *
+   * @returns {{ pushPenaltyPct: number }}  The penalty rate now in effect.
    */
   pushOn() {
     if (this._phase !== "yaku_decision") {
       throw new Error(`pushOn() called while phase is "${this._phase}".`);
     }
+
+    this._roundEndingAfterDecision = false;   // round continues
+    this._pushCount++;
+    this._pushPenaltyRate   = Math.min(0.9, 0.3 + (this._pushCount - 1) * 0.2);
+
     const allYaku         = this._scoring.evaluate(this._capture.getAll());
     const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
     this._atRiskScore       = Math.round(this._basePoints * totalMultiplier);
     this._pushPenaltyActive = true;
 
-    // Deal a fresh hand into the remaining hand slots (up to HAND_SIZE new cards,
-    // capped by deck size and available hand capacity so maxSize is never exceeded).
-    const handCount = Math.min(
-      GameRoundManager.HAND_SIZE,
-      this._deck.drawPileSize,
-      this._hand.availableSlots
-    );
+    // Deal a scaled hand — fewer cards with each successive push.
+    const targetHand = Math.max(2, GameRoundManager.HAND_SIZE - this._pushCount * 2);
+    const handCount  = Math.min(targetHand, this._deck.drawPileSize, this._hand.availableSlots);
     if (handCount > 0) this._hand.add(this._deck.draw(handCount));
 
-    // Reset the play counter for the new deal.
-    this._playsRemaining = GameRoundManager.PLAYS_PER_ROUND;
+    // Fewer plays available with each successive push.
+    this._playsRemaining = Math.max(2, GameRoundManager.PLAYS_PER_ROUND - this._pushCount);
     this._phase = "idle";
+
+    return { pushPenaltyPct: Math.round(this._pushPenaltyRate * 100) };
   }
 
   /**
@@ -390,6 +425,7 @@ export default class GameRoundManager {
         basePoints:   this._basePoints,
         finalScore,
         penaltyApplied,
+        penaltyRate:  penaltyApplied ? this._pushPenaltyRate : 0,
         turn:         this._turn,
         deckCard:     null,
       };
@@ -548,7 +584,18 @@ export default class GameRoundManager {
     // ── END DIAGNOSTICS ───────────────────────────────────────────────────────
 
     const allYaku         = this._scoring.evaluate(this._capture.getAll());
-    const newYaku         = allYaku.filter(y => !this._yakuBeforeTurn.has(y.name));
+    // A yaku is "new" if it wasn't present before OR if its multiplier grew
+    // by ≥0.3 (a subset bonus — Inoshikacho, Akatan, Aotan — activated).
+    // Incremental growth (+0.2 per extra card) does NOT trigger a decision.
+    // A yaku counts as "new" if its name wasn't present before, OR if its
+    // multiplier jumped by more than the largest incremental step (+0.3 for
+    // Hikari).  Subset bonuses (Inoshikacho +0.5, Akatan/Aotan +0.4) clear
+    // that bar; plain extra-card growth (+0.2 Tane/Tanzaku, +0.3 Hikari,
+    // +0.15 Kasu) does not, so it will NOT trigger a Bank/Push decision.
+    const newYaku = allYaku.filter(y => {
+      const prev = this._yakuBeforeTurn.get(y.name);
+      return prev === undefined || y.multiplier - prev > 0.3;
+    });
     const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
 
     // Completing a new yaku clears the push penalty regardless of outcome.
@@ -557,35 +604,42 @@ export default class GameRoundManager {
     // Round ends when the hand is empty OR the play limit is reached.
     const roundOver = this._hand.isEmpty() || this._playsRemaining <= 0;
 
-    // Apply the 50% penalty only when the round ends while the flag is active
-    // (meaning the player pushed but never completed another yaku).
+    // Apply the escalating penalty only when the round ends under penalty.
     const penaltyApplied = roundOver && this._pushPenaltyActive;
     const finalScore     = Math.round(
-      this._basePoints * totalMultiplier * (penaltyApplied ? 0.5 : 1.0)
+      this._basePoints * totalMultiplier * (penaltyApplied ? (1 - this._pushPenaltyRate) : 1.0)
     );
 
-    if (roundOver) {
-      this._phase = "round_over";
-    } else if (newYaku.length > 0) {
+    // The rate the player would face if they choose to push on this turn.
+    const nextPushPenaltyPct = Math.round(Math.min(0.9, 0.3 + this._pushCount * 0.2) * 100);
+
+    if (newYaku.length > 0) {
+      // A new yaku always triggers a Bank/Push decision, even on the final play.
+      // If the round would also end, defer that transition until after the decision.
+      this._roundEndingAfterDecision = roundOver;
       this._phase = "yaku_decision";
+    } else if (roundOver) {
+      this._phase = "round_over";
     } else {
       this._phase = "idle";
     }
 
-    const status = roundOver           ? "round_over"    :
-                   newYaku.length > 0 ? "yaku_decision" : "ok";
+    const status = newYaku.length > 0 ? "yaku_decision" :
+                   roundOver          ? "round_over"    : "ok";
     return {
       status,
       newYaku,
       allYaku,
       totalMultiplier,
-      basePoints:        this._basePoints,
+      basePoints:          this._basePoints,
       finalScore,
       penaltyApplied,
-      turn:              this._turn,
-      deckCard:          this._lastDeckCard,
-      discarded:         [...this._discardedThisTurn],
-      roundDiscardCount: this._discardCount,
+      penaltyRate:         penaltyApplied ? this._pushPenaltyRate : 0,
+      nextPushPenaltyPct,
+      turn:                this._turn,
+      deckCard:            this._lastDeckCard,
+      discarded:           [...this._discardedThisTurn],
+      roundDiscardCount:   this._discardCount,
     };
   }
 }

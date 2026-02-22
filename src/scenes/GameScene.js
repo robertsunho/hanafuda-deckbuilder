@@ -609,8 +609,10 @@ export class GameScene extends Phaser.Scene {
 
     // ── Push penalty notice ───────────────────────────────────────────────
     if (result.penaltyApplied) {
+      const lossPct  = Math.round(result.penaltyRate * 100);
+      const keepMult = (1 - result.penaltyRate).toFixed(1);
       this._overlayObjs.push(
-        this.add.text(cx, y, '\u26A0 Push penalty: score halved (\xD70.5)', {
+        this.add.text(cx, y, `\u26A0 Push penalty: ${lossPct}% lost (\xD7${keepMult})`, {
           fontSize: '15px', color: '#ff8866',
         }).setOrigin(0.5)
       );
@@ -730,15 +732,15 @@ export class GameScene extends Phaser.Scene {
     pushBtn.on('pointerover',  () => pushBtn.setFillStyle(0x9a2a2a));
     pushBtn.on('pointerout',   () => pushBtn.setFillStyle(0x6a1a1a));
     pushBtn.on('pointerdown',  () => {
-      this._round.pushOn();
+      const { pushPenaltyPct } = this._round.pushOn();
       this._clearObjs(this._overlayObjs);
-      this._setStatus('Pushed! Complete another yaku or lose 50% of your score.');
+      this._setStatus(`Pushed! Complete another yaku or lose ${pushPenaltyPct}% of your score.`);
       this._renderAll();
     });
     this._overlayObjs.push(pushBtn);
     this._overlayObjs.push(
       this.add.text(cx + 118, btnY,
-        'Push  (new hand, risk 50%)',
+        `Push  (new hand, risk ${result.nextPushPenaltyPct}%)`,
         { fontSize: '14px', color: '#ffffff' }
       ).setOrigin(0.5).setDepth(25)
     );
