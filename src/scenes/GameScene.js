@@ -4,9 +4,9 @@ import run                   from '../systems/RunManager.js';
 
 // ── Layout constants ───────────────────────────────────────────────────────────
 // Canvas is 1280 × 720.
-// Left panel  (x   0–170): deck + discard display
-// Play area   (x 170–1080): field + hand, centred at PLAY_CX
-// Right panel (x 1080–1280): capture stack
+// Left panel  (x   0–170): deck + discard + capture stack
+// Play area   (x 170–1120): field + hand, centred at PLAY_CX
+// Right panel (x 1120–1280): spirit column
 
 const CARD_W     = 105;   // natural image size
 const CARD_H     = 159;
@@ -14,21 +14,20 @@ const CARD_SCALE = 0.85;  // all card sprites rendered at 85 %
 
 const PLAY_CX = 530;   // horizontal centre of the field + hand area
 
-// ── Left panel (deck + discard) ────────────────────────────────────────────
+// ── Left panel (deck + discard + capture stack) ────────────────────────────
 const DECK_X     = 85;   // deck card back centre x
 const DECK_Y     = 210;  // deck card back centre y
 const DISCARD_X  = 85;   // discard area centre x
-const DISCARD_Y  = 390;  // discard area centre y (label + count below deck)
+const DISCARD_Y  = 390;  // discard animation / static display y
 
 // When the deck flips, the face-up card is revealed here for FLIP_HOLD ms.
 const FLIP_X     = 85;
 const FLIP_Y     = 210;
 const FLIP_HOLD  = 800;  // ms the flipped card stays visible
 
-// ── Capture column ─────────────────────────────────────────────────────────
-const CAP_X      = 1195;
-const CAP_TOP    = 80;
-const CAP_BOTTOM = 717;
+// Face-down capture stack (below discard area).
+const CAP_STACK_X = DECK_X;
+const CAP_STACK_Y = 530;
 
 // ── Field ──────────────────────────────────────────────────────────────────
 // Up to 8 slots in a 4-column × 2-row grid.
@@ -47,6 +46,32 @@ const SLOT_BG_H  = Math.round(CARD_H * CARD_SCALE) + 8;   // ≈ 143 px
 const HAND_STEP  = 88;
 const HAND_Y     = 638;
 
+// ── Right panel: spirit column ────────────────────────────────────────────
+const SPIRIT_CARD_W = 140;
+const SPIRIT_CARD_H = 45;
+const SPIRIT_X      = 1195;   // horizontal centre of the right panel
+const SPIRIT_TOP    = 80;     // y centre of the first spirit slot
+const SPIRIT_STEP   = 60;     // vertical distance between spirit slots
+
+// ── Consumable cards (right of hand area) ─────────────────────────────────
+const CONS_CARD_W  = 80;
+const CONS_CARD_H  = 50;
+const CONS_X_START = 925;    // centre x of first consumable slot
+const CONS_STEP    = 88;     // horizontal step between slots
+// Consumables share HAND_Y for their vertical centre.
+
+// ── Rarity colours ────────────────────────────────────────────────────────
+const RARITY_COLOR = {
+  common:    0x667788,
+  uncommon:  0x44aa44,
+  rare:      0x4488ff,
+  legendary: 0xddaa22,
+};
+
+// ── Slot counts (mirrors RunManager statics) ──────────────────────────────
+const MAX_SPIRIT_SLOTS     = 5;
+const MAX_CONSUMABLE_SLOTS = 3;
+
 // ── Tints ──────────────────────────────────────────────────────────────────
 const TINT_PENDING  = 0xffee33;  // gold  — pending-match slot
 const TINT_DIM      = 0x445566;  // slate — non-interactive
@@ -64,17 +89,24 @@ export class GameScene extends Phaser.Scene {
     this._round          = new GameRoundManager();
     this._animating      = false;   // true while a turn animation is playing
     this._yakuGuideOpen  = false;   // true while the Yaku Reference overlay is shown
+    this._captureOverlayOpen = false; // true while the captured-cards overlay is shown
 
     // Mutable sprite arrays — cleared and rebuilt each render.
-    this._handObjs      = [];
-    this._fieldObjs     = [];
-    this._captureObjs   = [];
-    this._overlayObjs   = [];
-    this._yakuGuideObjs = [];
-    this._actionBtnObjs = [];
+    this._handObjs           = [];
+    this._fieldObjs          = [];
+    this._captureObjs        = [];   // face-down stack + badge
+    this._spiritObjs         = [];   // spirit column cards
+    this._consumableObjs     = [];   // consumable cards near hand
+    this._overlayObjs        = [];
+    this._captureOverlayObjs = [];
+    this._yakuGuideObjs      = [];
+    this._actionBtnObjs      = [];
 
     /** IDs of hand cards currently selected by the player. */
     this._selectedCardIds = new Set();
+
+    /** Index of the selected consumable (null = none). */
+    this._selectedConsumableIndex = null;
 
     this._createCardBackTexture();
     this._buildStaticUI();
@@ -112,11 +144,12 @@ export class GameScene extends Phaser.Scene {
     const labelStyle = { fontSize: '12px', color: '#556677' };
 
     // ── Zone labels ───────────────────────────────────────────────────────
-    this.add.text(PLAY_CX, 38,  'FIELD',    labelStyle).setOrigin(0.5, 0);
-    this.add.text(PLAY_CX, 551, 'HAND',     labelStyle).setOrigin(0.5, 0);
-    this.add.text(CAP_X,   50,  'CAPTURED', labelStyle).setOrigin(0.5, 0);
-    this.add.text(DECK_X,  50,  'DECK',     labelStyle).setOrigin(0.5, 0);
-    this.add.text(DISCARD_X, 360, 'DISCARDS', labelStyle).setOrigin(0.5, 0);
+    this.add.text(PLAY_CX,    38,  'FIELD',     labelStyle).setOrigin(0.5, 0);
+    this.add.text(PLAY_CX,    551, 'HAND',      labelStyle).setOrigin(0.5, 0);
+    this.add.text(SPIRIT_X,   50,  'SPIRITS',   labelStyle).setOrigin(0.5, 0);
+    this.add.text(DECK_X,     50,  'DECK',      labelStyle).setOrigin(0.5, 0);
+    this.add.text(DISCARD_X,  360, 'DISCARDS',  labelStyle).setOrigin(0.5, 0);
+    this.add.text(CAP_STACK_X, 445, 'CAPTURED', labelStyle).setOrigin(0.5, 0);
 
     // ── Dividers ──────────────────────────────────────────────────────────
     this.add.rectangle(PLAY_CX, 543, 940, 1, 0x2a3a50);  // field / hand
@@ -132,9 +165,8 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5, 0);
 
     // ── Score display (three lines: base · multiplier · projected) ────────
-    // Horizontally between the rightmost field column (x≈725) and the capture
-    // panel (x=1120); vertically centred in the gap between the two field rows
-    // (row 1 centre y=160, row 2 centre y=400 → midpoint y≈280).
+    // Horizontally between the rightmost field column (x≈725) and the right
+    // panel (x=1120); vertically centred in the gap between field rows.
     this._baseText = this.add.text(920, 262, '', {
       fontSize: '13px',
       color: '#aaccee',
@@ -205,10 +237,14 @@ export class GameScene extends Phaser.Scene {
     this._clearObjs(this._handObjs);
     this._clearObjs(this._fieldObjs);
     this._clearObjs(this._captureObjs);
+    this._clearObjs(this._spiritObjs);
+    this._clearObjs(this._consumableObjs);
     this._clearObjs(this._actionBtnObjs);
     this._renderHand();
     this._renderField();
-    this._renderCaptures();
+    this._renderSpiritColumn();
+    this._renderCaptureStack();
+    this._renderConsumables();
     this._renderActionButtons();
     this._updateInfoTexts();
   }
@@ -219,7 +255,8 @@ export class GameScene extends Phaser.Scene {
     const cards  = this._round.hand.getAll();
     const n      = cards.length;
     // Cards are interactive only when idle, not mid-animation, and no overlay open.
-    const idle   = this._round.phase === 'idle' && !this._animating && !this._yakuGuideOpen;
+    const idle   = this._round.phase === 'idle' && !this._animating
+                    && !this._yakuGuideOpen && !this._captureOverlayOpen;
     const startX = PLAY_CX - ((n - 1) * HAND_STEP) / 2;
 
     for (let i = 0; i < n; i++) {
@@ -286,23 +323,265 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // ── Captures ──────────────────────────────────────────────────────────────
+  // ── Spirit column (right panel) ───────────────────────────────────────────
 
-  _renderCaptures() {
-    const cards = this._round.capture.getAll();
-    const n     = cards.length;
-    if (n === 0) return;
+  _renderSpiritColumn() {
+    const spirits = run.spirits;
 
-    const scaledH = Math.round(CARD_H * CARD_SCALE);
-    const step = n === 1
-      ? 0
-      : Math.min(scaledH + 6, Math.floor((CAP_BOTTOM - CAP_TOP) / (n - 1)));
+    for (let i = 0; i < MAX_SPIRIT_SLOTS; i++) {
+      const spirit = spirits[i];
+      const y      = SPIRIT_TOP + i * SPIRIT_STEP;
 
-    for (let i = 0; i < n; i++) {
-      const y   = CAP_TOP + i * step;
-      const spr = this.add.image(CAP_X, y, cards[i].id).setScale(CARD_SCALE);
-      this._captureObjs.push(spr);
+      if (!spirit) {
+        // Empty slot — dim outline only.
+        const slot = this.add.rectangle(SPIRIT_X, y, SPIRIT_CARD_W, SPIRIT_CARD_H, 0x0a1628)
+          .setStrokeStyle(1, 0x1e2d40);
+        this._spiritObjs.push(slot);
+        continue;
+      }
+
+      // Card background.
+      const card = this.add.rectangle(SPIRIT_X, y, SPIRIT_CARD_W, SPIRIT_CARD_H, 0x0d1b2a)
+        .setStrokeStyle(1, 0x2a3a50);
+      this._spiritObjs.push(card);
+
+      // Rarity left-border strip.
+      const rarityCol = RARITY_COLOR[spirit.rarity] ?? RARITY_COLOR.common;
+      const border    = this.add.rectangle(
+        SPIRIT_X - SPIRIT_CARD_W / 2 + 2, y, 4, SPIRIT_CARD_H - 4, rarityCol
+      );
+      this._spiritObjs.push(border);
+
+      // Name label.
+      const nameText = this.add.text(
+        SPIRIT_X - SPIRIT_CARD_W / 2 + 10, y,
+        spirit.name,
+        { fontSize: '11px', color: '#cce0ff' }
+      ).setOrigin(0, 0.5);
+      this._spiritObjs.push(nameText);
+
+      // Hover tooltip — appears to the left of the card.
+      const tooltip = this.add.text(
+        SPIRIT_X - SPIRIT_CARD_W / 2 - 8, y,
+        spirit.description,
+        {
+          fontSize: '11px',
+          color: '#e8e8e8',
+          backgroundColor: '#0a0f1e',
+          padding: { x: 6, y: 4 },
+          wordWrap: { width: 190 },
+        }
+      ).setOrigin(1, 0.5).setDepth(30).setVisible(false);
+      this._spiritObjs.push(tooltip);
+
+      card.setInteractive();
+      card.on('pointerover', () => tooltip.setVisible(true));
+      card.on('pointerout',  () => tooltip.setVisible(false));
     }
+  }
+
+  // ── Capture stack (left panel, below discard area) ────────────────────────
+
+  _renderCaptureStack() {
+    const count = this._round.capture.getAll().length;
+
+    // Face-down card-back sprite.
+    const stackSpr = this.add.image(CAP_STACK_X, CAP_STACK_Y, 'card_back')
+      .setScale(CARD_SCALE)
+      .setVisible(count > 0);
+    this._captureObjs.push(stackSpr);
+
+    // Count badge.
+    const badge = this.add.text(CAP_STACK_X, CAP_STACK_Y + 70, String(count), {
+      fontSize: '18px',
+      color: '#aaccee',
+      stroke: '#000000',
+      strokeThickness: 3,
+    }).setOrigin(0.5, 0);
+    this._captureObjs.push(badge);
+
+    // Click to open captured-cards overlay.
+    if (count > 0) {
+      stackSpr.setInteractive({ useHandCursor: true });
+      stackSpr.on('pointerover', () => stackSpr.setTint(TINT_HOVER));
+      stackSpr.on('pointerout',  () => stackSpr.clearTint());
+      stackSpr.on('pointerdown', () => this._showCaptureOverlay());
+    }
+  }
+
+  // ── Consumable cards (right of hand) ──────────────────────────────────────
+
+  _renderConsumables() {
+    const consumables = run.consumables;
+    const idle        = this._round.phase === 'idle' && !this._animating
+                          && !this._yakuGuideOpen && !this._captureOverlayOpen;
+
+    for (let i = 0; i < MAX_CONSUMABLE_SLOTS; i++) {
+      const cons     = consumables[i];
+      const selected = this._selectedConsumableIndex === i && cons !== undefined;
+      const x        = CONS_X_START + i * CONS_STEP;
+      const y        = HAND_Y - (selected ? 15 : 0);
+
+      if (!cons) {
+        // Empty slot — dim outline.
+        const slot = this.add.rectangle(x, HAND_Y, CONS_CARD_W, CONS_CARD_H, 0x0a1628)
+          .setStrokeStyle(1, 0x1e2d40);
+        this._consumableObjs.push(slot);
+        continue;
+      }
+
+      // Card background, highlighted when selected.
+      const rarityCol = RARITY_COLOR[cons.rarity] ?? RARITY_COLOR.common;
+      const card = this.add.rectangle(x, y, CONS_CARD_W, CONS_CARD_H, 0x0d1b2a)
+        .setStrokeStyle(2, selected ? rarityCol : 0x2a3a50);
+      this._consumableObjs.push(card);
+
+      // Rarity top-border strip.
+      const border = this.add.rectangle(
+        x, y - CONS_CARD_H / 2 + 2, CONS_CARD_W - 4, 4, rarityCol
+      );
+      this._consumableObjs.push(border);
+
+      // Name label.
+      const nameText = this.add.text(x, y + 4, cons.name, {
+        fontSize: '10px', color: '#cce0ff',
+      }).setOrigin(0.5, 0.5);
+      this._consumableObjs.push(nameText);
+
+      // Hover tooltip — appears above the card.
+      const tooltip = this.add.text(x, HAND_Y - CONS_CARD_H - 8, cons.description, {
+        fontSize: '11px',
+        color: '#e8e8e8',
+        backgroundColor: '#0a0f1e',
+        padding: { x: 6, y: 4 },
+        wordWrap: { width: 180 },
+      }).setOrigin(0.5, 1).setDepth(30).setVisible(false);
+      this._consumableObjs.push(tooltip);
+
+      if (idle) {
+        card.setInteractive({ useHandCursor: true });
+        card.on('pointerover', () => tooltip.setVisible(true));
+        card.on('pointerout',  () => tooltip.setVisible(false));
+        card.on('pointerdown', () => {
+          tooltip.setVisible(false);
+          this._toggleConsumableSelection(i);
+        });
+      }
+    }
+  }
+
+  // ── Captured-cards overlay ─────────────────────────────────────────────────
+
+  _showCaptureOverlay() {
+    if (this._captureOverlayOpen) return;
+    this._captureOverlayOpen = true;
+
+    // Dim hand while overlay is open.
+    this._clearObjs(this._handObjs);
+    this._renderHand();
+
+    const cards = this._round.capture.getAll();
+    const cx    = PLAY_CX;
+    const cy    = 330;
+    const objs  = this._captureOverlayObjs;
+
+    // Background panel.
+    objs.push(
+      this.add.rectangle(cx, cy, 800, 500, 0x080d1a, 0.95)
+        .setStrokeStyle(2, 0x3a6080)
+        .setDepth(20)
+    );
+
+    objs.push(
+      this.add.text(cx, cy - 228, 'Captured Cards', {
+        fontSize: '20px', color: '#e8c96a',
+        stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(20)
+    );
+
+    objs.push(
+      this.add.rectangle(cx, cy - 208, 740, 1, 0x3a6080).setDepth(20)
+    );
+
+    if (cards.length === 0) {
+      objs.push(
+        this.add.text(cx, cy, 'No cards captured yet.', {
+          fontSize: '15px', color: '#778899',
+        }).setOrigin(0.5).setDepth(20)
+      );
+    } else {
+      // Organise cards by type.
+      const TYPES       = ['bright', 'animal', 'ribbon', 'plain'];
+      const TYPE_LABELS = { bright: 'Brights', animal: 'Animals', ribbon: 'Ribbons', plain: 'Plains' };
+      const byType      = { bright: [], animal: [], ribbon: [], plain: [] };
+      for (const card of cards) {
+        if (byType[card.type] !== undefined) byType[card.type].push(card);
+      }
+
+      const OV_SCALE = 0.45;
+      const OV_W     = Math.round(CARD_W * OV_SCALE);
+      const OV_H     = Math.round(CARD_H * OV_SCALE);
+      const OV_GAP   = 6;
+      const ROW_MAX  = 10;
+
+      let y = cy - 190;
+      for (const type of TYPES) {
+        const group = byType[type];
+        if (group.length === 0) continue;
+
+        objs.push(
+          this.add.text(cx - 360, y,
+            `${TYPE_LABELS[type]}  (${group.length})`,
+            { fontSize: '12px', color: '#778899' }
+          ).setOrigin(0, 0).setDepth(20)
+        );
+        y += 18;
+
+        // Lay out in rows of up to ROW_MAX.
+        let rowStart = 0;
+        while (rowStart < group.length) {
+          const rowCards = group.slice(rowStart, rowStart + ROW_MAX);
+          const rowW     = rowCards.length * (OV_W + OV_GAP) - OV_GAP;
+          const startX   = cx - rowW / 2 + OV_W / 2;
+          for (let j = 0; j < rowCards.length; j++) {
+            const spr = this.add.image(
+              startX + j * (OV_W + OV_GAP),
+              y + OV_H / 2,
+              rowCards[j].id
+            ).setScale(OV_SCALE).setDepth(20);
+            objs.push(spr);
+          }
+          y      += OV_H + OV_GAP + 4;
+          rowStart += ROW_MAX;
+        }
+        y += 8;
+      }
+    }
+
+    // Close button.
+    const closeY   = cy + 224;
+    const closeBtn = this.add.rectangle(cx, closeY, 140, 36, 0x1a4a6a)
+      .setStrokeStyle(2, 0x4488aa)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(20);
+    closeBtn.on('pointerover', () => closeBtn.setFillStyle(0x2a6a9a));
+    closeBtn.on('pointerout',  () => closeBtn.setFillStyle(0x1a4a6a));
+    closeBtn.on('pointerdown', () => this._closeCaptureOverlay());
+    objs.push(closeBtn);
+    objs.push(
+      this.add.text(cx, closeY, 'Close', {
+        fontSize: '15px', color: '#ffffff',
+      }).setOrigin(0.5).setDepth(20)
+    );
+  }
+
+  _closeCaptureOverlay() {
+    if (!this._captureOverlayOpen) return;
+    this._captureOverlayOpen = false;
+    this._clearObjs(this._captureOverlayObjs);
+    // Restore hand interactivity.
+    this._clearObjs(this._handObjs);
+    this._renderHand();
   }
 
   // ── Card selection ─────────────────────────────────────────────────────────
@@ -312,16 +591,71 @@ export class GameScene extends Phaser.Scene {
       this._selectedCardIds.delete(cardId);
     } else {
       this._selectedCardIds.add(cardId);
+      // Mutual exclusivity: deselect any selected consumable.
+      this._selectedConsumableIndex = null;
     }
     this._clearObjs(this._handObjs);
+    this._clearObjs(this._consumableObjs);
     this._clearObjs(this._actionBtnObjs);
     this._renderHand();
+    this._renderConsumables();
+    this._renderActionButtons();
+  }
+
+  // ── Consumable selection ───────────────────────────────────────────────────
+
+  _toggleConsumableSelection(index) {
+    if (this._selectedConsumableIndex === index) {
+      this._selectedConsumableIndex = null;
+    } else {
+      this._selectedConsumableIndex = index;
+      // Mutual exclusivity: deselect all hand cards.
+      this._selectedCardIds.clear();
+    }
+    this._clearObjs(this._handObjs);
+    this._clearObjs(this._consumableObjs);
+    this._clearObjs(this._actionBtnObjs);
+    this._renderHand();
+    this._renderConsumables();
     this._renderActionButtons();
   }
 
   _renderActionButtons() {
-    const idle  = this._round.phase === 'idle' && !this._animating && !this._yakuGuideOpen;
+    const idle  = this._round.phase === 'idle' && !this._animating
+                    && !this._yakuGuideOpen && !this._captureOverlayOpen;
     const count = this._selectedCardIds.size;
+
+    // ── Use button for selected consumable ────────────────────────────────
+    if (idle && this._selectedConsumableIndex !== null) {
+      const cons = run.consumables[this._selectedConsumableIndex];
+      if (cons) {
+        const y = 700;
+        const useBtn = this.add.rectangle(PLAY_CX, y, 180, 40, 0x1a2a5a)
+          .setStrokeStyle(2, 0x4466cc)
+          .setInteractive({ useHandCursor: true })
+          .setDepth(5);
+        useBtn.on('pointerover',  () => useBtn.setFillStyle(0x2a4a8a));
+        useBtn.on('pointerout',   () => useBtn.setFillStyle(0x1a2a5a));
+        useBtn.on('pointerdown',  () => {
+          const idx = this._selectedConsumableIndex;
+          this._selectedConsumableIndex = null;
+          console.log(`Used ${cons.name}`);
+          run.useConsumable(idx);
+          this._clearObjs(this._consumableObjs);
+          this._clearObjs(this._actionBtnObjs);
+          this._renderConsumables();
+          this._renderActionButtons();
+        });
+        this._actionBtnObjs.push(useBtn);
+        this._actionBtnObjs.push(
+          this.add.text(PLAY_CX, y, `Use: ${cons.name}`, {
+            fontSize: '15px', color: '#aaddff',
+          }).setOrigin(0.5).setDepth(5)
+        );
+      }
+      return;
+    }
+
     if (!idle || count === 0) return;
 
     const y           = 700;
@@ -670,9 +1004,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   _restartRound() {
+    this._closeCaptureOverlay();
     this._closeYakuGuide();
     this._clearObjs(this._overlayObjs);
     this._selectedCardIds.clear();
+    this._selectedConsumableIndex = null;
     this._round.startRound();
     this._afterRoundStart();
     this._renderAll();
