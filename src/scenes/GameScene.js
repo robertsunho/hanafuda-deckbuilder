@@ -614,6 +614,7 @@ export class GameScene extends Phaser.Scene {
           }
           this._renderConsumables();
           this._renderActionButtons();
+          this._updateInfoTexts();
         });
         this._actionBtnObjs.push(useBtn);
         this._actionBtnObjs.push(
