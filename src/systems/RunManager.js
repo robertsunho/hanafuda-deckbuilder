@@ -12,7 +12,7 @@
 
 class RunManager {
 
-  static MAX_SPIRIT_SLOTS     = 5;
+  static MAX_SPIRIT_SLOTS     = 4;
   static MAX_CONSUMABLE_SLOTS = 3;
 
   constructor() {
