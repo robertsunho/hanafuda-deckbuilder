@@ -142,10 +142,10 @@ export default class FieldManager {
    * if the field is full.
    *
    * @param {object} card
-   * @returns {{ matched: boolean, discarded: boolean, captured: object[]|null }}
-   *   matched   — true when a pending slot was formed (or 4-card auto-capture)
+   * @returns {{ matched: boolean, discarded: boolean, captured: null }}
+   *   matched   — true when a pending slot was formed (1–4 cards merged)
    *   discarded — true when no match and the field was full (card lost)
-   *   captured  — non-null when a 4-card auto-capture occurred
+   *   captured  — always null; 4-card stacks stay pending until the deck phase
    */
   playHandCard(card) {
     const matchingSlots = this.getSlotsForMonth(card.month);
@@ -173,12 +173,10 @@ export default class FieldManager {
     target.cards = [...allFieldCards, card];
     target.state = 'pending';
 
-    if (target.cards.length === 4) {
-      const captured = [...target.cards];
-      this._nullify(target);
-      return { matched: true, discarded: false, captured };
-    }
-
+    // Even if the stack now holds all 4 cards of the month, do NOT capture
+    // here.  Leave it as a pending slot so the cards remain visible on the
+    // field during the hand-phase pause and the deck-flip animation.  The
+    // capture is resolved in the deck phase (_doDeckPhase / capturePendingMatch).
     return { matched: true, discarded: false, captured: null };
   }
 

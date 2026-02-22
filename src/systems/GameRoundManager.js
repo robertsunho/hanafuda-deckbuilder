@@ -517,16 +517,16 @@ export default class GameRoundManager {
         // this turn; _finalizeTurn proceeds normally.
       } else {
         // Deck card is a different month from the pending match.
-        // Only a 2-card pending (hand card + exactly one field card) captures
-        // on a different-month deck flip.  Larger pending stacks (3 cards)
-        // need all 4 of their month assembled before they can capture, so
-        // they strand back to 'normal' and stay on the field.
-        if (pending.cards.length === 2) {
+        // 2-card pending (hand card + 1 field card) → capture now.
+        // 4-card pending (hand card completed the month stack) → capture now.
+        // 3-card pending → needs the 4th card before it can score; strand it
+        //   back to 'normal' so it stays on the field for a future turn.
+        if (pending.cards.length === 3) {
+          this._field.strandPendingMatch();
+        } else {
+          // 2 or 4 cards: the match is complete — capture immediately.
           const pendingCards = this._field.capturePendingMatch();
           this._addCapture(pendingCards);
-        } else {
-          // 3-card pending → strand it (revert to normal, wait for the 4th).
-          this._field.strandPendingMatch();
         }
 
         // Deck card goes to the field normally (stack or new slot).
@@ -564,38 +564,20 @@ export default class GameRoundManager {
     this._turn++;
     this._capture.recordTurn();
 
-    // ── TEMPORARY SCORING DIAGNOSTICS ────────────────────────────────────────
-    const capturedCards = this._capture.getAll();
-    const byType = { bright: 0, animal: 0, ribbon: 0, plain: 0 };
-    const byMonth = {};
-    for (const c of capturedCards) {
-      if (byType[c.type] !== undefined) byType[c.type]++;
-      byMonth[c.month] = (byMonth[c.month] ?? 0) + 1;
-    }
-    console.log(
-      `[Scoring T${this._turn}] captured=${capturedCards.length}`,
-      `| types:`, byType,
-      `| months:`, byMonth,
-    );
-    console.log(
-      `[Scoring T${this._turn}] evaluate() →`,
-      this._scoring.evaluate(capturedCards).map(y => `${y.name} ×${y.multiplier.toFixed(2)}`),
-    );
-    // ── END DIAGNOSTICS ───────────────────────────────────────────────────────
-
-    const allYaku         = this._scoring.evaluate(this._capture.getAll());
-    // A yaku is "new" if it wasn't present before OR if its multiplier grew
-    // by ≥0.3 (a subset bonus — Inoshikacho, Akatan, Aotan — activated).
-    // Incremental growth (+0.2 per extra card) does NOT trigger a decision.
+    const allYaku = this._scoring.evaluate(this._capture.getAll());
     // A yaku counts as "new" if its name wasn't present before, OR if its
-    // multiplier jumped by more than the largest incremental step (+0.3 for
-    // Hikari).  Subset bonuses (Inoshikacho +0.5, Akatan/Aotan +0.4) clear
-    // that bar; plain extra-card growth (+0.2 Tane/Tanzaku, +0.3 Hikari,
-    // +0.15 Kasu) does not, so it will NOT trigger a Bank/Push decision.
+    // multiplier jumped by more than the largest single incremental step
+    // (+0.3 for Hikari).  Subset bonuses (Inoshikacho +0.5, Akatan/Aotan
+    // +0.4) clear that bar; plain extra-card growth (+0.2 Tane/Tanzaku,
+    // +0.3 Hikari, +0.15 Kasu) does not → no spurious Bank/Push decision.
+    // _yakuBeforeTurn is always the previous turn's snapshot (refreshed
+    // below), so growth never accumulates across turns.
     const newYaku = allYaku.filter(y => {
       const prev = this._yakuBeforeTurn.get(y.name);
       return prev === undefined || y.multiplier - prev > 0.3;
     });
+    // Refresh baseline so next turn compares against current state, not stale state.
+    this._yakuBeforeTurn = new Map(allYaku.map(y => [y.name, y.multiplier]));
     const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
 
     // Completing a new yaku clears the push penalty regardless of outcome.
