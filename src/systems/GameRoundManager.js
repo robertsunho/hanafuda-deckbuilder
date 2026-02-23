@@ -618,10 +618,13 @@ export default class GameRoundManager {
     // _yakuBeforeTurn is always the previous turn's snapshot (refreshed
     // below), so growth never accumulates across turns.
     const newYaku = allYaku.filter(y => {
+      if (y.isSpiritBonus) return false;   // spirit bonuses never trigger Bank/Push
       const prev = this._yakuBeforeTurn.get(y.name);
       return prev === undefined || y.multiplier - prev > 0.3;
     });
     // Refresh baseline so next turn compares against current state, not stale state.
+    // Spirit bonus entries are included so their multiplier changes are tracked and
+    // don't falsely register as "new" on subsequent turns.
     this._yakuBeforeTurn = new Map(allYaku.map(y => [y.name, y.multiplier]));
     const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
 

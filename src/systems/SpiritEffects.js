@@ -5,7 +5,10 @@
 //   modifyScoring(capturedCards, allYaku) → extraYaku[]
 //     Called by ScoringEngine.evaluate() after all standard yaku have been
 //     checked.  Returns zero or more additional yaku entries to append.
-//     Entry shape: { name: string, multiplier: number, cards: object[] }
+//     Entry shape: { name: string, multiplier: number, cards: object[],
+//                    isSpiritBonus: true }
+//     The isSpiritBonus flag prevents these entries from triggering the
+//     Bank/Push yaku_decision phase in GameRoundManager.
 //
 // Spirits whose effects are entirely in-play (deal-time or round-end) appear
 // as empty stubs — they have no scoring hook but are still registered so
@@ -22,7 +25,7 @@ const _effects = {
       const months = new Set([3, 4, 5]);
       const count  = capturedCards.filter(c => months.has(c.month)).length;
       if (count === 0) return [];
-      return [{ name: 'Spring Spirit', multiplier: 1.0 + 0.3 * count, cards: [] }];
+      return [{ name: 'Spring Spirit', multiplier: 1.0 + 0.3 * count, cards: [], isSpiritBonus: true }];
     },
   },
 
@@ -31,7 +34,7 @@ const _effects = {
       const months = new Set([6, 7, 8]);
       const count  = capturedCards.filter(c => months.has(c.month)).length;
       if (count === 0) return [];
-      return [{ name: 'Summer Spirit', multiplier: 1.0 + 0.3 * count, cards: [] }];
+      return [{ name: 'Summer Spirit', multiplier: 1.0 + 0.3 * count, cards: [], isSpiritBonus: true }];
     },
   },
 
@@ -40,7 +43,7 @@ const _effects = {
       const months = new Set([9, 10, 11]);
       const count  = capturedCards.filter(c => months.has(c.month)).length;
       if (count === 0) return [];
-      return [{ name: 'Autumn Spirit', multiplier: 1.0 + 0.3 * count, cards: [] }];
+      return [{ name: 'Autumn Spirit', multiplier: 1.0 + 0.3 * count, cards: [], isSpiritBonus: true }];
     },
   },
 
@@ -49,7 +52,7 @@ const _effects = {
       const months = new Set([12, 1, 2]);
       const count  = capturedCards.filter(c => months.has(c.month)).length;
       if (count === 0) return [];
-      return [{ name: 'Winter Spirit', multiplier: 1.0 + 0.3 * count, cards: [] }];
+      return [{ name: 'Winter Spirit', multiplier: 1.0 + 0.3 * count, cards: [], isSpiritBonus: true }];
     },
   },
 
@@ -69,7 +72,7 @@ const _effects = {
       if (animals.length < 2) return [];
       if (allYaku.some(y => y.name === 'Tane')) return [];
       const multiplier = 1.3 + (animals.length - 2) * 0.1;
-      return [{ name: 'Tane (Spirit)', multiplier, cards: animals }];
+      return [{ name: 'Tane (Spirit)', multiplier, cards: animals, isSpiritBonus: true }];
     },
   },
 
@@ -84,7 +87,7 @@ const _effects = {
       if (ribbons.length < 3) return [];
       if (allYaku.some(y => y.name === 'Tanzaku')) return [];
       const multiplier = 1.3 + (ribbons.length - 3) * 0.1;
-      return [{ name: 'Tanzaku (Spirit)', multiplier, cards: ribbons }];
+      return [{ name: 'Tanzaku (Spirit)', multiplier, cards: ribbons, isSpiritBonus: true }];
     },
   },
 
@@ -99,7 +102,7 @@ const _effects = {
       if (plains.length < 4) return [];
       if (allYaku.some(y => y.name === 'Kasu')) return [];
       const multiplier = 1.3 + (plains.length - 4) * 0.1;
-      return [{ name: 'Kasu (Spirit)', multiplier, cards: plains }];
+      return [{ name: 'Kasu (Spirit)', multiplier, cards: plains, isSpiritBonus: true }];
     },
   },
 
