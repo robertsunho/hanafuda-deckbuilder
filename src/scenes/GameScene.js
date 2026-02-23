@@ -32,7 +32,7 @@ const DISCARD_Y    = 300;   // discard card centre y  (also anim target)
 const CAP_STACK_X  = DECK_X;
 const CAP_STACK_Y  = 459;   // captured card centre y
 
-// Consumable fan base (card 0 centre).  Cards 1/2 are offset by SLOT_FAN_X/Y.
+// Consumable fan base (card 0 centre).  Cards 1/2 are offset horizontally only.
 const CONS_BASE_X  = DECK_X;
 const CONS_BASE_Y  = 618;
 
@@ -364,7 +364,7 @@ export class GameScene extends Phaser.Scene {
       const cons     = consumables[i];
       const selected = this._selectedConsumableIndex === i;
       const x        = CONS_BASE_X + i * SLOT_FAN_X;
-      const y        = CONS_BASE_Y + i * SLOT_FAN_Y - (selected ? 15 : 0);
+      const y        = CONS_BASE_Y - (selected ? 15 : 0);
       const depth    = selected ? 10 : i;  // selected card pops above the stack
 
       const rarityCol = RARITY_COLOR[cons.rarity] ?? RARITY_COLOR.common;

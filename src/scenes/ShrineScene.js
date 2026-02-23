@@ -9,13 +9,13 @@
 //   Bottom centre — Meditate (escalating-cost reroll) + Continue buttons
 // ─────────────────────────────────────────────────────────────────────────────
 
-import run from '../systems/RunManager.js';
+import run, { RunManager } from '../systems/RunManager.js';
 import { spirits     } from '../data/spirits.js';
 import { consumables } from '../data/consumables.js';
 
-// ── Mirror the RunManager slot caps locally (avoids importing the class) ─────
-const MAX_SPIRIT_SLOTS     = 5;
-const MAX_CONSUMABLE_SLOTS = 3;
+// ── Slot caps sourced from RunManager so both scenes stay in sync ─────────────
+const MAX_SPIRIT_SLOTS     = RunManager.MAX_SPIRIT_SLOTS;
+const MAX_CONSUMABLE_SLOTS = RunManager.MAX_CONSUMABLE_SLOTS;
 
 // ── Rarity palette ────────────────────────────────────────────────────────────
 const RARITY_BORDER = {

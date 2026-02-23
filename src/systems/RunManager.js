@@ -217,5 +217,8 @@ class RunManager {
 
 // ── Singleton export ──────────────────────────────────────────────────────────
 // All scenes and systems import this single shared instance.
+// The class itself is also exported so callers can read static constants
+// (e.g. RunManager.MAX_SPIRIT_SLOTS) without depending on magic numbers.
 const run = new RunManager();
+export { RunManager };
 export default run;
