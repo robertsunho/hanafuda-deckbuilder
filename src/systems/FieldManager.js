@@ -186,9 +186,13 @@ export default class FieldManager {
    * Play one or more same-month cards from the player's hand onto the field.
    * All cards must share the same month.
    *
-   * Match found: all played cards are merged into the first matching slot.
-   * If the combined total reaches 4, all are immediately auto-captured.
-   * Otherwise the slot stays in 'normal' state — no pending is set.
+   * Capture rules after merging into the target slot:
+   *   • total >= 4              → capture all (full month set assembled)
+   *   • fieldCount > 0
+   *     && played === 1
+   *     && total === 2          → capture the pair (standard 1-for-1 match)
+   *   • total === 3             → leave as normal 3-stack (waiting for 4th)
+   *   • played > 1, total === 2 → leave as normal stack (placement, not match)
    *
    * No match: all played cards fill the first empty position as a new stack,
    * or are discarded if the field is full.
@@ -210,8 +214,9 @@ export default class FieldManager {
     }
 
     // Merge all same-month field slots into the first, then add played cards.
-    const target        = matchingSlots[0];
-    const allFieldCards = matchingSlots.flatMap(s => s.cards);
+    const target         = matchingSlots[0];
+    const allFieldCards  = matchingSlots.flatMap(s => s.cards);
+    const fieldCardCount = allFieldCards.length;
 
     // Null out any overflow slots (3-cap edge case from the deal).
     for (let i = 1; i < matchingSlots.length; i++) {
@@ -219,14 +224,18 @@ export default class FieldManager {
     }
 
     target.cards = [...allFieldCards, ...cards];
+    const total  = target.cards.length;
 
-    if (target.cards.length >= 4) {
+    const isPairMatch = fieldCardCount > 0 && cards.length === 1 && total === 2;
+    const isFullSet   = total >= 4;
+
+    if (isPairMatch || isFullSet) {
       const captured = [...target.cards];
       this._nullify(target);
       return { matched: true, discarded: false, captured };
     }
 
-    // Stay in 'normal' state — no pending slot for multi-card hand plays.
+    // total === 3, or multi-card placement onto empty — leave as normal stack.
     return { matched: true, discarded: false, captured: null };
   }
 
@@ -249,7 +258,10 @@ export default class FieldManager {
     );
     if (slot) {
       slot.cards.push(card);
-      if (slot.cards.length === 4) {
+      const len = slot.cards.length;
+      // Capture a pair (1+1=2) or a completed set (3+1=4).
+      // A 3-card stack (2+1) is left to wait for the 4th card.
+      if (len === 2 || len >= 4) {
         const captured = [...slot.cards];
         this._nullify(slot);
         return { discarded: false, captured };
