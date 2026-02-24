@@ -58,6 +58,7 @@ export default class GameRoundManager {
   static PLAYS_PER_ROUND = 5;   // how many hand cards the player may play
   static HAND_SIZE       = 8;   // cards dealt to the player's hand at deal time
   static FIELD_DEAL      = 8;   // cards dealt face-up to the field at deal time
+  static MAX_DISCARDS    = 2;   // free discards available per round
 
   constructor() {
     this._deck    = new DeckManager();
@@ -98,6 +99,9 @@ export default class GameRoundManager {
 
     /** Plays remaining this round (counts down from PLAYS_PER_ROUND). */
     this._playsRemaining = GameRoundManager.PLAYS_PER_ROUND;
+
+    /** Discards remaining this round (counts down from MAX_DISCARDS). */
+    this._discardsRemaining = GameRoundManager.MAX_DISCARDS;
 
     /**
      * Groups of cards that were auto-captured at round start because the
@@ -172,6 +176,8 @@ export default class GameRoundManager {
   get discardCount()   { return this._discardCount; }
   /** Plays remaining before the round ends (counts down each turn). */
   get playsRemaining() { return this._playsRemaining; }
+  /** Free discards remaining this round (counts down from MAX_DISCARDS). */
+  get discardsRemaining() { return this._discardsRemaining; }
   /** Running base capture points earned so far this round. */
   get basePoints()     { return this._basePoints; }
   /** Number of times the player has pushed this round. */
@@ -240,6 +246,7 @@ export default class GameRoundManager {
     this._discardCount       = 0;
     this._discardedThisTurn  = [];
     this._playsRemaining     = GameRoundManager.PLAYS_PER_ROUND;
+    this._discardsRemaining  = GameRoundManager.MAX_DISCARDS;
     this._basePoints         = 0;
     this._naturalCaptures    = [];
     this._atRiskScore        = 0;
@@ -405,7 +412,8 @@ export default class GameRoundManager {
     if (handCount > 0) this._hand.add(this._deck.draw(handCount));
 
     // Fewer plays available with each successive push.
-    this._playsRemaining = Math.max(2, GameRoundManager.PLAYS_PER_ROUND - this._pushCount);
+    this._playsRemaining    = Math.max(2, GameRoundManager.PLAYS_PER_ROUND - this._pushCount);
+    this._discardsRemaining = GameRoundManager.MAX_DISCARDS;
     this._phase = "idle";
 
     return { pushPenaltyPct: Math.round(this._pushPenaltyRate * 100) };
@@ -413,55 +421,34 @@ export default class GameRoundManager {
 
   /**
    * Discard selected hand cards and draw replacements from the deck.
-   * Costs 1 play (decrements _playsRemaining).
+   * Free action — costs 1 discard (decrements _discardsRemaining), NOT a play.
    * Only callable during the 'idle' phase.
    *
    * @param {string[]} cardIds  IDs of cards currently in hand to discard.
-   * @returns {{ status: 'ok'|'round_over', removed: object[], drawn: object[], ... }}
+   * @returns {{ status: 'ok', removed: object[], drawn: object[], discardsRemaining: number }}
+   * @throws {Error} if no discards remain or called outside the 'idle' phase
    */
   discardCards(cardIds) {
     if (this._phase !== "idle") {
       throw new Error(`discardCards() called while phase is "${this._phase}".`);
     }
+    if (this._discardsRemaining <= 0) {
+      throw new Error("No discards remaining.");
+    }
 
     const removed = this._hand.removeMany(cardIds);
     if (removed.length === 0) {
-      return { status: "ok", removed: [], drawn: [], playsRemaining: this._playsRemaining };
+      return { status: "ok", removed: [], drawn: [], discardsRemaining: this._discardsRemaining };
     }
 
-    this._playsRemaining--;
+    this._discardsRemaining--;
 
     // Draw replacements (capped by deck size and remaining hand capacity).
     const drawCount = Math.min(removed.length, this._deck.drawPileSize, this._hand.availableSlots);
     const drawn     = drawCount > 0 ? this._deck.draw(drawCount) : [];
     if (drawn.length > 0) this._hand.add(drawn);
 
-    const roundOver = this._hand.isEmpty() || this._playsRemaining <= 0;
-
-    if (roundOver) {
-      this._phase = "round_over";
-      const allYaku         = this._scoring.evaluate(this._capture.getAll(), this._spirits);
-      const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
-      const penaltyApplied  = this._pushPenaltyActive;
-      const finalScore      = Math.round(
-        this._basePoints * totalMultiplier * (penaltyApplied ? 0.5 : 1.0)
-      );
-      return {
-        status: "round_over",
-        removed, drawn,
-        newYaku:      [],
-        allYaku,
-        totalMultiplier,
-        basePoints:   this._basePoints,
-        finalScore,
-        penaltyApplied,
-        penaltyRate:  penaltyApplied ? this._pushPenaltyRate : 0,
-        turn:         this._turn,
-        deckCard:     null,
-      };
-    }
-
-    return { status: "ok", removed, drawn, playsRemaining: this._playsRemaining };
+    return { status: "ok", removed, drawn, discardsRemaining: this._discardsRemaining };
   }
 
   /**
@@ -520,8 +507,8 @@ export default class GameRoundManager {
 
   /**
    * Add captured cards to the capture pile and accumulate base points.
-   * Cards are worth their face `points` value (bright=20, animal=10,
-   * ribbon=5, plain=1).  A full-month capture (exactly 4 cards) earns a
+   * Cards are worth their face `points` value (bright=20, animal=12,
+   * ribbon=10, plain=3).  A full-month capture (exactly 4 cards) earns a
    * +5 bonus on top.
    *
    * @param {object[]} cards

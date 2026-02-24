@@ -178,8 +178,9 @@ export class GameScene extends Phaser.Scene {
     this.add.text(200, 18, '?', { fontSize: '13px', color: '#aaccee' }).setOrigin(0.5);
 
     // ── Turn / plays / ki ─────────────────────────────────────────────────
-    this._turnText  = this.add.text(10, 10, '', { fontSize: '13px', color: '#556677' });
-    this._playsText = this.add.text(10, 26, '', { fontSize: '13px', color: '#556677' });
+    this._turnText     = this.add.text(10, 10, '', { fontSize: '13px', color: '#556677' });
+    this._playsText    = this.add.text(10, 26, '', { fontSize: '13px', color: '#556677' });
+    this._discardsText = this.add.text(10, 42, '', { fontSize: '13px', color: '#556677' });
     this._kiText    = this.add.text(1270, 10, '', {
       fontSize: '13px', color: '#ffee88',
     }).setOrigin(1, 0);
@@ -647,15 +648,21 @@ export class GameScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(5)
     );
 
-    const discardBtn = this.add.rectangle(PLAY_CX + 90, y, 160, 40, 0x6a3a1a)
-      .setStrokeStyle(2, 0xaa7744).setInteractive({ useHandCursor: true }).setDepth(5);
-    discardBtn.on('pointerover',  () => discardBtn.setFillStyle(0x9a5a2a));
-    discardBtn.on('pointerout',   () => discardBtn.setFillStyle(0x6a3a1a));
-    discardBtn.on('pointerdown',  () => this._onDiscardButton());
+    const discardsLeft    = this._round.discardsRemaining;
+    const discardEnabled  = discardsLeft > 0;
+    const discardBtn = this.add.rectangle(PLAY_CX + 90, y, 160, 40,
+      discardEnabled ? 0x6a3a1a : 0x2a1a0a)
+      .setStrokeStyle(2, discardEnabled ? 0xaa7744 : 0x443322).setDepth(5);
+    if (discardEnabled) {
+      discardBtn.setInteractive({ useHandCursor: true });
+      discardBtn.on('pointerover',  () => discardBtn.setFillStyle(0x9a5a2a));
+      discardBtn.on('pointerout',   () => discardBtn.setFillStyle(0x6a3a1a));
+      discardBtn.on('pointerdown',  () => this._onDiscardButton());
+    }
     this._actionBtnObjs.push(discardBtn);
     this._actionBtnObjs.push(
-      this.add.text(PLAY_CX + 90, y, 'Discard', {
-        fontSize: '16px', color: '#ffffff',
+      this.add.text(PLAY_CX + 90, y, `Discard (${discardsLeft} left)`, {
+        fontSize: '15px', color: discardEnabled ? '#ffffff' : '#554433',
       }).setOrigin(0.5).setDepth(5)
     );
   }
@@ -678,17 +685,14 @@ export class GameScene extends Phaser.Scene {
       result = this._round.discardCards(cardIds);
     } catch (e) {
       console.error('[GameScene] discardCards error:', e.message);
+      this._setStatus(e.message);
+      this._renderAll();
       return;
     }
 
-    if (result.status === 'round_over') {
-      this._renderAll();
-      this._showEndScreen(result);
-    } else {
-      const n = result.removed.length;
-      this._setStatus(`Discarded ${n} card${n > 1 ? 's' : ''}  —  play your next card.`);
-      this._renderAll();
-    }
+    const n = result.removed.length;
+    this._setStatus(`Discarded ${n} card${n > 1 ? 's' : ''}  —  play your next card.`);
+    this._renderAll();
   }
 
   // ── Play a card ────────────────────────────────────────────────────────────
@@ -802,6 +806,7 @@ export class GameScene extends Phaser.Scene {
 
     this._turnText.setText(`Turn: ${this._round.turn}`);
     this._playsText.setText(`Plays: ${this._round.playsRemaining}`);
+    this._discardsText.setText(`Discards: ${this._round.discardsRemaining}`);
     this._kiText.setText(`Ki: ${run.ki}`);
 
     this._deckSprite.setVisible(drawSize > 0);
