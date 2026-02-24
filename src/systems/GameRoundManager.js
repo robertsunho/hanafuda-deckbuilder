@@ -279,8 +279,9 @@ export default class GameRoundManager {
    * Costs exactly 1 play regardless of how many cards are played.
    *
    * Match found: played cards are added to the matching field slot.
-   * If the slot reaches 4 cards they are immediately captured; otherwise the
-   * slot stays as a normal stack (no pending state).
+   * A standard 1-for-1 match (1 played onto 1 field card) sets the slot to
+   * 'pending' and defers capture to the deck-flip phase. A full set of 4 is
+   * captured immediately. All other totals stay as a normal stack.
    *
    * No match: cards fill the first empty field slot, or are discarded if full.
    *
