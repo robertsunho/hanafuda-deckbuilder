@@ -629,8 +629,19 @@ export class GameScene extends Phaser.Scene {
 
     if (!idle || count === 0) return;
 
-    const y           = 700;
-    const playEnabled = count === 1;
+    // Play is enabled only when all selected cards share the same month.
+    const allHandCards   = this._round.hand.getAll();
+    const selectedCards  = allHandCards.filter(c => this._selectedCardIds.has(c.id));
+    const mixedMonths    = selectedCards.length > 1 &&
+                           !selectedCards.every(c => c.month === selectedCards[0].month);
+    const playEnabled    = selectedCards.length > 0 && !mixedMonths;
+
+    // Show a hint when the selection spans multiple months.
+    if (mixedMonths) {
+      this._setStatus('Select cards of the same month to play.');
+    }
+
+    const y = 700;
 
     const playBtn = this.add.rectangle(PLAY_CX - 90, y, 160, 40,
       playEnabled ? 0x1a6a1a : 0x222a22)
@@ -668,10 +679,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   _onPlayButton() {
-    const [cardId] = [...this._selectedCardIds];
+    const cardIds = [...this._selectedCardIds];
     this._selectedCardIds.clear();
     this._clearObjs(this._actionBtnObjs);
-    this._playCard(cardId);
+    this._playCards(cardIds);
   }
 
   _onDiscardButton() {
@@ -695,16 +706,16 @@ export class GameScene extends Phaser.Scene {
     this._renderAll();
   }
 
-  // ── Play a card ────────────────────────────────────────────────────────────
+  // ── Play cards ─────────────────────────────────────────────────────────────
 
-  _playCard(cardId) {
+  _playCards(cardIds) {
     if (this._animating) return;
 
     let handResult;
     try {
-      handResult = this._round.playHandCard(cardId);
+      handResult = this._round.playHandCards(cardIds);
     } catch (e) {
-      console.error('[GameScene] playHandCard error:', e.message);
+      console.error('[GameScene] playHandCards error:', e.message);
       return;
     }
 
@@ -773,14 +784,16 @@ export class GameScene extends Phaser.Scene {
 
   _handleResult(result) {
     switch (result.status) {
-      case 'ok':
-        if (result.discarded.length > 0) {
-          this._setStatus('Card discarded (field full)  —  play your next card.');
+      case 'ok': {
+        const nd = result.discarded.length;
+        if (nd > 0) {
+          this._setStatus(`${nd} card${nd > 1 ? 's' : ''} discarded (field full)  —  play your next card.`);
         } else {
           this._setStatus(`Deck: ${result.deckCard ? result.deckCard.name : '—'}  —  play your next card.`);
         }
         this._renderAll();
         break;
+      }
       case 'yaku_decision':
         this._renderAll();
         this._showYakuDecision(result);

@@ -28,8 +28,8 @@
 // Turn is split into two callable phases so the UI can animate them
 // separately:
 //
-//   playHandCard(cardId) → { status: 'awaiting_deck', handCard, matched,
-//                             autoCaptured, discarded }
+//   playHandCards(cardIds) → { status: 'awaiting_deck', handCards, matched,
+//                               autoCaptured, discarded }
 //     Removes the card from hand, applies the hand phase, sets phase to
 //     'awaiting_deck'.  The UI re-renders the board (pending match visible)
 //     before continuing.
@@ -271,29 +271,52 @@ export default class GameRoundManager {
   }
 
   /**
-   * Phase 1 of a turn: remove a card from the player's hand and apply it to
-   * the field (hand phase only — the deck is NOT flipped yet).
+   * Phase 1 of a turn: remove one or more same-month cards from the player's
+   * hand and apply them to the field (hand phase only — the deck is NOT
+   * flipped yet).
    *
-   * After this call the field will show the pending-match slot (gold tint) if
-   * the card matched, giving the UI a chance to re-render before the deck flip.
+   * All cards in cardIds must be in the hand and share the same month.
+   * Costs exactly 1 play regardless of how many cards are played.
    *
-   * @param {string} cardId  id of a card currently in the player's hand
-   * @returns {{ status: 'awaiting_deck', handCard: object,
+   * Match found: played cards are added to the matching field slot.
+   * If the slot reaches 4 cards they are immediately captured; otherwise the
+   * slot stays as a normal stack (no pending state).
+   *
+   * No match: cards fill the first empty field slot, or are discarded if full.
+   *
+   * @param {string[]} cardIds  IDs of cards in the player's hand to play.
+   * @returns {{ status: 'awaiting_deck', handCards: object[],
    *             matched: boolean, autoCaptured: boolean, discarded: object[] }}
-   * @throws {Error} if called outside the 'idle' phase, or if cardId not in hand
+   * @throws {Error} if called outside the 'idle' phase, or validation fails
    */
-  playHandCard(cardId) {
+  playHandCards(cardIds) {
     if (this._phase !== "idle") {
       throw new Error(
-        `playHandCard() called while phase is "${this._phase}".` +
+        `playHandCards() called while phase is "${this._phase}".` +
         (this._phase === "round_over" ? " The round is over." : "")
       );
     }
-
-    const card = this._hand.remove(cardId);
-    if (!card) {
-      throw new Error(`Card "${cardId}" is not in the player's hand.`);
+    if (!cardIds || cardIds.length === 0) {
+      throw new Error("playHandCards() requires at least one card ID.");
     }
+
+    // Validate all cards are in hand.
+    const handMap = new Map(this._hand.getAll().map(c => [c.id, c]));
+    const cards   = cardIds.map(id => {
+      const card = handMap.get(id);
+      if (!card) throw new Error(`Card "${id}" is not in the player's hand.`);
+      return card;
+    });
+
+    // Validate same month.
+    const month = cards[0].month;
+    if (cards.some(c => c.month !== month)) {
+      const months = [...new Set(cards.map(c => c.month))].join(", ");
+      throw new Error(`All played cards must share the same month (got months: ${months}).`);
+    }
+
+    // Remove all played cards from hand.
+    this._hand.removeMany(cardIds);
 
     // Count this play against the round limit.
     this._playsRemaining--;
@@ -305,24 +328,26 @@ export default class GameRoundManager {
 
     this._discardedThisTurn = [];   // reset each turn
 
-    const handResult = this._field.playHandCard(card);
+    const handResult = this._field.playHandCards(cards);
     if (handResult.captured) {
-      // 4-card auto-capture assembled during the hand phase.
+      // All 4 cards of the month assembled — capture immediately.
       this._addCapture(handResult.captured);
     } else if (handResult.discarded) {
-      // Hand card couldn't land — field was full and no match.
-      this._discardedThisTurn.push(card);
-      this._discardCount++;
+      // No room on the field — all played cards are lost.
+      for (const card of cards) {
+        this._discardedThisTurn.push(card);
+        this._discardCount++;
+      }
     }
 
     this._phase = "awaiting_deck";
 
     return {
       status:       "awaiting_deck",
-      handCard:     card,
+      handCards:    cards,
       matched:      handResult.matched,
       autoCaptured: handResult.captured != null,
-      discarded:    handResult.discarded ? [card] : [],
+      discarded:    handResult.discarded ? [...cards] : [],
       basePoints:   this._basePoints,
     };
   }

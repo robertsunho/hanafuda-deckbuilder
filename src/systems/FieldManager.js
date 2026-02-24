@@ -180,6 +180,56 @@ export default class FieldManager {
     return { matched: true, discarded: false, captured: null };
   }
 
+  // ── Hand-card phase (multi-card) ───────────────────────────────────────────
+
+  /**
+   * Play one or more same-month cards from the player's hand onto the field.
+   * All cards must share the same month.
+   *
+   * Match found: all played cards are merged into the first matching slot.
+   * If the combined total reaches 4, all are immediately auto-captured.
+   * Otherwise the slot stays in 'normal' state — no pending is set.
+   *
+   * No match: all played cards fill the first empty position as a new stack,
+   * or are discarded if the field is full.
+   *
+   * @param {object[]} cards  One or more cards sharing the same month.
+   * @returns {{ matched: boolean, discarded: boolean, captured: object[]|null }}
+   */
+  playHandCards(cards) {
+    const month         = cards[0].month;
+    const matchingSlots = this.getSlotsForMonth(month);
+
+    if (matchingSlots.length === 0) {
+      const idx = this._firstEmptyIndex();
+      if (idx === -1) {
+        return { matched: false, discarded: true, captured: null };
+      }
+      this._placeAt(idx, { month, cards: [...cards], state: 'normal' });
+      return { matched: false, discarded: false, captured: null };
+    }
+
+    // Merge all same-month field slots into the first, then add played cards.
+    const target        = matchingSlots[0];
+    const allFieldCards = matchingSlots.flatMap(s => s.cards);
+
+    // Null out any overflow slots (3-cap edge case from the deal).
+    for (let i = 1; i < matchingSlots.length; i++) {
+      this._nullify(matchingSlots[i]);
+    }
+
+    target.cards = [...allFieldCards, ...cards];
+
+    if (target.cards.length >= 4) {
+      const captured = [...target.cards];
+      this._nullify(target);
+      return { matched: true, discarded: false, captured };
+    }
+
+    // Stay in 'normal' state — no pending slot for multi-card hand plays.
+    return { matched: true, discarded: false, captured: null };
+  }
+
   // ── Deck-flip phase ────────────────────────────────────────────────────────
 
   /**
