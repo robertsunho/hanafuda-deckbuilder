@@ -259,9 +259,9 @@ export default class FieldManager {
     if (slot) {
       slot.cards.push(card);
       const len = slot.cards.length;
-      // Capture a pair (1+1=2) or a completed set (3+1=4).
-      // A 3-card stack (2+1) is left to wait for the 4th card.
-      if (len === 2 || len >= 4) {
+      // Only capture when the full 4-card set is assembled.
+      // Pairs and 3-stacks accumulate on the field until the 4th card arrives.
+      if (len >= 4) {
         const captured = [...slot.cards];
         this._nullify(slot);
         return { discarded: false, captured };
