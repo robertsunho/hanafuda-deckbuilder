@@ -230,19 +230,17 @@ export default class GameRoundManager {
    *             flow, basePoints, finalScore }}
    */
   getCurrentScoring() {
-    const allYaku         = this._scoring.evaluate(this._capture.getAll(), this._spirits);
-    const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
     // Live estimate: assume best-case (no pending failure) for HUD display.
     const pushFactor = Math.min(1.5, 1.0 + this._pushCount * 0.1);
     const flow       = Math.max(1.0, this._styleBase * pushFactor);
+    const sc = this._scoring.calculateFinalScore(this._capture.getAll(), this._spirits, flow);
     return {
-      allYaku,
-      totalMultiplier,
+      ...sc,
+      allYaku:         sc.yakuList,
+      totalMultiplier: sc.yakuMult,
+      basePoints:      sc.boostedBasePoints,
       pushFactor,
-      styleBase:  this._styleBase,
-      flow,
-      basePoints: this._basePoints,
-      finalScore: Math.round(this._basePoints * totalMultiplier * flow),
+      styleBase:       this._styleBase,
     };
   }
 
@@ -349,7 +347,7 @@ export default class GameRoundManager {
 
     // Snapshot active yaku (name → multiplier) so _finalizeTurn() can diff.
     this._yakuBeforeTurn = new Map(
-      this._scoring.evaluate(this._capture.getAll(), this._spirits).map(y => [y.name, y.multiplier])
+      this._scoring.evaluate(this._capture.getAll()).map(y => [y.name, y.multiplier])
     );
 
     this._discardedThisTurn = [];   // reset each turn
@@ -410,29 +408,26 @@ export default class GameRoundManager {
     if (this._phase !== "yaku_decision") {
       throw new Error(`bankScore() called while phase is "${this._phase}".`);
     }
-    const allYaku         = this._scoring.evaluate(this._capture.getAll(), this._spirits);
-    const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
     // Banking counts as a successful outcome — Push Factor is positive.
     const pushFactor = Math.min(1.5, 1.0 + this._pushCount * 0.1);
     const flow       = Math.max(1.0, this._styleBase * pushFactor);
-    const finalScore = Math.round(this._basePoints * totalMultiplier * flow);
+    const sc = this._scoring.calculateFinalScore(this._capture.getAll(), this._spirits, flow);
     this._roundEndingAfterDecision = false;
     this._phase = "round_over";
     return {
-      status:         "banked",
-      newYaku:        [],
-      allYaku,
-      totalMultiplier,
+      status:          "banked",
+      newYaku:         [],
+      ...sc,
+      allYaku:         sc.yakuList,
+      totalMultiplier: sc.yakuMult,
+      basePoints:      sc.boostedBasePoints,
       pushFactor,
-      styleBase:      this._styleBase,
-      flow,
-      basePoints:     this._basePoints,
-      finalScore,
-      penaltyApplied: false,
-      pushCount:      this._pushCount,
-      pigDoubleKi:    this._pigDoubleKi,
-      turn:           this._turn,
-      deckCard:       this._lastDeckCard,
+      styleBase:       this._styleBase,
+      penaltyApplied:  false,
+      pushCount:       this._pushCount,
+      pigDoubleKi:     this._pigDoubleKi,
+      turn:            this._turn,
+      deckCard:        this._lastDeckCard,
     };
   }
 
@@ -458,7 +453,7 @@ export default class GameRoundManager {
     this._roundEndingAfterDecision = false;
     this._pushCount++;
 
-    const allYaku         = this._scoring.evaluate(this._capture.getAll(), this._spirits);
+    const allYaku         = this._scoring.evaluate(this._capture.getAll());
     const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
     this._atRiskScore       = Math.round(this._basePoints * totalMultiplier);
     this._pushPenaltyActive = true;
@@ -658,24 +653,18 @@ export default class GameRoundManager {
     this._turn++;
     this._capture.recordTurn();
 
-    const allYaku = this._scoring.evaluate(this._capture.getAll(), this._spirits);
+    // Evaluate yaku (spirits excluded) for the Bank/Push new-yaku diff.
     // A yaku counts as "new" if its name wasn't present before, OR if its
     // multiplier jumped by more than the largest single incremental step
     // (+0.3 for Hikari).  Subset bonuses (Inoshikacho +0.5, Akatan/Aotan
     // +0.4) clear that bar; plain extra-card growth (+0.2 Tane/Tanzaku,
     // +0.3 Hikari, +0.15 Kasu) does not → no spurious Bank/Push decision.
-    // _yakuBeforeTurn is always the previous turn's snapshot (refreshed
-    // below), so growth never accumulates across turns.
-    const newYaku = allYaku.filter(y => {
-      if (y.isSpiritBonus) return false;   // spirit bonuses never trigger Bank/Push
+    const yakuForDiff = this._scoring.evaluate(this._capture.getAll());
+    const newYaku = yakuForDiff.filter(y => {
       const prev = this._yakuBeforeTurn.get(y.name);
       return prev === undefined || y.multiplier - prev > 0.3;
     });
-    // Refresh baseline so next turn compares against current state, not stale state.
-    // Spirit bonus entries are included so their multiplier changes are tracked and
-    // don't falsely register as "new" on subsequent turns.
-    this._yakuBeforeTurn = new Map(allYaku.map(y => [y.name, y.multiplier]));
-    const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
+    this._yakuBeforeTurn = new Map(yakuForDiff.map(y => [y.name, y.multiplier]));
 
     // Completing a new yaku clears the push penalty regardless of outcome.
     if (newYaku.length > 0) this._pushPenaltyActive = false;
@@ -693,11 +682,11 @@ export default class GameRoundManager {
       ? Math.max(0.5, 1.0 - this._pushCount * 0.1)
       : Math.min(1.5, 1.0 + this._pushCount * 0.1);
 
-    // ── Flow ─────────────────────────────────────────────────────────────────
-    // Flow = Style Base × Push Factor, floored at 1.0 so the player always
-    // scores at least Base Points × Yaku Multiplier.
-    const flow       = Math.max(1.0, this._styleBase * pushFactor);
-    const finalScore = Math.round(this._basePoints * totalMultiplier * flow);
+    // ── Flow = Style Base × Push Factor, floored at 1.0 ─────────────────────
+    const flow = Math.max(1.0, this._styleBase * pushFactor);
+
+    // ── Full three-channel score ──────────────────────────────────────────────
+    const sc = this._scoring.calculateFinalScore(this._capture.getAll(), this._spirits, flow);
 
     // For the Bank/Push decision overlay: what Flow would result if the NEXT
     // push also fails?  Used by the UI to show the downside risk.
@@ -723,21 +712,20 @@ export default class GameRoundManager {
     return {
       status,
       newYaku,
-      allYaku,
-      totalMultiplier,
+      ...sc,
+      allYaku:         sc.yakuList,
+      totalMultiplier: sc.yakuMult,
+      basePoints:      sc.boostedBasePoints,
       pushFactor,
-      styleBase:           this._styleBase,
-      flow,
-      basePoints:          this._basePoints,
-      finalScore,
+      styleBase:       this._styleBase,
       penaltyApplied,
-      pushCount:           this._pushCount,
-      pigDoubleKi:         this._pigDoubleKi,
+      pushCount:       this._pushCount,
+      pigDoubleKi:     this._pigDoubleKi,
       nextFailFlow,
-      turn:                this._turn,
-      deckCard:            this._lastDeckCard,
-      discarded:           [...this._discardedThisTurn],
-      roundDiscardCount:   this._discardCount,
+      turn:            this._turn,
+      deckCard:        this._lastDeckCard,
+      discarded:       [...this._discardedThisTurn],
+      roundDiscardCount: this._discardCount,
     };
   }
 }

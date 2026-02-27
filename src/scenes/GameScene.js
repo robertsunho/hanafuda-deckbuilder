@@ -816,8 +816,20 @@ export class GameScene extends Phaser.Scene {
     const drawSize     = this._round.deck.drawPileSize;
     const discardCount = this._round.discardCount;
 
-    this._baseText.setText(`Base: ${sc.basePoints}`);
-    this._multiText.setText(`\xD7${sc.totalMultiplier.toFixed(2)} yaku  \xD7${sc.flow.toFixed(2)} flow`);
+    // Base line — show point-boost detail when active (ratio differs from 1.0).
+    const ptBoostActive = Math.abs(sc.pointBoost - 1.0) > 0.001;
+    const baseStr = ptBoostActive
+      ? `Base: ${sc.rawBasePoints} (\xD7${sc.pointBoost.toFixed(2)} = ${sc.boostedBasePoints})`
+      : `Base: ${sc.boostedBasePoints}`;
+    this._baseText.setText(baseStr);
+
+    // Mult line — show additive and multiplicative spirit channels when active.
+    let multStr = `\xD7${sc.yakuMult.toFixed(2)} yaku`;
+    if (sc.additiveMult !== 0)        multStr += `  +${sc.additiveMult.toFixed(2)} spirit`;
+    if (Math.abs(sc.multMult - 1.0) > 0.001) multStr += `  \xD7${sc.multMult.toFixed(2)} mm`;
+    multStr += `  \xD7${sc.flow.toFixed(2)} flow`;
+    this._multiText.setText(multStr);
+
     this._projText.setText(`= ${sc.finalScore}`);
     this._thresholdText.setText(`Target: ${run.threshold}`);
 
@@ -870,12 +882,16 @@ export class GameScene extends Phaser.Scene {
 
     // ── Score breakdown ───────────────────────────────────────────────────
     let y = cy - 204;
+
+    // Base — show point-boost detail when active.
+    const ptBoostActive = Math.abs(result.pointBoost - 1.0) > 0.001;
+    const baseLabel = ptBoostActive
+      ? `Base: ${result.rawBasePoints}  (\xD7${result.pointBoost.toFixed(2)} pt boost \u2192 ${result.boostedBasePoints})`
+      : `Base: ${result.boostedBasePoints}`;
     this._overlayObjs.push(
-      this.add.text(cx, y, `Base Points: ${result.basePoints}`, {
-        fontSize: '18px', color: '#aaccee',
-      }).setOrigin(0.5)
+      this.add.text(cx, y, baseLabel, { fontSize: '17px', color: '#aaccee' }).setOrigin(0.5)
     );
-    y += 28;
+    y += 26;
 
     if (result.allYaku.length === 0) {
       this._overlayObjs.push(
@@ -891,27 +907,32 @@ export class GameScene extends Phaser.Scene {
             fontSize: '16px', color: '#cce0ff',
           }).setOrigin(0.5)
         );
-        y += 24;
+        y += 22;
       }
     }
-    y += 8;
+    y += 6;
 
+    // Multiplier line — show all three channels.
+    let multLabel = `\xD7${result.yakuMult.toFixed(2)} yaku`;
+    if (result.additiveMult !== 0)
+      multLabel += `  +${result.additiveMult.toFixed(2)} spirit`;
+    if (Math.abs(result.multMult - 1.0) > 0.001)
+      multLabel += `  \xD7${result.multMult.toFixed(2)} mm`;
+    multLabel += `  = \xD7${result.effectiveMult.toFixed(2)} eff.`;
     this._overlayObjs.push(
-      this.add.text(cx, y, `Yaku Multiplier: \xD7${result.totalMultiplier.toFixed(2)}`, {
-        fontSize: '17px', color: '#ffee88',
-      }).setOrigin(0.5)
+      this.add.text(cx, y, multLabel, { fontSize: '15px', color: '#ffee88' }).setOrigin(0.5)
     );
-    y += 26;
+    y += 24;
 
     const flowLabel = result.penaltyApplied
       ? `\u26A0 Flow: \xD7${result.flow.toFixed(2)}  (Style \xD7${result.styleBase.toFixed(2)} \xD7 Push \xD7${result.pushFactor.toFixed(1)})  [penalty]`
       : `Flow: \xD7${result.flow.toFixed(2)}  (Style \xD7${result.styleBase.toFixed(2)} \xD7 Push \xD7${result.pushFactor.toFixed(1)})`;
     this._overlayObjs.push(
       this.add.text(cx, y, flowLabel, {
-        fontSize: '14px', color: result.penaltyApplied ? '#ff8866' : '#88ddaa',
+        fontSize: '13px', color: result.penaltyApplied ? '#ff8866' : '#88ddaa',
       }).setOrigin(0.5)
     );
-    y += 26;
+    y += 24;
 
     this._overlayObjs.push(
       this.add.text(cx, y, `Final Score: ${result.finalScore}`, {
@@ -1070,11 +1091,20 @@ export class GameScene extends Phaser.Scene {
       y += 23;
     }
     y += 6;
+    // Formula line: show non-default channels only.
+    let formulaParts = [`Base ${result.boostedBasePoints}`];
+    if (Math.abs(result.pointBoost - 1.0) > 0.001)
+      formulaParts[0] += ` (\xD7${result.pointBoost.toFixed(2)} pt)`;
+    let multPart = `\xD7${result.yakuMult.toFixed(2)}`;
+    if (result.additiveMult !== 0) multPart += `+${result.additiveMult.toFixed(2)}`;
+    formulaParts.push(multPart);
+    if (Math.abs(result.multMult - 1.0) > 0.001)
+      formulaParts.push(`\xD7${result.multMult.toFixed(2)} mm`);
+    formulaParts.push(`\xD7${result.flow.toFixed(2)} flow`);
+    formulaParts.push(`= ${result.finalScore} pts`);
     this._overlayObjs.push(
-      this.add.text(cx, y,
-        `Base ${result.basePoints}  \xD7  yaku ${result.totalMultiplier.toFixed(2)}  \xD7  flow ${result.flow.toFixed(2)}  =  ${result.finalScore} pts`,
-        { fontSize: '13px', color: '#cce0ff' }
-      ).setOrigin(0.5).setDepth(25)
+      this.add.text(cx, y, formulaParts.join('  '), { fontSize: '13px', color: '#cce0ff' })
+        .setOrigin(0.5).setDepth(25)
     );
 
     const btnY = cy + 86;
