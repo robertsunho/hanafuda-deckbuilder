@@ -1,60 +1,43 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// ShrineScene — between-round shop where the player spends ki on spirits and
-// consumables.
+// ShrineScene — between-round shop
+//
+// Appears after every round the player passes.  Two variants:
+//   isGrove=false  "Wayside Shrine"  — Spirits + 3 placeholder sections
+//   isGrove=true   "The Sacred Grove" — same + Spirit Fusion placeholder
 //
 // Layout (1280 × 720):
-//   Top bar       — title (Shrine / Sacred Grove), round, ki balance
-//   Left half     — Spirit Altar: 3 weighted-random offer cards + loadout row
-//   Right half    — Offering Table: 3 weighted-random consumable cards + held row
-//   Bottom centre — Meditate (escalating-cost reroll) + Continue buttons
+//   Header        [y 0–64]      title, act/round, ki balance
+//   Left column   [x 0–640]     Spirits section: offer cards + loadout
+//   Right column  [x 640–1280]  Placeholder sections stacked evenly
+//   Footer        [y ~668–720]  Continue / Enter the Forest button
+//
+// The full scene is rebuilt (children.removeAll) after every purchase so all
+// state (ki balance, loadout, button affordability) updates automatically.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import run, { RunManager } from '../systems/RunManager.js';
-import { spirits     } from '../data/spirits.js';
-import { consumables } from '../data/consumables.js';
+import { SPIRIT_CATALOG }  from '../data/spirits.js';
 
-// ── Slot caps sourced from RunManager so both scenes stay in sync ─────────────
-const MAX_SPIRIT_SLOTS     = RunManager.MAX_SPIRIT_SLOTS;
-const MAX_CONSUMABLE_SLOTS = RunManager.MAX_CONSUMABLE_SLOTS;
-
-// ── Rarity palette ────────────────────────────────────────────────────────────
-const RARITY_BORDER = {
-  common:    0x667788,
-  uncommon:  0x44aa44,
-  rare:      0x4488ff,
-  legendary: 0xddaa22,
+// ── Channel badge display ──────────────────────────────────────────────────────
+const CHANNEL_BADGE = {
+  point:          { label: 'POINT',   bgColor: 0x1a3a88, textColor: '#88aaff' },
+  additive:       { label: 'MULT+',   bgColor: 0x7a5500, textColor: '#ffdd44' },
+  multiplicative: { label: 'MULT\xD7', bgColor: 0x882222, textColor: '#ff8888' },
 };
-const RARITY_TEXT = {
-  common:    '#889aaa',
-  uncommon:  '#88dd88',
-  rare:      '#88aaff',
-  legendary: '#ffcc44',
-};
-
-// Weighted selection probability (relative, not summing to 1).
-const RARITY_WEIGHT = { common: 50, uncommon: 30, rare: 15, legendary: 5 };
 
 // ── Layout constants ──────────────────────────────────────────────────────────
-const OFFER_SLOTS  = 3;     // cards shown per section per visit
+const HEADER_H  = 64;   // height of the top bar
+const LCX       = 320;  // left column center x
+const RCX       = 960;  // right column center x
+const DIV_X     = 640;  // vertical divider between columns
 
-const LEFT_CX   = 320;     // horizontal centre of spirit section
-const RIGHT_CX  = 960;     // horizontal centre of consumable section
-const DIVIDER_X = 640;     // vertical divider between sections
+const CARD_W    = 158;  // spirit offer card width
+const CARD_H    = 204;  // spirit offer card height
+const CARD_GAP  = 14;   // gap between cards in the offer row
 
-const CARD_W    = 155;
-const CARD_H    = 205;
-const CARD_STEP = CARD_W + 18;   // centre-to-centre x spacing for offer cards
-// Offer card row:  i=0 → cx−step, i=1 → cx, i=2 → cx+step
+const CARD_ROW_Y = 278; // vertical center of the spirit offer card row
 
-const SMALL_W    = 108;
-const SMALL_H    = 68;
-const SMALL_STEP = SMALL_W + 10;
-
-const TOP_BAR_H   = 60;
-const OFFER_Y     = 250;   // vertical centre of offer card row
-const SECTION_DIV = 390;   // y of the divider between offers and loadout
-const LOADOUT_Y   = 460;   // vertical centre of the small loadout cards
-const BTN_Y       = 648;   // y of bottom action buttons
+const BTN_Y     = 690;  // continue button center y
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -65,360 +48,305 @@ export class ShrineScene extends Phaser.Scene {
   }
 
   create() {
-    const { isGrove }          = this.scene.settings.data || {};
-    this._isGrove              = isGrove ?? false;
-    this._meditateCount        = 0;
-    this._spiritPurchased      = new Array(OFFER_SLOTS).fill(false);
-    this._consumablePurchased  = new Array(OFFER_SLOTS).fill(false);
-
-    this._rollOffers();
+    const { isGrove } = this.scene.settings.data || {};
+    this._isGrove     = isGrove ?? false;
+    this._offering    = this._generateOffering();
+    this._purchased   = new Array(this._offering.length).fill(false);
     this._buildUI();
   }
 
-  // ── Offer rolling ─────────────────────────────────────────────────────────
-
-  _rollOffers() {
-    // Filter spirits already in the loadout so they are never offered twice.
-    const equippedIds    = new Set(run.spirits.map(s => s.id));
-    const availableSpirits = spirits.filter(s => !equippedIds.has(s.id));
-
-    this._offeredSpirits      = this._weightedSample(availableSpirits, OFFER_SLOTS);
-    this._offeredConsumables  = this._weightedSample(consumables, OFFER_SLOTS);
-
-    this._spiritPurchased     = new Array(OFFER_SLOTS).fill(false);
-    this._consumablePurchased = new Array(OFFER_SLOTS).fill(false);
-  }
+  // ── Offer generation ─────────────────────────────────────────────────────
 
   /**
-   * Weighted random sample without replacement.
-   * Common=50 / Uncommon=30 / Rare=15 / Legendary=5.
-   * Returns fewer items than requested when the pool is smaller.
-   *
-   * @param {object[]} pool
-   * @param {number}   count
-   * @returns {object[]}
+   * Filter SPIRIT_CATALOG by tier and owned status, then pick up to 3 at random.
+   * @returns {object[]}  0–3 spirit definitions from SPIRIT_CATALOG.
    */
-  _weightedSample(pool, count) {
-    const result    = [];
-    const remaining = [...pool];
-
-    while (result.length < count && remaining.length > 0) {
-      const totalWeight = remaining.reduce(
-        (sum, item) => sum + (RARITY_WEIGHT[item.rarity] ?? 10), 0
-      );
-      let roll   = Math.random() * totalWeight;
-      let chosen = remaining[remaining.length - 1];
-
-      for (let i = 0; i < remaining.length; i++) {
-        roll -= (RARITY_WEIGHT[remaining[i].rarity] ?? 10);
-        if (roll <= 0) { chosen = remaining[i]; break; }
-      }
-
-      result.push(chosen);
-      remaining.splice(remaining.indexOf(chosen), 1);
-    }
-
-    return result;
+  _generateOffering() {
+    const ownedIds = new Set(run.spirits.map(s => s.id));
+    const pool     = SPIRIT_CATALOG.filter(
+      s => s.tier <= run.act && !ownedIds.has(s.id)
+    );
+    // Simple random sample without replacement.
+    return [...pool].sort(() => Math.random() - 0.5).slice(0, 3);
   }
 
-  // ── UI build / rebuild ────────────────────────────────────────────────────
+  // ── UI construction ──────────────────────────────────────────────────────
 
-  /**
-   * Tear down and redraw the entire scene.
-   * Called on create, on purchase, and on meditate.
-   */
   _buildUI() {
     this.children.removeAll(true);
-
-    this._drawBackground();
-    this._drawTopBar();
-    this._drawSectionLabels();
-    this._drawOfferCards();
-    this._drawLoadouts();
-    this._drawBottomButtons();
+    this._drawBg();
+    this._drawHeader();
+    this._drawSpiritsSection();
+    this._drawRightColumn();
+    this._drawContinueButton();
   }
 
-  // ── Background ────────────────────────────────────────────────────────────
-
-  _drawBackground() {
-    // Base fill
+  _drawBg() {
     this.add.rectangle(640, 360, 1280, 720, 0x060c18);
-    // Subtle vertical divider between sections
-    this.add.rectangle(DIVIDER_X, 390, 1, 660, 0x1e2d40);
+    // Subtle divider between columns.
+    this.add.rectangle(DIV_X, 360, 1, 720, 0x1e2d40);
   }
 
-  // ── Top bar ───────────────────────────────────────────────────────────────
+  // ── Header ────────────────────────────────────────────────────────────────
 
-  _drawTopBar() {
-    this.add.rectangle(640, TOP_BAR_H / 2, 1280, TOP_BAR_H, 0x0a1628);
-    this.add.rectangle(640, TOP_BAR_H,     1280, 1,         0x2a3a50);
+  _drawHeader() {
+    this.add.rectangle(640, HEADER_H / 2, 1280, HEADER_H, 0x0a1628);
+    this.add.rectangle(640, HEADER_H,     1280, 1,         0x2a3a50);
 
-    const isGrove = this._isGrove;
-    this.add.text(640, TOP_BAR_H / 2,
-      isGrove ? 'Sacred Grove' : 'Shrine',
-      {
-        fontSize: '24px',
-        color:    isGrove ? '#ffcc44' : '#e8c96a',
-        stroke: '#000000', strokeThickness: 3,
-      }
-    ).setOrigin(0.5);
+    const title      = this._isGrove ? 'The Sacred Grove' : 'Wayside Shrine';
+    const titleColor = this._isGrove ? '#ffcc44' : '#e8c96a';
+    this.add.text(640, HEADER_H / 2, title, {
+      fontSize: '24px', color: titleColor,
+      stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5);
 
-    this.add.text(20, TOP_BAR_H / 2,
+    this.add.text(16, HEADER_H / 2,
       `Act ${run.act}  —  Round ${run.round}`,
       { fontSize: '14px', color: '#556677' }
     ).setOrigin(0, 0.5);
 
-    this.add.text(1260, TOP_BAR_H / 2,
+    this.add.text(1264, HEADER_H / 2,
       `Ki: ${run.ki}`,
       { fontSize: '17px', color: '#ffee88', stroke: '#000000', strokeThickness: 2 }
     ).setOrigin(1, 0.5);
   }
 
-  // ── Section labels + loadout headers ─────────────────────────────────────
+  // ── Left column: Spirits section (functional) ────────────────────────────
 
-  _drawSectionLabels() {
-    this.add.text(LEFT_CX,  78, 'Spirit Altar',   { fontSize: '15px', color: '#aaccee' }).setOrigin(0.5);
-    this.add.text(RIGHT_CX, 78, 'Offering Table', { fontSize: '15px', color: '#aaccee' }).setOrigin(0.5);
+  _drawSpiritsSection() {
+    const cx = LCX;
 
-    // Horizontal dividers above the loadout rows
-    this.add.rectangle(LEFT_CX,  SECTION_DIV, 580, 1, 0x1e2d40);
-    this.add.rectangle(RIGHT_CX, SECTION_DIV, 580, 1, 0x1e2d40);
-
-    this.add.text(LEFT_CX,  SECTION_DIV + 8, 'Equipped Spirits',  { fontSize: '11px', color: '#445566' }).setOrigin(0.5, 0);
-    this.add.text(RIGHT_CX, SECTION_DIV + 8, 'Held Consumables',  { fontSize: '11px', color: '#445566' }).setOrigin(0.5, 0);
-
-    // "Slots full" warnings
-    if (run.spirits.length >= MAX_SPIRIT_SLOTS) {
-      this.add.text(LEFT_CX, 98, 'Spirit slots full', { fontSize: '11px', color: '#cc4444' }).setOrigin(0.5);
-    }
-    if (run.consumables.length >= MAX_CONSUMABLE_SLOTS) {
-      this.add.text(RIGHT_CX, 98, 'Consumable slots full', { fontSize: '11px', color: '#cc4444' }).setOrigin(0.5);
-    }
-  }
-
-  // ── Offer cards ───────────────────────────────────────────────────────────
-
-  _drawOfferCards() {
-    const spiritsFull     = run.spirits.length     >= MAX_SPIRIT_SLOTS;
-    const consumablesFull = run.consumables.length  >= MAX_CONSUMABLE_SLOTS;
-
-    this._offeredSpirits.forEach((spirit, i) => {
-      const cx = LEFT_CX + (i - 1) * CARD_STEP;
-      this._drawOfferCard(cx, OFFER_Y, spirit,
-        this._spiritPurchased[i], spiritsFull,
-        () => this._purchaseSpirit(i));
-    });
-
-    if (this._offeredSpirits.length === 0) {
-      this.add.text(LEFT_CX, OFFER_Y, 'All spirits acquired.', { fontSize: '14px', color: '#445566' }).setOrigin(0.5);
-    }
-
-    this._offeredConsumables.forEach((consumable, i) => {
-      const cx = RIGHT_CX + (i - 1) * CARD_STEP;
-      this._drawOfferCard(cx, OFFER_Y, consumable,
-        this._consumablePurchased[i], consumablesFull,
-        () => this._purchaseConsumable(i));
-    });
-  }
-
-  /**
-   * Draw a single shop offer card.
-   *
-   * @param {number}   cx
-   * @param {number}   cy
-   * @param {object}   item       spirit or consumable definition
-   * @param {boolean}  purchased  already bought this reroll
-   * @param {boolean}  slotsFull  player's slot category is full
-   * @param {Function} onBuy      called when the player clicks to purchase
-   */
-  _drawOfferCard(cx, cy, item, purchased, slotsFull, onBuy) {
-    const canAfford  = run.ki >= item.cost;
-    const buyable    = !purchased && !slotsFull && canAfford;
-    const dimmed     = purchased || slotsFull;
-    const cardAlpha  = dimmed ? 0.45 : 1.0;
-
-    const borderColor = RARITY_BORDER[item.rarity] ?? RARITY_BORDER.common;
-    const bgColor     = dimmed ? 0x0c1520 : 0x0f1e30;
-
-    // Card background / hit area
-    const bg = this.add.rectangle(cx, cy, CARD_W, CARD_H, bgColor)
-      .setStrokeStyle(2, borderColor)
-      .setAlpha(cardAlpha);
-
-    if (buyable) {
-      bg.setInteractive({ useHandCursor: true });
-      bg.on('pointerover', () => bg.setFillStyle(0x1a2d45));
-      bg.on('pointerout',  () => bg.setFillStyle(bgColor));
-      bg.on('pointerdown', onBuy);
-    }
-
-    const half = CARD_H / 2;
-
-    // Name
-    this.add.text(cx, cy - half + 12, item.name, {
-      fontSize: '13px', color: '#e8e8e8',
-      wordWrap: { width: CARD_W - 16 }, align: 'center',
-    }).setOrigin(0.5, 0).setAlpha(cardAlpha);
-
-    // Rarity label
-    this.add.text(cx, cy - half + 30, item.rarity, {
-      fontSize: '10px', color: RARITY_TEXT[item.rarity] ?? RARITY_TEXT.common,
-    }).setOrigin(0.5, 0).setAlpha(cardAlpha);
-
-    // Description
-    this.add.text(cx, cy - 20, item.description, {
-      fontSize: '11px', color: '#9aadbb',
-      wordWrap: { width: CARD_W - 16 }, align: 'center',
-    }).setOrigin(0.5, 0).setAlpha(cardAlpha);
-
-    // Cost badge
-    const costColor = (!purchased && canAfford) ? '#ffee88' : '#cc6644';
-    this.add.text(cx, cy + half - 20, `${item.cost} ki`, {
-      fontSize: '13px', color: costColor,
+    // Section heading.
+    this.add.text(cx, HEADER_H + 10, 'Spirits', {
+      fontSize: '18px', color: '#aaccee',
       stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5, 0).setAlpha(cardAlpha);
+    }).setOrigin(0.5, 0);
+    this.add.text(cx, HEADER_H + 32, 'Choose companions for your journey', {
+      fontSize: '11px', color: '#445566',
+    }).setOrigin(0.5, 0);
+    if (!run.canAddSpirit) {
+      this.add.text(cx, HEADER_H + 50, 'Spirit slots full', {
+        fontSize: '11px', color: '#cc4444',
+      }).setOrigin(0.5, 0);
+    }
 
-    // State overlays
+    // Offer cards.
+    if (this._offering.length === 0) {
+      this.add.text(cx, CARD_ROW_Y, 'No spirits available.', {
+        fontSize: '14px', color: '#445566',
+      }).setOrigin(0.5);
+    } else {
+      const n       = this._offering.length;
+      const totalW  = n * CARD_W + (n - 1) * CARD_GAP;
+      const startCX = cx - totalW / 2 + CARD_W / 2;
+      for (let i = 0; i < n; i++) {
+        this._drawSpiritCard(startCX + i * (CARD_W + CARD_GAP), CARD_ROW_Y, this._offering[i], i);
+      }
+    }
+
+    // Divider above equipped spirits.
+    const divY = CARD_ROW_Y + CARD_H / 2 + 22;
+    this.add.rectangle(cx, divY, 580, 1, 0x1e2d40);
+    this.add.text(cx, divY + 7, 'Equipped Spirits', {
+      fontSize: '11px', color: '#445566',
+    }).setOrigin(0.5, 0);
+
+    // Loadout slots.
+    const slots    = RunManager.MAX_SPIRIT_SLOTS;
+    const slotW    = 112;
+    const slotH    = 56;
+    const slotGap  = 10;
+    const totalSW  = slots * slotW + (slots - 1) * slotGap;
+    const slotCX0  = cx - totalSW / 2 + slotW / 2;
+    const slotCY   = divY + 44;
+    const owned    = run.spirits;
+
+    for (let i = 0; i < slots; i++) {
+      this._drawLoadoutSlot(slotCX0 + i * (slotW + slotGap), slotCY, owned[i] ?? null, slotW, slotH);
+    }
+  }
+
+  _drawSpiritCard(cx, cy, spiritDef, index) {
+    const purchased = this._purchased[index];
+    const canAfford = run.ki >= spiritDef.cost;
+    const hasSlot   = run.canAddSpirit;
+    const buyable   = !purchased && canAfford && hasSlot;
+    const alpha     = purchased ? 0.5 : 1.0;
+
+    const top = cy - CARD_H / 2;
+    const bot = cy + CARD_H / 2;
+
+    // Card panel.
+    this.add.rectangle(cx, cy, CARD_W, CARD_H, 0x0f1e30)
+      .setStrokeStyle(2, 0x2a4a6a)
+      .setAlpha(alpha);
+
+    // Name.
+    this.add.text(cx, top + 10, spiritDef.name, {
+      fontSize: '13px', color: '#e8e8e8',
+      wordWrap: { width: CARD_W - 14 }, align: 'center',
+    }).setOrigin(0.5, 0).setAlpha(alpha);
+
+    // Channel badge.
+    const badge = CHANNEL_BADGE[spiritDef.channel]
+                  ?? { label: spiritDef.channel.toUpperCase(), bgColor: 0x333333, textColor: '#888888' };
+    this.add.rectangle(cx, top + 40, 60, 17, badge.bgColor, 0.9).setAlpha(alpha);
+    this.add.text(cx, top + 40, badge.label, {
+      fontSize: '9px', color: badge.textColor, fontStyle: 'bold',
+    }).setOrigin(0.5).setAlpha(alpha);
+
+    // Description.
+    this.add.text(cx, top + 56, spiritDef.description, {
+      fontSize: '10px', color: '#8aadbb',
+      wordWrap: { width: CARD_W - 14 }, align: 'center',
+    }).setOrigin(0.5, 0).setAlpha(alpha);
+
+    // Purchased overlay.
     if (purchased) {
+      this.add.rectangle(cx, cy, CARD_W - 4, CARD_H - 4, 0x000000, 0.35);
       this.add.text(cx, cy, 'Purchased', {
-        fontSize: '13px', color: '#667788',
+        fontSize: '14px', color: '#667788',
         stroke: '#000000', strokeThickness: 2,
       }).setOrigin(0.5);
-    } else if (slotsFull) {
-      this.add.text(cx, cy - half + 48, 'Slots full', {
-        fontSize: '10px', color: '#cc4444',
-      }).setOrigin(0.5, 0);
-    } else if (!canAfford) {
-      this.add.text(cx, cy - half + 48, 'Not enough ki', {
-        fontSize: '10px', color: '#886644',
-      }).setOrigin(0.5, 0);
-    }
-  }
-
-  // ── Loadout rows ──────────────────────────────────────────────────────────
-
-  _drawLoadouts() {
-    // ── Spirit slots (5) ──────────────────────────────────────────────────
-    const equippedSpirits = run.spirits;
-    for (let i = 0; i < MAX_SPIRIT_SLOTS; i++) {
-      const cx = LEFT_CX + (i - 2) * SMALL_STEP;
-      this._drawSmallSlot(cx, LOADOUT_Y, equippedSpirits[i] ?? null);
+      return;
     }
 
-    // ── Consumable slots (3) ──────────────────────────────────────────────
-    const heldConsumables = run.consumables;
-    for (let i = 0; i < MAX_CONSUMABLE_SLOTS; i++) {
-      const cx = RIGHT_CX + (i - 1) * SMALL_STEP;
-      this._drawSmallSlot(cx, LOADOUT_Y, heldConsumables[i] ?? null);
-    }
-  }
+    // Cost label.
+    const costColor = canAfford ? '#ffee88' : '#cc6644';
+    this.add.text(cx, bot - 50, `${spiritDef.cost} ki`, {
+      fontSize: '13px', color: costColor,
+    }).setOrigin(0.5, 0).setAlpha(alpha);
 
-  /**
-   * Draw one small loadout slot card.
-   * @param {number}      cx
-   * @param {number}      cy
-   * @param {object|null} item  null → empty slot
-   */
-  _drawSmallSlot(cx, cy, item) {
-    const borderColor = item
-      ? (RARITY_BORDER[item.rarity] ?? RARITY_BORDER.common)
-      : 0x1e2d40;
+    // Buy button.
+    const btnBg     = buyable ? 0x1a5a2a : 0x141e14;
+    const btnBorder = buyable ? 0x44aa66 : 0x2a362a;
+    const btnLabel  = !hasSlot ? 'Slots full' : !canAfford ? "Can't afford" : 'Buy';
+    const btnTextC  = buyable  ? '#aaffcc'    : '#445566';
 
-    this.add.rectangle(cx, cy, SMALL_W, SMALL_H, 0x0a1220)
-      .setStrokeStyle(1, borderColor);
+    const btn = this.add.rectangle(cx, bot - 24, CARD_W - 18, 26, btnBg)
+      .setStrokeStyle(1, btnBorder);
+    this.add.text(cx, bot - 24, btnLabel, {
+      fontSize: '12px', color: btnTextC,
+    }).setOrigin(0.5);
 
-    if (item) {
-      this.add.text(cx, cy - SMALL_H / 2 + 6, item.name, {
-        fontSize: '10px', color: '#ccdde8',
-        wordWrap: { width: SMALL_W - 8 }, align: 'center',
-      }).setOrigin(0.5, 0);
-    } else {
-      this.add.text(cx, cy, '—', { fontSize: '14px', color: '#2a3a50' }).setOrigin(0.5);
-    }
-  }
-
-  // ── Bottom buttons ────────────────────────────────────────────────────────
-
-  _drawBottomButtons() {
-    this._drawMeditateButton();
-    this._drawContinueButton();
-  }
-
-  _drawMeditateButton() {
-    const cost        = this._meditateCount + 1;
-    const canMeditate = run.ki >= cost;
-    const bgColor     = canMeditate ? 0x1a3a5a : 0x111a28;
-    const borderColor = canMeditate ? 0x4488aa : 0x2a3a50;
-    const textColor   = canMeditate ? '#aaccee' : '#445566';
-
-    const btn = this.add.rectangle(430, BTN_Y, 230, 44, bgColor)
-      .setStrokeStyle(2, borderColor);
-
-    if (canMeditate) {
+    if (buyable) {
       btn.setInteractive({ useHandCursor: true });
-      btn.on('pointerover', () => btn.setFillStyle(0x2a5a8a));
-      btn.on('pointerout',  () => btn.setFillStyle(bgColor));
-      btn.on('pointerdown', () => this._meditate());
+      btn.on('pointerover', () => btn.setFillStyle(0x2a7a3a));
+      btn.on('pointerout',  () => btn.setFillStyle(btnBg));
+      btn.on('pointerdown', () => this._buySpirit(index));
+    }
+  }
+
+  _drawLoadoutSlot(cx, cy, spirit, w, h) {
+    const borderColor = spirit ? 0x3a6080 : 0x1e2d40;
+    this.add.rectangle(cx, cy, w, h, 0x0a1220).setStrokeStyle(1, borderColor);
+    if (spirit) {
+      this.add.text(cx, cy, spirit.name, {
+        fontSize: '10px', color: '#ccdde8',
+        wordWrap: { width: w - 10 }, align: 'center',
+      }).setOrigin(0.5);
+    } else {
+      this.add.text(cx, cy, '\u2014', { fontSize: '14px', color: '#1e2d40' }).setOrigin(0.5);
+    }
+  }
+
+  // ── Right column: placeholder sections ───────────────────────────────────
+
+  _drawRightColumn() {
+    // Always-present sections.
+    const sections = [
+      {
+        heading:  'Consumables',
+        subtitle: 'Single-use items for tactical advantages',
+        note:     'Coming soon\u2026',
+        bgColor:  0x1a3a5a,
+      },
+      {
+        heading:  'Paramita Upgrades',
+        subtitle: 'Permanent enhancements to your yaku multipliers',
+        note:     'Coming soon\u2026',
+        bgColor:  0x3a2a5a,
+      },
+      {
+        heading:  'Wu Xing Forge',
+        subtitle: 'Transform your cards with elemental power',
+        note:     'Coming soon\u2026',
+        bgColor:  0x2a4a3a,
+      },
+    ];
+
+    // Grove-exclusive section.
+    if (this._isGrove) {
+      sections.push({
+        heading:  'Fusion Ritual',
+        subtitle: 'Sacred Grove only — combine two spirits into something greater',
+        note:     'Coming soon\u2026',
+        bgColor:  0x4a3a1a,
+      });
     }
 
-    this.add.text(430, BTN_Y, `Meditate  (${cost} ki)`, {
-      fontSize: '14px', color: textColor,
+    // Divide available vertical space evenly across sections.
+    const topY  = HEADER_H + 6;
+    const botY  = BTN_Y - 38;  // leave room above the continue button
+    const avail = botY - topY;
+    const secH  = Math.floor(avail / sections.length);
+
+    for (let i = 0; i < sections.length; i++) {
+      this._drawPlaceholderSection(RCX, topY + i * secH, secH, sections[i]);
+    }
+  }
+
+  _drawPlaceholderSection(cx, topY, height, { heading, subtitle, note, bgColor }) {
+    // Heading.
+    this.add.text(cx, topY + 4, heading, {
+      fontSize: '15px', color: '#aaccee',
+    }).setOrigin(0.5, 0);
+
+    // Subtitle.
+    this.add.text(cx, topY + 24, subtitle, {
+      fontSize: '10px', color: '#445566',
+    }).setOrigin(0.5, 0);
+
+    // Dimmed panel taking the remaining vertical space in this section.
+    const panelPadTop = 42;
+    const panelPadBot = 8;
+    const panelH      = height - panelPadTop - panelPadBot;
+    const panelCY     = topY + panelPadTop + panelH / 2;
+
+    this.add.rectangle(cx, panelCY, 570, panelH, bgColor, 0.2)
+      .setStrokeStyle(1, 0x223344);
+    this.add.text(cx, panelCY, note, {
+      fontSize: '13px', color: '#445566', fontStyle: 'italic',
     }).setOrigin(0.5);
   }
 
+  // ── Continue button ───────────────────────────────────────────────────────
+
   _drawContinueButton() {
-    const btn = this.add.rectangle(850, BTN_Y, 230, 44, 0x1a4a2a)
+    const label = this._isGrove ? 'Enter the Forest' : 'Continue';
+    const btn   = this.add.rectangle(640, BTN_Y, 260, 44, 0x1a4a2a)
       .setStrokeStyle(2, 0x44aa66)
       .setInteractive({ useHandCursor: true });
     btn.on('pointerover', () => btn.setFillStyle(0x2a6a3a));
     btn.on('pointerout',  () => btn.setFillStyle(0x1a4a2a));
-    btn.on('pointerdown', () => this._continue());
+    btn.on('pointerdown', () => this.scene.start('GameScene'));
 
-    this.add.text(850, BTN_Y, 'Continue', {
+    this.add.text(640, BTN_Y, label, {
       fontSize: '16px', color: '#ffffff',
       stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5);
   }
 
-  // ── Actions ───────────────────────────────────────────────────────────────
+  // ── Purchase ──────────────────────────────────────────────────────────────
 
-  _purchaseSpirit(index) {
-    const spirit = this._offeredSpirits[index];
-    if (!spirit)                                    return;
-    if (run.ki < spirit.cost)                       return;
-    if (run.spirits.length >= MAX_SPIRIT_SLOTS)     return;
-    if (this._spiritPurchased[index])               return;
+  _buySpirit(index) {
+    const spiritDef = this._offering[index];
+    if (!spiritDef || this._purchased[index]) return;
 
-    run.spendKi(spirit.cost);
-    run.addSpirit(spirit);
-    this._spiritPurchased[index] = true;
-    this._buildUI();
-  }
-
-  _purchaseConsumable(index) {
-    const consumable = this._offeredConsumables[index];
-    if (!consumable)                                       return;
-    if (run.ki < consumable.cost)                         return;
-    if (run.consumables.length >= MAX_CONSUMABLE_SLOTS)   return;
-    if (this._consumablePurchased[index])                 return;
-
-    run.spendKi(consumable.cost);
-    run.addConsumable(consumable);
-    this._consumablePurchased[index] = true;
-    this._buildUI();
-  }
-
-  _meditate() {
-    const cost = this._meditateCount + 1;
-    if (run.ki < cost) return;
-
-    run.spendKi(cost);
-    this._meditateCount++;
-    this._rollOffers();
-    this._buildUI();
-  }
-
-  _continue() {
-    this.scene.start('GameScene');
+    const result = run.buySpirit(spiritDef);
+    if (result.success) {
+      this._purchased[index] = true;
+      this._buildUI();
+    }
   }
 }

@@ -100,7 +100,23 @@ class RunManager {
 
   // ── Spirit loadout ─────────────────────────────────────────────────────────
 
-  get spirits() { return [...this._spirits]; }
+  get spirits()      { return [...this._spirits]; }
+  get spiritSlots()  { return RunManager.MAX_SPIRIT_SLOTS; }
+  get canAddSpirit() { return this._spirits.length < RunManager.MAX_SPIRIT_SLOTS; }
+
+  /**
+   * Purchase a spirit from the shop.
+   * Deducts ki and pushes a minimal { id, name } object onto the loadout.
+   * @param {object} spiritDef  Entry from SPIRIT_CATALOG.
+   * @returns {{ success: boolean, reason?: string }}
+   */
+  buySpirit(spiritDef) {
+    if (!this.canAddSpirit)        return { success: false, reason: 'No spirit slots available' };
+    if (this._ki < spiritDef.cost) return { success: false, reason: 'Not enough ki' };
+    this._ki -= spiritDef.cost;
+    this._spirits.push({ id: spiritDef.id, name: spiritDef.name });
+    return { success: true };
+  }
 
   /**
    * Equip a spirit into the loadout.

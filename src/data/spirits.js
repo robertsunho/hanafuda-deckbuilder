@@ -1,113 +1,88 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// spirits.js — catalogue of all available spirit cards
+// spirits.js — catalogue of all available spirits
 //
-// Each spirit:
-//   id          unique string identifier
+// Each entry:
+//   id          unique string identifier (matches SpiritEffects.js key)
 //   name        display name
-//   description human-readable effect summary (runtime logic implemented separately)
-//   cost        ki cost to acquire at the shrine shop
-//   rarity      'common' | 'uncommon' | 'rare' | 'legendary'
-//   effect      machine-readable effect key / descriptor (for the game engine)
+//   description human-readable effect summary
+//   channel     'point' | 'additive' | 'multiplicative'
+//   cost        ki cost to purchase at the shop
+//   tier        1 = available from Act 1
+//               2 = appears Act 3+
+//               3 = appears Act 5+
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const spirits = [
+export const SPIRIT_CATALOG = [
 
-  // ── Seasonal spirits (common) ─────────────────────────────────────────────
+  // ── Seasonal spirits — Channel 1: Point Boost ─────────────────────────────
 
   {
     id:          'spirit_spring',
     name:        'Spring Spirit',
-    description: '+0.3× per captured card from months 3, 4, 5.',
-    cost:        4,
-    rarity:      'common',
-    effect:      'seasonal_bonus:3,4,5:0.3',
+    description: 'Cards from months 3–5 (Cherry, Wisteria, Iris) worth ×1.5 base points.',
+    channel:     'point',
+    cost:        8,
+    tier:        1,
   },
   {
     id:          'spirit_summer',
     name:        'Summer Spirit',
-    description: '+0.3× per captured card from months 6, 7, 8.',
-    cost:        4,
-    rarity:      'common',
-    effect:      'seasonal_bonus:6,7,8:0.3',
+    description: 'Cards from months 6–8 (Peony, Clover, Pampas) worth ×1.5 base points.',
+    channel:     'point',
+    cost:        8,
+    tier:        1,
   },
   {
     id:          'spirit_autumn',
     name:        'Autumn Spirit',
-    description: '+0.3× per captured card from months 9, 10, 11.',
-    cost:        4,
-    rarity:      'common',
-    effect:      'seasonal_bonus:9,10,11:0.3',
+    description: 'Cards from months 9–11 (Chrysanthemum, Maple, Rain) worth ×1.5 base points.',
+    channel:     'point',
+    cost:        8,
+    tier:        1,
   },
   {
     id:          'spirit_winter',
     name:        'Winter Spirit',
-    description: '+0.3× per captured card from months 12, 1, 2.',
-    cost:        4,
-    rarity:      'common',
-    effect:      'seasonal_bonus:12,1,2:0.3',
+    description: 'Cards from months 12–2 (Paulownia, Pine, Plum) worth ×1.5 base points.',
+    channel:     'point',
+    cost:        8,
+    tier:        1,
   },
 
-  // ── Yaku threshold spirits (uncommon) ─────────────────────────────────────
+  // ── Yaku spirits — Channel 2: Additive Multiplier ─────────────────────────
 
   {
     id:          'spirit_tane_no_kami',
     name:        'Tane-no-Kami',
-    description: 'Tane threshold reduced to 2 animals. +0.1× per animal beyond.',
-    cost:        5,
-    rarity:      'uncommon',
-    effect:      'tane_threshold:2:0.1',
+    description: '+0.3 additive multiplier when Tane (Animals) yaku is scored.',
+    channel:     'additive',
+    cost:        7,
+    tier:        1,
   },
   {
     id:          'spirit_tanzaku_no_kami',
     name:        'Tanzaku-no-Kami',
-    description: 'Tanzaku threshold reduced to 3 ribbons. +0.1× per ribbon beyond.',
-    cost:        5,
-    rarity:      'uncommon',
-    effect:      'tanzaku_threshold:3:0.1',
+    description: '+0.3 additive multiplier when Tanzaku (Ribbons) yaku is scored.',
+    channel:     'additive',
+    cost:        7,
+    tier:        1,
   },
   {
     id:          'spirit_kasu_no_kami',
     name:        'Kasu-no-Kami',
-    description: 'Kasu threshold reduced to 4 plains. +0.1× per plain beyond.',
-    cost:        5,
-    rarity:      'uncommon',
-    effect:      'kasu_threshold:4:0.1',
-  },
-
-  // ── Rare spirits ──────────────────────────────────────────────────────────
-
-  {
-    id:          'spirit_kitsune',
-    name:        'Kitsune',
-    description: 'One random hand card becomes wild (matches any month) each round.',
+    description: '+0.3 additive multiplier when Kasu (Plains) yaku is scored.',
+    channel:     'additive',
     cost:        7,
-    rarity:      'rare',
-    effect:      'wild_hand_card:1',
-  },
-  {
-    id:          'spirit_dokkaebi',
-    name:        'Dokkaebi',
-    description: 'Randomly doubles one completed yaku multiplier at round end.',
-    cost:        7,
-    rarity:      'rare',
-    effect:      'double_random_yaku',
-  },
-
-  // ── Legendary spirits ─────────────────────────────────────────────────────
-
-  {
-    id:          'spirit_yin_yang',
-    name:        'Yin-Yang',
-    description: 'If you complete yaku from 2+ card types, both get +0.5× bonus.',
-    cost:        10,
-    rarity:      'legendary',
-    effect:      'multi_type_yaku_bonus:2:0.5',
+    tier:        1,
   },
 ];
 
 /**
- * Look up a spirit by its id.
+ * Look up a spirit definition by id.
  * @param {string} id
  * @returns {object|undefined}
  */
-export const spiritById = Object.fromEntries(spirits.map(s => [s.id, s]));
+export const getSpiritDef = (id) => SPIRIT_CATALOG.find(s => s.id === id);
+
+// Backward-compat alias for any remaining imports.
+export const spirits = SPIRIT_CATALOG;
