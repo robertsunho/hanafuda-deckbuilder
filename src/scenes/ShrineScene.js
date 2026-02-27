@@ -65,6 +65,8 @@ export class ShrineScene extends Phaser.Scene {
   }
 
   create() {
+    const { isGrove }          = this.scene.settings.data || {};
+    this._isGrove              = isGrove ?? false;
     this._meditateCount        = 0;
     this._spiritPurchased      = new Array(OFFER_SLOTS).fill(false);
     this._consumablePurchased  = new Array(OFFER_SLOTS).fill(false);
@@ -151,7 +153,7 @@ export class ShrineScene extends Phaser.Scene {
     this.add.rectangle(640, TOP_BAR_H / 2, 1280, TOP_BAR_H, 0x0a1628);
     this.add.rectangle(640, TOP_BAR_H,     1280, 1,         0x2a3a50);
 
-    const isGrove = run.isGroveRound;
+    const isGrove = this._isGrove;
     this.add.text(640, TOP_BAR_H / 2,
       isGrove ? 'Sacred Grove' : 'Shrine',
       {

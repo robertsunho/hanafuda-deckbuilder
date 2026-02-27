@@ -1000,34 +1000,31 @@ export class GameScene extends Phaser.Scene {
           }).setOrigin(0.5)
         );
 
-      } else if (run.nextIsGrove) {
-        // ── Sacred Grove ─────────────────────────────────────────────
-        this._overlayObjs.push(
-          this.add.text(cx, y + 32, 'Entering the Sacred Grove\u2026', {
-            fontSize: '14px', color: '#ffcc44',
-          }).setOrigin(0.5)
-        );
-        const btn = this.add.rectangle(cx, btnY, 230, 46, 0x4a4a1a)
-          .setStrokeStyle(2, 0xaaaa44).setInteractive({ useHandCursor: true });
-        btn.on('pointerover', () => btn.setFillStyle(0x6a6a2a));
-        btn.on('pointerout',  () => btn.setFillStyle(0x4a4a1a));
-        btn.on('pointerdown', () => this.scene.start('ShrineScene'));
-        this._overlayObjs.push(btn);
-        this._overlayObjs.push(
-          this.add.text(cx, btnY, 'Visit Shrine', { fontSize: '18px', color: '#ffffff' })
-            .setOrigin(0.5)
-        );
-
       } else {
-        // ── Next round ───────────────────────────────────────────────
-        const btn = this.add.rectangle(cx, btnY, 230, 46, 0x1a4a6a)
-          .setStrokeStyle(2, 0x4488aa).setInteractive({ useHandCursor: true });
-        btn.on('pointerover', () => btn.setFillStyle(0x2a6a9a));
-        btn.on('pointerout',  () => btn.setFillStyle(0x1a4a6a));
-        btn.on('pointerdown', () => this._restartRound());
+        // ── Always visit the shop; Grove rounds get the special variant ─
+        const isGrove = run.nextIsGrove;
+
+        if (isGrove) {
+          this._overlayObjs.push(
+            this.add.text(cx, y + 32, 'Entering the Sacred Grove\u2026', {
+              fontSize: '14px', color: '#ffcc44',
+            }).setOrigin(0.5)
+          );
+        }
+
+        const btnLabel  = isGrove ? 'Visit Sacred Grove' : 'Visit Shrine';
+        const btnColor  = isGrove ? 0x4a4a1a : 0x1a4a6a;
+        const btnHover  = isGrove ? 0x6a6a2a : 0x2a6a9a;
+        const btnStroke = isGrove ? 0xaaaa44 : 0x4488aa;
+
+        const btn = this.add.rectangle(cx, btnY, 230, 46, btnColor)
+          .setStrokeStyle(2, btnStroke).setInteractive({ useHandCursor: true });
+        btn.on('pointerover', () => btn.setFillStyle(btnHover));
+        btn.on('pointerout',  () => btn.setFillStyle(btnColor));
+        btn.on('pointerdown', () => this.scene.start('ShrineScene', { isGrove }));
         this._overlayObjs.push(btn);
         this._overlayObjs.push(
-          this.add.text(cx, btnY, 'Next Round', { fontSize: '18px', color: '#ffffff' })
+          this.add.text(cx, btnY, btnLabel, { fontSize: '18px', color: '#ffffff' })
             .setOrigin(0.5)
         );
       }
