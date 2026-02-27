@@ -1,6 +1,6 @@
 import GameRoundManager      from '../systems/GameRoundManager.js';
 import { YAKU_INFO }         from '../systems/ScoringEngine.js';
-import run                   from '../systems/RunManager.js';
+import run, { RunManager }   from '../systems/RunManager.js';
 
 // ── Layout constants ───────────────────────────────────────────────────────────
 // Canvas is 1280 × 720.
@@ -164,11 +164,12 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5, 0);
 
     // ── Score display ─────────────────────────────────────────────────────
-    this._baseText  = this.add.text(920, 262, '', { fontSize: '13px', color: '#aaccee' }).setOrigin(0.5, 0);
-    this._multiText = this.add.text(920, 280, '', {
+    this._baseText      = this.add.text(920, 258, '', { fontSize: '13px', color: '#aaccee' }).setOrigin(0.5, 0);
+    this._multiText     = this.add.text(920, 274, '', {
       fontSize: '16px', color: '#ffee88', stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5, 0);
-    this._projText  = this.add.text(920, 301, '', { fontSize: '13px', color: '#ffffff' }).setOrigin(0.5, 0);
+    this._projText      = this.add.text(920, 295, '', { fontSize: '13px', color: '#ffffff' }).setOrigin(0.5, 0);
+    this._thresholdText = this.add.text(920, 313, '', { fontSize: '12px', color: '#667788' }).setOrigin(0.5, 0);
 
     // ── Yaku Guide button ─────────────────────────────────────────────────
     const guideBtn = this.add.rectangle(200, 18, 26, 20, 0x1a3550)
@@ -182,6 +183,7 @@ export class GameScene extends Phaser.Scene {
     this._turnText     = this.add.text(10, 10, '', { fontSize: '13px', color: '#556677' });
     this._playsText    = this.add.text(10, 26, '', { fontSize: '13px', color: '#556677' });
     this._discardsText = this.add.text(10, 42, '', { fontSize: '13px', color: '#556677' });
+    this._actRoundText = this.add.text(10, 58, '', { fontSize: '13px', color: '#445566' });
     this._kiText    = this.add.text(1270, 10, '', {
       fontSize: '13px', color: '#ffee88',
     }).setOrigin(1, 0);
@@ -817,10 +819,12 @@ export class GameScene extends Phaser.Scene {
     this._baseText.setText(`Base: ${sc.basePoints}`);
     this._multiText.setText(`\xD7${sc.totalMultiplier.toFixed(2)} yaku  \xD7${sc.flow.toFixed(2)} flow`);
     this._projText.setText(`= ${sc.finalScore}`);
+    this._thresholdText.setText(`Target: ${run.threshold}`);
 
     this._turnText.setText(`Turn: ${this._round.turn}`);
     this._playsText.setText(`Plays: ${this._round.playsRemaining}`);
     this._discardsText.setText(`Discards: ${this._round.discardsRemaining}`);
+    this._actRoundText.setText(`Act ${run.act}  R${run.round}/18`);
     this._kiText.setText(`Ki: ${run.ki}`);
 
     this._deckSprite.setVisible(drawSize > 0);
@@ -836,11 +840,17 @@ export class GameScene extends Phaser.Scene {
     this._clearObjs(this._overlayObjs);
     const cx = PLAY_CX, cy = 330;
 
+    // Compute threshold and ki reward before any state changes.
+    const tr       = run.checkThreshold(result.finalScore);
+    const kiEarned = run.calculateKiReward(result, tr.threshold);
+
     this._overlayObjs.push(
-      this.add.rectangle(cx, cy, 720, 480, 0x080d1a, 0.93).setStrokeStyle(2, 0x3a6080)
+      this.add.rectangle(cx, cy, 720, 560, 0x080d1a, 0.93).setStrokeStyle(2, 0x3a6080)
     );
+
+    // ── Title ─────────────────────────────────────────────────────────────
     this._overlayObjs.push(
-      this.add.text(cx, cy - 210,
+      this.add.text(cx, cy - 258,
         result.status === 'banked' ? 'Score Banked!' : 'Round Over',
         {
           fontSize: '34px',
@@ -850,13 +860,22 @@ export class GameScene extends Phaser.Scene {
       ).setOrigin(0.5)
     );
 
-    let y = cy - 158;
+    // Act / Round subtitle
+    this._overlayObjs.push(
+      this.add.text(cx, cy - 226,
+        `Act ${run.act}  —  Round ${run.round} of ${RunManager.TOTAL_ROUNDS}`,
+        { fontSize: '14px', color: '#6688aa' }
+      ).setOrigin(0.5)
+    );
+
+    // ── Score breakdown ───────────────────────────────────────────────────
+    let y = cy - 204;
     this._overlayObjs.push(
       this.add.text(cx, y, `Base Points: ${result.basePoints}`, {
         fontSize: '18px', color: '#aaccee',
       }).setOrigin(0.5)
     );
-    y += 34;
+    y += 28;
 
     if (result.allYaku.length === 0) {
       this._overlayObjs.push(
@@ -864,7 +883,7 @@ export class GameScene extends Phaser.Scene {
           fontSize: '15px', color: '#778899',
         }).setOrigin(0.5)
       );
-      y += 26;
+      y += 24;
     } else {
       for (const yaku of result.allYaku) {
         this._overlayObjs.push(
@@ -872,17 +891,17 @@ export class GameScene extends Phaser.Scene {
             fontSize: '16px', color: '#cce0ff',
           }).setOrigin(0.5)
         );
-        y += 25;
+        y += 24;
       }
     }
-    y += 10;
+    y += 8;
 
     this._overlayObjs.push(
       this.add.text(cx, y, `Yaku Multiplier: \xD7${result.totalMultiplier.toFixed(2)}`, {
         fontSize: '17px', color: '#ffee88',
       }).setOrigin(0.5)
     );
-    y += 28;
+    y += 26;
 
     const flowLabel = result.penaltyApplied
       ? `\u26A0 Flow: \xD7${result.flow.toFixed(2)}  (Style \xD7${result.styleBase.toFixed(2)} \xD7 Push \xD7${result.pushFactor.toFixed(1)})  [penalty]`
@@ -892,37 +911,127 @@ export class GameScene extends Phaser.Scene {
         fontSize: '14px', color: result.penaltyApplied ? '#ff8866' : '#88ddaa',
       }).setOrigin(0.5)
     );
-    y += 28;
+    y += 26;
 
     this._overlayObjs.push(
       this.add.text(cx, y, `Final Score: ${result.finalScore}`, {
         fontSize: '24px', color: '#ffffff', stroke: '#000000', strokeThickness: 3,
       }).setOrigin(0.5)
     );
-    y += 36;
+    y += 32;
 
-    const kiEarned = run.calculateKiReward(result, 100);
     this._overlayObjs.push(
       this.add.text(cx, y, `Ki earned: +${kiEarned}`, {
         fontSize: '16px', color: '#ffee88', stroke: '#000000', strokeThickness: 2,
       }).setOrigin(0.5)
     );
+    y += 24;
 
-    const btnY = cy + 188;
-    const btn  = this.add.rectangle(cx, btnY, 230, 46, 0x1a4a6a)
-      .setStrokeStyle(2, 0x4488aa).setInteractive({ useHandCursor: true });
-    btn.on('pointerover',  () => btn.setFillStyle(0x2a6a9a));
-    btn.on('pointerout',   () => btn.setFillStyle(0x1a4a6a));
-    btn.on('pointerdown',  () => {
+    // ── Threshold section ─────────────────────────────────────────────────
+    this._overlayObjs.push(this.add.rectangle(cx, y + 10, 580, 1, 0x2a3a50));
+    y += 22;
+
+    this._overlayObjs.push(
+      this.add.text(cx, y, `Threshold: ${tr.threshold}`, {
+        fontSize: '13px', color: '#556677',
+      }).setOrigin(0.5)
+    );
+    y += 22;
+
+    const absPct = Math.round(Math.abs(tr.marginPct));
+    if (tr.passed) {
+      const sign = tr.margin >= 0 ? '+' : '';
+      this._overlayObjs.push(
+        this.add.text(cx, y,
+          `\u2713 Cleared!  ${tr.score} / ${tr.threshold}  (${sign}${Math.round(tr.margin)}, ${sign}${absPct}%)`,
+          { fontSize: '16px', color: '#44dd88', stroke: '#000000', strokeThickness: 2 }
+        ).setOrigin(0.5)
+      );
+    } else {
+      this._overlayObjs.push(
+        this.add.text(cx, y,
+          `\u2717 Failed.  ${tr.score} / ${tr.threshold}  (${absPct}% short)`,
+          { fontSize: '16px', color: '#ee4444', stroke: '#000000', strokeThickness: 2 }
+        ).setOrigin(0.5)
+      );
+    }
+
+    // ── Action / button ───────────────────────────────────────────────────
+    const btnY = cy + 248;
+
+    if (!tr.passed) {
+      // ── Run over ──────────────────────────────────────────────────────
+      run.addKi(kiEarned);
+      run.endRun(false);
+
+      const btn = this.add.rectangle(cx, btnY, 230, 46, 0x5a1a1a)
+        .setStrokeStyle(2, 0xaa3333).setInteractive({ useHandCursor: true });
+      btn.on('pointerover', () => btn.setFillStyle(0x8a2a2a));
+      btn.on('pointerout',  () => btn.setFillStyle(0x5a1a1a));
+      btn.on('pointerdown', () => this.scene.start('BootScene'));
+      this._overlayObjs.push(btn);
+      this._overlayObjs.push(
+        this.add.text(cx, btnY, 'Return to Menu', { fontSize: '18px', color: '#ffaaaa' })
+          .setOrigin(0.5)
+      );
+
+    } else {
+      // ── Threshold passed — advance and branch ─────────────────────────
       run.addKi(kiEarned);
       run.advanceRound(result.finalScore);
-      this.scene.start('ShrineScene');
-    });
-    this._overlayObjs.push(btn);
-    this._overlayObjs.push(
-      this.add.text(cx, btnY, 'Visit Shrine', { fontSize: '18px', color: '#ffffff' })
-        .setOrigin(0.5)
-    );
+
+      if (run.isRunComplete) {
+        // ── Victory ─────────────────────────────────────────────────
+        run.endRun(true);
+        this._overlayObjs.push(
+          this.add.text(cx, y + 32, 'Run Complete!', {
+            fontSize: '20px', color: '#ffee44', stroke: '#000000', strokeThickness: 3,
+          }).setOrigin(0.5)
+        );
+        const btn = this.add.rectangle(cx, btnY, 260, 46, 0x3a6a1a)
+          .setStrokeStyle(2, 0x88cc44).setInteractive({ useHandCursor: true });
+        btn.on('pointerover', () => btn.setFillStyle(0x5a9a2a));
+        btn.on('pointerout',  () => btn.setFillStyle(0x3a6a1a));
+        btn.on('pointerdown', () => this.scene.start('BootScene'));
+        this._overlayObjs.push(btn);
+        this._overlayObjs.push(
+          this.add.text(cx, btnY, 'Victory!  Return to Menu', {
+            fontSize: '16px', color: '#ccff88',
+          }).setOrigin(0.5)
+        );
+
+      } else if (run.nextIsGrove) {
+        // ── Sacred Grove ─────────────────────────────────────────────
+        this._overlayObjs.push(
+          this.add.text(cx, y + 32, 'Entering the Sacred Grove\u2026', {
+            fontSize: '14px', color: '#ffcc44',
+          }).setOrigin(0.5)
+        );
+        const btn = this.add.rectangle(cx, btnY, 230, 46, 0x4a4a1a)
+          .setStrokeStyle(2, 0xaaaa44).setInteractive({ useHandCursor: true });
+        btn.on('pointerover', () => btn.setFillStyle(0x6a6a2a));
+        btn.on('pointerout',  () => btn.setFillStyle(0x4a4a1a));
+        btn.on('pointerdown', () => this.scene.start('ShrineScene'));
+        this._overlayObjs.push(btn);
+        this._overlayObjs.push(
+          this.add.text(cx, btnY, 'Visit Shrine', { fontSize: '18px', color: '#ffffff' })
+            .setOrigin(0.5)
+        );
+
+      } else {
+        // ── Next round ───────────────────────────────────────────────
+        const btn = this.add.rectangle(cx, btnY, 230, 46, 0x1a4a6a)
+          .setStrokeStyle(2, 0x4488aa).setInteractive({ useHandCursor: true });
+        btn.on('pointerover', () => btn.setFillStyle(0x2a6a9a));
+        btn.on('pointerout',  () => btn.setFillStyle(0x1a4a6a));
+        btn.on('pointerdown', () => this._restartRound());
+        this._overlayObjs.push(btn);
+        this._overlayObjs.push(
+          this.add.text(cx, btnY, 'Next Round', { fontSize: '18px', color: '#ffffff' })
+            .setOrigin(0.5)
+        );
+      }
+    }
   }
 
   _restartRound() {

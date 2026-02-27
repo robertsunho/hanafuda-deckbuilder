@@ -151,7 +151,7 @@ export class ShrineScene extends Phaser.Scene {
     this.add.rectangle(640, TOP_BAR_H / 2, 1280, TOP_BAR_H, 0x0a1628);
     this.add.rectangle(640, TOP_BAR_H,     1280, 1,         0x2a3a50);
 
-    const isGrove = run.isSacredGrove;
+    const isGrove = run.isGroveRound;
     this.add.text(640, TOP_BAR_H / 2,
       isGrove ? 'Sacred Grove' : 'Shrine',
       {
@@ -162,7 +162,7 @@ export class ShrineScene extends Phaser.Scene {
     ).setOrigin(0.5);
 
     this.add.text(20, TOP_BAR_H / 2,
-      `Round ${run.round}`,
+      `Act ${run.act}  —  Round ${run.round}`,
       { fontSize: '14px', color: '#556677' }
     ).setOrigin(0, 0.5);
 
@@ -417,7 +417,6 @@ export class ShrineScene extends Phaser.Scene {
   }
 
   _continue() {
-    run.advanceRound();
     this.scene.start('GameScene');
   }
 }

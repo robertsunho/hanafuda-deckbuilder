@@ -15,6 +15,29 @@ class RunManager {
   static MAX_SPIRIT_SLOTS     = 4;
   static MAX_CONSUMABLE_SLOTS = 3;
 
+  static TOTAL_ROUNDS   = 18;
+  static ROUNDS_PER_ACT = 3;
+  static TOTAL_ACTS     = 6;
+
+  /**
+   * Grove appears after completing each of these rounds (end of acts 1–5).
+   * After round 15 the player visits the Grove, then plays the final act.
+   */
+  static GROVE_ROUNDS = [3, 6, 9, 12, 15];
+
+  /**
+   * Minimum score required to survive each round (index 0 = Round 1).
+   * Failing to meet the threshold ends the run immediately.
+   */
+  static THRESHOLDS = [
+     50,  70,   90,   // Act 1
+    100, 160,  275,   // Act 2
+    275, 500,  825,   // Act 3
+    775, 1600, 2700,  // Act 4
+   2900, 6250, 9500,  // Act 5
+   9500, 17000, 25000, // Act 6
+  ];
+
   constructor() {
     // ── Ki economy ───────────────────────────────────────────────────────────
     /** @type {number} */
@@ -42,6 +65,12 @@ class RunManager {
      * Cannot be boosted by spirits — it is the player-skill layer only.
      */
     this._styleBase = 1.0;
+
+    // ── Run state ────────────────────────────────────────────────────────────
+    /** True once the run has ended (won or lost). */
+    this._runOver = false;
+    /** True if the run ended in victory (all 18 rounds cleared). */
+    this._runWon  = false;
   }
 
   // ── Ki economy ─────────────────────────────────────────────────────────────
@@ -138,15 +167,45 @@ class RunManager {
     return this.removeConsumable(index);
   }
 
+  // ── Run progression ────────────────────────────────────────────────────────
+
   get round()      { return this._round; }
   get totalScore() { return this._totalScore; }
 
+  /** Current act number (1-based, 6 total). */
+  get act()        { return Math.floor((this._round - 1) / RunManager.ROUNDS_PER_ACT) + 1; }
+
+  /** Round position within the current act (1–3). */
+  get roundInAct() { return ((this._round - 1) % RunManager.ROUNDS_PER_ACT) + 1; }
+
+  /** Minimum score required to pass the current round. */
+  get threshold()  { return RunManager.THRESHOLDS[this._round - 1] ?? 0; }
+
   /**
-   * True when the current round number is divisible by 3.
-   * Every third shrine visit includes a spirit fusion opportunity.
-   * @returns {boolean}
+   * True when a Sacred Grove visit should follow the round just completed.
+   * Query this AFTER calling advanceRound() — it checks whether the round
+   * that was just finished (now _round − 1) is a Grove round.
    */
-  get isSacredGrove() { return this._round % 3 === 0; }
+  get isGroveRound() { return RunManager.GROVE_ROUNDS.includes(this._round - 1); }
+
+  /**
+   * True when all 18 rounds have been completed.
+   * Query this AFTER calling advanceRound().
+   */
+  get isRunComplete() { return this._round > RunManager.TOTAL_ROUNDS; }
+
+  /**
+   * Alias of isGroveRound — used by GameScene to decide the next transition.
+   * After advanceRound(): "the round I just finished was a Grove round,
+   * so the next destination is ShrineScene."
+   */
+  get nextIsGrove() { return RunManager.GROVE_ROUNDS.includes(this._round - 1); }
+
+  /** True once the run has ended (won or lost). */
+  get runOver() { return this._runOver; }
+
+  /** True if the run ended in victory. */
+  get runWon()  { return this._runWon; }
 
   // ── Style Base ─────────────────────────────────────────────────────────────
 
@@ -167,7 +226,7 @@ class RunManager {
     this._styleBase = 1.0 + (this._styleBase - 1.0) * 0.7;
   }
 
-  // ── Run progression ────────────────────────────────────────────────────────
+  // ── Round advancement ──────────────────────────────────────────────────────
 
   /**
    * Increment the round counter, add a completed round's score to the
@@ -180,6 +239,38 @@ class RunManager {
     this.decayStyle();
     this._round++;
     return this;
+  }
+
+  // ── Threshold check ────────────────────────────────────────────────────────
+
+  /**
+   * Check whether a round score meets the survival threshold for the current
+   * round.  Call BEFORE advanceRound() so the correct threshold is used.
+   *
+   * @param {number} score
+   * @returns {{ passed: boolean, score: number, threshold: number,
+   *             margin: number, marginPct: number }}
+   */
+  checkThreshold(score) {
+    const threshold = RunManager.THRESHOLDS[this._round - 1] ?? 0;
+    return {
+      passed:    score >= threshold,
+      score,
+      threshold,
+      margin:    score - threshold,
+      marginPct: threshold > 0 ? ((score - threshold) / threshold * 100) : 100,
+    };
+  }
+
+  // ── Run state ──────────────────────────────────────────────────────────────
+
+  /**
+   * Mark the run as ended.  Called by GameScene once the outcome is decided.
+   * @param {boolean} won  True if all rounds cleared; false if a threshold failed.
+   */
+  endRun(won) {
+    this._runOver = true;
+    this._runWon  = won;
   }
 
   // ── Ki reward calculation ──────────────────────────────────────────────────
@@ -202,9 +293,8 @@ class RunManager {
    * @param {{ allYaku: object[], finalScore: number,
    *            penaltyApplied: boolean, pushCount: number,
    *            pigDoubleKi?: boolean }} result
-   * @param {number} threshold  Score threshold for surplus bonus (typically
-   *                            the round's base point total before multipliers,
-   *                            or a fixed per-round target).
+   * @param {number} threshold  Score threshold for surplus bonus — pass the
+   *                            round threshold from checkThreshold().threshold.
    * @returns {number}  Ki earned (integer ≥ 0).
    */
   calculateKiReward(result, threshold) {
@@ -235,12 +325,14 @@ class RunManager {
    */
   toSnapshot() {
     return {
-      ki:           this._ki,
-      round:        this._round,
-      totalScore:   this._totalScore,
-      styleBase:    this._styleBase,
-      spirits:      [...this._spirits],
-      consumables:  [...this._consumables],
+      ki:          this._ki,
+      round:       this._round,
+      totalScore:  this._totalScore,
+      styleBase:   this._styleBase,
+      spirits:     [...this._spirits],
+      consumables: [...this._consumables],
+      runOver:     this._runOver,
+      runWon:      this._runWon,
     };
   }
 }
