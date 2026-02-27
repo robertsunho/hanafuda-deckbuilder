@@ -115,6 +115,7 @@ export class GameScene extends Phaser.Scene {
     this._buildStaticUI();
 
     this._round.setSpirits(run.spirits);
+    this._round.setStyleBase(run.styleBase);
     this._round.startRound();
     this._afterRoundStart();
     this._renderAll();
@@ -814,7 +815,7 @@ export class GameScene extends Phaser.Scene {
     const discardCount = this._round.discardCount;
 
     this._baseText.setText(`Base: ${sc.basePoints}`);
-    this._multiText.setText(`\xD7${sc.totalMultiplier.toFixed(2)}`);
+    this._multiText.setText(`\xD7${sc.totalMultiplier.toFixed(2)} yaku  \xD7${sc.flow.toFixed(2)} flow`);
     this._projText.setText(`= ${sc.finalScore}`);
 
     this._turnText.setText(`Turn: ${this._round.turn}`);
@@ -877,22 +878,21 @@ export class GameScene extends Phaser.Scene {
     y += 10;
 
     this._overlayObjs.push(
-      this.add.text(cx, y, `Combined Multiplier: \xD7${result.totalMultiplier.toFixed(2)}`, {
+      this.add.text(cx, y, `Yaku Multiplier: \xD7${result.totalMultiplier.toFixed(2)}`, {
         fontSize: '17px', color: '#ffee88',
       }).setOrigin(0.5)
     );
-    y += 32;
+    y += 28;
 
-    if (result.penaltyApplied) {
-      const lossPct  = Math.round(result.penaltyRate * 100);
-      const keepMult = (1 - result.penaltyRate).toFixed(1);
-      this._overlayObjs.push(
-        this.add.text(cx, y, `\u26A0 Push penalty: ${lossPct}% lost (\xD7${keepMult})`, {
-          fontSize: '15px', color: '#ff8866',
-        }).setOrigin(0.5)
-      );
-      y += 28;
-    }
+    const flowLabel = result.penaltyApplied
+      ? `\u26A0 Flow: \xD7${result.flow.toFixed(2)}  (Style \xD7${result.styleBase.toFixed(2)} \xD7 Push \xD7${result.pushFactor.toFixed(1)})  [penalty]`
+      : `Flow: \xD7${result.flow.toFixed(2)}  (Style \xD7${result.styleBase.toFixed(2)} \xD7 Push \xD7${result.pushFactor.toFixed(1)})`;
+    this._overlayObjs.push(
+      this.add.text(cx, y, flowLabel, {
+        fontSize: '14px', color: result.penaltyApplied ? '#ff8866' : '#88ddaa',
+      }).setOrigin(0.5)
+    );
+    y += 28;
 
     this._overlayObjs.push(
       this.add.text(cx, y, `Final Score: ${result.finalScore}`, {
@@ -932,6 +932,7 @@ export class GameScene extends Phaser.Scene {
     this._selectedCardIds.clear();
     this._selectedConsumableIndex = null;
     this._round.setSpirits(run.spirits);
+    this._round.setStyleBase(run.styleBase);
     this._round.startRound();
     this._afterRoundStart();
     this._renderAll();
@@ -965,8 +966,8 @@ export class GameScene extends Phaser.Scene {
     y += 6;
     this._overlayObjs.push(
       this.add.text(cx, y,
-        `Base ${result.basePoints}  \xD7  ${result.totalMultiplier.toFixed(2)}  =  ${result.finalScore} pts`,
-        { fontSize: '15px', color: '#cce0ff' }
+        `Base ${result.basePoints}  \xD7  yaku ${result.totalMultiplier.toFixed(2)}  \xD7  flow ${result.flow.toFixed(2)}  =  ${result.finalScore} pts`,
+        { fontSize: '13px', color: '#cce0ff' }
       ).setOrigin(0.5).setDepth(25)
     );
 
@@ -994,14 +995,14 @@ export class GameScene extends Phaser.Scene {
     pushBtn.on('pointerover',  () => pushBtn.setFillStyle(0x9a2a2a));
     pushBtn.on('pointerout',   () => pushBtn.setFillStyle(0x6a1a1a));
     pushBtn.on('pointerdown',  () => {
-      const { pushPenaltyPct } = this._round.pushOn();
+      const { failedFlow } = this._round.pushOn();
       this._clearObjs(this._overlayObjs);
-      this._setStatus(`Pushed! Complete another yaku or lose ${pushPenaltyPct}% of your score.`);
+      this._setStatus(`Pushed! Complete another yaku or flow drops to \xD7${failedFlow.toFixed(2)}.`);
       this._renderAll();
     });
     this._overlayObjs.push(pushBtn);
     this._overlayObjs.push(
-      this.add.text(cx + 118, btnY, `Push  (new hand, risk ${result.nextPushPenaltyPct}%)`, {
+      this.add.text(cx + 118, btnY, `Push  (risk flow \xD7${result.nextFailFlow.toFixed(2)})`, {
         fontSize: '14px', color: '#ffffff',
       }).setOrigin(0.5).setDepth(25)
     );

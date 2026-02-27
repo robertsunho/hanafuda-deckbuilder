@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// ScoringEngine — simplified 7-yaku evaluation (multiplier-based)
+// ScoringEngine — 6-yaku evaluation (multiplier-based)
 //
 // Call evaluate(capturedCards) with any array of card objects from cards.js.
 // Returns an array of matched yaku, each as:
@@ -13,9 +13,8 @@
 //   Tanzaku     ×1.3 base  (+0.2/ribbon beyond 4; +0.4 for red set; +0.4 for blue set)
 //   Hikari      ×1.5 base  (+0.3/bright beyond 2; Rain Man −0.2; all 5 → ×5.0)
 //   Kasu        ×1.3 base  (+0.15/plain beyond 5)
-//   Hanami-zake ×1.5 flat  (march_curtain + september_sake)
-//   Tsukimi-zake×1.5 flat  (august_moon  + september_sake)
-//   Full Month  ×1.5 flat  per month where all 4 cards are captured
+//   Tsuki-narabi×1.4 base  (+0.2/month beyond 4; longest consecutive month run)
+//   Full Month  ×1.5+0.5n  single entry; 1 month=×1.5, 2=×2.0, … 12=×7.0
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Fixed card sets ───────────────────────────────────────────────────────────
@@ -51,9 +50,6 @@ const AOTAN_IDS = new Set([
   "october_ribbon",
 ]);
 
-const HANAMI_ZAKE_IDS  = new Set(["march_curtain",  "september_sake"]);
-const TSUKIMI_ZAKE_IDS = new Set(["august_moon",    "september_sake"]);
-
 // ── Public yaku catalogue ─────────────────────────────────────────────────────
 
 /**
@@ -69,12 +65,10 @@ export const YAKU_INFO = {
                   description: "2+ Brights (×1.5, +0.3× each extra). Rain Man −0.2×. All 5 Brights = ×5.0." },
   KASU:         { name: "Kasu",          multiplier: 1.3,
                   description: "5+ Plains (×1.3, +0.15× each extra)." },
-  HANAMI_ZAKE:  { name: "Hanami-zake",   multiplier: 1.5,
-                  description: "Cherry Blossom Curtain + Sake Cup." },
-  TSUKIMI_ZAKE: { name: "Tsukimi-zake",  multiplier: 1.5,
-                  description: "Full Moon + Sake Cup." },
+  TSUKI_NARABI: { name: "Tsuki-narabi",  multiplier: 1.4,
+                  description: "4+ consecutive months represented (×1.4, +0.2× each extra month)." },
   FULL_MONTH:   { name: "Full Month",    multiplier: 1.5,
-                  description: "All 4 cards from any one month. ×1.5 per completed month." },
+                  description: "All 4 cards from any one month. ×1.5 for first; +0.5× each additional (max ×7.0 for all 12)." },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -101,8 +95,7 @@ export default class ScoringEngine {
     this._push(results, this._checkTanzaku(byType.ribbon));
     this._push(results, this._checkHikari(byType.bright));
     this._push(results, this._checkKasu(byType.plain));
-    this._push(results, this._checkHanamiZake(capturedCards));
-    this._push(results, this._checkTsukimiZake(capturedCards));
+    this._push(results, this._checkTsukiNarabi(capturedCards));
 
     // Full Month can fire for multiple months simultaneously.
     for (const entry of this._checkFullMonth(capturedCards)) {
@@ -212,26 +205,71 @@ export default class ScoringEngine {
     return { name: YAKU_INFO.KASU.name, multiplier, cards: [...plains] };
   }
 
-  /** Hanami-zake — Cherry Blossom Curtain + Sake Cup (×1.5 flat). */
-  _checkHanamiZake(capturedCards) {
-    const matched = capturedCards.filter(c => HANAMI_ZAKE_IDS.has(c.id));
-    if (matched.length < 2) return null;
-    return { name: YAKU_INFO.HANAMI_ZAKE.name, multiplier: 1.5, cards: matched };
-  }
+  /**
+   * Tsuki-narabi — 4+ consecutive months represented in captured cards.
+   * Only requires at least one card from each month in the run.
+   * Scores the longest consecutive sequence found.
+   * ×1.4 base, +0.2× per month beyond 4.
+   *
+   * Examples:
+   *   Months 3,4,5,6     → ×1.4
+   *   Months 1,2,3,4,5   → ×1.6
+   *   Months 2,3,4,5,6,7 → ×1.8
+   */
+  _checkTsukiNarabi(capturedCards) {
+    // Collect unique months present
+    const months = new Set();
+    for (const card of capturedCards) {
+      months.add(card.month);
+    }
 
-  /** Tsukimi-zake — Full Moon + Sake Cup (×1.5 flat). */
-  _checkTsukimiZake(capturedCards) {
-    const matched = capturedCards.filter(c => TSUKIMI_ZAKE_IDS.has(c.id));
-    if (matched.length < 2) return null;
-    return { name: YAKU_INFO.TSUKIMI_ZAKE.name, multiplier: 1.5, cards: matched };
+    if (months.size < 4) return null;
+
+    // Sort months numerically and find longest consecutive run
+    const sorted = [...months].sort((a, b) => a - b);
+    let longestRun   = 1;
+    let currentRun   = 1;
+    let longestStart = sorted[0];
+    let currentStart = sorted[0];
+
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i] === sorted[i - 1] + 1) {
+        currentRun++;
+        if (currentRun > longestRun) {
+          longestRun   = currentRun;
+          longestStart = currentStart;
+        }
+      } else {
+        currentRun   = 1;
+        currentStart = sorted[i];
+      }
+    }
+
+    if (longestRun < 4) return null;
+
+    // Gather all cards belonging to months in the longest run
+    const runMonths = new Set();
+    for (let m = longestStart; m < longestStart + longestRun; m++) {
+      runMonths.add(m);
+    }
+    const cards = capturedCards.filter(c => runMonths.has(c.month));
+
+    const multiplier = 1.4 + (longestRun - 4) * 0.2;
+    return { name: YAKU_INFO.TSUKI_NARABI.name, multiplier, cards };
   }
 
   /**
    * Full Month — all 4 cards of any single month captured.
-   * ×1.5 per completed month; returns one entry per month (multiplicative stacking
-   * is handled by calculateTotalMultiplier like every other yaku).
    *
-   * @returns {{ name, multiplier, cards }[]}  Zero or more entries.
+   * Returns a SINGLE yaku entry whose multiplier scales additively:
+   *   1 month  → ×1.5
+   *   2 months → ×2.0
+   *   n months → ×(1.0 + 0.5 × n)   max ×7.0 for all 12
+   *
+   * One combined entry (not one per month) prevents exponential compounding
+   * when the player captures multiple complete months across several pushes.
+   *
+   * @returns {{ name, multiplier, cards }[]}  0 or 1 entries.
    */
   _checkFullMonth(capturedCards) {
     const byMonth = new Map();
@@ -239,12 +277,15 @@ export default class ScoringEngine {
       if (!byMonth.has(card.month)) byMonth.set(card.month, []);
       byMonth.get(card.month).push(card);
     }
-    const entries = [];
+    const completedCards = [];
+    let count = 0;
     for (const [, cards] of byMonth) {
       if (cards.length === 4) {
-        entries.push({ name: YAKU_INFO.FULL_MONTH.name, multiplier: 1.5, cards: [...cards] });
+        count++;
+        completedCards.push(...cards);
       }
     }
-    return entries;
+    if (count === 0) return [];
+    return [{ name: YAKU_INFO.FULL_MONTH.name, multiplier: 1.0 + 0.5 * count, cards: completedCards }];
   }
 }

@@ -134,11 +134,11 @@ export default class GameRoundManager {
     this._pushCount = 0;
 
     /**
-     * Fraction of the final score lost when the round ends under penalty.
-     * Escalates with each push: push 1 = 0.3, push 2 = 0.5, push 3 = 0.7, …
-     * Capped at 0.9.
+     * Style Base snapshot for this round — copied from run.styleBase at round
+     * start via setStyleBase().  Updated by recordStyleHand() when the player
+     * makes a resonance play.  Used to compute Flow at round end.
      */
-    this._pushPenaltyRate = 0;
+    this._styleBase = 1.0;
 
     /**
      * True when the round would normally end (hand empty or plays exhausted)
@@ -203,20 +203,46 @@ export default class GameRoundManager {
   setSpirits(spirits) { this._spirits = [...spirits]; }
 
   /**
+   * Set the Style Base for this round.  Call before startRound() with the
+   * run's current styleBase so scoring uses the up-to-date value.
+   * @param {number} styleBase
+   */
+  setStyleBase(styleBase) { this._styleBase = styleBase; }
+
+  /**
+   * Record a resonance (style) hand — increments the round's Style Base by 0.1.
+   * Also call run.accumulateStyle() from the game scene so the RunManager
+   * stays in sync for cross-round decay.
+   * @returns {number} The updated styleBase.
+   */
+  recordStyleHand() {
+    this._styleBase += 0.1;
+    return this._styleBase;
+  }
+
+  /**
    * Live scoring snapshot — evaluates the current capture pile and returns
    * the full picture needed to render the score HUD.
    *
-   * @returns {{ allYaku: object[], totalMultiplier: number,
-   *             basePoints: number, finalScore: number }}
+   * Push Factor shown here is the optimistic value (assumes no failure).
+   *
+   * @returns {{ allYaku, totalMultiplier, pushFactor, styleBase,
+   *             flow, basePoints, finalScore }}
    */
   getCurrentScoring() {
     const allYaku         = this._scoring.evaluate(this._capture.getAll(), this._spirits);
     const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
+    // Live estimate: assume best-case (no pending failure) for HUD display.
+    const pushFactor = Math.min(1.5, 1.0 + this._pushCount * 0.1);
+    const flow       = Math.max(1.0, this._styleBase * pushFactor);
     return {
       allYaku,
       totalMultiplier,
-      basePoints:  this._basePoints,
-      finalScore:  Math.round(this._basePoints * totalMultiplier),
+      pushFactor,
+      styleBase:  this._styleBase,
+      flow,
+      basePoints: this._basePoints,
+      finalScore: Math.round(this._basePoints * totalMultiplier * flow),
     };
   }
 
@@ -249,10 +275,9 @@ export default class GameRoundManager {
     this._discardsRemaining  = GameRoundManager.MAX_DISCARDS;
     this._basePoints         = 0;
     this._naturalCaptures    = [];
-    this._atRiskScore        = 0;
+    this._atRiskScore              = 0;
     this._pushPenaltyActive        = false;
     this._pushCount                = 0;
-    this._pushPenaltyRate          = 0;
     this._roundEndingAfterDecision = false;
     this._dogProtection            = false;
     this._pigDoubleKi              = false;
@@ -387,7 +412,10 @@ export default class GameRoundManager {
     }
     const allYaku         = this._scoring.evaluate(this._capture.getAll(), this._spirits);
     const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
-    const finalScore      = Math.round(this._basePoints * totalMultiplier);
+    // Banking counts as a successful outcome — Push Factor is positive.
+    const pushFactor = Math.min(1.5, 1.0 + this._pushCount * 0.1);
+    const flow       = Math.max(1.0, this._styleBase * pushFactor);
+    const finalScore = Math.round(this._basePoints * totalMultiplier * flow);
     this._roundEndingAfterDecision = false;
     this._phase = "round_over";
     return {
@@ -395,10 +423,12 @@ export default class GameRoundManager {
       newYaku:        [],
       allYaku,
       totalMultiplier,
+      pushFactor,
+      styleBase:      this._styleBase,
+      flow,
       basePoints:     this._basePoints,
       finalScore,
       penaltyApplied: false,
-      penaltyRate:    0,
       pushCount:      this._pushCount,
       pigDoubleKi:    this._pigDoubleKi,
       turn:           this._turn,
@@ -408,24 +438,25 @@ export default class GameRoundManager {
 
   /**
    * Push decision: accept the risk and continue playing.
-   * Each successive push shrinks the hand dealt, reduces available plays,
-   * and escalates the penalty rate.
+   * Each successive push shrinks the hand dealt and reduces available plays.
    *
    * Scaling (pushCount after increment):
-   *   Hand cards  = max(2, HAND_SIZE − pushCount × 2)   → 6, 4, 2, 2, …
-   *   Plays       = max(2, PLAYS_PER_ROUND − pushCount)  → 4, 3, 2, 2, …
-   *   Penalty     = min(0.9, 0.3 + (pushCount−1) × 0.2) → 30%, 50%, 70%, 90%
+   *   Hand cards = max(2, HAND_SIZE − pushCount × 2)  → 6, 4, 2, 2, …
+   *   Plays      = max(2, PLAYS_PER_ROUND − pushCount) → 4, 3, 2, 2, …
    *
-   * @returns {{ pushPenaltyPct: number }}  The penalty rate now in effect.
+   * Risk: if the round ends without a new yaku, Push Factor = −0.1 per push
+   * (floored at 0.5 after 5 pushes).  Dog consumable suppresses the downside.
+   *
+   * @returns {{ failedPushFactor: number, failedFlow: number }}
+   *   The Push Factor and Flow that would apply if THIS push fails.
    */
   pushOn() {
     if (this._phase !== "yaku_decision") {
       throw new Error(`pushOn() called while phase is "${this._phase}".`);
     }
 
-    this._roundEndingAfterDecision = false;   // round continues
+    this._roundEndingAfterDecision = false;
     this._pushCount++;
-    this._pushPenaltyRate   = Math.min(0.9, 0.3 + (this._pushCount - 1) * 0.2);
 
     const allYaku         = this._scoring.evaluate(this._capture.getAll(), this._spirits);
     const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
@@ -442,7 +473,12 @@ export default class GameRoundManager {
     this._discardsRemaining = GameRoundManager.MAX_DISCARDS;
     this._phase = "idle";
 
-    return { pushPenaltyPct: Math.round(this._pushPenaltyRate * 100) };
+    // Return the Flow that would apply if this push fails (for the status bar).
+    const failedPushFactor = this._dogProtection
+      ? 1.0
+      : Math.max(0.5, 1.0 - this._pushCount * 0.1);
+    const failedFlow = Math.max(1.0, this._styleBase * failedPushFactor);
+    return { failedPushFactor, failedFlow };
   }
 
   /**
@@ -647,15 +683,29 @@ export default class GameRoundManager {
     // Round ends when the hand is empty OR the play limit is reached.
     const roundOver = this._hand.isEmpty() || this._playsRemaining <= 0;
 
-    // Apply the escalating penalty only when the round ends under penalty.
-    // Dog consumable suppresses the penalty entirely.
+    // Dog consumable suppresses the push penalty (treats the outcome as success).
     const penaltyApplied = roundOver && this._pushPenaltyActive && !this._dogProtection;
-    const finalScore     = Math.round(
-      this._basePoints * totalMultiplier * (penaltyApplied ? (1 - this._pushPenaltyRate) : 1.0)
-    );
 
-    // The rate the player would face if they choose to push on this turn.
-    const nextPushPenaltyPct = Math.round(Math.min(0.9, 0.3 + this._pushCount * 0.2) * 100);
+    // ── Push Factor ───────────────────────────────────────────────────────────
+    // Success (or no push): +0.1 per push, capped at ×1.5 after 5 pushes.
+    // Failure (round ends under penalty): −0.1 per push, floored at ×0.5.
+    const pushFactor = penaltyApplied
+      ? Math.max(0.5, 1.0 - this._pushCount * 0.1)
+      : Math.min(1.5, 1.0 + this._pushCount * 0.1);
+
+    // ── Flow ─────────────────────────────────────────────────────────────────
+    // Flow = Style Base × Push Factor, floored at 1.0 so the player always
+    // scores at least Base Points × Yaku Multiplier.
+    const flow       = Math.max(1.0, this._styleBase * pushFactor);
+    const finalScore = Math.round(this._basePoints * totalMultiplier * flow);
+
+    // For the Bank/Push decision overlay: what Flow would result if the NEXT
+    // push also fails?  Used by the UI to show the downside risk.
+    const nextPushCount      = this._pushCount + 1;
+    const nextFailPushFactor = this._dogProtection
+      ? 1.0
+      : Math.max(0.5, 1.0 - nextPushCount * 0.1);
+    const nextFailFlow = Math.max(1.0, this._styleBase * nextFailPushFactor);
 
     if (newYaku.length > 0) {
       // A new yaku always triggers a Bank/Push decision, even on the final play.
@@ -675,13 +725,15 @@ export default class GameRoundManager {
       newYaku,
       allYaku,
       totalMultiplier,
+      pushFactor,
+      styleBase:           this._styleBase,
+      flow,
       basePoints:          this._basePoints,
       finalScore,
       penaltyApplied,
-      penaltyRate:         penaltyApplied ? this._pushPenaltyRate : 0,
       pushCount:           this._pushCount,
       pigDoubleKi:         this._pigDoubleKi,
-      nextPushPenaltyPct,
+      nextFailFlow,
       turn:                this._turn,
       deckCard:            this._lastDeckCard,
       discarded:           [...this._discardedThisTurn],

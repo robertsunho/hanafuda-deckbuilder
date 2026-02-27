@@ -34,11 +34,20 @@ class RunManager {
 
     /** Cumulative score across all completed rounds. */
     this._totalScore = 0;
+
+    /**
+     * Style Base — the player's skill expression multiplier.
+     * Starts at 1.0.  Grows +0.1 per resonance (style) play during a round.
+     * Decays 30% toward 1.0 between rounds: newStyle = 1.0 + (old − 1.0) × 0.7.
+     * Cannot be boosted by spirits — it is the player-skill layer only.
+     */
+    this._styleBase = 1.0;
   }
 
   // ── Ki economy ─────────────────────────────────────────────────────────────
 
-  get ki() { return this._ki; }
+  get ki()        { return this._ki; }
+  get styleBase() { return this._styleBase; }
 
   /**
    * Add ki to the balance.
@@ -129,8 +138,6 @@ class RunManager {
     return this.removeConsumable(index);
   }
 
-  // ── Run progression ────────────────────────────────────────────────────────
-
   get round()      { return this._round; }
   get totalScore() { return this._totalScore; }
 
@@ -141,14 +148,36 @@ class RunManager {
    */
   get isSacredGrove() { return this._round % 3 === 0; }
 
+  // ── Style Base ─────────────────────────────────────────────────────────────
+
   /**
-   * Increment the round counter and add a completed round's score to the
-   * cumulative total.
+   * Increment Style Base by the given amount (default +0.1 per style hand).
+   * Called by the game scene whenever the player completes a resonance play.
+   * @param {number} [amount=0.1]
+   */
+  accumulateStyle(amount = 0.1) {
+    this._styleBase += amount;
+  }
+
+  /**
+   * Decay Style Base 30% toward 1.0.  Called automatically by advanceRound().
+   * newStyle = 1.0 + (oldStyle − 1.0) × 0.7
+   */
+  decayStyle() {
+    this._styleBase = 1.0 + (this._styleBase - 1.0) * 0.7;
+  }
+
+  // ── Run progression ────────────────────────────────────────────────────────
+
+  /**
+   * Increment the round counter, add a completed round's score to the
+   * cumulative total, and decay Style Base toward 1.0.
    * @param {number} [roundScore=0]  The final score from the completed round.
    * @returns {this}
    */
   advanceRound(roundScore = 0) {
     this._totalScore += roundScore;
+    this.decayStyle();
     this._round++;
     return this;
   }
@@ -209,6 +238,7 @@ class RunManager {
       ki:           this._ki,
       round:        this._round,
       totalScore:   this._totalScore,
+      styleBase:    this._styleBase,
       spirits:      [...this._spirits],
       consumables:  [...this._consumables],
     };

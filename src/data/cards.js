@@ -9,7 +9,7 @@
 //
 // Tags are thematic descriptors used to compute spirit / hexagram affinity.
 //
-// vertical: 'sky' | 'earth' — cosmic axis of the card's imagery
+// vertical: 'sky' | 'land' — cosmic axis of the card's imagery
 // temporal: 'day' | 'night' — time-of-day quality of the card
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -37,7 +37,7 @@ export const cards = [
     points: 10,
     name: "Pine Poetry Ribbon",
     tags: ["poetry", "noble", "winter", "evergreen"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
   {
@@ -49,7 +49,7 @@ export const cards = [
     points: 3,
     name: "Pine Plain",
     tags: ["winter", "evergreen"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
   {
@@ -61,7 +61,7 @@ export const cards = [
     points: 3,
     name: "Pine Plain",
     tags: ["winter", "evergreen"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
 
@@ -87,7 +87,7 @@ export const cards = [
     points: 10,
     name: "Plum Poetry Ribbon",
     tags: ["poetry", "spring", "blossom"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
   {
@@ -99,7 +99,7 @@ export const cards = [
     points: 3,
     name: "Plum Plain",
     tags: ["spring", "blossom"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
   {
@@ -111,7 +111,7 @@ export const cards = [
     points: 3,
     name: "Plum Plain",
     tags: ["spring", "blossom"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
 
@@ -125,7 +125,7 @@ export const cards = [
     points: 20,
     name: "Cherry Blossom Viewing Curtain",
     tags: ["celebration", "spring", "noble", "blossom", "ceremony", "revelry"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
   {
@@ -137,7 +137,7 @@ export const cards = [
     points: 10,
     name: "Cherry Poetry Ribbon",
     tags: ["poetry", "spring", "blossom"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
   {
@@ -149,7 +149,7 @@ export const cards = [
     points: 3,
     name: "Cherry Plain",
     tags: ["spring", "blossom"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
   {
@@ -161,7 +161,7 @@ export const cards = [
     points: 3,
     name: "Cherry Plain",
     tags: ["spring", "blossom"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
 
@@ -187,7 +187,7 @@ export const cards = [
     points: 10,
     name: "Wisteria Ribbon",
     tags: ["spring", "vine", "delicate"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
   {
@@ -199,7 +199,7 @@ export const cards = [
     points: 3,
     name: "Wisteria Plain",
     tags: ["spring", "vine"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
   {
@@ -211,7 +211,7 @@ export const cards = [
     points: 3,
     name: "Wisteria Plain",
     tags: ["spring", "vine"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
 
@@ -225,7 +225,7 @@ export const cards = [
     points: 12,
     name: "Eight-Plank Bridge",
     tags: ["water", "bridge", "spring", "journey", "passage"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
   {
@@ -237,7 +237,7 @@ export const cards = [
     points: 10,
     name: "Iris Ribbon",
     tags: ["spring", "water", "flower"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
   {
@@ -249,7 +249,7 @@ export const cards = [
     points: 3,
     name: "Iris Plain",
     tags: ["spring", "water"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
   {
@@ -261,7 +261,7 @@ export const cards = [
     points: 3,
     name: "Iris Plain",
     tags: ["spring", "water"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
 
@@ -287,7 +287,7 @@ export const cards = [
     points: 10,
     name: "Peony Blue Ribbon",
     tags: ["summer", "flower", "noble", "poetry"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
   {
@@ -299,7 +299,7 @@ export const cards = [
     points: 3,
     name: "Peony Plain",
     tags: ["summer", "flower"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
   {
@@ -311,7 +311,7 @@ export const cards = [
     points: 3,
     name: "Peony Plain",
     tags: ["summer", "flower"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
 
@@ -325,7 +325,7 @@ export const cards = [
     points: 12,
     name: "Wild Boar",
     tags: ["animal", "summer", "wild", "hunt", "forest", "earth"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
   {
@@ -337,7 +337,7 @@ export const cards = [
     points: 10,
     name: "Bush Clover Ribbon",
     tags: ["summer", "field", "wild"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
   {
@@ -349,7 +349,7 @@ export const cards = [
     points: 3,
     name: "Bush Clover Plain",
     tags: ["summer", "field"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
   {
@@ -361,7 +361,7 @@ export const cards = [
     points: 3,
     name: "Bush Clover Plain",
     tags: ["summer", "field"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
 
@@ -399,7 +399,7 @@ export const cards = [
     points: 3,
     name: "Pampas Plain",
     tags: ["autumn", "field", "wind"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
   {
@@ -411,7 +411,7 @@ export const cards = [
     points: 3,
     name: "Pampas Plain",
     tags: ["autumn", "field", "wind"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
 
@@ -425,7 +425,7 @@ export const cards = [
     points: 12,
     name: "Sake Cup",
     tags: ["celebration", "autumn", "longevity", "ritual", "drink", "noble"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
   {
@@ -437,7 +437,7 @@ export const cards = [
     points: 10,
     name: "Chrysanthemum Blue Ribbon",
     tags: ["autumn", "flower", "noble", "poetry"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
   {
@@ -449,7 +449,7 @@ export const cards = [
     points: 3,
     name: "Chrysanthemum Plain",
     tags: ["autumn", "flower"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
   {
@@ -461,7 +461,7 @@ export const cards = [
     points: 3,
     name: "Chrysanthemum Plain",
     tags: ["autumn", "flower"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
 
@@ -475,7 +475,7 @@ export const cards = [
     points: 12,
     name: "Deer among Maple",
     tags: ["animal", "autumn", "forest", "grace", "foliage", "earth"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
   {
@@ -487,7 +487,7 @@ export const cards = [
     points: 10,
     name: "Maple Blue Ribbon",
     tags: ["autumn", "foliage", "noble", "poetry"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
   {
@@ -499,7 +499,7 @@ export const cards = [
     points: 3,
     name: "Maple Plain",
     tags: ["autumn", "foliage"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
   {
@@ -511,7 +511,7 @@ export const cards = [
     points: 3,
     name: "Maple Plain",
     tags: ["autumn", "foliage"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "day",
   },
 
@@ -549,7 +549,7 @@ export const cards = [
     points: 10,
     name: "Willow Ribbon",
     tags: ["rain", "water", "winter", "sorrow"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
   {
@@ -587,7 +587,7 @@ export const cards = [
     points: 3,
     name: "Paulownia Plain",
     tags: ["winter", "noble", "evergreen"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
   {
@@ -599,7 +599,7 @@ export const cards = [
     points: 3,
     name: "Paulownia Plain",
     tags: ["winter", "noble", "evergreen"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
   {
@@ -611,7 +611,7 @@ export const cards = [
     points: 3,
     name: "Paulownia Yellow Sky Plain",
     tags: ["winter", "noble", "sky"],
-    vertical: "earth",
+    vertical: "land",
     temporal: "night",
   },
 ];
@@ -653,13 +653,13 @@ export const cardsByTag = cards.reduce((acc, card) => {
 }, {});
 
 /**
- * Cards grouped by vertical axis: "sky" | "earth".
- * @type {{ sky: typeof cards, earth: typeof cards }}
+ * Cards grouped by vertical axis: "sky" | "land".
+ * @type {{ sky: typeof cards, land: typeof cards }}
  * @example cardsByVertical.sky // the 10 sky cards
  */
 export const cardsByVertical = {
-  sky:   cards.filter(c => c.vertical === "sky"),
-  earth: cards.filter(c => c.vertical === "earth"),
+  sky:  cards.filter(c => c.vertical === "sky"),
+  land: cards.filter(c => c.vertical === "land"),
 };
 
 /**
@@ -674,13 +674,13 @@ export const cardsByTemporal = {
 
 /**
  * Cards grouped by combined vertical+temporal quadrant.
- * Keys: "sky+day" | "sky+night" | "earth+day" | "earth+night".
+ * Keys: "sky+day" | "sky+night" | "land+day" | "land+night".
  * @type {Object.<string, typeof cards>}
  * @example cardsByQuadrant['sky+night'] // Moon, Geese, Cuckoo, Rain Man, Swallow, Lightning
  */
 export const cardsByQuadrant = {
-  "sky+day":    cards.filter(c => c.vertical === "sky"   && c.temporal === "day"),
-  "sky+night":  cards.filter(c => c.vertical === "sky"   && c.temporal === "night"),
-  "earth+day":  cards.filter(c => c.vertical === "earth" && c.temporal === "day"),
-  "earth+night":cards.filter(c => c.vertical === "earth" && c.temporal === "night"),
+  "sky+day":   cards.filter(c => c.vertical === "sky"  && c.temporal === "day"),
+  "sky+night": cards.filter(c => c.vertical === "sky"  && c.temporal === "night"),
+  "land+day":  cards.filter(c => c.vertical === "land" && c.temporal === "day"),
+  "land+night":cards.filter(c => c.vertical === "land" && c.temporal === "night"),
 };

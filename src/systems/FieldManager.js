@@ -228,10 +228,11 @@ export default class FieldManager {
     const total  = target.cards.length;
 
     if (total >= 4) {
-      // Full month set — capture immediately.
-      const captured = [...target.cards];
-      this._nullify(target);
-      return { matched: true, discarded: false, captured };
+      // Full month set assembled — mark pending so the cards remain visible
+      // on the field through the hand-phase pause and deck-flip animation.
+      // Capture is deferred to the deck phase (capturePendingMatch).
+      target.state = 'pending';
+      return { matched: true, discarded: false, captured: null };
     }
 
     if (fieldCardCount > 0 && cards.length === 1 && total === 2) {
