@@ -1,119 +1,208 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// SpiritEffects — scoring hook registry for all spirits
+// SpiritEffects — three-channel scoring registry for all 24 spirits
 //
-// Each entry may define:
-//   modifyScoring(capturedCards, allYaku) → extraYaku[]
-//     Called by ScoringEngine.evaluate() after all standard yaku have been
-//     checked.  Returns zero or more additional yaku entries to append.
-//     Entry shape: { name: string, multiplier: number, cards: object[],
-//                    isSpiritBonus: true }
-//     The isSpiritBonus flag prevents these entries from triggering the
-//     Bank/Push yaku_decision phase in GameRoundManager.
+// Each entry may implement any combination of:
 //
-// Spirits whose effects are entirely in-play (deal-time or round-end) appear
-// as empty stubs — they have no scoring hook but are still registered so
-// SpiritEffects.get() never returns null for a known spirit id.
+//   getPointBoosts({ capturedCards, spirits })
+//     → Map<cardId, multiplier> | null
+//     Channel 1: multiply the base point value of specific captured cards.
+//     Boosts stack multiplicatively across spirits (two ×2 effects = ×4).
+//
+//   getAdditiveMult({ capturedCards, yakuList, spirits })
+//     → number (default 0)
+//     Channel 2: flat addition to the yaku multiplier layer.
+//     Stacks additively: two +0.3 effects = +0.6 total.
+//
+//   getMultMult({ capturedCards, yakuList, spirits })
+//     → number (default 1.0)
+//     Channel 3: multiplies the entire (Yaku + Additive) layer.
+//     Stacks multiplicatively: two ×1.3 effects = ×1.69.
+//
+// Axis spirits use card.vertical ('sky' | 'ground') and card.temporal ('day' | 'night').
+// Note: Land cards use 'ground' internally; the display name is 'Land'.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ── Factory helpers ───────────────────────────────────────────────────────────
+
+function monthPointBoost(months, mult) {
+  const set = new Set(months);
+  return {
+    getPointBoosts({ capturedCards }) {
+      const boosts = new Map();
+      for (const card of capturedCards) {
+        if (set.has(card.month)) boosts.set(card.id, mult);
+      }
+      return boosts.size > 0 ? boosts : null;
+    },
+  };
+}
+
+function monthAdditiveMult(months, bonusPerCard) {
+  const set = new Set(months);
+  return {
+    getAdditiveMult({ capturedCards }) {
+      let n = 0;
+      for (const card of capturedCards) {
+        if (set.has(card.month)) n++;
+      }
+      return n * bonusPerCard;
+    },
+  };
+}
+
+function monthFusion(months, mult, bonusPerCard) {
+  const set = new Set(months);
+  return {
+    getPointBoosts({ capturedCards }) {
+      const boosts = new Map();
+      for (const card of capturedCards) {
+        if (set.has(card.month)) boosts.set(card.id, mult);
+      }
+      return boosts.size > 0 ? boosts : null;
+    },
+    getAdditiveMult({ capturedCards }) {
+      let n = 0;
+      for (const card of capturedCards) {
+        if (set.has(card.month)) n++;
+      }
+      return n * bonusPerCard;
+    },
+  };
+}
+
+function verticalPointBoost(vertical, mult) {
+  return {
+    getPointBoosts({ capturedCards }) {
+      const boosts = new Map();
+      for (const card of capturedCards) {
+        if (card.vertical === vertical) boosts.set(card.id, mult);
+      }
+      return boosts.size > 0 ? boosts : null;
+    },
+  };
+}
+
+function verticalAdditiveMult(vertical, bonusPerCard) {
+  return {
+    getAdditiveMult({ capturedCards }) {
+      let n = 0;
+      for (const card of capturedCards) {
+        if (card.vertical === vertical) n++;
+      }
+      return n * bonusPerCard;
+    },
+  };
+}
+
+function verticalFusion(vertical, mult, bonusPerCard) {
+  return {
+    getPointBoosts({ capturedCards }) {
+      const boosts = new Map();
+      for (const card of capturedCards) {
+        if (card.vertical === vertical) boosts.set(card.id, mult);
+      }
+      return boosts.size > 0 ? boosts : null;
+    },
+    getAdditiveMult({ capturedCards }) {
+      let n = 0;
+      for (const card of capturedCards) {
+        if (card.vertical === vertical) n++;
+      }
+      return n * bonusPerCard;
+    },
+  };
+}
+
+function temporalPointBoost(temporal, mult) {
+  return {
+    getPointBoosts({ capturedCards }) {
+      const boosts = new Map();
+      for (const card of capturedCards) {
+        if (card.temporal === temporal) boosts.set(card.id, mult);
+      }
+      return boosts.size > 0 ? boosts : null;
+    },
+  };
+}
+
+function temporalAdditiveMult(temporal, bonusPerCard) {
+  return {
+    getAdditiveMult({ capturedCards }) {
+      let n = 0;
+      for (const card of capturedCards) {
+        if (card.temporal === temporal) n++;
+      }
+      return n * bonusPerCard;
+    },
+  };
+}
+
+function temporalFusion(temporal, mult, bonusPerCard) {
+  return {
+    getPointBoosts({ capturedCards }) {
+      const boosts = new Map();
+      for (const card of capturedCards) {
+        if (card.temporal === temporal) boosts.set(card.id, mult);
+      }
+      return boosts.size > 0 ? boosts : null;
+    },
+    getAdditiveMult({ capturedCards }) {
+      let n = 0;
+      for (const card of capturedCards) {
+        if (card.temporal === temporal) n++;
+      }
+      return n * bonusPerCard;
+    },
+  };
+}
+
+// ── Spirit effect registry ────────────────────────────────────────────────────
 
 const _effects = {
 
-  // ── Seasonal spirits (common) ─────────────────────────────────────────────
-  // +0.3× per captured card whose month falls in the matching season.
+  // ── Seasonal Point Boost ──────────────────────────────────────────────────
 
-  spirit_spring: {
-    modifyScoring(capturedCards) {
-      const months = new Set([3, 4, 5]);
-      const count  = capturedCards.filter(c => months.has(c.month)).length;
-      if (count === 0) return [];
-      return [{ name: 'Spring Spirit', multiplier: 1.0 + 0.3 * count, cards: [], isSpiritBonus: true }];
-    },
-  },
+  spring_pollen:  monthPointBoost([3, 4, 5],   1.5),
+  summer_heat:    monthPointBoost([6, 7, 8],   1.5),
+  autumn_harvest: monthPointBoost([9, 10, 11], 1.5),
+  winter_cold:    monthPointBoost([12, 1, 2],  1.5),
 
-  spirit_summer: {
-    modifyScoring(capturedCards) {
-      const months = new Set([6, 7, 8]);
-      const count  = capturedCards.filter(c => months.has(c.month)).length;
-      if (count === 0) return [];
-      return [{ name: 'Summer Spirit', multiplier: 1.0 + 0.3 * count, cards: [], isSpiritBonus: true }];
-    },
-  },
+  // ── Seasonal Additive Mult ────────────────────────────────────────────────
 
-  spirit_autumn: {
-    modifyScoring(capturedCards) {
-      const months = new Set([9, 10, 11]);
-      const count  = capturedCards.filter(c => months.has(c.month)).length;
-      if (count === 0) return [];
-      return [{ name: 'Autumn Spirit', multiplier: 1.0 + 0.3 * count, cards: [], isSpiritBonus: true }];
-    },
-  },
+  spring_bees:     monthAdditiveMult([3, 4, 5],   0.1),
+  summer_humidity: monthAdditiveMult([6, 7, 8],   0.1),
+  autumn_leaves:   monthAdditiveMult([9, 10, 11], 0.1),
+  winter_aridity:  monthAdditiveMult([12, 1, 2],  0.1),
 
-  spirit_winter: {
-    modifyScoring(capturedCards) {
-      const months = new Set([12, 1, 2]);
-      const count  = capturedCards.filter(c => months.has(c.month)).length;
-      if (count === 0) return [];
-      return [{ name: 'Winter Spirit', multiplier: 1.0 + 0.3 * count, cards: [], isSpiritBonus: true }];
-    },
-  },
+  // ── Axis Point Boost ──────────────────────────────────────────────────────
+  // Land uses card.vertical === 'ground' internally.
 
-  // ── Yaku threshold spirits (uncommon) ─────────────────────────────────────
-  // Each lowers the activation threshold for its target yaku.
-  // The spirit entry only fires when the standard yaku has NOT already triggered
-  // (to avoid double-counting the same card type).
+  sky_clouds: verticalPointBoost('sky',    1.7),
+  land_soil:  verticalPointBoost('ground', 1.2),
+  day_light:  temporalPointBoost('day',    1.4),
+  night_dark: temporalPointBoost('night',  1.3),
 
-  spirit_tane_no_kami: {
-    /**
-     * Tane threshold lowered to 2 animals.
-     * Multiplier: ×1.3 base, +0.1× per animal beyond 2.
-     * Skips if standard Tane (3+) already fired this evaluation.
-     */
-    modifyScoring(capturedCards, allYaku) {
-      const animals = capturedCards.filter(c => c.type === 'animal');
-      if (animals.length < 2) return [];
-      if (allYaku.some(y => y.name === 'Tane')) return [];
-      const multiplier = 1.3 + (animals.length - 2) * 0.1;
-      return [{ name: 'Tane (Spirit)', multiplier, cards: animals, isSpiritBonus: true }];
-    },
-  },
+  // ── Axis Additive Mult ────────────────────────────────────────────────────
 
-  spirit_tanzaku_no_kami: {
-    /**
-     * Tanzaku threshold lowered to 3 ribbons.
-     * Multiplier: ×1.3 base, +0.1× per ribbon beyond 3.
-     * Skips if standard Tanzaku (4+) already fired this evaluation.
-     */
-    modifyScoring(capturedCards, allYaku) {
-      const ribbons = capturedCards.filter(c => c.type === 'ribbon');
-      if (ribbons.length < 3) return [];
-      if (allYaku.some(y => y.name === 'Tanzaku')) return [];
-      const multiplier = 1.3 + (ribbons.length - 3) * 0.1;
-      return [{ name: 'Tanzaku (Spirit)', multiplier, cards: ribbons, isSpiritBonus: true }];
-    },
-  },
+  sky_wind:        verticalAdditiveMult('sky',    0.15),
+  land_rock:       verticalAdditiveMult('ground', 0.05),
+  day_movement:    temporalAdditiveMult('day',    0.07),
+  night_stillness: temporalAdditiveMult('night',  0.07),
 
-  spirit_kasu_no_kami: {
-    /**
-     * Kasu threshold lowered to 4 plains.
-     * Multiplier: ×1.3 base, +0.1× per plain beyond 4.
-     * Skips if standard Kasu (5+) already fired this evaluation.
-     */
-    modifyScoring(capturedCards, allYaku) {
-      const plains = capturedCards.filter(c => c.type === 'plain');
-      if (plains.length < 4) return [];
-      if (allYaku.some(y => y.name === 'Kasu')) return [];
-      const multiplier = 1.3 + (plains.length - 4) * 0.1;
-      return [{ name: 'Kasu (Spirit)', multiplier, cards: plains, isSpiritBonus: true }];
-    },
-  },
+  // ── Seasonal Fusion Spirits ───────────────────────────────────────────────
+  // Both channels active with reduced values vs. holding both base spirits.
 
-  // ── Rare spirits (in-play effects — no scoring hook) ──────────────────────
+  fusion_bloom:        monthFusion([3, 4, 5],   1.4, 0.08),
+  fusion_thunderstorm: monthFusion([6, 7, 8],   1.4, 0.08),
+  fusion_decay:        monthFusion([9, 10, 11], 1.4, 0.08),
+  fusion_blizzard:     monthFusion([12, 1, 2],  1.4, 0.08),
 
-  spirit_kitsune:  {},  // wild_hand_card: one hand card goes wild at deal time (stub)
-  spirit_dokkaebi: {},  // double_random_yaku: doubles one yaku multiplier at round end (stub)
+  // ── Axis Fusion Spirits ───────────────────────────────────────────────────
 
-  // ── Legendary spirits (complex cross-type effect — no scoring hook) ────────
-
-  spirit_yin_yang: {},  // multi_type_yaku_bonus: +0.5× per type if 2+ types scored (stub)
+  fusion_atmosphere: verticalFusion('sky',    1.5,  0.12),
+  fusion_continent:  verticalFusion('ground', 1.15, 0.04),
+  fusion_sun:        temporalFusion('day',    1.3,  0.05),
+  fusion_moon:       temporalFusion('night',  1.2,  0.05),
 };
 
 // ── Public interface ──────────────────────────────────────────────────────────
@@ -121,7 +210,10 @@ const _effects = {
 /**
  * Look up the effect definition for a spirit.
  * @param {string} spiritId
- * @returns {{ modifyScoring?: Function }|null}  null if the id is unrecognised.
+ * @returns {{ getPointBoosts?: Function,
+ *             getAdditiveMult?: Function,
+ *             getMultMult?: Function }|null}
+ *   null if the id is unrecognised.
  */
 const SpiritEffects = {
   get(spiritId) { return _effects[spiritId] ?? null; },

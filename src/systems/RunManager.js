@@ -3,6 +3,8 @@
 //
 // Manages the ki economy, spirit loadout, consumable inventory, and run
 // progression for the entire run.  Import the exported instance, not the class:
+import { findFusionRecipe } from '../data/fusionRecipes.js';
+import { getSpiritDef }     from '../data/spirits.js';
 //
 //   import run from './systems/RunManager.js';
 //   run.addKi(5);
@@ -12,7 +14,7 @@
 
 class RunManager {
 
-  static MAX_SPIRIT_SLOTS     = 4;
+  static MAX_SPIRIT_SLOTS     = 6;
   static MAX_CONSUMABLE_SLOTS = 3;
 
   static TOTAL_ROUNDS   = 18;
@@ -141,6 +143,34 @@ class RunManager {
       throw new Error(`No spirit at index ${index}.`);
     }
     return this._spirits.splice(index, 1)[0];
+  }
+
+  /**
+   * Fuse two equipped spirits into one using a known fusion recipe.
+   * Removes both input spirits and adds the fused result, freeing one slot.
+   * No ki cost — the cost was purchasing both inputs.
+   *
+   * @param {string} spiritIdA
+   * @param {string} spiritIdB
+   * @returns {{ success: boolean, reason?: string, fusedSpirit?: object }}
+   */
+  fuseSpirits(spiritIdA, spiritIdB) {
+    const recipe = findFusionRecipe(spiritIdA, spiritIdB);
+    if (!recipe) return { success: false, reason: 'No fusion recipe exists for these spirits.' };
+
+    const indexA = this._spirits.findIndex(s => s.id === spiritIdA);
+    const indexB = this._spirits.findIndex(s => s.id === spiritIdB);
+    if (indexA === -1 || indexB === -1) return { success: false, reason: 'Spirits not equipped.' };
+
+    // Remove higher index first to keep lower index stable.
+    const [first, second] = indexA > indexB ? [indexA, indexB] : [indexB, indexA];
+    this._spirits.splice(first, 1);
+    this._spirits.splice(second, 1);
+
+    const fusedDef = getSpiritDef(recipe.output);
+    this._spirits.push({ id: fusedDef.id, name: fusedDef.name });
+
+    return { success: true, fusedSpirit: fusedDef };
   }
 
   // ── Consumable inventory ───────────────────────────────────────────────────
