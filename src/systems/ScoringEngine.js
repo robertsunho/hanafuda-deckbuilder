@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// ScoringEngine — 6-yaku evaluation (additive bonus system)
+// ScoringEngine — 5-yaku evaluation (flat additive bonus system)
 //
 // Call evaluate(capturedCards) with any array of card objects from cards.js.
 // Returns an array of matched yaku, each as:
@@ -9,13 +9,18 @@
 //   total multiplier = 1.0 + sum(all yaku bonuses)
 // No yaku → total multiplier of 1.0 (base points unchanged).
 //
-// Yaku summary:
-//   Kasu        +0.3 base  (+0.1/plain beyond 5)
-//   Tanzaku     +0.3 base  (+0.15/ribbon beyond 3)
-//   Tane        +0.4 base  (+0.1/animal beyond 3)
-//   Tsuki-narabi+0.3 base  (+0.05/month beyond 5; longest consecutive run)
-//   Full Month  +0.6 first (+0.3 second, +0.15 third, +0.1 each after)
-//   Hikari      +0.7 base  (+0.3/bright beyond 2)
+// Yaku summary (all flat — no per-extra scaling):
+//   Kasu        +0.3  (5+ plains)
+//   Tanzaku     +0.3  (3+ ribbons)
+//   Tane        +0.4  (3+ animals)
+//   Tsuki-narabi+0.3  (5+ consecutive months; longest run)
+//   Hikari      +0.7  (2+ brights)
+//
+// Maximum yaku mult: 1.0 + 0.3 + 0.3 + 0.4 + 0.3 + 0.7 = 3.0 (all 5 active)
+//
+// Full Month is NOT a yaku. Capturing all 4 cards of a month still adds +5
+// to base points (handled in calculateFinalScore), but triggers no yaku,
+// no Bank/Push decision, and no multiplier bonus.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Fixed card sets ───────────────────────────────────────────────────────────
@@ -32,21 +37,20 @@ const BRIGHT_IDS = new Set([
 
 /**
  * Static reference for every recognised yaku.
- * `baseBonus` shows the minimum additive bonus; scaling yaku go higher at runtime.
+ * `baseBonus` is the flat additive bonus — the same regardless of how many
+ * qualifying cards are captured beyond the threshold.
  */
 export const YAKU_INFO = {
-  TANE:         { name: "Tane",          baseBonus: 0.4,
-                  description: "3+ Animals (+0.4, +0.1 each extra)." },
-  TANZAKU:      { name: "Tanzaku",       baseBonus: 0.3,
-                  description: "3+ Ribbons (+0.3, +0.15 each extra)." },
-  HIKARI:       { name: "Hikari",        baseBonus: 0.7,
-                  description: "2+ Brights (+0.7, +0.3 each extra)." },
-  KASU:         { name: "Kasu",          baseBonus: 0.3,
-                  description: "5+ Plains (+0.3, +0.1 each extra)." },
-  TSUKI_NARABI: { name: "Tsuki-narabi",  baseBonus: 0.3,
-                  description: "5+ consecutive months represented (+0.3, +0.05 each extra)." },
-  FULL_MONTH:   { name: "Full Month",    baseBonus: 0.6,
-                  description: "All 4 cards from one month. +0.6 first, +0.3 second, +0.15 third, +0.1 each after." },
+  TANE:         { name: "Tane",         baseBonus: 0.4,
+                  description: "3+ Animals. Flat +0.4 bonus." },
+  TANZAKU:      { name: "Tanzaku",      baseBonus: 0.3,
+                  description: "3+ Ribbons. Flat +0.3 bonus." },
+  HIKARI:       { name: "Hikari",       baseBonus: 0.7,
+                  description: "2+ Brights. Flat +0.7 bonus." },
+  KASU:         { name: "Kasu",         baseBonus: 0.3,
+                  description: "5+ Plains. Flat +0.3 bonus." },
+  TSUKI_NARABI: { name: "Tsuki-narabi", baseBonus: 0.3,
+                  description: "5+ consecutive months represented. Flat +0.3 bonus." },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,8 +62,9 @@ export default class ScoringEngine {
   // ── Public API ─────────────────────────────────────────────────────────────
 
   /**
-   * Evaluate captured cards against all standard yaku.
+   * Evaluate captured cards against all 5 standard yaku.
    * Spirits operate via the three channels in calculateFinalScore(), not here.
+   * Full Month completion does NOT produce a yaku entry.
    *
    * @param {object[]} capturedCards  Card objects from cards.js
    * @returns {{ name: string, bonus: number, count: number, threshold: number }[]}
@@ -68,16 +73,11 @@ export default class ScoringEngine {
     const results = [];
     const byType  = this._partition(capturedCards);
 
-    this._push(results, this._checkTane(byType.animal));
-    this._push(results, this._checkTanzaku(byType.ribbon));
-    this._push(results, this._checkHikari(byType.bright));
     this._push(results, this._checkKasu(byType.plain));
+    this._push(results, this._checkTanzaku(byType.ribbon));
+    this._push(results, this._checkTane(byType.animal));
     this._push(results, this._checkTsukiNarabi(capturedCards));
-
-    // Full Month returns 0 or 1 entries (one combined entry for all full months).
-    for (const entry of this._checkFullMonth(capturedCards)) {
-      results.push(entry);
-    }
+    this._push(results, this._checkHikari(byType.bright));
 
     return results;
   }
@@ -132,7 +132,7 @@ export default class ScoringEngine {
       boostedCardSum += card.points * cardBoost;
     }
 
-    // Full-month bonus (+5 per complete month) is not affected by point boosts.
+    // +5 base points per complete month — not a yaku, not affected by boosts.
     const monthCounts = new Map();
     for (const c of capturedCards) {
       monthCounts.set(c.month, (monthCounts.get(c.month) || 0) + 1);
@@ -198,119 +198,57 @@ export default class ScoringEngine {
   // ── Yaku checkers ──────────────────────────────────────────────────────────
 
   /**
-   * Tane — 3+ Animal cards.
-   * +0.4 base, +0.1 per animal beyond 3.
-   */
-  _checkTane(animals) {
-    if (animals.length < 3) return null;
-    const bonus = 0.4 + (animals.length - 3) * 0.1;
-    return { name: YAKU_INFO.TANE.name, bonus, count: animals.length, threshold: 3 };
-  }
-
-  /**
-   * Tanzaku — 3+ Ribbon cards.
-   * +0.3 base, +0.15 per ribbon beyond 3.
-   */
-  _checkTanzaku(ribbons) {
-    if (ribbons.length < 3) return null;
-    const bonus = 0.3 + (ribbons.length - 3) * 0.15;
-    return { name: YAKU_INFO.TANZAKU.name, bonus, count: ribbons.length, threshold: 3 };
-  }
-
-  /**
-   * Hikari — 2+ Bright cards.
-   * +0.7 base, +0.3 per bright beyond 2.
-   */
-  _checkHikari(brights) {
-    const brightCards = brights.filter(c => BRIGHT_IDS.has(c.id));
-    if (brightCards.length < 2) return null;
-    const bonus = 0.7 + (brightCards.length - 2) * 0.3;
-    return { name: YAKU_INFO.HIKARI.name, bonus, count: brightCards.length, threshold: 2 };
-  }
-
-  /**
-   * Kasu — 5+ Plain cards.
-   * +0.3 base, +0.1 per plain beyond 5.
+   * Kasu — 5+ Plain cards. Flat +0.3 bonus.
    */
   _checkKasu(plains) {
     if (plains.length < 5) return null;
-    const bonus = 0.3 + (plains.length - 5) * 0.1;
-    return { name: YAKU_INFO.KASU.name, bonus, count: plains.length, threshold: 5 };
+    return { name: YAKU_INFO.KASU.name, bonus: 0.3, count: plains.length, threshold: 5 };
+  }
+
+  /**
+   * Tanzaku — 3+ Ribbon cards. Flat +0.3 bonus.
+   */
+  _checkTanzaku(ribbons) {
+    if (ribbons.length < 3) return null;
+    return { name: YAKU_INFO.TANZAKU.name, bonus: 0.3, count: ribbons.length, threshold: 3 };
+  }
+
+  /**
+   * Tane — 3+ Animal cards. Flat +0.4 bonus.
+   */
+  _checkTane(animals) {
+    if (animals.length < 3) return null;
+    return { name: YAKU_INFO.TANE.name, bonus: 0.4, count: animals.length, threshold: 3 };
   }
 
   /**
    * Tsuki-narabi — 5+ consecutive months represented in captured cards.
-   * Only requires at least one card from each month in the run.
-   * Scores the longest consecutive sequence found.
-   * +0.3 base, +0.05 per month beyond 5.
-   *
-   * Examples:
-   *   Months 3,4,5,6,7       → +0.30
-   *   Months 1,2,3,4,5,6     → +0.35
-   *   Months 2,3,4,5,6,7,8   → +0.40
+   * Requires at least one card from each month in the run.
+   * Scores the longest consecutive sequence found. Flat +0.3 bonus.
    */
   _checkTsukiNarabi(capturedCards) {
-    // Collect unique months present
-    const months = new Set();
-    for (const card of capturedCards) {
-      months.add(card.month);
-    }
-
-    if (months.size < 5) return null;
-
-    // Sort months numerically and find longest consecutive run
-    const sorted = [...months].sort((a, b) => a - b);
-    let longestRun   = 1;
-    let currentRun   = 1;
-    let currentStart = sorted[0];
-
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i] === sorted[i - 1] + 1) {
-        currentRun++;
-        if (currentRun > longestRun) {
-          longestRun = currentRun;
-        }
+    const capturedMonths = new Set(capturedCards.map(c => c.month));
+    let longest = 0;
+    let current = 0;
+    for (let m = 1; m <= 12; m++) {
+      if (capturedMonths.has(m)) {
+        current++;
+        longest = Math.max(longest, current);
       } else {
-        currentRun   = 1;
-        currentStart = sorted[i];
+        current = 0;
       }
     }
-
-    if (longestRun < 5) return null;
-
-    const bonus = 0.3 + (longestRun - 5) * 0.05;
-    return { name: YAKU_INFO.TSUKI_NARABI.name, bonus, count: longestRun, threshold: 5 };
+    if (longest < 5) return null;
+    return { name: YAKU_INFO.TSUKI_NARABI.name, bonus: 0.3, count: longest, threshold: 5 };
   }
 
   /**
-   * Full Month — all 4 cards of any single month captured.
-   *
-   * Returns a single combined yaku entry using diminishing returns:
-   *   1 month  → +0.60
-   *   2 months → +0.90
-   *   3 months → +1.05
-   *   4 months → +1.15
-   *   n months → +0.10 each beyond 3
-   *
-   * @returns {{ name, bonus, count, threshold }[]}  0 or 1 entries.
+   * Hikari — 2+ Bright cards. Flat +0.7 bonus.
+   * All 5 brights (Goko) still scores +0.7 — no special override.
    */
-  _checkFullMonth(capturedCards) {
-    const byMonth = new Map();
-    for (const card of capturedCards) {
-      if (!byMonth.has(card.month)) byMonth.set(card.month, []);
-      byMonth.get(card.month).push(card);
-    }
-    let count = 0;
-    for (const [, cards] of byMonth) {
-      if (cards.length === 4) count++;
-    }
-    if (count === 0) return [];
-
-    const diminishingBonuses = [0.6, 0.3, 0.15, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1];
-    let totalBonus = 0;
-    for (let i = 0; i < count; i++) {
-      totalBonus += diminishingBonuses[i] || 0.1;
-    }
-    return [{ name: YAKU_INFO.FULL_MONTH.name, bonus: totalBonus, count, threshold: 1 }];
+  _checkHikari(brights) {
+    const brightCards = brights.filter(c => BRIGHT_IDS.has(c.id));
+    if (brightCards.length < 2) return null;
+    return { name: YAKU_INFO.HIKARI.name, bonus: 0.7, count: brightCards.length, threshold: 2 };
   }
 }
