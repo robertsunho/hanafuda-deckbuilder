@@ -71,9 +71,9 @@ export default class GameRoundManager {
     this._phase = "idle";
 
     /**
-     * Yaku name → multiplier snapshot taken at the start of the current turn.
+     * Yaku name → bonus snapshot taken at the start of the current turn.
      * Used to diff against post-turn evaluation: a yaku is "new" if its name
-     * was absent OR its multiplier grew by ≥0.3 (subset bonus activated).
+     * was absent OR its bonus grew by >0.3.
      * @type {Map<string, number>}
      */
     this._yakuBeforeTurn = new Map();
@@ -345,9 +345,9 @@ export default class GameRoundManager {
     // Count this play against the round limit.
     this._playsRemaining--;
 
-    // Snapshot active yaku (name → multiplier) so _finalizeTurn() can diff.
+    // Snapshot active yaku (name → bonus) so _finalizeTurn() can diff.
     this._yakuBeforeTurn = new Map(
-      this._scoring.evaluate(this._capture.getAll()).map(y => [y.name, y.multiplier])
+      this._scoring.evaluate(this._capture.getAll()).map(y => [y.name, y.bonus])
     );
 
     this._discardedThisTurn = [];   // reset each turn
@@ -655,16 +655,14 @@ export default class GameRoundManager {
 
     // Evaluate yaku (spirits excluded) for the Bank/Push new-yaku diff.
     // A yaku counts as "new" if its name wasn't present before, OR if its
-    // multiplier jumped by more than the largest single incremental step
-    // (+0.3 for Hikari).  Subset bonuses (Inoshikacho +0.5, Akatan/Aotan
-    // +0.4) clear that bar; plain extra-card growth (+0.2 Tane/Tanzaku,
-    // +0.3 Hikari, +0.15 Kasu) does not → no spurious Bank/Push decision.
+    // bonus jumped by more than 0.3 (no sub-combinations exist in the current
+    // system, so in practice only newly appearing yaku trigger a decision).
     const yakuForDiff = this._scoring.evaluate(this._capture.getAll());
     const newYaku = yakuForDiff.filter(y => {
       const prev = this._yakuBeforeTurn.get(y.name);
-      return prev === undefined || y.multiplier - prev > 0.3;
+      return prev === undefined || y.bonus - prev > 0.3;
     });
-    this._yakuBeforeTurn = new Map(yakuForDiff.map(y => [y.name, y.multiplier]));
+    this._yakuBeforeTurn = new Map(yakuForDiff.map(y => [y.name, y.bonus]));
 
     // Completing a new yaku clears the push penalty regardless of outcome.
     if (newYaku.length > 0) this._pushPenaltyActive = false;

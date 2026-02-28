@@ -903,7 +903,7 @@ export class GameScene extends Phaser.Scene {
     } else {
       for (const yaku of result.allYaku) {
         this._overlayObjs.push(
-          this.add.text(cx, y, `${yaku.name}  \xD7${yaku.multiplier.toFixed(1)}`, {
+          this.add.text(cx, y, `${yaku.name}  +${yaku.bonus.toFixed(2)}`, {
             fontSize: '16px', color: '#cce0ff',
           }).setOrigin(0.5)
         );
@@ -912,8 +912,12 @@ export class GameScene extends Phaser.Scene {
     }
     y += 6;
 
-    // Multiplier line — show all three channels.
-    let multLabel = `\xD7${result.yakuMult.toFixed(2)} yaku`;
+    // Multiplier line — additive yaku construction + spirit channels.
+    let multLabel = '1.0';
+    for (const yaku of result.allYaku) {
+      multLabel += ` +${yaku.bonus.toFixed(2)} (${yaku.name})`;
+    }
+    multLabel += ` = \xD7${result.yakuMult.toFixed(2)} yaku`;
     if (result.additiveMult !== 0)
       multLabel += `  +${result.additiveMult.toFixed(2)} spirit`;
     if (Math.abs(result.multMult - 1.0) > 0.001)
@@ -1084,7 +1088,7 @@ export class GameScene extends Phaser.Scene {
     let y = cy - 68;
     for (const yaku of result.newYaku) {
       this._overlayObjs.push(
-        this.add.text(cx, y, `${yaku.name}  \xD7${yaku.multiplier.toFixed(1)}`, {
+        this.add.text(cx, y, `${yaku.name}  +${yaku.bonus.toFixed(2)}`, {
           fontSize: '16px', color: '#ffee88',
         }).setOrigin(0.5).setDepth(25)
       );
@@ -1187,7 +1191,7 @@ export class GameScene extends Phaser.Scene {
     let y = cy - 178;
     for (const yaku of Object.values(YAKU_INFO)) {
       objs.push(
-        this.add.text(cx - 360, y, `${yaku.name}  \xD7${yaku.multiplier.toFixed(1)}`, {
+        this.add.text(cx - 360, y, `${yaku.name}  +${yaku.baseBonus.toFixed(1)}`, {
           fontSize: '14px', color: '#ffee88',
         }).setOrigin(0, 0.5).setDepth(20)
       );
