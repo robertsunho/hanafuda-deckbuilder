@@ -744,6 +744,8 @@ export class GameScene extends Phaser.Scene {
 
       this._showDeckAnimation(deckResult, () => {
         this._animating = false;
+        const styleCombos = this._round.lastStyleCombos;
+        if (styleCombos.length > 0) this._showStyleComboPopup(styleCombos);
         this._handleResult(deckResult);
       });
     });
@@ -781,6 +783,39 @@ export class GameScene extends Phaser.Scene {
       for (const obj of temp) obj.destroy();
       onComplete();
     });
+  }
+
+  // ── Style combo popup ──────────────────────────────────────────────────────
+
+  /**
+   * Show a brief, non-blocking toast for newly triggered style combos.
+   * Fades out automatically — no pause, no buttons.
+   * @param {{ name: string, bonus: number }[]} combos
+   */
+  _showStyleComboPopup(combos) {
+    const x = CAP_STACK_X + 110;
+    let y = CAP_STACK_Y - 30;
+
+    for (const combo of combos) {
+      const label = `${combo.name}  +${combo.bonus.toFixed(1)} Style`;
+      const txt = this.add.text(x, y, label, {
+        fontSize: '14px',
+        color: '#ffcc44',
+        stroke: '#000000',
+        strokeThickness: 3,
+      }).setOrigin(0, 0.5).setDepth(30).setAlpha(1);
+
+      this.tweens.add({
+        targets:  txt,
+        alpha:    0,
+        y:        y - 30,
+        duration: 1400,
+        ease:     'Cubic.easeOut',
+        onComplete: () => txt.destroy(),
+      });
+
+      y -= 24;
+    }
   }
 
   // ── Result dispatcher ─────────────────────────────────────────────────────
@@ -937,6 +972,29 @@ export class GameScene extends Phaser.Scene {
       }).setOrigin(0.5)
     );
     y += 24;
+
+    // ── Style combos ──────────────────────────────────────────────────────
+    const styleCombos = this._round.triggeredStyleCombos;
+    const styleTotal  = this._round.roundStyleTotal;
+    if (styleCombos.length > 0) {
+      this._overlayObjs.push(this.add.rectangle(cx, y + 4, 580, 1, 0x2a3a50));
+      y += 14;
+      for (const sc of styleCombos) {
+        this._overlayObjs.push(
+          this.add.text(cx, y, `${sc.name}  +${sc.bonus.toFixed(1)} Style`, {
+            fontSize: '13px', color: '#ffcc44',
+          }).setOrigin(0.5)
+        );
+        y += 18;
+      }
+      this._overlayObjs.push(
+        this.add.text(cx, y,
+          `Style total: +${styleTotal.toFixed(1)}  \u2192  Style Base now \xD7${run.styleBase.toFixed(2)}`,
+          { fontSize: '12px', color: '#bbaa55' }
+        ).setOrigin(0.5)
+      );
+      y += 20;
+    }
 
     this._overlayObjs.push(
       this.add.text(cx, y, `Final Score: ${result.finalScore}`, {

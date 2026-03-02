@@ -293,6 +293,14 @@ class RunManager {
   }
 
   /**
+   * Add to Style Base.  Called when style combos are triggered.
+   * @param {number} amount  Bonus to add (e.g. 0.2 for a seasonal combo).
+   */
+  addStyleBase(amount) {
+    this._styleBase += amount;
+  }
+
+  /**
    * Decay Style Base 30% toward 1.0.  Called automatically by advanceRound().
    * newStyle = 1.0 + (oldStyle − 1.0) × 0.7
    */

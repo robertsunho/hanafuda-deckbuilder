@@ -51,6 +51,7 @@ import FieldManager     from "./FieldManager.js";
 import CaptureManager   from "./CaptureManager.js";
 import ScoringEngine    from "./ScoringEngine.js";
 import ConsumableEffects from "./ConsumableEffects.js";
+import StyleEngine      from "./StyleEngine.js";
 import run              from "./RunManager.js";
 
 export default class GameRoundManager {
@@ -67,6 +68,7 @@ export default class GameRoundManager {
     this._field   = new FieldManager();
     this._capture = new CaptureManager();
     this._scoring = new ScoringEngine();
+    this._style   = new StyleEngine();
 
     /** @type {'idle'|'awaiting_deck'|'round_over'} */
     this._phase = "idle";
@@ -157,6 +159,13 @@ export default class GameRoundManager {
     this._pigDoubleKi = false;
 
     /**
+     * Style combos newly triggered on the most recent capture event.
+     * Read (and cleared) by GameScene via the lastStyleCombos getter.
+     * @type {{ id: string, name: string, bonus: number }[]}
+     */
+    this._lastStyleCombos = [];
+
+    /**
      * Active spirit loadout for this round — used by ScoringEngine to run
      * spirit scoring hooks.  Set via setSpirits() before startRound().
      * @type {object[]}
@@ -196,6 +205,23 @@ export default class GameRoundManager {
 
   /** True when the Pig consumable has queued a ki-reward double. */
   get pigDoubleKi()   { return this._pigDoubleKi; }
+
+  /**
+   * Style combos newly triggered on the last capture event.
+   * Clears the internal buffer after reading so each event is consumed once.
+   * @returns {{ id: string, name: string, bonus: number }[]}
+   */
+  get lastStyleCombos() {
+    const combos = this._lastStyleCombos;
+    this._lastStyleCombos = [];
+    return combos;
+  }
+
+  /** Total style bonus accumulated from combos triggered so far this round. */
+  get roundStyleTotal() { return this._style.getRoundStyleTotal(); }
+
+  /** All style combos triggered this round (for end-of-round display). */
+  get triggeredStyleCombos() { return this._style.getTriggeredCombos(); }
 
   /**
    * Set the active spirit loadout for scoring.  Call before startRound().
@@ -280,6 +306,8 @@ export default class GameRoundManager {
     this._roundEndingAfterDecision = false;
     this._dogProtection            = false;
     this._pigDoubleKi              = false;
+    this._lastStyleCombos          = [];
+    this._style.resetRound();
 
     this._hand.add(this._deck.draw(GameRoundManager.HAND_SIZE));
 
@@ -576,6 +604,26 @@ export default class GameRoundManager {
     this._basePoints += cards.reduce((sum, c) => sum + c.points, 0);
     if (cards.length === 4) this._basePoints += 5;   // full-month bonus
     run.onCardsCaptured(cards);
+
+    // Check for newly triggered style combos against the full capture pile.
+    const newCombos = this._style.checkCombos(this._capture.getAll());
+    if (newCombos.length > 0) {
+      this._onStyleCombos(newCombos);
+    }
+  }
+
+  /**
+   * Called when style combos are newly triggered during a capture event.
+   * Updates Style Base in RunManager and stores combo info for UI feedback.
+   * Does NOT trigger Bank/Push decisions.
+   *
+   * @param {{ id: string, name: string, bonus: number }[]} combos
+   */
+  _onStyleCombos(combos) {
+    for (const combo of combos) {
+      run.addStyleBase(combo.bonus);
+    }
+    this._lastStyleCombos = combos;
   }
 
   /**
