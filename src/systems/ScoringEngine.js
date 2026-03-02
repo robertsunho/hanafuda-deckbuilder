@@ -23,15 +23,11 @@
 // no Bank/Push decision, and no multiplier bonus.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Fixed card sets ───────────────────────────────────────────────────────────
+// ── Wu Xing Water depreciation multiplier tables ──────────────────────────────
+// depLevel indexes into the array.  Floored at the last entry.
 
-const BRIGHT_IDS = new Set([
-  "january_crane",
-  "march_curtain",
-  "august_moon",
-  "november_rainman",
-  "december_phoenix",
-]);
+export const SNOW_MULT = [2.0, 1.5, 1.0, 0.75, 0.5, 0.25];
+export const ICE_MULT  = [4.0, 3.0, 2.0, 1.5, 1.0, 0.75, 0.5, 0.25];
 
 // ── Public yaku catalogue ─────────────────────────────────────────────────────
 
@@ -106,34 +102,70 @@ export default class ScoringEngine {
    *           × flow
    *
    * @param {object[]} capturedCards
-   * @param {object[]} spirits        Active spirit loadout
-   * @param {number}   [flow=1.0]     Pre-computed Flow (styleBase × pushFactor)
-   * @param {object}   [upgrades={}]  Yaku upgrade counts (see evaluate())
+   * @param {object[]} spirits          Active spirit loadout
+   * @param {number}   [flow=1.0]       Pre-computed Flow (styleBase × pushFactor)
+   * @param {object}   [upgrades={}]    Yaku upgrade counts (see evaluate())
+   * @param {boolean}  [applyProcs=false]  When true Metal proc rolls fire; pass
+   *                                        true only for the final round score.
    * @returns {{
    *   yakuList: object[], yakuMult: number,
    *   rawBasePoints: number, boostedBasePoints: number, pointBoost: number,
    *   additiveMult: number, multMult: number, effectiveMult: number,
-   *   flow: number, finalScore: number
+   *   flow: number, finalScore: number, metalConsumableCount: number
    * }}
    */
-  calculateFinalScore(capturedCards, spirits = [], flow = 1.0, upgrades = {}) {
+  calculateFinalScore(capturedCards, spirits = [], flow = 1.0, upgrades = {}, applyProcs = false) {
     // ── Step 1: Standard yaku ─────────────────────────────────────────────
     const yakuList = this.evaluate(capturedCards, upgrades);
     const yakuMult = this.calculateTotalMultiplier(yakuList);
 
     // ── Step 2: Point Boost channel ───────────────────────────────────────
-    const rawBasePoints = capturedCards.reduce((sum, c) => sum + c.points, 0);
-    let boostedCardSum  = 0;
+    const rawBasePoints      = capturedCards.reduce((sum, c) => sum + c.points, 0);
+    let boostedCardSum       = 0;
+    let metalConsumableCount = 0;
     for (const card of capturedCards) {
-      let cardBoost = 1.0;
-      for (const spirit of spirits) {
-        const effect = SpiritEffects.get(spirit.id);
-        if (effect?.getPointBoosts) {
-          const boosts = effect.getPointBoosts({ capturedCards, spirits });
-          if (boosts?.has(card.id)) cardBoost *= boosts.get(card.id);
+      const enh    = card.enhancement;
+      const isFire = enh?.element === 'fire';
+
+      // Fire enhancement overrides base points; spirit boosts are skipped.
+      let pts = isFire
+        ? (enh.tier === 'upgraded' ? 20 : 10)
+        : card.points;
+
+      // Spirit point boosts — Fire cards have no identity so they're excluded.
+      if (!isFire) {
+        for (const spirit of spirits) {
+          const effect = SpiritEffects.get(spirit.id);
+          if (effect?.getPointBoosts) {
+            const boosts = effect.getPointBoosts({ capturedCards, spirits });
+            if (boosts?.has(card.id)) pts *= boosts.get(card.id);
+          }
         }
       }
-      boostedCardSum += card.points * cardBoost;
+
+      // Water: multiply by the current depreciation level.
+      if (enh?.element === 'water') {
+        const multArr = enh.tier === 'upgraded' ? ICE_MULT : SNOW_MULT;
+        const level   = Math.min(enh.depLevel ?? 0, multArr.length - 1);
+        pts *= multArr[level];
+      }
+
+      // Metal: proc roll — only applied on the final scoring pass.
+      if (applyProcs && enh?.element === 'metal') {
+        const roll       = Math.random();
+        const isUpgraded = enh.tier === 'upgraded';
+        if (roll < (isUpgraded ? 0.20 : 0.10)) {
+          pts *= 5;
+          card._lastMetalProc = 'points_5x';
+        } else if (roll < (isUpgraded ? 0.30 : 0.15)) {
+          metalConsumableCount++;
+          card._lastMetalProc = 'consumable';
+        } else {
+          card._lastMetalProc = null;
+        }
+      }
+
+      boostedCardSum += pts;
     }
 
     // +5 base points per complete month — not a yaku, not affected by boosts.
@@ -182,6 +214,7 @@ export default class ScoringEngine {
       effectiveMult,
       flow,
       finalScore,
+      metalConsumableCount,
     };
   }
 
@@ -194,7 +227,15 @@ export default class ScoringEngine {
   _partition(capturedCards) {
     const out = { bright: [], animal: [], ribbon: [], plain: [] };
     for (const card of capturedCards) {
-      if (out[card.type]) out[card.type].push(card);
+      if (card.enhancement?.element === 'fire') {
+        // Fire-enhanced cards count toward ALL four yaku simultaneously.
+        out.bright.push(card);
+        out.animal.push(card);
+        out.ribbon.push(card);
+        out.plain.push(card);
+      } else if (out[card.type]) {
+        out[card.type].push(card);
+      }
     }
     return out;
   }
@@ -234,7 +275,10 @@ export default class ScoringEngine {
    * Scores the longest consecutive sequence found. Flat +0.3 bonus.
    */
   _checkTsukiNarabi(capturedCards) {
-    const capturedMonths = new Set(capturedCards.map(c => c.month));
+    // Fire-enhanced cards have no month identity — exclude them.
+    const capturedMonths = new Set(
+      capturedCards.filter(c => c.enhancement?.element !== 'fire').map(c => c.month)
+    );
     let longest = 0;
     let current = 0;
     for (let m = 1; m <= 12; m++) {

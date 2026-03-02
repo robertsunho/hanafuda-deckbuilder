@@ -151,7 +151,10 @@ export default class StyleEngine {
    *   Newly triggered combos only.  Empty if none.
    */
   checkCombos(capturedCards) {
-    const ids            = new Set(capturedCards.map(c => c.id));
+    // Fire-enhanced cards have no identity (no month, type, or card id for
+    // style purposes) — exclude them from all combo checks.
+    const styleCards     = capturedCards.filter(c => c.enhancement?.element !== 'fire');
+    const ids            = new Set(styleCards.map(c => c.id));
     const newlyTriggered = [];
 
     for (const combo of STYLE_COMBOS) {
@@ -159,7 +162,7 @@ export default class StyleEngine {
 
       const passed = combo.test
         ? combo.test(ids)
-        : combo.testFn(ids, capturedCards);
+        : combo.testFn(ids, styleCards);
 
       if (passed) {
         this._triggeredThisRound.add(combo.id);

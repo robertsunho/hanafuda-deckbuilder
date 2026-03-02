@@ -1,6 +1,7 @@
 import GameRoundManager      from '../systems/GameRoundManager.js';
 import { YAKU_INFO }         from '../systems/ScoringEngine.js';
 import run, { RunManager }   from '../systems/RunManager.js';
+import { getElementDef }     from '../data/consumables.js';
 
 // ── Layout constants ───────────────────────────────────────────────────────────
 // Canvas is 1280 × 720.
@@ -273,6 +274,10 @@ export class GameScene extends Phaser.Scene {
         spr.setTint(TINT_DIM);
       }
       this._handObjs.push(spr);
+
+      // Enhancement badge — placed above the card to avoid overlapping action buttons.
+      const enhBadge = this._makeEnhancementBadge(card, x, y - Math.round(CARD_H * CARD_SCALE / 2) - 20);
+      if (enhBadge) enhBadge.forEach(o => this._handObjs.push(o));
     }
   }
 
@@ -315,6 +320,14 @@ export class GameScene extends Phaser.Scene {
           spr.setTint(TINT_PENDING);
         }
         this._fieldObjs.push(spr);
+
+        // Enhancement badge (only on the top card of the fan)
+        if (j === slot.cards.length - 1) {
+          const bx = SLOT_XS[col] + j * SLOT_FAN_X;
+          const by = SLOT_YS[row] + j * SLOT_FAN_Y + Math.round(CARD_H * CARD_SCALE / 2) + 4;
+          const enhBadge = this._makeEnhancementBadge(card, bx, by);
+          if (enhBadge) enhBadge.forEach(o => this._fieldObjs.push(o));
+        }
       }
     }
   }
@@ -645,8 +658,8 @@ export class GameScene extends Phaser.Scene {
       const cons = run.consumables[this._selectedConsumableIndex];
       if (cons) {
         const y       = 700;
-        const isMark  = cons.id && cons.id.startsWith('mark_');
-        const btnLabel = isMark ? `Activate: ${cons.name}` : `Use: ${cons.name}`;
+        const isMark    = cons.id && (cons.id.startsWith('mark_') || cons.id.startsWith('element_'));
+        const btnLabel  = isMark ? `Activate: ${cons.name}` : `Use: ${cons.name}`;
 
         const useBtn = this.add.rectangle(PLAY_CX, y, 210, 40, 0x1a2a5a)
           .setStrokeStyle(2, 0x4466cc).setInteractive({ useHandCursor: true }).setDepth(5);
@@ -743,12 +756,23 @@ export class GameScene extends Phaser.Scene {
    */
   _activateMark(cons, idx) {
     this._markMode = { id: cons.id, index: idx, step: 'select_source', sourceCard: null };
-    const instructions = {
-      mark_impermanence: 'Impermanence: click a card to promote it. ESC to cancel.',
-      mark_nonbeing:     'Non-being: click a card to permanently remove it. ESC to cancel.',
-      mark_transcendence:'Transcendence: click the SOURCE card first. ESC to cancel.',
+    const ELEMENT_LABELS = {
+      water: 'Snow (2×pts, depreciates)', wood:  'Leaf (slot bypass)',
+      fire:  'Ember (wildcard, 10pts)', earth: 'Clay (ki interest)',
+      metal: 'Iron (proc chance)',
     };
-    this._setStatus(instructions[cons.id] ?? 'Click a card. ESC to cancel.');
+    const instructions = {
+      mark_impermanence:  'Impermanence: click a card to promote it. ESC to cancel.',
+      mark_nonbeing:      'Non-being: click a card to permanently remove it. ESC to cancel.',
+      mark_transcendence: 'Transcendence: click the SOURCE card first. ESC to cancel.',
+    };
+    let msg = instructions[cons.id];
+    if (!msg && cons.id.startsWith('element_')) {
+      const element = cons.id.replace('element_', '');
+      const label   = ELEMENT_LABELS[element] ?? cons.name;
+      msg = `${cons.name}: apply ${label} to a card. ESC to cancel.`;
+    }
+    this._setStatus(msg ?? 'Click a card. ESC to cancel.');
     this._renderAll();
   }
 
@@ -790,6 +814,51 @@ export class GameScene extends Phaser.Scene {
         this._setStatus('Transcendence complete.');
         this._renderAll();
       }
+
+    } else if (id.startsWith('element_')) {
+      const element = id.replace('element_', '');
+      const result  = run.applyElement(card.id, element);
+
+      // Handle stripped → return base consumable if inventory has space.
+      let extraMsg = '';
+      if (result.action === 'stripped' && result.returnedConsumable) {
+        const returnedDef = getElementDef(result.returnedConsumable);
+        if (returnedDef && run.canAddConsumable) {
+          try {
+            run.addConsumable({
+              id: returnedDef.id, name: returnedDef.name,
+              description: returnedDef.description, category: returnedDef.category,
+            });
+            extraMsg = `  ${returnedDef.name} returned to inventory.`;
+          } catch (_) {
+            extraMsg = `  ${returnedDef.name} recovered but inventory full — lost!`;
+          }
+        } else if (returnedDef) {
+          extraMsg = `  ${returnedDef.name} recovered but inventory full — lost!`;
+        }
+      }
+
+      const ENH_NAMES = {
+        water: { base: 'Snow', upgraded: 'Ice' },
+        wood:  { base: 'Leaf', upgraded: 'Silk' },
+        fire:  { base: 'Ember', upgraded: 'Charcoal' },
+        earth: { base: 'Clay', upgraded: 'Pottery' },
+        metal: { base: 'Iron', upgraded: 'Meteorite' },
+      };
+      const enhName = ENH_NAMES[element]?.[result.action === 'upgraded' ? 'upgraded' : 'base'] ?? element;
+
+      const ACTION_MSG = {
+        applied_base: `${enhName} applied to ${card.name}!`,
+        upgraded:     `Upgraded to ${ENH_NAMES[element]?.upgraded ?? element}!`,
+        stripped:     `Enhancement stripped!${extraMsg}`,
+        overwritten:  `Overwritten with ${enhName}.`,
+        no_effect:    'No effect.',
+      };
+
+      run.useConsumable(index);
+      this._markMode = null;
+      this._setStatus(ACTION_MSG[result.action] ?? 'Done.');
+      this._renderAll();
     }
   }
 
@@ -1412,5 +1481,58 @@ export class GameScene extends Phaser.Scene {
 
   _setStatus(msg) {
     this._statusText.setText(msg);
+  }
+
+  // ── Enhancement badge ─────────────────────────────────────────────────────
+
+  /**
+   * Create a small enhancement indicator badge below a card.
+   * Returns an array of Phaser objects (or null if the card has no enhancement).
+   * The caller should push these into the appropriate obj array so they're
+   * cleared with the next render cycle.
+   *
+   * @param {object} card  Card object (may have card.enhancement)
+   * @param {number} x     Horizontal centre of the badge
+   * @param {number} y     Top edge of the badge area
+   * @returns {Phaser.GameObjects.GameObject[]|null}
+   */
+  _makeEnhancementBadge(card, x, y) {
+    const enh = card.enhancement;
+    if (!enh) return null;
+
+    const ENH_NAMES = {
+      water: { base: 'Snow', upgraded: 'Ice' },
+      wood:  { base: 'Leaf', upgraded: 'Silk' },
+      fire:  { base: 'Ember', upgraded: 'Charcoal' },
+      earth: { base: 'Clay', upgraded: 'Pottery' },
+      metal: { base: 'Iron', upgraded: 'Meteorite' },
+    };
+    const ELEM_COLORS = {
+      water: '#4488ff', wood: '#44cc44', fire: '#ff6644',
+      earth: '#cc8822', metal: '#bbbbbb',
+    };
+    const objs    = [];
+    const name    = ENH_NAMES[enh.element]?.[enh.tier] ?? enh.element;
+    const color   = ELEM_COLORS[enh.element] ?? '#ffffff';
+    const star    = enh.tier === 'upgraded' ? '\u2605' : '\u2022';
+
+    objs.push(this.add.text(x, y, `${star}${name}`, {
+      fontSize: '8px', color,
+      stroke: '#000000', strokeThickness: 2,
+    }).setOrigin(0.5, 0));
+
+    // For Water: show current multiplier below the name.
+    if (enh.element === 'water') {
+      const SNOW_MULT = [2.0, 1.5, 1.0, 0.75, 0.5, 0.25];
+      const ICE_MULT  = [4.0, 3.0, 2.0, 1.5, 1.0, 0.75, 0.5, 0.25];
+      const multArr   = enh.tier === 'upgraded' ? ICE_MULT : SNOW_MULT;
+      const level     = Math.min(enh.depLevel ?? 0, multArr.length - 1);
+      objs.push(this.add.text(x, y + 10, `\xD7${multArr[level]}`, {
+        fontSize: '8px', color: '#88aaff',
+        stroke: '#000000', strokeThickness: 2,
+      }).setOrigin(0.5, 0));
+    }
+
+    return objs;
   }
 }

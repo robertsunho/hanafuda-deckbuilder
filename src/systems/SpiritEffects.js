@@ -24,12 +24,16 @@
 
 // ── Factory helpers ───────────────────────────────────────────────────────────
 
+// Fire-enhanced cards have no month, vertical, or temporal identity.
+// All factory functions skip them so they can't trigger seasonal/axis spirit effects.
+
 function monthPointBoost(months, mult) {
   const set = new Set(months);
   return {
     getPointBoosts({ capturedCards }) {
       const boosts = new Map();
       for (const card of capturedCards) {
+        if (card.enhancement?.element === 'fire') continue;
         if (set.has(card.month)) boosts.set(card.id, mult);
       }
       return boosts.size > 0 ? boosts : null;
@@ -43,6 +47,7 @@ function monthAdditiveMult(months, bonusPerCard) {
     getAdditiveMult({ capturedCards }) {
       let n = 0;
       for (const card of capturedCards) {
+        if (card.enhancement?.element === 'fire') continue;
         if (set.has(card.month)) n++;
       }
       return n * bonusPerCard;
@@ -56,6 +61,7 @@ function monthFusion(months, mult, bonusPerCard) {
     getPointBoosts({ capturedCards }) {
       const boosts = new Map();
       for (const card of capturedCards) {
+        if (card.enhancement?.element === 'fire') continue;
         if (set.has(card.month)) boosts.set(card.id, mult);
       }
       return boosts.size > 0 ? boosts : null;
@@ -63,6 +69,7 @@ function monthFusion(months, mult, bonusPerCard) {
     getAdditiveMult({ capturedCards }) {
       let n = 0;
       for (const card of capturedCards) {
+        if (card.enhancement?.element === 'fire') continue;
         if (set.has(card.month)) n++;
       }
       return n * bonusPerCard;
@@ -75,6 +82,7 @@ function verticalPointBoost(vertical, mult) {
     getPointBoosts({ capturedCards }) {
       const boosts = new Map();
       for (const card of capturedCards) {
+        if (card.enhancement?.element === 'fire') continue;
         if (card.vertical === vertical) boosts.set(card.id, mult);
       }
       return boosts.size > 0 ? boosts : null;
@@ -87,6 +95,7 @@ function verticalAdditiveMult(vertical, bonusPerCard) {
     getAdditiveMult({ capturedCards }) {
       let n = 0;
       for (const card of capturedCards) {
+        if (card.enhancement?.element === 'fire') continue;
         if (card.vertical === vertical) n++;
       }
       return n * bonusPerCard;
@@ -99,6 +108,7 @@ function verticalFusion(vertical, mult, bonusPerCard) {
     getPointBoosts({ capturedCards }) {
       const boosts = new Map();
       for (const card of capturedCards) {
+        if (card.enhancement?.element === 'fire') continue;
         if (card.vertical === vertical) boosts.set(card.id, mult);
       }
       return boosts.size > 0 ? boosts : null;
@@ -106,6 +116,7 @@ function verticalFusion(vertical, mult, bonusPerCard) {
     getAdditiveMult({ capturedCards }) {
       let n = 0;
       for (const card of capturedCards) {
+        if (card.enhancement?.element === 'fire') continue;
         if (card.vertical === vertical) n++;
       }
       return n * bonusPerCard;
@@ -118,6 +129,7 @@ function temporalPointBoost(temporal, mult) {
     getPointBoosts({ capturedCards }) {
       const boosts = new Map();
       for (const card of capturedCards) {
+        if (card.enhancement?.element === 'fire') continue;
         if (card.temporal === temporal) boosts.set(card.id, mult);
       }
       return boosts.size > 0 ? boosts : null;
@@ -130,6 +142,7 @@ function temporalAdditiveMult(temporal, bonusPerCard) {
     getAdditiveMult({ capturedCards }) {
       let n = 0;
       for (const card of capturedCards) {
+        if (card.enhancement?.element === 'fire') continue;
         if (card.temporal === temporal) n++;
       }
       return n * bonusPerCard;
@@ -142,6 +155,7 @@ function temporalFusion(temporal, mult, bonusPerCard) {
     getPointBoosts({ capturedCards }) {
       const boosts = new Map();
       for (const card of capturedCards) {
+        if (card.enhancement?.element === 'fire') continue;
         if (card.temporal === temporal) boosts.set(card.id, mult);
       }
       return boosts.size > 0 ? boosts : null;
@@ -149,6 +163,7 @@ function temporalFusion(temporal, mult, bonusPerCard) {
     getAdditiveMult({ capturedCards }) {
       let n = 0;
       for (const card of capturedCards) {
+        if (card.enhancement?.element === 'fire') continue;
         if (card.temporal === temporal) n++;
       }
       return n * bonusPerCard;

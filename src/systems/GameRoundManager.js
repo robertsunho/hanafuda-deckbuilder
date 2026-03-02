@@ -49,7 +49,7 @@ import DeckManager      from "./DeckManager.js";
 import HandManager      from "./HandManager.js";
 import FieldManager     from "./FieldManager.js";
 import CaptureManager   from "./CaptureManager.js";
-import ScoringEngine    from "./ScoringEngine.js";
+import ScoringEngine, { SNOW_MULT, ICE_MULT } from "./ScoringEngine.js";
 import ConsumableEffects from "./ConsumableEffects.js";
 import StyleEngine      from "./StyleEngine.js";
 import run              from "./RunManager.js";
@@ -220,6 +220,9 @@ export default class GameRoundManager {
   /** Total style bonus accumulated from combos triggered so far this round. */
   get roundStyleTotal() { return this._style.getRoundStyleTotal(); }
 
+  /** Ki gained from Earth enhancements at the start of this round (0 if none). */
+  get lastEarthKiGain() { return this._lastEarthKiGain ?? 0; }
+
   /** All style combos triggered this round (for end-of-round display). */
   get triggeredStyleCombos() { return this._style.getTriggeredCombos(); }
 
@@ -285,6 +288,19 @@ export default class GameRoundManager {
    * @returns {this} for chaining
    */
   startRound() {
+    // ── Earth enhancement ki generation (before dealing) ─────────────────
+    // Each Clay card contributes 2% ki interest; Pottery contributes 5%.
+    const deckCards = run.getDeck();
+    let earthInterest = 0;
+    for (const card of deckCards) {
+      if (card.enhancement?.element === 'earth') {
+        earthInterest += card.enhancement.tier === 'upgraded' ? 0.05 : 0.02;
+      }
+    }
+    const kiGain = Math.floor(run.ki * earthInterest);
+    if (kiGain > 0) run.addKi(kiGain);
+    this._lastEarthKiGain = kiGain;
+
     this._deck.resetWithCards(run.getDeck()).shuffle();
     this._hand.clear();
     this._field.clear();
@@ -440,7 +456,12 @@ export default class GameRoundManager {
     // Banking counts as a successful outcome — Push Factor is positive.
     const pushFactor = Math.min(1.5, 1.0 + this._pushCount * 0.1);
     const flow       = Math.max(1.0, this._styleBase * pushFactor);
-    const sc = this._scoring.calculateFinalScore(this._capture.getAll(), this._spirits, flow, run.yakuUpgrades);
+    const sc = this._scoring.calculateFinalScore(
+      this._capture.getAll(), this._spirits, flow, run.yakuUpgrades, true
+    );
+    // Apply post-round enhancement effects (Water dep increment, Fire breaks,
+    // Metal consumable generation).
+    this._applyPostRoundEnhancements(this._capture.getAll(), sc.metalConsumableCount);
     this._roundEndingAfterDecision = false;
     this._phase = "round_over";
     return {
@@ -550,6 +571,40 @@ export default class GameRoundManager {
     const effect = ConsumableEffects.get(consumable.id);
     if (!effect) return { success: false, message: `Unknown consumable: ${consumable.id}` };
     return effect.execute({ roundManager: this, params });
+  }
+
+  // ── Enhancement post-round updates ────────────────────────────────────────
+
+  /**
+   * Apply end-of-round mutations to all cards in the capture pile:
+   *   • Water/Ice: increment depLevel (floored at the last multiplier index).
+   *   • Fire/Ember/Charcoal: roll for permanent card destruction.
+   *   • Metal (proc'd for consumable): generate a random consumable via run.
+   *
+   * Called once by bankScore() or _finalizeTurn() when the round actually ends.
+   *
+   * @param {object[]} capturedCards
+   * @param {number}   metalConsumableCount  Number of Metal consumable procs.
+   */
+  _applyPostRoundEnhancements(capturedCards, metalConsumableCount = 0) {
+    for (const card of capturedCards) {
+      if (card.enhancement?.element === 'water') {
+        const multArr = card.enhancement.tier === 'upgraded' ? ICE_MULT : SNOW_MULT;
+        const maxLevel = multArr.length - 1;
+        card.enhancement.depLevel = Math.min((card.enhancement.depLevel ?? 0) + 1, maxLevel);
+      }
+      if (card.enhancement?.element === 'fire') {
+        const breakChance = card.enhancement.tier === 'upgraded' ? 2 / 7 : 1 / 7;
+        if (Math.random() < breakChance) {
+          run.deleteCard(card.id);
+          card._broken = true;
+        }
+      }
+    }
+    // Generate any Metal-procced consumables.
+    for (let i = 0; i < metalConsumableCount; i++) {
+      run.generateRandomConsumable();
+    }
   }
 
   // ── Three Marks helpers ────────────────────────────────────────────────────
@@ -666,11 +721,21 @@ export default class GameRoundManager {
 
     if (pending) {
       if (deckCard.month === pending.month) {
-        // Deck card is the same month as the pending match → add to it.
-        // addToPendingMatch handles both the 4-card auto-capture and stranding.
-        const { captured } = this._field.addToPendingMatch(deckCard);
-        if (captured) {
-          this._addCapture(captured);
+        // Deck card is the same month as the pending match.
+        // Silk (Wood upgraded) cards in the pending slot are immune to stranding:
+        // they force a capture even when adding the deck card would normally strand.
+        const hasSilk = pending.cards.some(
+          c => c.enhancement?.element === 'wood' && c.enhancement.tier === 'upgraded'
+        );
+        if (hasSilk) {
+          // Push deck card into the pending slot then capture immediately.
+          pending.cards.push(deckCard);
+          const captured = this._field.capturePendingMatch();
+          if (captured.length > 0) this._addCapture(captured);
+        } else {
+          // Standard addToPendingMatch handles 4-card auto-capture and stranding.
+          const { captured } = this._field.addToPendingMatch(deckCard);
+          if (captured) this._addCapture(captured);
         }
         // Whether captured or stranded, the pending state is resolved for
         // this turn; _finalizeTurn proceeds normally.
@@ -754,7 +819,12 @@ export default class GameRoundManager {
     const flow = Math.max(1.0, this._styleBase * pushFactor);
 
     // ── Full three-channel score ──────────────────────────────────────────────
-    const sc = this._scoring.calculateFinalScore(this._capture.getAll(), this._spirits, flow, run.yakuUpgrades);
+    // Roll Metal procs only when the round is ending without a yaku decision
+    // (the yaku_decision → bankScore() path applies procs there instead).
+    const isTerminal = roundOver && newYaku.length === 0;
+    const sc = this._scoring.calculateFinalScore(
+      this._capture.getAll(), this._spirits, flow, run.yakuUpgrades, isTerminal
+    );
 
     // For the Bank/Push decision overlay: what Flow would result if the NEXT
     // push also fails?  Used by the UI to show the downside risk.
@@ -770,6 +840,8 @@ export default class GameRoundManager {
       this._roundEndingAfterDecision = roundOver;
       this._phase = "yaku_decision";
     } else if (roundOver) {
+      // Apply post-round enhancement mutations (Water dep, Fire breaks, Metal cons).
+      this._applyPostRoundEnhancements(this._capture.getAll(), sc.metalConsumableCount);
       this._phase = "round_over";
     } else {
       this._phase = "idle";

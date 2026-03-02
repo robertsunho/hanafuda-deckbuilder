@@ -153,6 +153,11 @@ export default class FieldManager {
     if (matchingSlots.length === 0) {
       const idx = this._firstEmptyIndex();
       if (idx === -1) {
+        // Leaf/Silk Wood-enhanced cards bypass the field slot limit.
+        if (card.enhancement?.element === 'wood') {
+          this._slots.push({ month: card.month, cards: [card], state: 'normal' });
+          return { matched: false, discarded: false, captured: null };
+        }
         return { matched: false, discarded: true, captured: null };
       }
       this._placeAt(idx, { month: card.month, cards: [card], state: 'normal' });
@@ -208,6 +213,11 @@ export default class FieldManager {
     if (matchingSlots.length === 0) {
       const idx = this._firstEmptyIndex();
       if (idx === -1) {
+        // Leaf/Silk bypass: Wood-enhanced cards ignore the slot limit.
+        if (cards[0].enhancement?.element === 'wood') {
+          this._slots.push({ month, cards: [...cards], state: 'normal' });
+          return { matched: false, discarded: false, captured: null };
+        }
         return { matched: false, discarded: true, captured: null };
       }
       this._placeAt(idx, { month, cards: [...cards], state: 'normal' });
@@ -278,6 +288,11 @@ export default class FieldManager {
 
     const idx = this._firstEmptyIndex();
     if (idx === -1) {
+      // Leaf/Silk bypass: Wood-enhanced deck flip cards ignore the slot limit.
+      if (card.enhancement?.element === 'wood') {
+        this._slots.push({ month: card.month, cards: [card], state: 'normal' });
+        return { discarded: false, captured: null };
+      }
       return { discarded: true, captured: null };
     }
     this._placeAt(idx, { month: card.month, cards: [card], state: 'normal' });

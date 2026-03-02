@@ -15,11 +15,12 @@
 // so all state (ki balance, loadout, button affordability) updates automatically.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import run, { RunManager }              from '../systems/RunManager.js';
-import { SPIRIT_CATALOG, getSpiritDef } from '../data/spirits.js';
-import { getAvailableFusions }          from '../data/fusionRecipes.js';
-import { THREE_MARKS }                  from '../data/consumables.js';
-import { YAKU_INFO }                    from '../systems/ScoringEngine.js';
+import run, { RunManager }                      from '../systems/RunManager.js';
+import { SPIRIT_CATALOG, getSpiritDef }         from '../data/spirits.js';
+import { getAvailableFusions }                  from '../data/fusionRecipes.js';
+import { THREE_MARKS, WUXING_CONSUMABLES,
+         getElementDef }                        from '../data/consumables.js';
+import { YAKU_INFO }                            from '../systems/ScoringEngine.js';
 
 // ── Channel badge display ──────────────────────────────────────────────────────
 const CHANNEL_BADGE = {
@@ -475,12 +476,22 @@ export class ShrineScene extends Phaser.Scene {
       fontSize: '18px', color: '#88ddff', stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(50));
 
-    // Instruction text per mark type
-    const instruction = {
-      mark_impermanence: 'Click a card to promote it to the next type.',
-      mark_nonbeing:     'Click a card to permanently remove it from your deck.',
-      mark_transcendence:'Click the SOURCE card (it will be replaced).',
-    }[markDef.id] ?? 'Select a card.';
+    // Instruction text per consumable type
+    const ELEMENT_NAMES = {
+      water: 'Snow (2× pts)', wood: 'Leaf (slot bypass)', fire: 'Ember (wildcard)',
+      earth: 'Clay (ki interest)', metal: 'Iron (proc chance)',
+    };
+    let instruction = 'Select a card.';
+    if (markDef.id === 'mark_impermanence') {
+      instruction = 'Click a card to promote it to the next type.';
+    } else if (markDef.id === 'mark_nonbeing') {
+      instruction = 'Click a card to permanently remove it from your deck.';
+    } else if (markDef.id === 'mark_transcendence') {
+      instruction = 'Click the SOURCE card (it will be replaced).';
+    } else if (markDef.id.startsWith('element_')) {
+      const eName = ELEMENT_NAMES[markDef.element] ?? markDef.name;
+      instruction = `Apply ${eName} enhancement. Generative/destructive cycles apply.`;
+    }
 
     push(this.add.text(cx, cy - H / 2 + 36, instruction, {
       fontSize: '12px', color: '#557799',
@@ -527,23 +538,25 @@ export class ShrineScene extends Phaser.Scene {
       });
 
       spr.on('pointerdown', () => {
+        const closeOverlay = () => {
+          for (const o of this._confirmObjs) o.destroy();
+          this._confirmObjs = [];
+        };
+
         if (markDef.id === 'mark_impermanence') {
           run.promoteCard(card.id);
-          for (const o of this._confirmObjs) o.destroy();
-          this._confirmObjs = [];
-          // Add to inventory if player wants to save for later
-          // (immediate use — no inventory addition)
+          closeOverlay();
           this._buildUI();
+
         } else if (markDef.id === 'mark_nonbeing') {
           run.deleteCard(card.id);
-          for (const o of this._confirmObjs) o.destroy();
-          this._confirmObjs = [];
+          closeOverlay();
           this._buildUI();
+
         } else if (markDef.id === 'mark_transcendence') {
           if (!transcendSource) {
             transcendSource = card;
             spr.setTint(0xffcc44);
-            // Update instruction
             for (const o of this._confirmObjs) {
               if (o._isTargetInstruction) o.destroy();
             }
@@ -554,10 +567,29 @@ export class ShrineScene extends Phaser.Scene {
             instr._isTargetInstruction = true;
           } else {
             run.transcendCard(transcendSource.id, card.id);
-            for (const o of this._confirmObjs) o.destroy();
-            this._confirmObjs = [];
+            closeOverlay();
             this._buildUI();
           }
+
+        } else if (markDef.id.startsWith('element_')) {
+          // Wu Xing element application
+          const element = markDef.element ?? markDef.id.replace('element_', '');
+          const result  = run.applyElement(card.id, element);
+          // If the element stripped an existing enhancement, return the base
+          // consumable to inventory (if space is available).
+          if (result.action === 'stripped' && result.returnedConsumable) {
+            const returnedDef = getElementDef(result.returnedConsumable);
+            if (returnedDef && run.canAddConsumable) {
+              try {
+                run.addConsumable({
+                  id: returnedDef.id, name: returnedDef.name,
+                  description: returnedDef.description, category: returnedDef.category,
+                });
+              } catch (_) { /* inventory was actually full */ }
+            }
+          }
+          closeOverlay();
+          this._buildUI();
         }
       });
     }
@@ -598,23 +630,65 @@ export class ShrineScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(51));
   }
 
-  // ── Wu Xing Forge section (placeholder) ───────────────────────────────────
+  // ── Wu Xing Forge section ─────────────────────────────────────────────────
 
   _drawWuXingForgeSection(cx, topY, height) {
     this.add.text(cx, topY + 4, 'Wu Xing Forge', {
       fontSize: '15px', color: '#aaccee',
     }).setOrigin(0.5, 0);
-    this.add.text(cx, topY + 22, 'Transform your cards with elemental power', {
-      fontSize: '10px', color: '#445566',
+    this.add.text(cx, topY + 22, 'Apply elemental enhancements to your cards  —  5 ki each', {
+      fontSize: '10px', color: '#334455',
     }).setOrigin(0.5, 0);
 
-    const panelH  = height - 40;
-    const panelCY = topY + 40 + panelH / 2;
-    this.add.rectangle(cx, panelCY, 570, panelH, 0x2a4a3a, 0.2)
-      .setStrokeStyle(1, 0x223344);
-    this.add.text(cx, panelCY, 'Coming soon\u2026', {
-      fontSize: '13px', color: '#445566', fontStyle: 'italic',
-    }).setOrigin(0.5);
+    // 5 element tiles in a row
+    const ELEMENT_COLORS = {
+      water: '#4488ff', wood: '#44cc44', fire: '#ff6644', earth: '#cc8822', metal: '#aaaaaa',
+    };
+    const ELEMENT_BORDER = {
+      water: 0x2255aa, wood: 0x228833, fire: 0xaa3322, earth: 0x885511, metal: 0x666666,
+    };
+    const tileW  = 100;
+    const tileH  = height - 36;
+    const tileGap = 8;
+    const totalW = WUXING_CONSUMABLES.length * tileW + (WUXING_CONSUMABLES.length - 1) * tileGap;
+    const startX = cx - totalW / 2 + tileW / 2;
+    const tileY  = topY + 34 + tileH / 2;
+
+    for (let i = 0; i < WUXING_CONSUMABLES.length; i++) {
+      const def     = WUXING_CONSUMABLES[i];
+      const x       = startX + i * (tileW + tileGap);
+      const full    = !run.canAddConsumable;
+      const afford  = run.ki >= def.cost;
+      const buyable = afford && !full;
+      const color   = ELEMENT_COLORS[def.element] ?? '#aaaaaa';
+      const bdr     = ELEMENT_BORDER[def.element] ?? 0x555555;
+
+      this.add.rectangle(x, tileY, tileW, tileH, buyable ? 0x0a1a1a : 0x080e10)
+        .setStrokeStyle(1, buyable ? bdr : 0x1a2233);
+
+      this.add.text(x, tileY - tileH / 2 + 7, def.name, {
+        fontSize: '12px', color, fontStyle: 'bold',
+      }).setOrigin(0.5, 0);
+
+      this.add.text(x, tileY - tileH / 2 + 21, def.description, {
+        fontSize: '7px', color: '#445566',
+        wordWrap: { width: tileW - 8 }, align: 'center',
+      }).setOrigin(0.5, 0);
+
+      const btnY2  = tileY + tileH / 2 - 14;
+      const btnLbl = full ? 'Full' : !afford ? 'N/A' : '5 ki';
+      const btnTxt = buyable ? color : '#334455';
+      const btn    = this.add.rectangle(x, btnY2, tileW - 10, 20, buyable ? 0x111e1e : 0x080e0e)
+        .setStrokeStyle(1, buyable ? bdr : 0x1a2233);
+      this.add.text(x, btnY2, btnLbl, { fontSize: '10px', color: btnTxt }).setOrigin(0.5);
+
+      if (buyable) {
+        btn.setInteractive({ useHandCursor: true });
+        btn.on('pointerover', () => btn.setFillStyle(0x1a2e2e));
+        btn.on('pointerout',  () => btn.setFillStyle(0x111e1e));
+        btn.on('pointerdown', () => this._buyConsumable(def));
+      }
+    }
   }
 
   // ── Fusion Ritual section (Sacred Grove only) ─────────────────────────────
