@@ -116,8 +116,36 @@ class RunManager {
     if (!this.canAddSpirit)        return { success: false, reason: 'No spirit slots available' };
     if (this._ki < spiritDef.cost) return { success: false, reason: 'Not enough ki' };
     this._ki -= spiritDef.cost;
-    this._spirits.push({ id: spiritDef.id, name: spiritDef.name });
+    const spirit = { id: spiritDef.id, name: spiritDef.name };
+    // Initialize persistent state for stateful spirits.
+    if (spiritDef.id === 'kasu_abundance') spirit.state = { plainsCaptured: 0 };
+    if (spiritDef.id === 'tane_wildlife')  spirit.state = { seenAnimals: [] };
+    this._spirits.push(spirit);
     return { success: true };
+  }
+
+  /**
+   * Notify spirits of newly captured cards.
+   * Call this each time cards are added to the capture pile so that persistent
+   * spirit state (Abundance, Wildlife) updates in real-time.
+   * Do NOT call at round-end with the full pile — call incrementally per event.
+   *
+   * @param {object[]} newlyCapturedCards  Card objects just captured.
+   */
+  onCardsCaptured(newlyCapturedCards) {
+    for (const spirit of this._spirits) {
+      if (spirit.id === 'kasu_abundance' && spirit.state) {
+        spirit.state.plainsCaptured +=
+          newlyCapturedCards.filter(c => c.type === 'plain').length;
+      }
+      if (spirit.id === 'tane_wildlife' && spirit.state) {
+        for (const card of newlyCapturedCards) {
+          if (card.type === 'animal' && !spirit.state.seenAnimals.includes(card.id)) {
+            spirit.state.seenAnimals.push(card.id);
+          }
+        }
+      }
+    }
   }
 
   /**

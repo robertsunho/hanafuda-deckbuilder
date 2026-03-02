@@ -203,6 +203,66 @@ const _effects = {
   fusion_continent:  verticalFusion('ground', 1.15, 0.04),
   fusion_sun:        temporalFusion('day',    1.3,  0.05),
   fusion_moon:       temporalFusion('night',  1.2,  0.05),
+
+  // ── Yaku Scoring Spirits — multiplicative channel ─────────────────────────
+
+  /**
+   * Abundance: persistent accumulator.  Each plain captured (any round) adds
+   * +0.03 to the mult-mult permanently.  State lives on the spirit object.
+   */
+  kasu_abundance: {
+    getMultMult({ spirits }) {
+      const self = spirits.find(s => s.id === 'kasu_abundance');
+      const n    = self?.state?.plainsCaptured ?? 0;
+      return 1.0 + n * 0.03;
+    },
+  },
+
+  /**
+   * Wildlife: persistent collection tracker.  Each NEW unique animal species
+   * captured (any round) adds +0.1 to the mult-mult permanently.
+   */
+  tane_wildlife: {
+    getMultMult({ spirits }) {
+      const self = spirits.find(s => s.id === 'tane_wildlife');
+      const n    = self?.state?.seenAnimals?.length ?? 0;
+      return 1.0 + n * 0.1;
+    },
+  },
+
+  /**
+   * Festival: per-round calculator.  ×1.15 per unique ribbon subgroup present
+   * in the capture pile this round.
+   *   Subgroup A — red writing (poetry): january, february, march ribbons
+   *   Subgroup B — blue:                 june, september, october ribbons
+   *   Subgroup C — plain red:            all other ribbons (apr, may, jul, nov)
+   */
+  tanzaku_festival: {
+    getMultMult({ capturedCards }) {
+      const RED_WRITING = new Set(['january_ribbon', 'february_ribbon', 'march_ribbon']);
+      const BLUE        = new Set(['june_ribbon', 'september_ribbon', 'october_ribbon']);
+      const ids = new Set(capturedCards.map(c => c.id));
+      let subgroups = 0;
+      if ([...RED_WRITING].some(id => ids.has(id))) subgroups++;
+      if ([...BLUE].some(id => ids.has(id)))        subgroups++;
+      const hasPlainRed = capturedCards.some(
+        c => c.type === 'ribbon' && !RED_WRITING.has(c.id) && !BLUE.has(c.id)
+      );
+      if (hasPlainRed) subgroups++;
+      return subgroups > 0 ? Math.pow(1.15, subgroups) : 1.0;
+    },
+  },
+
+  /**
+   * Radiance: per-round calculator.  ×1.4 per bright in the capture pile.
+   * 0 brights = ×1.0, 1 = ×1.4, 2 = ×1.96, 3 = ×2.744, 4 = ×3.842, 5 = ×5.378.
+   */
+  hikari_radiance: {
+    getMultMult({ capturedCards }) {
+      const n = capturedCards.filter(c => c.type === 'bright').length;
+      return n > 0 ? Math.pow(1.4, n) : 1.0;
+    },
+  },
 };
 
 // ── Public interface ──────────────────────────────────────────────────────────

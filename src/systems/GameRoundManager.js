@@ -51,6 +51,7 @@ import FieldManager     from "./FieldManager.js";
 import CaptureManager   from "./CaptureManager.js";
 import ScoringEngine    from "./ScoringEngine.js";
 import ConsumableEffects from "./ConsumableEffects.js";
+import run              from "./RunManager.js";
 
 export default class GameRoundManager {
 
@@ -574,6 +575,7 @@ export default class GameRoundManager {
     this._capture.add(cards);
     this._basePoints += cards.reduce((sum, c) => sum + c.points, 0);
     if (cards.length === 4) this._basePoints += 5;   // full-month bonus
+    run.onCardsCaptured(cards);
   }
 
   /**

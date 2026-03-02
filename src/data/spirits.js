@@ -251,6 +251,41 @@ export const SPIRIT_CATALOG = [
     tier:        2,
     fusionGroup: 'night',
   },
+
+  // ── Yaku Scoring Spirits (Tier 1 — multiplicative channel) ───────────────
+
+  {
+    id:          'kasu_abundance',
+    name:        'Abundance',
+    description: '\xD71.0 mult. Permanently gains +0.03 for each plain card captured.',
+    channel:     'multiplicative',
+    cost:        8,
+    tier:        1,
+  },
+  {
+    id:          'tane_wildlife',
+    name:        'Wildlife',
+    description: '\xD71.0 mult. Permanently gains +0.1 for each unique animal species captured.',
+    channel:     'multiplicative',
+    cost:        8,
+    tier:        1,
+  },
+  {
+    id:          'tanzaku_festival',
+    name:        'Festival',
+    description: '\xD71.15 mult per unique ribbon type captured this round.',
+    channel:     'multiplicative',
+    cost:        7,
+    tier:        1,
+  },
+  {
+    id:          'hikari_radiance',
+    name:        'Radiance',
+    description: '\xD71.4 mult per bright captured this round.',
+    channel:     'multiplicative',
+    cost:        9,
+    tier:        1,
+  },
 ];
 
 /**
