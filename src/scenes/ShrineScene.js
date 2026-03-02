@@ -21,6 +21,7 @@ import { getAvailableFusions }                  from '../data/fusionRecipes.js';
 import { THREE_MARKS, WUXING_CONSUMABLES,
          getElementDef }                        from '../data/consumables.js';
 import { YAKU_INFO }                            from '../systems/ScoringEngine.js';
+import logger                                   from '../systems/GameplayLogger.js';
 
 // ── Channel badge display ──────────────────────────────────────────────────────
 const CHANNEL_BADGE = {
@@ -79,6 +80,7 @@ export class ShrineScene extends Phaser.Scene {
   _buildUI() {
     this.children.removeAll(true);
     this._confirmObjs = [];
+    logger.logShopEnter(run.ki, this._isGrove);
     this._drawBg();
     this._drawHeader();
     this._drawSpiritsSection();
@@ -361,6 +363,7 @@ export class ShrineScene extends Phaser.Scene {
         btn.on('pointerdown', () => {
           try {
             run.buyYakuUpgrade(u.id);
+            logger.logShopPurchase('upgrade', u.name, 5, `${u.yaku} now +${next.toFixed(1)}`);
             this._buildUI();
           } catch (e) {
             console.warn('[ShrineScene] buyYakuUpgrade:', e.message);
@@ -452,6 +455,7 @@ export class ShrineScene extends Phaser.Scene {
   _buyConsumable(markDef) {
     if (run.ki < markDef.cost) return;
     run.spendKi(markDef.cost);
+    logger.logShopPurchase('consumable', markDef.name, markDef.cost);
     this._showBoosterPack(markDef);
   }
 
@@ -545,11 +549,13 @@ export class ShrineScene extends Phaser.Scene {
 
         if (markDef.id === 'mark_impermanence') {
           run.promoteCard(card.id);
+          logger.logConsumableUse(markDef.name, `promoted ${card.id} at shop`);
           closeOverlay();
           this._buildUI();
 
         } else if (markDef.id === 'mark_nonbeing') {
           run.deleteCard(card.id);
+          logger.logConsumableUse(markDef.name, `deleted ${card.id} at shop`);
           closeOverlay();
           this._buildUI();
 
@@ -567,6 +573,7 @@ export class ShrineScene extends Phaser.Scene {
             instr._isTargetInstruction = true;
           } else {
             run.transcendCard(transcendSource.id, card.id);
+            logger.logConsumableUse(markDef.name, `${transcendSource.id} → ${card.id} at shop`);
             closeOverlay();
             this._buildUI();
           }
@@ -588,6 +595,7 @@ export class ShrineScene extends Phaser.Scene {
               } catch (_) { /* inventory was actually full */ }
             }
           }
+          logger.logConsumableUse(markDef.name, `${result.action} on ${card.id} at shop`);
           closeOverlay();
           this._buildUI();
         }
@@ -602,6 +610,7 @@ export class ShrineScene extends Phaser.Scene {
     saveBtn.on('pointerdown', () => {
       try {
         run.addConsumable({ id: markDef.id, name: markDef.name, description: markDef.description, category: markDef.category });
+        logger.logConsumableUse(markDef.name, 'saved for later');
       } catch (e) {
         console.warn('[ShrineScene] addConsumable:', e.message);
       }
@@ -795,8 +804,11 @@ export class ShrineScene extends Phaser.Scene {
   }
 
   _executeFusion(recipe) {
+    const nameA  = run.spirits.find(s => s.id === recipe.input[0])?.name ?? recipe.input[0];
+    const nameB  = run.spirits.find(s => s.id === recipe.input[1])?.name ?? recipe.input[1];
     const result = run.fuseSpirits(recipe.input[0], recipe.input[1]);
     if (!result.success) return;
+    logger.logShopFusion(nameA, nameB, result.fusedSpirit.name);
     // New slot opened — regenerate offering and rebuild.
     this._offering  = this._generateOffering();
     this._purchased = new Array(this._offering.length).fill(false);
@@ -812,7 +824,10 @@ export class ShrineScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
     btn.on('pointerover', () => btn.setFillStyle(0x2a6a3a));
     btn.on('pointerout',  () => btn.setFillStyle(0x1a4a2a));
-    btn.on('pointerdown', () => this.scene.start('GameScene'));
+    btn.on('pointerdown', () => {
+      logger.logShopExit(run.ki);
+      this.scene.start('GameScene');
+    });
 
     this.add.text(640, BTN_Y, label, {
       fontSize: '16px', color: '#ffffff',
@@ -828,6 +843,7 @@ export class ShrineScene extends Phaser.Scene {
     const result = run.buySpirit(spiritDef);
     if (result.success) {
       this._purchased[index] = true;
+      logger.logShopPurchase('spirit', spiritDef.name, spiritDef.cost);
       this._buildUI();
     }
   }

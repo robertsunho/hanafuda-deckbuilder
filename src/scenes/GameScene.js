@@ -2,6 +2,7 @@ import GameRoundManager      from '../systems/GameRoundManager.js';
 import { YAKU_INFO }         from '../systems/ScoringEngine.js';
 import run, { RunManager }   from '../systems/RunManager.js';
 import { getElementDef }     from '../data/consumables.js';
+import logger                from '../systems/GameplayLogger.js';
 
 // ── Layout constants ───────────────────────────────────────────────────────────
 // Canvas is 1280 × 720.
@@ -783,10 +784,12 @@ export class GameScene extends Phaser.Scene {
   _onMarkCardSelected(card) {
     if (!this._markMode) return;
     const { id, index } = this._markMode;
+    const consName = run.consumables[index]?.name ?? id;
 
     if (id === 'mark_impermanence') {
       run.promoteCard(card.id);
       run.useConsumable(index);
+      logger.logConsumableUse(consName, `promoted ${card.id}`);
       this._markMode = null;
       this._setStatus(`Impermanence: ${card.name} promoted.`);
       this._renderAll();
@@ -796,6 +799,7 @@ export class GameScene extends Phaser.Scene {
       this._round.removeCardFromHand(card.id);
       this._round.removeCardFromField(card.id);
       run.useConsumable(index);
+      logger.logConsumableUse(consName, `deleted ${card.id}`);
       this._markMode = null;
       this._setStatus(`Non-being: ${card.name} removed from your deck.`);
       this._renderAll();
@@ -810,6 +814,7 @@ export class GameScene extends Phaser.Scene {
         // select_target
         run.transcendCard(this._markMode.sourceCard.id, card.id);
         run.useConsumable(index);
+        logger.logConsumableUse(consName, `${this._markMode.sourceCard.id} → ${card.id}`);
         this._markMode = null;
         this._setStatus('Transcendence complete.');
         this._renderAll();
@@ -856,6 +861,7 @@ export class GameScene extends Phaser.Scene {
       };
 
       run.useConsumable(index);
+      logger.logConsumableUse(consName, `${result.action} on ${card.id}`);
       this._markMode = null;
       this._setStatus(ACTION_MSG[result.action] ?? 'Done.');
       this._renderAll();
@@ -885,6 +891,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    for (const card of result.removed) logger.logAction('discard', { cardId: card.id });
     const n = result.removed.length;
     this._setStatus(`Discarded ${n} card${n > 1 ? 's' : ''}  —  play your next card.`);
     this._renderAll();
@@ -894,6 +901,11 @@ export class GameScene extends Phaser.Scene {
 
   _playCards(cardIds) {
     if (this._animating) return;
+
+    // Log the play action before calling into the round manager.
+    const _handMap     = new Map(this._round.hand.getAll().map(c => [c.id, c]));
+    const _targetMonth = _handMap.get(cardIds[0])?.month;
+    logger.logAction('play', { cardIds, targetMonth: _targetMonth });
 
     let handResult;
     try {
@@ -1235,6 +1247,26 @@ export class GameScene extends Phaser.Scene {
       // ── Run over ──────────────────────────────────────────────────────
       run.addKi(kiEarned);
       run.endRun(false);
+      logger.logRunEnd('failed', run.round);
+      logger.logRunSummary({
+        round: run.round, ki: run.ki,
+        spirits: run.spirits, yakuUpgrades: run.yakuUpgrades,
+        deckSize: run.getDeck().length,
+        enhancedCards: run.getDeck().filter(c => c.enhancement),
+        promotedCards: run.getDeck().filter(c => c.promotionProgress > 0),
+      });
+
+      // ── Copy Log button ───────────────────────────────────────────────
+      const logBtnText = this.add.text(cx + 200, cy + 180, 'Copy Game Log', {
+        fontSize: '11px', color: '#88aacc',
+      }).setOrigin(0.5);
+      const logBtn = this.add.rectangle(cx + 200, cy + 180, 120, 30, 0x1a3a5a)
+        .setStrokeStyle(1, 0x4466cc).setInteractive({ useHandCursor: true });
+      logBtn.on('pointerdown', async () => {
+        const ok = await logger.copyToClipboard();
+        logBtnText.setText(ok ? 'Copied!' : 'Check console');
+      });
+      this._overlayObjs.push(logBtn, logBtnText);
 
       const btn = this.add.rectangle(cx, btnY, 230, 46, 0x5a1a1a)
         .setStrokeStyle(2, 0xaa3333).setInteractive({ useHandCursor: true });
@@ -1255,6 +1287,27 @@ export class GameScene extends Phaser.Scene {
       if (run.isRunComplete) {
         // ── Victory ─────────────────────────────────────────────────
         run.endRun(true);
+        logger.logRunEnd('victory', run.round);
+        logger.logRunSummary({
+          round: run.round, ki: run.ki,
+          spirits: run.spirits, yakuUpgrades: run.yakuUpgrades,
+          deckSize: run.getDeck().length,
+          enhancedCards: run.getDeck().filter(c => c.enhancement),
+          promotedCards: run.getDeck().filter(c => c.promotionProgress > 0),
+        });
+
+        // ── Copy Log button ───────────────────────────────────────────
+        const logBtnTextV = this.add.text(cx + 200, cy + 180, 'Copy Game Log', {
+          fontSize: '11px', color: '#88aacc',
+        }).setOrigin(0.5);
+        const logBtnV = this.add.rectangle(cx + 200, cy + 180, 120, 30, 0x1a3a5a)
+          .setStrokeStyle(1, 0x4466cc).setInteractive({ useHandCursor: true });
+        logBtnV.on('pointerdown', async () => {
+          const ok = await logger.copyToClipboard();
+          logBtnTextV.setText(ok ? 'Copied!' : 'Check console');
+        });
+        this._overlayObjs.push(logBtnV, logBtnTextV);
+
         this._overlayObjs.push(
           this.add.text(cx, y + 32, 'Run Complete!', {
             fontSize: '20px', color: '#ffee44', stroke: '#000000', strokeThickness: 3,
@@ -1366,6 +1419,7 @@ export class GameScene extends Phaser.Scene {
     bankBtn.on('pointerover',  () => bankBtn.setFillStyle(0x2a9a2a));
     bankBtn.on('pointerout',   () => bankBtn.setFillStyle(0x1a6a1a));
     bankBtn.on('pointerdown',  () => {
+      logger.logBankPushDecision('bank', this._round.pushCount);
       const bankedResult = this._round.bankScore();
       this._clearObjs(this._overlayObjs);
       this._renderAll();
@@ -1383,6 +1437,7 @@ export class GameScene extends Phaser.Scene {
     pushBtn.on('pointerover',  () => pushBtn.setFillStyle(0x9a2a2a));
     pushBtn.on('pointerout',   () => pushBtn.setFillStyle(0x6a1a1a));
     pushBtn.on('pointerdown',  () => {
+      logger.logBankPushDecision('push', this._round.pushCount);
       const { failedFlow } = this._round.pushOn();
       this._clearObjs(this._overlayObjs);
       this._setStatus(`Pushed! Complete another yaku or flow drops to \xD7${failedFlow.toFixed(2)}.`);

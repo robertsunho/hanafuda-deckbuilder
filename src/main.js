@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { BootScene }   from './scenes/BootScene.js';
 import { GameScene }   from './scenes/GameScene.js';
 import { ShrineScene } from './scenes/ShrineScene.js';
+import logger          from './systems/GameplayLogger.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -16,3 +17,4 @@ const config = {
 };
 
 const game = new Phaser.Game(config);
+window.gameLog = logger;

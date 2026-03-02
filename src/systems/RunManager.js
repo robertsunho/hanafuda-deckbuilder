@@ -7,6 +7,7 @@ import { findFusionRecipe }                     from '../data/fusionRecipes.js';
 import { getSpiritDef }                         from '../data/spirits.js';
 import { cards as ALL_CARDS }                   from '../data/cards.js';
 import { THREE_MARKS, WUXING_CONSUMABLES }      from '../data/consumables.js';
+import logger                                   from './GameplayLogger.js';
 //
 //   import run from './systems/RunManager.js';
 //   run.addKi(5);
@@ -112,6 +113,8 @@ class RunManager {
      * @type {object[]}
      */
     this._deck = JSON.parse(JSON.stringify(ALL_CARDS));
+
+    logger.logRunStart();
   }
 
   // ── Ki economy ─────────────────────────────────────────────────────────────

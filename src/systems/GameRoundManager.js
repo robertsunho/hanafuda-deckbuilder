@@ -53,6 +53,7 @@ import ScoringEngine, { SNOW_MULT, ICE_MULT } from "./ScoringEngine.js";
 import ConsumableEffects from "./ConsumableEffects.js";
 import StyleEngine      from "./StyleEngine.js";
 import run              from "./RunManager.js";
+import logger           from "./GameplayLogger.js";
 
 export default class GameRoundManager {
 
@@ -335,6 +336,13 @@ export default class GameRoundManager {
       this._field.dealCard(card);
     }
 
+    logger.logRoundStart(
+      run.round, run.act, run.threshold,
+      this._hand.getAll(), this._field.getAll(),
+      this._lastEarthKiGain ?? 0, run.ki, run.getDeck().length
+    );
+    logger.logSpiritLoadout(this._spirits);
+
     return this;
   }
 
@@ -462,6 +470,15 @@ export default class GameRoundManager {
     // Apply post-round enhancement effects (Water dep increment, Fire breaks,
     // Metal consumable generation).
     this._applyPostRoundEnhancements(this._capture.getAll(), sc.metalConsumableCount);
+    logger.logRoundEnd(
+      { ...sc, basePoints: sc.boostedBasePoints },
+      run.threshold,
+      sc.finalScore >= run.threshold,
+      this._capture.getAll(),
+      this._styleBase,
+      this._style.getTriggeredCombos(),
+      this._lastEnhancementEvents ?? []
+    );
     this._roundEndingAfterDecision = false;
     this._phase = "round_over";
     return {
@@ -587,24 +604,29 @@ export default class GameRoundManager {
    * @param {number}   metalConsumableCount  Number of Metal consumable procs.
    */
   _applyPostRoundEnhancements(capturedCards, metalConsumableCount = 0) {
+    const events = [];
     for (const card of capturedCards) {
       if (card.enhancement?.element === 'water') {
         const multArr = card.enhancement.tier === 'upgraded' ? ICE_MULT : SNOW_MULT;
         const maxLevel = multArr.length - 1;
         card.enhancement.depLevel = Math.min((card.enhancement.depLevel ?? 0) + 1, maxLevel);
+        events.push(`${card.id} Water dep → level ${card.enhancement.depLevel}`);
       }
       if (card.enhancement?.element === 'fire') {
         const breakChance = card.enhancement.tier === 'upgraded' ? 2 / 7 : 1 / 7;
         if (Math.random() < breakChance) {
           run.deleteCard(card.id);
           card._broken = true;
+          events.push(`${card.id} Fire BROKE — card destroyed`);
         }
       }
     }
     // Generate any Metal-procced consumables.
     for (let i = 0; i < metalConsumableCount; i++) {
       run.generateRandomConsumable();
+      events.push('Metal proc → free consumable generated');
     }
+    this._lastEnhancementEvents = events;
   }
 
   // ── Three Marks helpers ────────────────────────────────────────────────────
@@ -679,6 +701,7 @@ export default class GameRoundManager {
     this._basePoints += cards.reduce((sum, c) => sum + c.points, 0);
     if (cards.length === 4) this._basePoints += 5;   // full-month bonus
     run.onCardsCaptured(cards);
+    logger.logCapture(cards, 'capture');
 
     // Check for newly triggered style combos against the full capture pile.
     const newCombos = this._style.checkCombos(this._capture.getAll());
@@ -699,6 +722,7 @@ export default class GameRoundManager {
       run.addStyleBase(combo.bonus);
     }
     this._lastStyleCombos = combos;
+    logger.logStyleCombos(combos);
   }
 
   /**
@@ -717,6 +741,10 @@ export default class GameRoundManager {
     const deckCard = this._deck.draw(1)[0];
     this._lastDeckCard = deckCard;
 
+    // Track the deck flip outcome for logging.
+    let _flipResult   = 'field_place';
+    let _flipCaptures = [];
+
     const pending = this._field.getPendingSlot();
 
     if (pending) {
@@ -731,11 +759,21 @@ export default class GameRoundManager {
           // Push deck card into the pending slot then capture immediately.
           pending.cards.push(deckCard);
           const captured = this._field.capturePendingMatch();
-          if (captured.length > 0) this._addCapture(captured);
+          if (captured.length > 0) {
+            this._addCapture(captured);
+            _flipResult   = 'silk_capture';
+            _flipCaptures = captured;
+          }
         } else {
           // Standard addToPendingMatch handles 4-card auto-capture and stranding.
           const { captured } = this._field.addToPendingMatch(deckCard);
-          if (captured) this._addCapture(captured);
+          if (captured) {
+            this._addCapture(captured);
+            _flipResult   = 'capture';
+            _flipCaptures = captured;
+          } else {
+            _flipResult = 'strand';
+          }
         }
         // Whether captured or stranded, the pending state is resolved for
         // this turn; _finalizeTurn proceeds normally.
@@ -751,15 +789,19 @@ export default class GameRoundManager {
           // 2 or 4 cards: the match is complete — capture immediately.
           const pendingCards = this._field.capturePendingMatch();
           this._addCapture(pendingCards);
+          _flipCaptures = pendingCards;
         }
 
         // Deck card goes to the field normally (stack or new slot).
         const flipResult = this._field.addFlippedCard(deckCard);
         if (flipResult.captured) {
           this._addCapture(flipResult.captured);
+          _flipResult   = 'capture';
+          _flipCaptures = [..._flipCaptures, ...flipResult.captured];
         } else if (flipResult.discarded) {
           this._discardedThisTurn.push(deckCard);
           this._discardCount++;
+          _flipResult = 'field_discard';
         }
       }
     } else {
@@ -767,12 +809,16 @@ export default class GameRoundManager {
       const flipResult = this._field.addFlippedCard(deckCard);
       if (flipResult.captured) {
         this._addCapture(flipResult.captured);
+        _flipResult   = 'capture';
+        _flipCaptures = flipResult.captured;
       } else if (flipResult.discarded) {
         this._discardedThisTurn.push(deckCard);
         this._discardCount++;
+        _flipResult = 'field_discard';
       }
     }
 
+    logger.logDeckFlip(deckCard, _flipResult, _flipCaptures);
     return this._finalizeTurn();
   }
 
@@ -798,6 +844,7 @@ export default class GameRoundManager {
       return prev === undefined || y.bonus - prev > 0.3;
     });
     this._yakuBeforeTurn = new Map(yakuForDiff.map(y => [y.name, y.bonus]));
+    logger.logYakuState(yakuForDiff, newYaku);
 
     // Completing a new yaku clears the push penalty regardless of outcome.
     if (newYaku.length > 0) this._pushPenaltyActive = false;
@@ -842,6 +889,15 @@ export default class GameRoundManager {
     } else if (roundOver) {
       // Apply post-round enhancement mutations (Water dep, Fire breaks, Metal cons).
       this._applyPostRoundEnhancements(this._capture.getAll(), sc.metalConsumableCount);
+      logger.logRoundEnd(
+        { ...sc, basePoints: sc.boostedBasePoints },
+        run.threshold,
+        sc.finalScore >= run.threshold,
+        this._capture.getAll(),
+        this._styleBase,
+        this._style.getTriggeredCombos(),
+        this._lastEnhancementEvents ?? []
+      );
       this._phase = "round_over";
     } else {
       this._phase = "idle";
