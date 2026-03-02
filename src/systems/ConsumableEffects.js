@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// ConsumableEffects — runtime effect registry for all consumable items
+// ConsumableEffects — runtime effect registry for consumable items
 //
 // Each entry defines:
 //   execute({ roundManager, params }) → result
@@ -13,10 +13,9 @@
 //   Pig     — double ki earned from this round
 //   Rooster — reveal all draw-pile cards whose month appears on the field
 //
-// All other consumables are stubs returning success: false.
+// Three Marks consumables (mark_impermanence, mark_nonbeing, mark_transcendence)
+// are handled directly in GameScene and ShrineScene, not here.
 // ─────────────────────────────────────────────────────────────────────────────
-
-const _stub = { execute: () => ({ success: false, message: 'Not yet implemented.' }) };
 
 const _effects = {
 
@@ -65,17 +64,6 @@ const _effects = {
       return { success: true, message: msg, revealedCards };
     },
   },
-
-  // ── Stubs (not yet implemented) ───────────────────────────────────────────
-
-  consumable_rat:    _stub,
-  consumable_ox:     _stub,
-  consumable_tiger:  _stub,
-  consumable_rabbit: _stub,
-  consumable_dragon: _stub,
-  consumable_snake:  _stub,
-  consumable_goat:   _stub,
-  consumable_monkey: _stub,
 };
 
 // ── Public interface ──────────────────────────────────────────────────────────

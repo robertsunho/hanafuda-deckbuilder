@@ -111,6 +111,12 @@ export class GameScene extends Phaser.Scene {
     this._selectedCardIds         = new Set();
     this._selectedConsumableIndex = null;
 
+    /**
+     * Active Three Marks targeting state, or null when not in mark mode.
+     * @type {{ id: string, index: number, step: 'select_source'|'select_target', sourceCard: object|null }|null}
+     */
+    this._markMode = null;
+
     this._createCardBackTexture();
     this._buildStaticUI();
 
@@ -119,6 +125,15 @@ export class GameScene extends Phaser.Scene {
     this._round.startRound();
     this._afterRoundStart();
     this._renderAll();
+
+    // ESC cancels mark mode
+    this.input.keyboard.on('keydown-ESC', () => {
+      if (this._markMode) {
+        this._markMode = null;
+        this._setStatus('Mark cancelled.');
+        this._renderAll();
+      }
+    });
   }
 
   // ── Card-back texture ──────────────────────────────────────────────────────
@@ -223,11 +238,12 @@ export class GameScene extends Phaser.Scene {
   // ── Hand ──────────────────────────────────────────────────────────────────
 
   _renderHand() {
-    const cards  = this._round.hand.getAll();
-    const n      = cards.length;
-    const idle   = this._round.phase === 'idle' && !this._animating
-                    && !this._yakuGuideOpen && !this._captureOverlayOpen;
-    const startX = PLAY_CX - ((n - 1) * HAND_STEP) / 2;
+    const cards      = this._round.hand.getAll();
+    const n          = cards.length;
+    const idle       = this._round.phase === 'idle' && !this._animating
+                        && !this._yakuGuideOpen && !this._captureOverlayOpen;
+    const markActive = this._markMode !== null;
+    const startX     = PLAY_CX - ((n - 1) * HAND_STEP) / 2;
 
     for (let i = 0; i < n; i++) {
       const card     = cards[i];
@@ -236,7 +252,18 @@ export class GameScene extends Phaser.Scene {
       const y        = HAND_Y - (selected ? 20 : 0);
       const spr      = this.add.image(x, y, card.id).setScale(CARD_SCALE);
 
-      if (idle) {
+      if (markActive) {
+        // In mark mode: cards are selectable targets regardless of game phase.
+        const MARK_TINT        = 0x44ffcc;
+        const MARK_HOVER       = 0xaaffee;
+        const isTranscendSrc   = this._markMode.step === 'select_target'
+                                  && this._markMode.sourceCard?.id === card.id;
+        spr.setTint(isTranscendSrc ? TINT_PENDING : MARK_TINT);
+        spr.setInteractive({ useHandCursor: true });
+        spr.on('pointerover',  () => { if (!isTranscendSrc) spr.setTint(MARK_HOVER); });
+        spr.on('pointerout',   () => { spr.setTint(isTranscendSrc ? TINT_PENDING : MARK_TINT); });
+        spr.on('pointerdown',  () => this._onMarkCardSelected(card));
+      } else if (idle) {
         spr.setInteractive({ useHandCursor: true });
         if (selected) spr.setTint(TINT_HOVER);
         spr.on('pointerover',  () => spr.setTint(TINT_HOVER));
@@ -252,7 +279,9 @@ export class GameScene extends Phaser.Scene {
   // ── Field ─────────────────────────────────────────────────────────────────
 
   _renderField() {
-    const slots = this._round.field.getSlots();
+    const slots      = this._round.field.getSlots();
+    const markActive = this._markMode !== null;
+
     for (let i = 0; i < 8; i++) {
       const col = i % SLOT_COLS;
       const row = Math.floor(i / SLOT_COLS);
@@ -265,12 +294,26 @@ export class GameScene extends Phaser.Scene {
       if (!slot) continue;
       const col = i % SLOT_COLS, row = Math.floor(i / SLOT_COLS);
       for (let j = 0; j < slot.cards.length; j++) {
-        const spr = this.add.image(
+        const card = slot.cards[j];
+        const spr  = this.add.image(
           SLOT_XS[col] + j * SLOT_FAN_X,
           SLOT_YS[row] + j * SLOT_FAN_Y,
-          slot.cards[j].id
+          card.id
         ).setScale(CARD_SCALE);
-        if (slot.state === 'pending') spr.setTint(TINT_PENDING);
+
+        if (markActive) {
+          const MARK_TINT      = 0x44ffcc;
+          const MARK_HOVER     = 0xaaffee;
+          const isTranscendSrc = this._markMode.step === 'select_target'
+                                  && this._markMode.sourceCard?.id === card.id;
+          spr.setTint(isTranscendSrc ? TINT_PENDING : MARK_TINT);
+          spr.setInteractive({ useHandCursor: true });
+          spr.on('pointerover',  () => { if (!isTranscendSrc) spr.setTint(MARK_HOVER); });
+          spr.on('pointerout',   () => { spr.setTint(isTranscendSrc ? TINT_PENDING : MARK_TINT); });
+          spr.on('pointerdown',  () => this._onMarkCardSelected(card));
+        } else if (slot.state === 'pending') {
+          spr.setTint(TINT_PENDING);
+        }
         this._fieldObjs.push(spr);
       }
     }
@@ -362,7 +405,8 @@ export class GameScene extends Phaser.Scene {
   _renderConsumables() {
     const consumables = run.consumables;  // packed array, no gaps
     const idle        = this._round.phase === 'idle' && !this._animating
-                          && !this._yakuGuideOpen && !this._captureOverlayOpen;
+                          && !this._yakuGuideOpen && !this._captureOverlayOpen
+                          && !this._markMode;
 
     for (let i = 0; i < consumables.length; i++) {
       const cons     = consumables[i];
@@ -592,37 +636,46 @@ export class GameScene extends Phaser.Scene {
 
   _renderActionButtons() {
     const idle  = this._round.phase === 'idle' && !this._animating
-                    && !this._yakuGuideOpen && !this._captureOverlayOpen;
+                    && !this._yakuGuideOpen && !this._captureOverlayOpen
+                    && !this._markMode;
     const count = this._selectedCardIds.size;
 
-    // ── Use button (consumable selected) ──────────────────────────────────
+    // ── Use / Activate button (consumable selected) ────────────────────────
     if (idle && this._selectedConsumableIndex !== null) {
       const cons = run.consumables[this._selectedConsumableIndex];
       if (cons) {
-        const y = 700;
-        const useBtn = this.add.rectangle(PLAY_CX, y, 180, 40, 0x1a2a5a)
+        const y       = 700;
+        const isMark  = cons.id && cons.id.startsWith('mark_');
+        const btnLabel = isMark ? `Activate: ${cons.name}` : `Use: ${cons.name}`;
+
+        const useBtn = this.add.rectangle(PLAY_CX, y, 210, 40, 0x1a2a5a)
           .setStrokeStyle(2, 0x4466cc).setInteractive({ useHandCursor: true }).setDepth(5);
         useBtn.on('pointerover',  () => useBtn.setFillStyle(0x2a4a8a));
         useBtn.on('pointerout',   () => useBtn.setFillStyle(0x1a2a5a));
         useBtn.on('pointerdown',  () => {
-          const idx    = this._selectedConsumableIndex;
-          const result = this._round.useConsumable(cons);
-          this._selectedConsumableIndex = null;
-          run.useConsumable(idx);
-          this._clearObjs(this._consumableObjs);
-          this._clearObjs(this._actionBtnObjs);
-          if (result.revealedCards) {
-            this._showRoosterOverlay(result.revealedCards, result.message);
+          if (isMark) {
+            this._activateMark(cons, this._selectedConsumableIndex);
+            this._selectedConsumableIndex = null;
           } else {
-            this._setStatus(result.message ?? `Used ${cons.name}.`);
+            const idx    = this._selectedConsumableIndex;
+            const result = this._round.useConsumable(cons);
+            this._selectedConsumableIndex = null;
+            run.useConsumable(idx);
+            this._clearObjs(this._consumableObjs);
+            this._clearObjs(this._actionBtnObjs);
+            if (result.revealedCards) {
+              this._showRoosterOverlay(result.revealedCards, result.message);
+            } else {
+              this._setStatus(result.message ?? `Used ${cons.name}.`);
+            }
+            this._renderConsumables();
+            this._renderActionButtons();
+            this._updateInfoTexts();
           }
-          this._renderConsumables();
-          this._renderActionButtons();
-          this._updateInfoTexts();
         });
         this._actionBtnObjs.push(useBtn);
         this._actionBtnObjs.push(
-          this.add.text(PLAY_CX, y, `Use: ${cons.name}`, {
+          this.add.text(PLAY_CX, y, btnLabel, {
             fontSize: '15px', color: '#aaddff',
           }).setOrigin(0.5).setDepth(5)
         );
@@ -679,6 +732,65 @@ export class GameScene extends Phaser.Scene {
         fontSize: '15px', color: discardEnabled ? '#ffffff' : '#554433',
       }).setOrigin(0.5).setDepth(5)
     );
+  }
+
+  // ── Three Marks (in-round targeting) ──────────────────────────────────────
+
+  /**
+   * Enter mark mode for a Three Marks consumable.
+   * @param {object} cons  The consumable object from run.consumables.
+   * @param {number} idx   Its index in the consumable inventory.
+   */
+  _activateMark(cons, idx) {
+    this._markMode = { id: cons.id, index: idx, step: 'select_source', sourceCard: null };
+    const instructions = {
+      mark_impermanence: 'Impermanence: click a card to promote it. ESC to cancel.',
+      mark_nonbeing:     'Non-being: click a card to permanently remove it. ESC to cancel.',
+      mark_transcendence:'Transcendence: click the SOURCE card first. ESC to cancel.',
+    };
+    this._setStatus(instructions[cons.id] ?? 'Click a card. ESC to cancel.');
+    this._renderAll();
+  }
+
+  /**
+   * Handle a card click while in mark mode.
+   * @param {object} card  The card object that was clicked.
+   */
+  _onMarkCardSelected(card) {
+    if (!this._markMode) return;
+    const { id, index } = this._markMode;
+
+    if (id === 'mark_impermanence') {
+      run.promoteCard(card.id);
+      run.useConsumable(index);
+      this._markMode = null;
+      this._setStatus(`Impermanence: ${card.name} promoted.`);
+      this._renderAll();
+
+    } else if (id === 'mark_nonbeing') {
+      run.deleteCard(card.id);
+      this._round.removeCardFromHand(card.id);
+      this._round.removeCardFromField(card.id);
+      run.useConsumable(index);
+      this._markMode = null;
+      this._setStatus(`Non-being: ${card.name} removed from your deck.`);
+      this._renderAll();
+
+    } else if (id === 'mark_transcendence') {
+      if (this._markMode.step === 'select_source') {
+        this._markMode.step       = 'select_target';
+        this._markMode.sourceCard = card;
+        this._setStatus(`Transcendence: source is ${card.name}. Now click target. ESC to cancel.`);
+        this._renderAll();
+      } else {
+        // select_target
+        run.transcendCard(this._markMode.sourceCard.id, card.id);
+        run.useConsumable(index);
+        this._markMode = null;
+        this._setStatus('Transcendence complete.');
+        this._renderAll();
+      }
+    }
   }
 
   _onPlayButton() {
@@ -847,6 +959,14 @@ export class GameScene extends Phaser.Scene {
   // ── Info text updates ─────────────────────────────────────────────────────
 
   _updateInfoTexts() {
+    // Update mark mode status prompt when in mark mode.
+    if (this._markMode) {
+      const { id, step } = this._markMode;
+      if (id === 'mark_transcendence' && step === 'select_target') {
+        this._setStatus(`Transcendence: source is ${this._markMode.sourceCard.name}. Click target. ESC to cancel.`);
+      }
+    }
+
     const sc           = this._round.getCurrentScoring();
     const drawSize     = this._round.deck.drawPileSize;
     const discardCount = this._round.discardCount;
@@ -1120,6 +1240,7 @@ export class GameScene extends Phaser.Scene {
     this._clearObjs(this._overlayObjs);
     this._selectedCardIds.clear();
     this._selectedConsumableIndex = null;
+    this._markMode = null;
     this._round.setSpirits(run.spirits);
     this._round.setStyleBase(run.styleBase);
     this._round.startRound();

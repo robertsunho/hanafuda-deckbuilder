@@ -1,15 +1,35 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // RunManager — singleton that persists state across rounds and scenes
 //
-// Manages the ki economy, spirit loadout, consumable inventory, and run
-// progression for the entire run.  Import the exported instance, not the class:
+// Manages the ki economy, spirit loadout, consumable inventory, deck state,
+// and run progression for the entire run.  Import the exported instance:
 import { findFusionRecipe } from '../data/fusionRecipes.js';
 import { getSpiritDef }     from '../data/spirits.js';
+import { cards as ALL_CARDS } from '../data/cards.js';
 //
 //   import run from './systems/RunManager.js';
 //   run.addKi(5);
 //   run.advanceRound();
 //
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Card promotion helpers ────────────────────────────────────────────────────
+
+/** Ascending point order for card type promotion. */
+const TYPE_ORDER = ['plain', 'ribbon', 'animal', 'bright'];
+
+/**
+ * Map from `${month}_${type}` → first card of that month/type in ALL_CARDS.
+ * Used by promoteCard() to look up target card properties.
+ */
+const _baseCardLookup = new Map();
+for (const card of ALL_CARDS) {
+  const key = `${card.month}_${card.type}`;
+  if (!_baseCardLookup.has(key)) {
+    _baseCardLookup.set(key, card);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 class RunManager {
@@ -73,6 +93,24 @@ class RunManager {
     this._runOver = false;
     /** True if the run ended in victory (all 18 rounds cleared). */
     this._runWon  = false;
+
+    // ── Yaku upgrades ────────────────────────────────────────────────────────
+    /**
+     * Permanent upgrade levels for each yaku (purchased at the shrine).
+     * Each level adds +0.2 to the yaku's base bonus.
+     * @type {{ kasu: number, tanzaku: number, tane: number, hikari: number }}
+     */
+    this._yakuUpgrades = { kasu: 0, tanzaku: 0, tane: 0, hikari: 0 };
+
+    // ── Persistent deck ──────────────────────────────────────────────────────
+    /**
+     * The canonical deck array — deep-copied from ALL_CARDS at run start.
+     * Survives across rounds.  Three Marks mutations are applied in-place.
+     * DeckManager.resetWithCards() receives a shallow copy each round so
+     * card object references are shared (mutations propagate automatically).
+     * @type {object[]}
+     */
+    this._deck = JSON.parse(JSON.stringify(ALL_CARDS));
   }
 
   // ── Ki economy ─────────────────────────────────────────────────────────────
@@ -203,7 +241,8 @@ class RunManager {
 
   // ── Consumable inventory ───────────────────────────────────────────────────
 
-  get consumables() { return [...this._consumables]; }
+  get consumables()      { return [...this._consumables]; }
+  get canAddConsumable() { return this._consumables.length < RunManager.MAX_CONSUMABLE_SLOTS; }
 
   /**
    * Add a consumable to the inventory.
@@ -399,6 +438,105 @@ class RunManager {
     return Math.round(raw * pushMultiplier * pigMultiplier);
   }
 
+  // ── Yaku upgrades ──────────────────────────────────────────────────────────
+
+  /** Spread copy of the current yaku upgrade levels. */
+  get yakuUpgrades() { return { ...this._yakuUpgrades }; }
+
+  /**
+   * Purchase one level of a yaku upgrade. Costs 5 ki.
+   * @param {'kasu'|'tanzaku'|'tane'|'hikari'} yakuId
+   * @throws {Error} if not enough ki or unknown yakuId.
+   */
+  buyYakuUpgrade(yakuId) {
+    if (!(yakuId in this._yakuUpgrades)) {
+      throw new Error(`Unknown yaku upgrade id: ${yakuId}`);
+    }
+    if (this._ki < 5) {
+      throw new Error('Not enough ki to buy a yaku upgrade (costs 5).');
+    }
+    this._ki -= 5;
+    this._yakuUpgrades[yakuId]++;
+  }
+
+  // ── Persistent deck ────────────────────────────────────────────────────────
+
+  /**
+   * Shallow copy of the canonical deck array.
+   * Card objects are shared references — mutations (Three Marks) propagate.
+   * @returns {object[]}
+   */
+  getDeck() { return [...this._deck]; }
+
+  /**
+   * Promote one card to the next card type within its month.
+   * Uses `promotionProgress` to skip missing types automatically.
+   *
+   * Type order (ascending): plain → ribbon → animal → bright
+   * If the target type exists for the card's month, the card is mutated
+   * in-place (id, name, type, points, vertical, temporal) and
+   * promotionProgress resets to 0.
+   * If the target type is absent, promotionProgress increments (the skip
+   * will be applied on the next call).
+   *
+   * @param {string} cardId
+   */
+  promoteCard(cardId) {
+    const card = this._deck.find(c => c.id === cardId);
+    if (!card) return;
+
+    const currentIdx = TYPE_ORDER.indexOf(card.type);
+    if (currentIdx === -1) return;
+
+    const progress  = card.promotionProgress || 0;
+    const nextIdx   = (currentIdx + 1 + progress) % TYPE_ORDER.length;
+    const nextType  = TYPE_ORDER[nextIdx];
+    const targetKey = `${card.month}_${nextType}`;
+    const target    = _baseCardLookup.get(targetKey);
+
+    if (target) {
+      card.id                = target.id;
+      card.name              = target.name;
+      card.type              = target.type;
+      card.points            = target.points;
+      card.vertical          = target.vertical;
+      card.temporal          = target.temporal;
+      card.promotionProgress = 0;
+    } else {
+      card.promotionProgress = (card.promotionProgress || 0) + 1;
+    }
+  }
+
+  /**
+   * Permanently remove a card from the canonical deck.
+   * @param {string} cardId
+   */
+  deleteCard(cardId) {
+    const idx = this._deck.findIndex(c => c.id === cardId);
+    if (idx !== -1) this._deck.splice(idx, 1);
+  }
+
+  /**
+   * Copy all properties from the target card onto the source card in-place.
+   * The source card object reference is preserved in the deck array so its
+   * position is unchanged; it simply becomes an exact copy of the target.
+   *
+   * @param {string} sourceId
+   * @param {string} targetId
+   */
+  transcendCard(sourceId, targetId) {
+    const source = this._deck.find(c => c.id === sourceId);
+    const target = this._deck.find(c => c.id === targetId);
+    if (!source || !target) return;
+
+    // Clear all current keys.
+    for (const key of Object.keys(source)) {
+      delete source[key];
+    }
+    // Copy all target properties (deep enough for plain objects / arrays).
+    Object.assign(source, JSON.parse(JSON.stringify(target)));
+  }
+
   // ── Snapshot ───────────────────────────────────────────────────────────────
 
   /**
@@ -407,14 +545,16 @@ class RunManager {
    */
   toSnapshot() {
     return {
-      ki:          this._ki,
-      round:       this._round,
-      totalScore:  this._totalScore,
-      styleBase:   this._styleBase,
-      spirits:     [...this._spirits],
-      consumables: [...this._consumables],
-      runOver:     this._runOver,
-      runWon:      this._runWon,
+      ki:           this._ki,
+      round:        this._round,
+      totalScore:   this._totalScore,
+      styleBase:    this._styleBase,
+      spirits:      [...this._spirits],
+      consumables:  [...this._consumables],
+      yakuUpgrades: { ...this._yakuUpgrades },
+      deck:         JSON.parse(JSON.stringify(this._deck)),
+      runOver:      this._runOver,
+      runWon:       this._runWon,
     };
   }
 }

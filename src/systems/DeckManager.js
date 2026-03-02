@@ -148,6 +148,19 @@ export default class DeckManager {
   }
 
   /**
+   * Reset the draw pile using a caller-supplied array of card objects.
+   * Shares the same object references — mutations to cards propagate to the
+   * caller's array automatically (used with RunManager._deck for Three Marks).
+   * @param {object[]} cards  The canonical deck array from RunManager.getDeck().
+   * @returns {this} for chaining
+   */
+  resetWithCards(cards) {
+    this._drawPile   = [...cards];
+    this._discardPile = [];
+    return this;
+  }
+
+  /**
    * Return true when the draw pile is empty.
    * @returns {boolean}
    */

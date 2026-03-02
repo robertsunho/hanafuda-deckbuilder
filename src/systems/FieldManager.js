@@ -335,6 +335,31 @@ export default class FieldManager {
     if (slot) slot.state = 'normal';
   }
 
+  // ── Card removal ───────────────────────────────────────────────────────────
+
+  /**
+   * Remove a card from the field by its id.
+   * If the containing slot becomes empty, the slot is nulled out (gap preserved).
+   * Used by Three Marks Non-being to remove a card targeted during a round.
+   * @param {string} cardId
+   * @returns {boolean} true if found and removed, false if not on the field.
+   */
+  removeCardById(cardId) {
+    for (let i = 0; i < this._slots.length; i++) {
+      const slot = this._slots[i];
+      if (!slot) continue;
+      const idx = slot.cards.findIndex(c => c.id === cardId);
+      if (idx !== -1) {
+        slot.cards.splice(idx, 1);
+        if (slot.cards.length === 0) {
+          this._slots[i] = null;
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
   // ── Reset ──────────────────────────────────────────────────────────────────
 
   /**

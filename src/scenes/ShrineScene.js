@@ -18,6 +18,8 @@
 import run, { RunManager }              from '../systems/RunManager.js';
 import { SPIRIT_CATALOG, getSpiritDef } from '../data/spirits.js';
 import { getAvailableFusions }          from '../data/fusionRecipes.js';
+import { THREE_MARKS }                  from '../data/consumables.js';
+import { YAKU_INFO }                    from '../systems/ScoringEngine.js';
 
 // ── Channel badge display ──────────────────────────────────────────────────────
 const CHANNEL_BADGE = {
@@ -265,65 +267,352 @@ export class ShrineScene extends Phaser.Scene {
   // ── Right column ──────────────────────────────────────────────────────────
 
   _drawRightColumn() {
-    const sections = [
-      {
-        type:     'placeholder',
-        heading:  'Consumables',
-        subtitle: 'Single-use items for tactical advantages',
-        note:     'Coming soon\u2026',
-        bgColor:  0x1a3a5a,
-      },
-      {
-        type:     'placeholder',
-        heading:  'Paramita Upgrades',
-        subtitle: 'Permanent enhancements to your yaku multipliers',
-        note:     'Coming soon\u2026',
-        bgColor:  0x3a2a5a,
-      },
-      {
-        type:     'placeholder',
-        heading:  'Wu Xing Forge',
-        subtitle: 'Transform your cards with elemental power',
-        note:     'Coming soon\u2026',
-        bgColor:  0x2a4a3a,
-      },
-    ];
+    let topY = HEADER_H + 6;
+
+    // Fixed-height sections
+    this._drawParamitaSection(RCX, topY, 140);
+    topY += 140;
+    this._drawConsumablesSection(RCX, topY, 220);
+    topY += 220;
+    this._drawWuXingForgeSection(RCX, topY, 80);
+    topY += 80;
 
     if (this._isGrove) {
-      sections.push({ type: 'fusion' });
+      const remaining = BTN_Y - 38 - topY;
+      this._drawFusionSection(RCX, topY, remaining);
     }
+  }
 
-    const topY  = HEADER_H + 6;
-    const botY  = BTN_Y - 38;
-    const avail = botY - topY;
-    const secH  = Math.floor(avail / sections.length);
+  // ── Paramita Upgrades section ─────────────────────────────────────────────
 
-    for (let i = 0; i < sections.length; i++) {
-      const sectionY = topY + i * secH;
-      if (sections[i].type === 'fusion') {
-        this._drawFusionSection(RCX, sectionY, secH);
-      } else {
-        this._drawPlaceholderSection(RCX, sectionY, secH, sections[i]);
+  _drawParamitaSection(cx, topY, height) {
+    this.add.text(cx, topY + 4, 'Paramita Upgrades', {
+      fontSize: '15px', color: '#cc99ff',
+    }).setOrigin(0.5, 0);
+    this.add.text(cx, topY + 22, 'Permanently raise yaku bonuses  —  5 ki each', {
+      fontSize: '10px', color: '#664488',
+    }).setOrigin(0.5, 0);
+
+    // 4 upgrade tiles
+    const UPGRADES = [
+      { id: 'kasu',    name: 'Rice',   yaku: 'Kasu',    color: '#ddccaa' },
+      { id: 'tanzaku', name: 'Tea',    yaku: 'Tanzaku', color: '#aaccdd' },
+      { id: 'tane',    name: 'Broth',  yaku: 'Tane',    color: '#aaddaa' },
+      { id: 'hikari',  name: 'Honey',  yaku: 'Hikari',  color: '#ffee88' },
+    ];
+
+    const tileW   = 128;
+    const tileH   = 90;
+    const tileGap = 8;
+    const totalW  = UPGRADES.length * tileW + (UPGRADES.length - 1) * tileGap;
+    const startX  = cx - totalW / 2 + tileW / 2;
+    const tileY   = topY + 42 + tileH / 2;
+
+    const upgrades = run.yakuUpgrades;
+
+    for (let i = 0; i < UPGRADES.length; i++) {
+      const u        = UPGRADES[i];
+      const x        = startX + i * (tileW + tileGap);
+      const level    = upgrades[u.id] ?? 0;
+      const canAfford = run.ki >= 5;
+
+      // Base bonus from YAKU_INFO
+      const yakuKey  = u.yaku.toUpperCase().replace('-', '_');
+      const info     = YAKU_INFO[yakuKey] ?? Object.values(YAKU_INFO).find(v => v.name === u.yaku);
+      const base     = info ? info.baseBonus : 0;
+      const current  = +(base + level * 0.2).toFixed(1);
+      const next     = +(base + (level + 1) * 0.2).toFixed(1);
+
+      const bgCol  = canAfford ? 0x1a1030 : 0x0e0818;
+      const border = canAfford ? 0x553377 : 0x2a1a3a;
+      this.add.rectangle(x, tileY, tileW, tileH, bgCol)
+        .setStrokeStyle(1, border);
+
+      this.add.text(x, tileY - tileH / 2 + 8, u.name, {
+        fontSize: '12px', color: u.color, fontStyle: 'bold',
+      }).setOrigin(0.5, 0);
+
+      this.add.text(x, tileY - tileH / 2 + 22, u.yaku, {
+        fontSize: '10px', color: '#665577',
+      }).setOrigin(0.5, 0);
+
+      this.add.text(x, tileY - 4, `+${current} → +${next}`,
+        { fontSize: '11px', color: '#ccaaee' }
+      ).setOrigin(0.5);
+
+      // Buy button
+      const btnY    = tileY + tileH / 2 - 16;
+      const buyable = canAfford;
+      const btnBg   = buyable ? 0x3a1a5a : 0x1a0e2a;
+      const btnBdr  = buyable ? 0xaa55dd : 0x3a2a4a;
+      const btnTxt  = buyable ? '#cc88ff' : '#443355';
+
+      const btn = this.add.rectangle(x, btnY, tileW - 12, 22, btnBg)
+        .setStrokeStyle(1, btnBdr);
+      this.add.text(x, btnY, `${buyable ? '' : ''}5 ki`, {
+        fontSize: '11px', color: btnTxt,
+      }).setOrigin(0.5);
+
+      if (buyable) {
+        btn.setInteractive({ useHandCursor: true });
+        btn.on('pointerover', () => btn.setFillStyle(0x5a2a8a));
+        btn.on('pointerout',  () => btn.setFillStyle(btnBg));
+        btn.on('pointerdown', () => {
+          try {
+            run.buyYakuUpgrade(u.id);
+            this._buildUI();
+          } catch (e) {
+            console.warn('[ShrineScene] buyYakuUpgrade:', e.message);
+          }
+        });
       }
     }
   }
 
-  _drawPlaceholderSection(cx, topY, height, { heading, subtitle, note, bgColor }) {
-    this.add.text(cx, topY + 4, heading, {
+  // ── Consumables section ───────────────────────────────────────────────────
+
+  _drawConsumablesSection(cx, topY, height) {
+    this.add.text(cx, topY + 4, 'Consumables', {
+      fontSize: '15px', color: '#88ccee',
+    }).setOrigin(0.5, 0);
+    this.add.text(cx, topY + 22, 'Deck-modification marks  —  5 ki each', {
+      fontSize: '10px', color: '#334455',
+    }).setOrigin(0.5, 0);
+
+    // Inventory slots display
+    const slotCount = run.consumables.length;
+    this.add.text(cx, topY + 38,
+      `Inventory: ${slotCount} / ${RunManager.MAX_CONSUMABLE_SLOTS}`,
+      { fontSize: '11px', color: slotCount >= RunManager.MAX_CONSUMABLE_SLOTS ? '#cc4444' : '#556677' }
+    ).setOrigin(0.5, 0);
+
+    // Show current inventory names
+    if (slotCount > 0) {
+      const names = run.consumables.map(c => c.name).join(', ');
+      this.add.text(cx, topY + 54, names, {
+        fontSize: '10px', color: '#445566',
+        wordWrap: { width: 560 }, align: 'center',
+      }).setOrigin(0.5, 0);
+    }
+
+    // 3 mark shop cards
+    const CARD_W2  = 168;
+    const CARD_H2  = 110;
+    const CARD_GAP2 = 10;
+    const totalW   = THREE_MARKS.length * CARD_W2 + (THREE_MARKS.length - 1) * CARD_GAP2;
+    const startX   = cx - totalW / 2 + CARD_W2 / 2;
+    const cardY    = topY + 72 + CARD_H2 / 2;
+
+    for (let i = 0; i < THREE_MARKS.length; i++) {
+      const mark    = THREE_MARKS[i];
+      const x       = startX + i * (CARD_W2 + CARD_GAP2);
+      const full    = !run.canAddConsumable;
+      const afford  = run.ki >= mark.cost;
+      const buyable = afford && !full;
+
+      const bgCol  = 0x0a1a2a;
+      const border = buyable ? 0x2a6688 : 0x1a2a3a;
+      this.add.rectangle(x, cardY, CARD_W2, CARD_H2, bgCol)
+        .setStrokeStyle(1, border);
+
+      this.add.text(x, cardY - CARD_H2 / 2 + 8, mark.name, {
+        fontSize: '13px', color: '#88ddff', fontStyle: 'bold',
+      }).setOrigin(0.5, 0);
+
+      this.add.text(x, cardY - CARD_H2 / 2 + 24, mark.description, {
+        fontSize: '9px', color: '#445566',
+        wordWrap: { width: CARD_W2 - 14 }, align: 'center',
+      }).setOrigin(0.5, 0);
+
+      // Buy button
+      const btnY2   = cardY + CARD_H2 / 2 - 16;
+      const btnBg   = buyable ? 0x1a3a5a : 0x0e1a28;
+      const btnBdr  = buyable ? 0x44aacc : 0x1a2a3a;
+      const btnLbl  = full ? 'Slots full' : !afford ? "Can't afford" : 'Buy  5 ki';
+      const btnTxt  = buyable ? '#88ddff' : '#334455';
+
+      const btn = this.add.rectangle(x, btnY2, CARD_W2 - 12, 22, btnBg)
+        .setStrokeStyle(1, btnBdr);
+      this.add.text(x, btnY2, btnLbl, {
+        fontSize: '11px', color: btnTxt,
+      }).setOrigin(0.5);
+
+      if (buyable) {
+        btn.setInteractive({ useHandCursor: true });
+        btn.on('pointerover', () => btn.setFillStyle(0x2a5a88));
+        btn.on('pointerout',  () => btn.setFillStyle(btnBg));
+        btn.on('pointerdown', () => this._buyConsumable(mark));
+      }
+    }
+  }
+
+  // ── Buy consumable → booster pack overlay ────────────────────────────────
+
+  _buyConsumable(markDef) {
+    if (run.ki < markDef.cost) return;
+    run.spendKi(markDef.cost);
+    this._showBoosterPack(markDef);
+  }
+
+  _showBoosterPack(markDef) {
+    // Clear any existing booster pack overlay
+    for (const o of this._confirmObjs) o.destroy();
+    this._confirmObjs = [];
+
+    const deck = run.getDeck();
+    // Pick up to 8 random cards from the current deck
+    const shuffled = [...deck].sort(() => Math.random() - 0.5);
+    const preview  = shuffled.slice(0, Math.min(8, shuffled.length));
+
+    const cx = 640, cy = 360;
+    const W  = 900, H = 460;
+    const push = obj => { this._confirmObjs.push(obj); return obj; };
+
+    push(this.add.rectangle(cx, cy, W, H, 0x040810, 0.97)
+      .setStrokeStyle(2, 0x2a5a88).setDepth(50));
+
+    push(this.add.text(cx, cy - H / 2 + 14, `${markDef.name} — Select a Card`, {
+      fontSize: '18px', color: '#88ddff', stroke: '#000000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(50));
+
+    // Instruction text per mark type
+    const instruction = {
+      mark_impermanence: 'Click a card to promote it to the next type.',
+      mark_nonbeing:     'Click a card to permanently remove it from your deck.',
+      mark_transcendence:'Click the SOURCE card (it will be replaced).',
+    }[markDef.id] ?? 'Select a card.';
+
+    push(this.add.text(cx, cy - H / 2 + 36, instruction, {
+      fontSize: '12px', color: '#557799',
+    }).setOrigin(0.5).setDepth(50));
+
+    // Card grid — up to 8 cards in two rows of 4
+    const SCALE    = 0.42;
+    const CW       = Math.round(105 * SCALE);
+    const CH       = Math.round(159 * SCALE);
+    const GAP      = 12;
+    const perRow   = 4;
+    const rowCount = Math.ceil(preview.length / perRow);
+    const gridW    = perRow * CW + (perRow - 1) * GAP;
+    const gridStartX = cx - gridW / 2 + CW / 2;
+    const gridStartY = cy - 60;
+
+    // Transcendence: two-step selection
+    let transcendSource = null;
+
+    for (let i = 0; i < preview.length; i++) {
+      const card = preview[i];
+      const col  = i % perRow;
+      const row  = Math.floor(i / perRow);
+      const x    = gridStartX + col * (CW + GAP);
+      const y    = gridStartY + row * (CH + GAP + 22);
+
+      // Card image
+      const spr = push(this.add.image(x, y, card.id).setScale(SCALE).setDepth(51));
+
+      // Card label
+      push(this.add.text(x, y + CH / 2 + 2, `${card.name}`, {
+        fontSize: '8px', color: '#8899aa',
+        wordWrap: { width: CW + GAP - 4 }, align: 'center',
+      }).setOrigin(0.5, 0).setDepth(51));
+      push(this.add.text(x, y + CH / 2 + 12, `[${card.type}]`, {
+        fontSize: '8px', color: '#556677',
+      }).setOrigin(0.5, 0).setDepth(51));
+
+      spr.setInteractive({ useHandCursor: true });
+      spr.on('pointerover', () => spr.setTint(0xaaddff));
+      spr.on('pointerout',  () => {
+        if (transcendSource && transcendSource.id === card.id) return;
+        spr.clearTint();
+      });
+
+      spr.on('pointerdown', () => {
+        if (markDef.id === 'mark_impermanence') {
+          run.promoteCard(card.id);
+          for (const o of this._confirmObjs) o.destroy();
+          this._confirmObjs = [];
+          // Add to inventory if player wants to save for later
+          // (immediate use — no inventory addition)
+          this._buildUI();
+        } else if (markDef.id === 'mark_nonbeing') {
+          run.deleteCard(card.id);
+          for (const o of this._confirmObjs) o.destroy();
+          this._confirmObjs = [];
+          this._buildUI();
+        } else if (markDef.id === 'mark_transcendence') {
+          if (!transcendSource) {
+            transcendSource = card;
+            spr.setTint(0xffcc44);
+            // Update instruction
+            for (const o of this._confirmObjs) {
+              if (o._isTargetInstruction) o.destroy();
+            }
+            const instr = push(this.add.text(cx, cy - H / 2 + 36,
+              `Source: ${card.name}. Now click the TARGET card to copy from.`,
+              { fontSize: '12px', color: '#ffcc44' }
+            ).setOrigin(0.5).setDepth(51));
+            instr._isTargetInstruction = true;
+          } else {
+            run.transcendCard(transcendSource.id, card.id);
+            for (const o of this._confirmObjs) o.destroy();
+            this._confirmObjs = [];
+            this._buildUI();
+          }
+        }
+      });
+    }
+
+    // "Save for Later" button
+    const saveBtn = push(this.add.rectangle(cx - 100, cy + H / 2 - 30, 180, 36, 0x1a3a1a)
+      .setStrokeStyle(1, 0x44aa66).setInteractive({ useHandCursor: true }).setDepth(51));
+    saveBtn.on('pointerover', () => saveBtn.setFillStyle(0x2a5a2a));
+    saveBtn.on('pointerout',  () => saveBtn.setFillStyle(0x1a3a1a));
+    saveBtn.on('pointerdown', () => {
+      try {
+        run.addConsumable({ id: markDef.id, name: markDef.name, description: markDef.description, category: markDef.category });
+      } catch (e) {
+        console.warn('[ShrineScene] addConsumable:', e.message);
+      }
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    });
+    push(this.add.text(cx - 100, cy + H / 2 - 30, 'Save for Later', {
+      fontSize: '13px', color: '#aaffcc',
+    }).setOrigin(0.5).setDepth(51));
+
+    // Cancel button
+    const cancelBtn = push(this.add.rectangle(cx + 100, cy + H / 2 - 30, 140, 36, 0x2a1a1a)
+      .setStrokeStyle(1, 0x664444).setInteractive({ useHandCursor: true }).setDepth(51));
+    cancelBtn.on('pointerover', () => cancelBtn.setFillStyle(0x4a2a2a));
+    cancelBtn.on('pointerout',  () => cancelBtn.setFillStyle(0x2a1a1a));
+    cancelBtn.on('pointerdown', () => {
+      // Refund ki since no card was selected
+      run.addKi(markDef.cost);
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    });
+    push(this.add.text(cx + 100, cy + H / 2 - 30, 'Cancel (refund)', {
+      fontSize: '13px', color: '#ffaaaa',
+    }).setOrigin(0.5).setDepth(51));
+  }
+
+  // ── Wu Xing Forge section (placeholder) ───────────────────────────────────
+
+  _drawWuXingForgeSection(cx, topY, height) {
+    this.add.text(cx, topY + 4, 'Wu Xing Forge', {
       fontSize: '15px', color: '#aaccee',
     }).setOrigin(0.5, 0);
-    this.add.text(cx, topY + 24, subtitle, {
+    this.add.text(cx, topY + 22, 'Transform your cards with elemental power', {
       fontSize: '10px', color: '#445566',
     }).setOrigin(0.5, 0);
 
-    const panelPadTop = 42;
-    const panelPadBot = 8;
-    const panelH      = height - panelPadTop - panelPadBot;
-    const panelCY     = topY + panelPadTop + panelH / 2;
-
-    this.add.rectangle(cx, panelCY, 570, panelH, bgColor, 0.2)
+    const panelH  = height - 40;
+    const panelCY = topY + 40 + panelH / 2;
+    this.add.rectangle(cx, panelCY, 570, panelH, 0x2a4a3a, 0.2)
       .setStrokeStyle(1, 0x223344);
-    this.add.text(cx, panelCY, note, {
+    this.add.text(cx, panelCY, 'Coming soon\u2026', {
       fontSize: '13px', color: '#445566', fontStyle: 'italic',
     }).setOrigin(0.5);
   }

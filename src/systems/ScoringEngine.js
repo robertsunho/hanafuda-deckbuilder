@@ -67,17 +67,20 @@ export default class ScoringEngine {
    * Full Month completion does NOT produce a yaku entry.
    *
    * @param {object[]} capturedCards  Card objects from cards.js
+   * @param {object}   [upgrades={}]  Yaku upgrade counts keyed by yakuId
+   *                                  (kasu, tanzaku, tane, hikari).
+   *                                  Each level adds +0.2 to the base bonus.
    * @returns {{ name: string, bonus: number, count: number, threshold: number }[]}
    */
-  evaluate(capturedCards) {
+  evaluate(capturedCards, upgrades = {}) {
     const results = [];
     const byType  = this._partition(capturedCards);
 
-    this._push(results, this._checkKasu(byType.plain));
-    this._push(results, this._checkTanzaku(byType.ribbon));
-    this._push(results, this._checkTane(byType.animal));
+    this._push(results, this._checkKasu(byType.plain, upgrades));
+    this._push(results, this._checkTanzaku(byType.ribbon, upgrades));
+    this._push(results, this._checkTane(byType.animal, upgrades));
     this._push(results, this._checkTsukiNarabi(capturedCards));
-    this._push(results, this._checkHikari(byType.bright));
+    this._push(results, this._checkHikari(byType.bright, upgrades));
 
     return results;
   }
@@ -105,6 +108,7 @@ export default class ScoringEngine {
    * @param {object[]} capturedCards
    * @param {object[]} spirits        Active spirit loadout
    * @param {number}   [flow=1.0]     Pre-computed Flow (styleBase × pushFactor)
+   * @param {object}   [upgrades={}]  Yaku upgrade counts (see evaluate())
    * @returns {{
    *   yakuList: object[], yakuMult: number,
    *   rawBasePoints: number, boostedBasePoints: number, pointBoost: number,
@@ -112,9 +116,9 @@ export default class ScoringEngine {
    *   flow: number, finalScore: number
    * }}
    */
-  calculateFinalScore(capturedCards, spirits = [], flow = 1.0) {
+  calculateFinalScore(capturedCards, spirits = [], flow = 1.0, upgrades = {}) {
     // ── Step 1: Standard yaku ─────────────────────────────────────────────
-    const yakuList = this.evaluate(capturedCards);
+    const yakuList = this.evaluate(capturedCards, upgrades);
     const yakuMult = this.calculateTotalMultiplier(yakuList);
 
     // ── Step 2: Point Boost channel ───────────────────────────────────────
@@ -198,27 +202,30 @@ export default class ScoringEngine {
   // ── Yaku checkers ──────────────────────────────────────────────────────────
 
   /**
-   * Kasu — 5+ Plain cards. Flat +0.3 bonus.
+   * Kasu — 5+ Plain cards. Flat +0.3 bonus + upgrades.
    */
-  _checkKasu(plains) {
+  _checkKasu(plains, upgrades = {}) {
     if (plains.length < 5) return null;
-    return { name: YAKU_INFO.KASU.name, bonus: 0.3, count: plains.length, threshold: 5 };
+    const bonus = YAKU_INFO.KASU.baseBonus + (upgrades.kasu ?? 0) * 0.2;
+    return { name: YAKU_INFO.KASU.name, bonus, count: plains.length, threshold: 5 };
   }
 
   /**
-   * Tanzaku — 3+ Ribbon cards. Flat +0.3 bonus.
+   * Tanzaku — 3+ Ribbon cards. Flat +0.3 bonus + upgrades.
    */
-  _checkTanzaku(ribbons) {
+  _checkTanzaku(ribbons, upgrades = {}) {
     if (ribbons.length < 3) return null;
-    return { name: YAKU_INFO.TANZAKU.name, bonus: 0.3, count: ribbons.length, threshold: 3 };
+    const bonus = YAKU_INFO.TANZAKU.baseBonus + (upgrades.tanzaku ?? 0) * 0.2;
+    return { name: YAKU_INFO.TANZAKU.name, bonus, count: ribbons.length, threshold: 3 };
   }
 
   /**
-   * Tane — 3+ Animal cards. Flat +0.4 bonus.
+   * Tane — 3+ Animal cards. Flat +0.4 bonus + upgrades.
    */
-  _checkTane(animals) {
+  _checkTane(animals, upgrades = {}) {
     if (animals.length < 3) return null;
-    return { name: YAKU_INFO.TANE.name, bonus: 0.4, count: animals.length, threshold: 3 };
+    const bonus = YAKU_INFO.TANE.baseBonus + (upgrades.tane ?? 0) * 0.2;
+    return { name: YAKU_INFO.TANE.name, bonus, count: animals.length, threshold: 3 };
   }
 
   /**
@@ -243,12 +250,16 @@ export default class ScoringEngine {
   }
 
   /**
-   * Hikari — 2+ Bright cards. Flat +0.7 bonus.
-   * All 5 brights (Goko) still scores +0.7 — no special override.
+   * Hikari — 2+ Bright cards. Flat +0.7 bonus + upgrades.
+   * All 5 brights (Goko) still scores +0.7 base — no special override.
+   * Accepts any captured card with type='bright' (covers promoted cards).
    */
-  _checkHikari(brights) {
-    const brightCards = brights.filter(c => BRIGHT_IDS.has(c.id));
-    if (brightCards.length < 2) return null;
-    return { name: YAKU_INFO.HIKARI.name, bonus: 0.7, count: brightCards.length, threshold: 2 };
+  _checkHikari(brights, upgrades = {}) {
+    // brights is already pre-filtered to type='bright' cards by _partition.
+    // Original BRIGHT_IDS check is kept for canonical ids; promoted cards
+    // that land on a canonical id will also pass.
+    if (brights.length < 2) return null;
+    const bonus = YAKU_INFO.HIKARI.baseBonus + (upgrades.hikari ?? 0) * 0.2;
+    return { name: YAKU_INFO.HIKARI.name, bonus, count: brights.length, threshold: 2 };
   }
 }

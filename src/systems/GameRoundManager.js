@@ -260,7 +260,7 @@ export default class GameRoundManager {
     // Live estimate: assume best-case (no pending failure) for HUD display.
     const pushFactor = Math.min(1.5, 1.0 + this._pushCount * 0.1);
     const flow       = Math.max(1.0, this._styleBase * pushFactor);
-    const sc = this._scoring.calculateFinalScore(this._capture.getAll(), this._spirits, flow);
+    const sc = this._scoring.calculateFinalScore(this._capture.getAll(), this._spirits, flow, run.yakuUpgrades);
     return {
       ...sc,
       allYaku:         sc.yakuList,
@@ -285,7 +285,7 @@ export default class GameRoundManager {
    * @returns {this} for chaining
    */
   startRound() {
-    this._deck.fullReset().shuffle();
+    this._deck.resetWithCards(run.getDeck()).shuffle();
     this._hand.clear();
     this._field.clear();
     this._capture.clear();
@@ -376,7 +376,7 @@ export default class GameRoundManager {
 
     // Snapshot active yaku (name → bonus) so _finalizeTurn() can diff.
     this._yakuBeforeTurn = new Map(
-      this._scoring.evaluate(this._capture.getAll()).map(y => [y.name, y.bonus])
+      this._scoring.evaluate(this._capture.getAll(), run.yakuUpgrades).map(y => [y.name, y.bonus])
     );
 
     this._discardedThisTurn = [];   // reset each turn
@@ -440,7 +440,7 @@ export default class GameRoundManager {
     // Banking counts as a successful outcome — Push Factor is positive.
     const pushFactor = Math.min(1.5, 1.0 + this._pushCount * 0.1);
     const flow       = Math.max(1.0, this._styleBase * pushFactor);
-    const sc = this._scoring.calculateFinalScore(this._capture.getAll(), this._spirits, flow);
+    const sc = this._scoring.calculateFinalScore(this._capture.getAll(), this._spirits, flow, run.yakuUpgrades);
     this._roundEndingAfterDecision = false;
     this._phase = "round_over";
     return {
@@ -482,7 +482,7 @@ export default class GameRoundManager {
     this._roundEndingAfterDecision = false;
     this._pushCount++;
 
-    const allYaku         = this._scoring.evaluate(this._capture.getAll());
+    const allYaku         = this._scoring.evaluate(this._capture.getAll(), run.yakuUpgrades);
     const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
     this._atRiskScore       = Math.round(this._basePoints * totalMultiplier);
     this._pushPenaltyActive = true;
@@ -550,6 +550,26 @@ export default class GameRoundManager {
     const effect = ConsumableEffects.get(consumable.id);
     if (!effect) return { success: false, message: `Unknown consumable: ${consumable.id}` };
     return effect.execute({ roundManager: this, params });
+  }
+
+  // ── Three Marks helpers ────────────────────────────────────────────────────
+
+  /**
+   * Remove a card from the current hand by id.
+   * Used when Non-being targets a hand card during a round.
+   * @param {string} cardId
+   */
+  removeCardFromHand(cardId) {
+    this._hand.removeMany([cardId]);
+  }
+
+  /**
+   * Remove a card from the current field by id.
+   * Used when Non-being targets a field card during a round.
+   * @param {string} cardId
+   */
+  removeCardFromField(cardId) {
+    this._field.removeCardById(cardId);
   }
 
   // ── Snapshot ───────────────────────────────────────────────────────────────
@@ -707,7 +727,7 @@ export default class GameRoundManager {
     // A yaku counts as "new" if its name wasn't present before, OR if its
     // bonus jumped by more than 0.3 (no sub-combinations exist in the current
     // system, so in practice only newly appearing yaku trigger a decision).
-    const yakuForDiff = this._scoring.evaluate(this._capture.getAll());
+    const yakuForDiff = this._scoring.evaluate(this._capture.getAll(), run.yakuUpgrades);
     const newYaku = yakuForDiff.filter(y => {
       const prev = this._yakuBeforeTurn.get(y.name);
       return prev === undefined || y.bonus - prev > 0.3;
@@ -734,7 +754,7 @@ export default class GameRoundManager {
     const flow = Math.max(1.0, this._styleBase * pushFactor);
 
     // ── Full three-channel score ──────────────────────────────────────────────
-    const sc = this._scoring.calculateFinalScore(this._capture.getAll(), this._spirits, flow);
+    const sc = this._scoring.calculateFinalScore(this._capture.getAll(), this._spirits, flow, run.yakuUpgrades);
 
     // For the Bank/Push decision overlay: what Flow would result if the NEXT
     // push also fails?  Used by the UI to show the downside risk.
