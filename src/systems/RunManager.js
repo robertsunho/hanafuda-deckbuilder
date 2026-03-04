@@ -63,6 +63,14 @@ class RunManager {
   ];
 
   constructor() {
+    this.reset();
+  }
+
+  /**
+   * Reset ALL run state to starting values.
+   * Call this before starting a new run so no stale data carries over.
+   */
+  reset() {
     // ── Ki economy ───────────────────────────────────────────────────────────
     /** @type {number} */
     this._ki = 0;
