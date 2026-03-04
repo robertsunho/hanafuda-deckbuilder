@@ -3,6 +3,7 @@ import { YAKU_INFO }         from '../systems/ScoringEngine.js';
 import run, { RunManager }   from '../systems/RunManager.js';
 import { getElementDef }     from '../data/consumables.js';
 import logger                from '../systems/GameplayLogger.js';
+import SpiritEffects         from '../systems/SpiritEffects.js';
 
 // ── Layout constants ───────────────────────────────────────────────────────────
 // Canvas is 1280 × 720.
@@ -58,14 +59,14 @@ const HAND_STEP = 88;
 const HAND_Y    = 638;
 
 // ── Right panel: spirit column ────────────────────────────────────────────
-// Full CARD_SCALE → 89 × 135 px cards.  4 slots with 15 px gaps.
-// Centres at 140, 290, 440, 590.  Last card bottom = 657 px.
-const SPIRIT_CARD_W = Math.round(CARD_W * CARD_SCALE);  // 89
-const SPIRIT_CARD_H = Math.round(CARD_H * CARD_SCALE);  // 135
-const SPIRIT_X      = 1195;
-const SPIRIT_TOP    = 140;
-const SPIRIT_STEP   = SPIRIT_CARD_H + 15;  // 150
-const MAX_SPIRIT_SLOTS = 4;
+// Reduced card height (100 px) to fit all 6 slots with 8 px gaps.
+// Centres at 50, 158, 266, 374, 482, 590.  Last card bottom = 640 px.
+const SPIRIT_CARD_W    = Math.round(CARD_W * CARD_SCALE);  // 89
+const SPIRIT_CARD_H    = 100;
+const SPIRIT_X         = 1195;
+const SPIRIT_TOP       = 50;
+const SPIRIT_STEP      = 108;   // 100 + 8 px gap
+const MAX_SPIRIT_SLOTS = RunManager.MAX_SPIRIT_SLOTS;  // 6
 
 // ── Consumable cards ───────────────────────────────────────────────────────
 // Same full-scale dimensions as spirit cards.
@@ -99,6 +100,7 @@ export class GameScene extends Phaser.Scene {
     this._animating          = false;
     this._yakuGuideOpen      = false;
     this._captureOverlayOpen = false;
+    this._bankPushOpen       = false;
 
     this._handObjs           = [];
     this._fieldObjs          = [];
@@ -333,7 +335,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // ── Spirit column (right panel, full CARD_SCALE, 4 slots) ─────────────────
+  // ── Spirit column (right panel, 6 slots) ─────────────────────────────────
 
   _renderSpiritColumn() {
     const spirits = run.spirits;
@@ -364,26 +366,98 @@ export class GameScene extends Phaser.Scene {
       // Name label.
       this._spiritObjs.push(
         this.add.text(SPIRIT_X - SPIRIT_CARD_W / 2 + 10, y, spirit.name, {
-          fontSize: '12px', color: '#cce0ff',
+          fontSize: '11px', color: '#cce0ff',
         }).setOrigin(0, 0.5)
       );
 
-      // Hover tooltip — to the left of the card.
+      // Hover tooltip — to the left of the card. Content updated on hover.
       const tooltip = this.add.text(
-        SPIRIT_X - SPIRIT_CARD_W / 2 - 8, y, spirit.description,
+        SPIRIT_X - SPIRIT_CARD_W / 2 - 8, y, '',
         {
           fontSize: '11px', color: '#e8e8e8',
           backgroundColor: '#0a0f1e',
           padding: { x: 6, y: 4 },
-          wordWrap: { width: 190 },
+          wordWrap: { width: 200 },
         }
-      ).setOrigin(1, 0.5).setDepth(30).setVisible(false);
+      ).setOrigin(1, 0.5).setDepth(42).setVisible(false);
       this._spiritObjs.push(tooltip);
 
       card.setInteractive();
-      card.on('pointerover', () => tooltip.setVisible(true));
-      card.on('pointerout',  () => tooltip.setVisible(false));
+      card.on('pointerover', () => {
+        const captured = this._round.capture.getAll();
+        const contrib  = this._getSpiritContrib(spirit, captured);
+        tooltip.setText(spirit.description + (contrib ? '\n\n' + contrib : ''));
+        tooltip.setVisible(true);
+      });
+      card.on('pointerout', () => tooltip.setVisible(false));
     }
+  }
+
+  /**
+   * Compute a short "current contribution" string for the spirit tooltip.
+   * Returns null if there is nothing meaningful to show yet.
+   * @param {object}   spirit        Spirit object from run.spirits
+   * @param {object[]} captured      Cards in the capture pile this round
+   * @returns {string|null}
+   */
+  _getSpiritContrib(spirit, captured) {
+    const fx = SpiritEffects.get(spirit.id);
+    if (!fx) return null;
+
+    const spirits = run.spirits;
+    const lines   = [];
+
+    // ── Channel 1: point boosts ───────────────────────────────────────────
+    if (fx.getPointBoosts) {
+      const boosts = fx.getPointBoosts({ capturedCards: captured, spirits });
+      if (boosts && boosts.size > 0) {
+        // All boosted cards share the same mult for a given spirit.
+        const [, mult] = [...boosts][0];
+        lines.push(`\u00D7${mult.toFixed(1)} on ${boosts.size} card${boosts.size !== 1 ? 's' : ''}`);
+      } else {
+        lines.push('No matching cards captured yet');
+      }
+    }
+
+    // ── Channel 2: additive mult ──────────────────────────────────────────
+    if (fx.getAdditiveMult) {
+      const add = fx.getAdditiveMult({ capturedCards: captured, yakuList: [], spirits });
+      if (add !== 0) {
+        lines.push(`+${add.toFixed(2)} additive mult`);
+      } else {
+        lines.push('+0.00 additive mult');
+      }
+    }
+
+    // ── Channel 3: mult-mult ──────────────────────────────────────────────
+    if (fx.getMultMult) {
+      const mm = fx.getMultMult({ capturedCards: captured, yakuList: [], spirits });
+
+      // Persistent spirits: show underlying state for clarity.
+      if (spirit.id === 'kasu_abundance') {
+        const n = spirit.state?.plainsCaptured ?? 0;
+        lines.push(`Plains this run: ${n}  →  \u00D7${mm.toFixed(2)} mult`);
+      } else if (spirit.id === 'tane_wildlife') {
+        const n = spirit.state?.seenAnimals?.length ?? 0;
+        lines.push(`Unique animals: ${n}/9  →  \u00D7${mm.toFixed(2)} mult`);
+      } else if (spirit.id === 'tanzaku_festival') {
+        const RED_WRITING = new Set(['january_ribbon', 'february_ribbon', 'march_ribbon']);
+        const BLUE        = new Set(['june_ribbon', 'september_ribbon', 'october_ribbon']);
+        const ids         = new Set(captured.map(c => c.id));
+        let sg = 0;
+        if ([...RED_WRITING].some(id => ids.has(id))) sg++;
+        if ([...BLUE].some(id => ids.has(id)))        sg++;
+        if (captured.some(c => c.type === 'ribbon' && !RED_WRITING.has(c.id) && !BLUE.has(c.id))) sg++;
+        lines.push(`Ribbon types: ${sg}  →  \u00D7${mm.toFixed(2)} mult`);
+      } else if (spirit.id === 'hikari_radiance') {
+        const n = captured.filter(c => c.type === 'bright').length;
+        lines.push(`Brights: ${n}  →  \u00D7${mm.toFixed(2)} mult`);
+      } else {
+        lines.push(`\u00D7${mm.toFixed(2)} mult`);
+      }
+    }
+
+    return lines.length > 0 ? lines.join('\n') : null;
   }
 
   // ── Captured pile (left panel, face-down stack) ────────────────────────────
@@ -477,6 +551,8 @@ export class GameScene extends Phaser.Scene {
 
   _showCaptureOverlay() {
     if (this._captureOverlayOpen) return;
+    if (this._bankPushOpen) return;
+    if (this._yakuGuideOpen) this._closeYakuGuide();
     this._captureOverlayOpen = true;
     this._clearObjs(this._handObjs);
     this._renderHand();
@@ -1373,6 +1449,7 @@ export class GameScene extends Phaser.Scene {
   // ── Yaku decision overlay ─────────────────────────────────────────────────
 
   _showYakuDecision(result) {
+    this._bankPushOpen = true;
     this._clearObjs(this._overlayObjs);
     const cx = PLAY_CX, cy = 270;
 
@@ -1419,6 +1496,7 @@ export class GameScene extends Phaser.Scene {
     bankBtn.on('pointerover',  () => bankBtn.setFillStyle(0x2a9a2a));
     bankBtn.on('pointerout',   () => bankBtn.setFillStyle(0x1a6a1a));
     bankBtn.on('pointerdown',  () => {
+      this._bankPushOpen = false;
       logger.logBankPushDecision('bank', this._round.pushCount);
       const bankedResult = this._round.bankScore();
       this._clearObjs(this._overlayObjs);
@@ -1437,6 +1515,7 @@ export class GameScene extends Phaser.Scene {
     pushBtn.on('pointerover',  () => pushBtn.setFillStyle(0x9a2a2a));
     pushBtn.on('pointerout',   () => pushBtn.setFillStyle(0x6a1a1a));
     pushBtn.on('pointerdown',  () => {
+      this._bankPushOpen = false;
       logger.logBankPushDecision('push', this._round.pushCount);
       const { failedFlow } = this._round.pushOn();
       this._clearObjs(this._overlayObjs);
@@ -1473,6 +1552,8 @@ export class GameScene extends Phaser.Scene {
 
   _showYakuGuide() {
     if (this._yakuGuideOpen) return;
+    if (this._bankPushOpen) return;
+    if (this._captureOverlayOpen) this._closeCaptureOverlay();
     this._yakuGuideOpen = true;
     this._clearObjs(this._handObjs);
     this._renderHand();
