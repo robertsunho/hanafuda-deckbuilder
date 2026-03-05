@@ -662,6 +662,11 @@ export class GameScene extends Phaser.Scene {
       this.add.text(cx, closeY, 'Close', { fontSize: '15px', color: '#ffffff' })
         .setOrigin(0.5).setDepth(20)
     );
+
+    // Render above the Bank/Push overlay (depth 25) when it's active.
+    if (this._bankPushOpen) {
+      for (const obj of objs) if (obj.setDepth) obj.setDepth(32);
+    }
   }
 
   _closeCaptureOverlay() {
@@ -1237,6 +1242,11 @@ export class GameScene extends Phaser.Scene {
 
   _showEndScreen(result) {
     this._clearObjs(this._overlayObjs);
+    // Clear all board visuals — round is over; overlay takes center stage.
+    this._clearObjs(this._handObjs);
+    this._clearObjs(this._fieldObjs);
+    this._clearObjs(this._actionBtnObjs);
+    this._clearObjs(this._consumableObjs);
     const cx = PLAY_CX, cy = 330;
 
     // Compute threshold and ki reward before any state changes.

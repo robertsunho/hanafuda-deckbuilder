@@ -45,8 +45,7 @@ export const YAKU_INFO = {
                   description: "2+ Brights. Flat +0.7 bonus." },
   KASU:         { name: "Kasu",         baseBonus: 0.3,
                   description: "5+ Plains. Flat +0.3 bonus." },
-  TSUKI_NARABI: { name: "Tsuki-narabi", baseBonus: 0.3,
-                  description: "5+ consecutive months represented. Flat +0.3 bonus." },
+  // TSUKI_NARABI removed from active scoring (kept as dead reference)
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -75,7 +74,7 @@ export default class ScoringEngine {
     this._push(results, this._checkKasu(byType.plain, upgrades));
     this._push(results, this._checkTanzaku(byType.ribbon, upgrades));
     this._push(results, this._checkTane(byType.animal, upgrades));
-    this._push(results, this._checkTsukiNarabi(capturedCards));
+    // this._push(results, this._checkTsukiNarabi(capturedCards));  // removed
     this._push(results, this._checkHikari(byType.bright, upgrades));
 
     return results;
