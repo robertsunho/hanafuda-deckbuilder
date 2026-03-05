@@ -206,8 +206,8 @@ export default class FieldManager {
    * @param {object[]} cards  One or more cards sharing the same month.
    * @returns {{ matched: boolean, discarded: boolean, captured: object[]|null }}
    */
-  playHandCards(cards) {
-    const month         = cards[0].month;
+  playHandCards(cards, targetMonth = null) {
+    const month         = targetMonth ?? cards[0].month;
     const matchingSlots = this.getSlotsForMonth(month);
 
     if (matchingSlots.length === 0) {

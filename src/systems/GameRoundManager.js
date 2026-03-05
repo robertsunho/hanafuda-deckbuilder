@@ -101,6 +101,13 @@ export default class GameRoundManager {
      */
     this._discardedThisTurn = [];
 
+    /**
+     * All cards discarded this round (field-full + player intentional).
+     * Accumulates across turns; reset by startRound().
+     * @type {object[]}
+     */
+    this._allDiscards = [];
+
     /** Plays remaining this round (counts down from PLAYS_PER_ROUND). */
     this._playsRemaining = GameRoundManager.PLAYS_PER_ROUND;
 
@@ -185,6 +192,8 @@ export default class GameRoundManager {
   get lastDeckCard()   { return this._lastDeckCard; }
   /** Total cards discarded (field full) since the round started. */
   get discardCount()   { return this._discardCount; }
+  /** All cards discarded this round: field-full + player intentional. */
+  get allDiscards()    { return [...this._allDiscards]; }
   /** Plays remaining before the round ends (counts down each turn). */
   get playsRemaining() { return this._playsRemaining; }
   /** Free discards remaining this round (counts down from MAX_DISCARDS). */
@@ -313,6 +322,7 @@ export default class GameRoundManager {
     this._lastDeckCard       = null;
     this._discardCount       = 0;
     this._discardedThisTurn  = [];
+    this._allDiscards        = [];
     this._playsRemaining     = GameRoundManager.PLAYS_PER_ROUND;
     this._discardsRemaining  = GameRoundManager.MAX_DISCARDS;
     this._basePoints         = 0;
@@ -366,7 +376,7 @@ export default class GameRoundManager {
    *             matched: boolean, autoCaptured: boolean, discarded: object[] }}
    * @throws {Error} if called outside the 'idle' phase, or validation fails
    */
-  playHandCards(cardIds) {
+  playHandCards(cardIds, targetMonth = null) {
     if (this._phase !== "idle") {
       throw new Error(
         `playHandCards() called while phase is "${this._phase}".` +
@@ -405,7 +415,7 @@ export default class GameRoundManager {
 
     this._discardedThisTurn = [];   // reset each turn
 
-    const handResult = this._field.playHandCards(cards);
+    const handResult = this._field.playHandCards(cards, targetMonth);
     if (handResult.captured) {
       // All 4 cards of the month assembled — capture immediately.
       this._addCapture(handResult.captured);
@@ -413,6 +423,7 @@ export default class GameRoundManager {
       // No room on the field — all played cards are lost.
       for (const card of cards) {
         this._discardedThisTurn.push(card);
+        this._allDiscards.push(card);
         this._discardCount++;
       }
     }
@@ -565,6 +576,7 @@ export default class GameRoundManager {
       return { status: "ok", removed: [], drawn: [], discardsRemaining: this._discardsRemaining };
     }
 
+    for (const c of removed) this._allDiscards.push(c);
     this._discardsRemaining--;
 
     // Draw replacements (capped by deck size and remaining hand capacity).
@@ -800,6 +812,7 @@ export default class GameRoundManager {
           _flipCaptures = [..._flipCaptures, ...flipResult.captured];
         } else if (flipResult.discarded) {
           this._discardedThisTurn.push(deckCard);
+          this._allDiscards.push(deckCard);
           this._discardCount++;
           _flipResult = 'field_discard';
         }
@@ -813,6 +826,7 @@ export default class GameRoundManager {
         _flipCaptures = flipResult.captured;
       } else if (flipResult.discarded) {
         this._discardedThisTurn.push(deckCard);
+        this._allDiscards.push(deckCard);
         this._discardCount++;
         _flipResult = 'field_discard';
       }

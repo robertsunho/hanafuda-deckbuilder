@@ -456,7 +456,79 @@ export class ShrineScene extends Phaser.Scene {
     if (run.ki < markDef.cost) return;
     run.spendKi(markDef.cost);
     logger.logShopPurchase('consumable', markDef.name, markDef.cost);
-    this._showBoosterPack(markDef);
+    this._showUseOrCarryChoice(markDef);
+  }
+
+  _showUseOrCarryChoice(markDef) {
+    for (const o of this._confirmObjs) o.destroy();
+    this._confirmObjs = [];
+
+    const cx   = 640, cy = 360;
+    const push = obj => { this._confirmObjs.push(obj); return obj; };
+    const canCarry = run.canAddConsumable;
+
+    push(this.add.rectangle(cx, cy, 380, 220, 0x040810, 0.97)
+      .setStrokeStyle(2, 0x2a5a88).setDepth(55));
+    push(this.add.text(cx, cy - 80, markDef.name, {
+      fontSize: '17px', color: '#88ddff', stroke: '#000000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(55));
+    push(this.add.text(cx, cy - 52, 'How would you like to use this?', {
+      fontSize: '12px', color: '#557799',
+    }).setOrigin(0.5).setDepth(55));
+
+    // "Use Now" button
+    const useBtn = push(this.add.rectangle(cx, cy - 8, 260, 36, 0x1a3a5a)
+      .setStrokeStyle(1, 0x44aacc).setInteractive({ useHandCursor: true }).setDepth(56));
+    useBtn.on('pointerover', () => useBtn.setFillStyle(0x2a5a88));
+    useBtn.on('pointerout',  () => useBtn.setFillStyle(0x1a3a5a));
+    useBtn.on('pointerdown', () => {
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._showBoosterPack(markDef);
+    });
+    push(this.add.text(cx, cy - 8, 'Use Now  (pick from 8 cards)', {
+      fontSize: '12px', color: '#88ddff',
+    }).setOrigin(0.5).setDepth(56));
+
+    // "Carry" button
+    const carryBg = canCarry ? 0x1a3a1a : 0x1a1a1a;
+    const carryBr = canCarry ? 0x44aa66 : 0x334433;
+    const carryBtn = push(this.add.rectangle(cx, cy + 38, 260, 36, carryBg)
+      .setStrokeStyle(1, carryBr).setDepth(56));
+    if (canCarry) {
+      carryBtn.setInteractive({ useHandCursor: true });
+      carryBtn.on('pointerover', () => carryBtn.setFillStyle(0x2a5a2a));
+      carryBtn.on('pointerout',  () => carryBtn.setFillStyle(0x1a3a1a));
+      carryBtn.on('pointerdown', () => {
+        try {
+          run.addConsumable({ id: markDef.id, name: markDef.name,
+            description: markDef.description, category: markDef.category });
+          logger.logConsumableUse(markDef.name, 'carried into round');
+        } catch (e) { console.warn('[ShrineScene] addConsumable:', e.message); }
+        for (const o of this._confirmObjs) o.destroy();
+        this._confirmObjs = [];
+        this._buildUI();
+      });
+    }
+    push(this.add.text(cx, cy + 38,
+      canCarry ? 'Carry into Round' : 'Inventory full',
+      { fontSize: '12px', color: canCarry ? '#aaffcc' : '#554433' }
+    ).setOrigin(0.5).setDepth(56));
+
+    // "Cancel / refund" button
+    const cancelBtn = push(this.add.rectangle(cx, cy + 84, 160, 30, 0x2a1a1a)
+      .setStrokeStyle(1, 0x664444).setInteractive({ useHandCursor: true }).setDepth(56));
+    cancelBtn.on('pointerover', () => cancelBtn.setFillStyle(0x4a2a2a));
+    cancelBtn.on('pointerout',  () => cancelBtn.setFillStyle(0x2a1a1a));
+    cancelBtn.on('pointerdown', () => {
+      run.addKi(markDef.cost);
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    });
+    push(this.add.text(cx, cy + 84, 'Cancel (refund)', {
+      fontSize: '11px', color: '#ffaaaa',
+    }).setOrigin(0.5).setDepth(56));
   }
 
   _showBoosterPack(markDef) {
@@ -602,28 +674,8 @@ export class ShrineScene extends Phaser.Scene {
       });
     }
 
-    // "Save for Later" button
-    const saveBtn = push(this.add.rectangle(cx - 100, cy + H / 2 - 30, 180, 36, 0x1a3a1a)
-      .setStrokeStyle(1, 0x44aa66).setInteractive({ useHandCursor: true }).setDepth(51));
-    saveBtn.on('pointerover', () => saveBtn.setFillStyle(0x2a5a2a));
-    saveBtn.on('pointerout',  () => saveBtn.setFillStyle(0x1a3a1a));
-    saveBtn.on('pointerdown', () => {
-      try {
-        run.addConsumable({ id: markDef.id, name: markDef.name, description: markDef.description, category: markDef.category });
-        logger.logConsumableUse(markDef.name, 'saved for later');
-      } catch (e) {
-        console.warn('[ShrineScene] addConsumable:', e.message);
-      }
-      for (const o of this._confirmObjs) o.destroy();
-      this._confirmObjs = [];
-      this._buildUI();
-    });
-    push(this.add.text(cx - 100, cy + H / 2 - 30, 'Save for Later', {
-      fontSize: '13px', color: '#aaffcc',
-    }).setOrigin(0.5).setDepth(51));
-
-    // Cancel button
-    const cancelBtn = push(this.add.rectangle(cx + 100, cy + H / 2 - 30, 140, 36, 0x2a1a1a)
+    // Cancel button (refund; no card selected)
+    const cancelBtn = push(this.add.rectangle(cx, cy + H / 2 - 30, 140, 36, 0x2a1a1a)
       .setStrokeStyle(1, 0x664444).setInteractive({ useHandCursor: true }).setDepth(51));
     cancelBtn.on('pointerover', () => cancelBtn.setFillStyle(0x4a2a2a));
     cancelBtn.on('pointerout',  () => cancelBtn.setFillStyle(0x2a1a1a));
@@ -634,7 +686,7 @@ export class ShrineScene extends Phaser.Scene {
       this._confirmObjs = [];
       this._buildUI();
     });
-    push(this.add.text(cx + 100, cy + H / 2 - 30, 'Cancel (refund)', {
+    push(this.add.text(cx, cy + H / 2 - 30, 'Cancel (refund)', {
       fontSize: '13px', color: '#ffaaaa',
     }).setOrigin(0.5).setDepth(51));
   }

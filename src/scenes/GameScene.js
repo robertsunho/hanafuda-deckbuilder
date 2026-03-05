@@ -101,6 +101,8 @@ export class GameScene extends Phaser.Scene {
     this._yakuGuideOpen      = false;
     this._captureOverlayOpen = false;
     this._bankPushOpen       = false;
+    this._discardOverlayOpen = false;
+    this._fireWildCard       = null;
 
     this._handObjs           = [];
     this._fieldObjs          = [];
@@ -110,6 +112,7 @@ export class GameScene extends Phaser.Scene {
     this._overlayObjs        = [];
     this._captureOverlayObjs = [];
     this._yakuGuideObjs      = [];
+    this._discardOverlayObjs = [];
     this._actionBtnObjs      = [];
 
     this._selectedCardIds         = new Set();
@@ -130,11 +133,16 @@ export class GameScene extends Phaser.Scene {
     this._afterRoundStart();
     this._renderAll();
 
-    // ESC cancels mark mode
+    // ESC cancels mark mode or fire wild targeting
     this.input.keyboard.on('keydown-ESC', () => {
       if (this._markMode) {
         this._markMode = null;
         this._setStatus('Mark cancelled.');
+        this._renderAll();
+      } else if (this._fireWildCard) {
+        this._fireWildCard = null;
+        this._selectedCardIds.clear();
+        this._setStatus('Play cancelled.');
         this._renderAll();
       }
     });
@@ -167,7 +175,7 @@ export class GameScene extends Phaser.Scene {
 
     // Left-panel pile labels (above each card).
     this.add.text(DECK_X, 55,  'DECK',         labelStyle).setOrigin(0.5, 0);
-    this.add.text(DECK_X, 213, 'DISCARD',      labelStyle).setOrigin(0.5, 0);
+    // DISCARD label is interactive — wired to discard overlay below.
     this.add.text(DECK_X, 372, 'CAPTURED',     labelStyle).setOrigin(0.5, 0);
     this.add.text(DECK_X, 531, 'CONSUMABLES',  labelStyle).setOrigin(0.5, 0);
 
@@ -215,7 +223,14 @@ export class GameScene extends Phaser.Scene {
 
     // ── Discard pile ──────────────────────────────────────────────────────
     this._discardSprite = this.add.image(DECK_X, DISCARD_Y, 'card_back')
-      .setScale(CARD_SCALE).setTint(0x667788).setVisible(false);
+      .setScale(CARD_SCALE).setTint(0x667788).setVisible(false)
+      .setInteractive({ useHandCursor: true });
+    this._discardSprite.on('pointerdown', () => this._showDiscardOverlay());
+
+    // Make the DISCARD label also clickable for when the sprite is hidden.
+    const discardLabel = this.add.text(DECK_X, 213, 'DISCARD', labelStyle)
+      .setInteractive({ useHandCursor: true });
+    discardLabel.on('pointerdown', () => this._showDiscardOverlay());
     this._discardCountText = this.add.text(DECK_X, DISCARD_Y + 30, '0', {
       fontSize: '18px', color: '#cc6666', stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5, 0).setVisible(false);
@@ -244,8 +259,10 @@ export class GameScene extends Phaser.Scene {
   _renderHand() {
     const cards      = this._round.hand.getAll();
     const n          = cards.length;
+    const fireWild   = this._fireWildCard !== null;
     const idle       = this._round.phase === 'idle' && !this._animating
-                        && !this._yakuGuideOpen && !this._captureOverlayOpen;
+                        && !this._yakuGuideOpen && !this._captureOverlayOpen
+                        && !fireWild;
     const markActive = this._markMode !== null;
     const startX     = PLAY_CX - ((n - 1) * HAND_STEP) / 2;
 
@@ -253,7 +270,7 @@ export class GameScene extends Phaser.Scene {
       const card     = cards[i];
       const selected = this._selectedCardIds.has(card.id);
       const x        = startX + i * HAND_STEP;
-      const y        = HAND_Y - (selected ? 20 : 0);
+      const y        = HAND_Y - (selected || (fireWild && card.id === this._fireWildCard.id) ? 20 : 0);
       const spr      = this.add.image(x, y, card.id).setScale(CARD_SCALE);
 
       if (markActive) {
@@ -267,6 +284,9 @@ export class GameScene extends Phaser.Scene {
         spr.on('pointerover',  () => { if (!isTranscendSrc) spr.setTint(MARK_HOVER); });
         spr.on('pointerout',   () => { spr.setTint(isTranscendSrc ? TINT_PENDING : MARK_TINT); });
         spr.on('pointerdown',  () => this._onMarkCardSelected(card));
+      } else if (fireWild) {
+        // Fire wild targeting: selected fire card stays elevated; others dimmed.
+        spr.setTint(card.id === this._fireWildCard.id ? TINT_HOVER : TINT_DIM);
       } else if (idle) {
         spr.setInteractive({ useHandCursor: true });
         if (selected) spr.setTint(TINT_HOVER);
@@ -289,6 +309,7 @@ export class GameScene extends Phaser.Scene {
   _renderField() {
     const slots      = this._round.field.getSlots();
     const markActive = this._markMode !== null;
+    const fireWild   = this._fireWildCard !== null;
 
     for (let i = 0; i < 8; i++) {
       const col = i % SLOT_COLS;
@@ -319,6 +340,15 @@ export class GameScene extends Phaser.Scene {
           spr.on('pointerover',  () => { if (!isTranscendSrc) spr.setTint(MARK_HOVER); });
           spr.on('pointerout',   () => { spr.setTint(isTranscendSrc ? TINT_PENDING : MARK_TINT); });
           spr.on('pointerdown',  () => this._onMarkCardSelected(card));
+        } else if (fireWild) {
+          // Fire wild targeting: all occupied field slots are valid targets.
+          const FIRE_TINT  = 0xff9944;
+          const FIRE_HOVER = 0xffcc66;
+          spr.setTint(FIRE_TINT);
+          spr.setInteractive({ useHandCursor: true });
+          spr.on('pointerover', () => spr.setTint(FIRE_HOVER));
+          spr.on('pointerout',  () => spr.setTint(FIRE_TINT));
+          spr.on('pointerdown', () => this._playFireWild(slot.month));
         } else if (slot.state === 'pending') {
           spr.setTint(TINT_PENDING);
         }
@@ -551,8 +581,8 @@ export class GameScene extends Phaser.Scene {
 
   _showCaptureOverlay() {
     if (this._captureOverlayOpen) return;
-    if (this._bankPushOpen) return;
     if (this._yakuGuideOpen) this._closeYakuGuide();
+    if (this._discardOverlayOpen) this._closeDiscardOverlay();
     this._captureOverlayOpen = true;
     this._clearObjs(this._handObjs);
     this._renderHand();
@@ -725,6 +755,27 @@ export class GameScene extends Phaser.Scene {
   // ── Action buttons ────────────────────────────────────────────────────────
 
   _renderActionButtons() {
+    // Fire wild targeting: replace normal buttons with a cancel button.
+    if (this._fireWildCard) {
+      const y         = 700;
+      const cancelBtn = this.add.rectangle(PLAY_CX, y, 180, 40, 0x3a1a0a)
+        .setStrokeStyle(2, 0xaa6622).setInteractive({ useHandCursor: true }).setDepth(5);
+      cancelBtn.on('pointerover', () => cancelBtn.setFillStyle(0x5a2a0a));
+      cancelBtn.on('pointerout',  () => cancelBtn.setFillStyle(0x3a1a0a));
+      cancelBtn.on('pointerdown', () => {
+        this._fireWildCard = null;
+        this._selectedCardIds.clear();
+        this._setStatus('Play cancelled.');
+        this._renderAll();
+      });
+      this._actionBtnObjs.push(cancelBtn);
+      this._actionBtnObjs.push(
+        this.add.text(PLAY_CX, y, 'Cancel (ESC)', { fontSize: '15px', color: '#ffaa66' })
+          .setOrigin(0.5).setDepth(5)
+      );
+      return;
+    }
+
     const idle  = this._round.phase === 'idle' && !this._animating
                     && !this._yakuGuideOpen && !this._captureOverlayOpen
                     && !this._markMode;
@@ -946,6 +997,21 @@ export class GameScene extends Phaser.Scene {
 
   _onPlayButton() {
     const cardIds = [...this._selectedCardIds];
+
+    // Single fire-enhanced card → enter wild field-targeting mode.
+    if (cardIds.length === 1) {
+      const handMap = new Map(this._round.hand.getAll().map(c => [c.id, c]));
+      const card    = handMap.get(cardIds[0]);
+      const hasField = this._round.field.getSlots().some(s => s !== null);
+      if (card?.enhancement?.element === 'fire' && hasField) {
+        this._fireWildCard = card;
+        this._setStatus('Fire wild: click a field slot to play onto. ESC to cancel.');
+        this._clearObjs(this._actionBtnObjs);
+        this._renderAll();
+        return;
+      }
+    }
+
     this._selectedCardIds.clear();
     this._clearObjs(this._actionBtnObjs);
     this._playCards(cardIds);
@@ -975,17 +1041,25 @@ export class GameScene extends Phaser.Scene {
 
   // ── Play cards ─────────────────────────────────────────────────────────────
 
-  _playCards(cardIds) {
+  _playFireWild(targetSlotMonth) {
+    if (!this._fireWildCard) return;
+    const cardId = this._fireWildCard.id;
+    this._fireWildCard = null;
+    this._selectedCardIds.clear();
+    this._playCards([cardId], targetSlotMonth);
+  }
+
+  _playCards(cardIds, targetMonth = null) {
     if (this._animating) return;
 
     // Log the play action before calling into the round manager.
     const _handMap     = new Map(this._round.hand.getAll().map(c => [c.id, c]));
-    const _targetMonth = _handMap.get(cardIds[0])?.month;
+    const _targetMonth = targetMonth ?? _handMap.get(cardIds[0])?.month;
     logger.logAction('play', { cardIds, targetMonth: _targetMonth });
 
     let handResult;
     try {
-      handResult = this._round.playHandCards(cardIds);
+      handResult = this._round.playHandCards(cardIds, targetMonth);
     } catch (e) {
       console.error('[GameScene] playHandCards error:', e.message);
       return;
@@ -1552,8 +1626,8 @@ export class GameScene extends Phaser.Scene {
 
   _showYakuGuide() {
     if (this._yakuGuideOpen) return;
-    if (this._bankPushOpen) return;
     if (this._captureOverlayOpen) this._closeCaptureOverlay();
+    if (this._discardOverlayOpen) this._closeDiscardOverlay();
     this._yakuGuideOpen = true;
     this._clearObjs(this._handObjs);
     this._renderHand();
@@ -1606,6 +1680,80 @@ export class GameScene extends Phaser.Scene {
     this._clearObjs(this._yakuGuideObjs);
     this._clearObjs(this._handObjs);
     this._renderHand();
+  }
+
+  // ── Discard overlay ───────────────────────────────────────────────────────
+
+  _showDiscardOverlay() {
+    if (this._discardOverlayOpen) { this._closeDiscardOverlay(); return; }
+    if (this._captureOverlayOpen) this._closeCaptureOverlay();
+    if (this._yakuGuideOpen)      this._closeYakuGuide();
+    this._discardOverlayOpen = true;
+
+    const cards = this._round.allDiscards;
+    const cx    = PLAY_CX, cy = 330;
+    const objs  = this._discardOverlayObjs;
+
+    objs.push(
+      this.add.rectangle(cx, cy, 800, 500, 0x080d1a, 0.95)
+        .setStrokeStyle(2, 0x604030).setDepth(20)
+    );
+    objs.push(
+      this.add.text(cx, cy - 228, 'Discarded Cards', {
+        fontSize: '20px', color: '#e89a6a', stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(20)
+    );
+    objs.push(this.add.rectangle(cx, cy - 208, 740, 1, 0x604030).setDepth(20));
+
+    if (cards.length === 0) {
+      objs.push(
+        this.add.text(cx, cy, 'No cards discarded yet.', {
+          fontSize: '15px', color: '#778899',
+        }).setOrigin(0.5).setDepth(20)
+      );
+    } else {
+      const OV_SCALE = 0.45;
+      const OV_W    = Math.round(CARD_W * OV_SCALE);
+      const OV_H    = Math.round(CARD_H * OV_SCALE);
+      const OV_GAP  = 6;
+      const ROW_MAX = 10;
+      let y = cy - 190;
+
+      const rowStart0 = 0;
+      let start = 0;
+      while (start < cards.length) {
+        const row   = cards.slice(start, start + ROW_MAX);
+        const rowW  = row.length * (OV_W + OV_GAP) - OV_GAP;
+        const startX = cx - rowW / 2 + OV_W / 2;
+        for (let j = 0; j < row.length; j++) {
+          const card = row[j];
+          objs.push(
+            this.add.image(startX + j * (OV_W + OV_GAP), y + OV_H / 2, card.id)
+              .setScale(OV_SCALE).setDepth(20).setTint(0x886655)
+          );
+        }
+        y    += OV_H + OV_GAP + 4;
+        start += ROW_MAX;
+      }
+    }
+
+    const closeY   = cy + 224;
+    const closeBtn = this.add.rectangle(cx, closeY, 140, 36, 0x4a2a1a)
+      .setStrokeStyle(2, 0xaa6644).setInteractive({ useHandCursor: true }).setDepth(20);
+    closeBtn.on('pointerover', () => closeBtn.setFillStyle(0x6a3a2a));
+    closeBtn.on('pointerout',  () => closeBtn.setFillStyle(0x4a2a1a));
+    closeBtn.on('pointerdown', () => this._closeDiscardOverlay());
+    objs.push(closeBtn);
+    objs.push(
+      this.add.text(cx, closeY, 'Close', { fontSize: '15px', color: '#ffffff' })
+        .setOrigin(0.5).setDepth(20)
+    );
+  }
+
+  _closeDiscardOverlay() {
+    if (!this._discardOverlayOpen) return;
+    this._discardOverlayOpen = false;
+    this._clearObjs(this._discardOverlayObjs);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
