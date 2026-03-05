@@ -60,11 +60,12 @@ const HAND_Y    = 638;
 
 // ── Right panel: spirit column ────────────────────────────────────────────
 // Reduced card height (100 px) to fit all 6 slots with 8 px gaps.
-// Centres at 50, 158, 266, 374, 482, 590.  Last card bottom = 640 px.
+// Shifted down so slot tops clear the Ki counter (y≈28).
+// Centres at 100, 208, 316, 424, 532, 640.  Last card bottom = 690 px.
 const SPIRIT_CARD_W    = Math.round(CARD_W * CARD_SCALE);  // 89
 const SPIRIT_CARD_H    = 100;
 const SPIRIT_X         = 1195;
-const SPIRIT_TOP       = 50;
+const SPIRIT_TOP       = 100;
 const SPIRIT_STEP      = 108;   // 100 + 8 px gap
 const MAX_SPIRIT_SLOTS = RunManager.MAX_SPIRIT_SLOTS;  // 6
 
@@ -171,7 +172,7 @@ export class GameScene extends Phaser.Scene {
     // ── Zone labels ───────────────────────────────────────────────────────
     this.add.text(PLAY_CX,  38,  'FIELD',        labelStyle).setOrigin(0.5, 0);
     this.add.text(PLAY_CX,  551, 'HAND',         labelStyle).setOrigin(0.5, 0);
-    this.add.text(SPIRIT_X, 50,  'SPIRITS',      labelStyle).setOrigin(0.5, 0);
+    this.add.text(SPIRIT_X, 30,  'SPIRITS',      labelStyle).setOrigin(0.5, 0);
 
     // Left-panel pile labels (above each card).
     this.add.text(DECK_X, 55,  'DECK',         labelStyle).setOrigin(0.5, 0);
