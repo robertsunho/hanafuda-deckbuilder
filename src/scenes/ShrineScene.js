@@ -574,9 +574,9 @@ export class ShrineScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(50));
 
     // Card grid — up to 8 cards in two rows of 4
-    const SCALE    = 0.42;
-    const CW       = Math.round(105 * SCALE);
-    const CH       = Math.round(159 * SCALE);
+    const SCALE    = 0.68;
+    const CW       = Math.round(64 * SCALE);
+    const CH       = Math.round(104 * SCALE);
     const GAP      = 12;
     const perRow   = 4;
     const rowCount = Math.ceil(preview.length / perRow);

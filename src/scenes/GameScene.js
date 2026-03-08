@@ -12,9 +12,9 @@ import SpiritEffects         from '../systems/SpiritEffects.js';
 // Play area   (x 170–1120): field + hand, centred at PLAY_CX
 // Right panel (x 1120–1280): spirit column
 
-const CARD_W     = 105;   // natural image width
-const CARD_H     = 159;   // natural image height
-const CARD_SCALE = 0.85;  // rendered at 85 %
+const CARD_W     = 64;    // natural image width  (pixel-art assets 64×104)
+const CARD_H     = 104;   // natural image height
+const CARD_SCALE = 1.4;   // scale to match previous on-screen size
 
 const PLAY_CX = 530;
 
@@ -617,7 +617,7 @@ export class GameScene extends Phaser.Scene {
         if (byType[card.type] !== undefined) byType[card.type].push(card);
       }
 
-      const OV_SCALE = 0.45;
+      const OV_SCALE = 0.73;
       const OV_W = Math.round(CARD_W * OV_SCALE);
       const OV_H = Math.round(CARD_H * OV_SCALE);
       const OV_GAP   = 6;
@@ -1723,7 +1723,7 @@ export class GameScene extends Phaser.Scene {
         }).setOrigin(0.5).setDepth(20)
       );
     } else {
-      const OV_SCALE = 0.45;
+      const OV_SCALE = 0.73;
       const OV_W    = Math.round(CARD_W * OV_SCALE);
       const OV_H    = Math.round(CARD_H * OV_SCALE);
       const OV_GAP  = 6;

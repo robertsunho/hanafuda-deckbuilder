@@ -6,6 +6,7 @@ import logger          from './systems/GameplayLogger.js';
 
 const config = {
   type: Phaser.AUTO,
+  pixelArt: true,
   width: 1280,
   height: 720,
   backgroundColor: '#16213e',
