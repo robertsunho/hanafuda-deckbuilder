@@ -122,8 +122,17 @@ class RunManager {
      */
     this._deck = JSON.parse(JSON.stringify(ALL_CARDS));
 
+    // ── Scoring mode ─────────────────────────────────────────────────────────
+    /** @type {'multiplicative'|'additive'} */
+    this._scoringMode = 'additive';
+
     logger.logRunStart();
   }
+
+  // ── Scoring mode ───────────────────────────────────────────────────────────
+
+  get scoringMode() { return this._scoringMode; }
+  setScoringMode(mode) { this._scoringMode = mode; }
 
   // ── Ki economy ─────────────────────────────────────────────────────────────
 
@@ -436,8 +445,16 @@ class RunManager {
     const base         = 3;
     const yakuBonus    = allYaku.length;
     let   surplusBonus = 0;
-    if      (finalScore >= threshold * 3) surplusBonus = 2;
-    else if (finalScore >= threshold * 2) surplusBonus = 1;
+    if (this._scoringMode === 'additive') {
+      // Additive mode: extra tier (+3 for 4× threshold) plus existing tiers.
+      const surplusRatio = (finalScore - threshold) / threshold;
+      if      (surplusRatio >= 3.0) surplusBonus = 3;
+      else if (surplusRatio >= 2.0) surplusBonus = 2;
+      else if (surplusRatio >= 1.0) surplusBonus = 1;
+    } else {
+      if      (finalScore >= threshold * 3) surplusBonus = 2;
+      else if (finalScore >= threshold * 2) surplusBonus = 1;
+    }
 
     const raw = base + yakuBonus + surplusBonus;
 

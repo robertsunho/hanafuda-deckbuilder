@@ -719,7 +719,6 @@ export default class GameRoundManager {
    * @returns {object} event record
    */
   _scoreAdditiveEvent(yakuName) {
-    const EVENT_MULTS = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
     const unspent     = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
     const yakuCards   = this._selectAdditiveYakuCards(yakuName, unspent);
 
@@ -758,8 +757,8 @@ export default class GameRoundManager {
     const pushFactor = Math.min(1.5, 1.0 + this._pushCount * 0.1);
     const flow       = Math.max(1.0, this._styleBase * pushFactor);
 
-    // Event escalation multiplier.
-    const eventMult  = EVENT_MULTS[Math.min(this._eventCount, EVENT_MULTS.length - 1)];
+    // Event escalation multiplier — uncapped: +0.3 per event, starting at ×1.0.
+    const eventMult  = 1.0 + this._eventCount * 0.3;
 
     const eventScore = Math.round(
       yakuCardPoints * (1 + yakuBonus + additiveMult) * multMult * flow * eventMult
@@ -917,6 +916,12 @@ export default class GameRoundManager {
   _doDeckPhase() {
     if (this._deck.isEmpty()) {
       this._lastDeckCard = null;
+      // No deck card to flip — resolve any pending match as a capture.
+      const pending = this._field.getPendingSlot();
+      if (pending) {
+        const captured = this._field.capturePendingMatch();
+        if (captured.length > 0) this._addCapture(captured);
+      }
       return this._finalizeTurn();
     }
 

@@ -47,25 +47,6 @@ const STYLE_COMBOS = [
     test:  (ids) => ids.has('june_ribbon') && ids.has('september_ribbon') && ids.has('october_ribbon'),
   },
 
-  // ── Full Month ────────────────────────────────────────────────────────────
-  // Triggers once per round even if multiple months are complete.
-
-  {
-    id:     'full_month',
-    name:   'Full Month',
-    bonus:  0.3,
-    testFn: (ids, cards) => {
-      const monthCounts = new Map();
-      for (const c of cards) {
-        monthCounts.set(c.month, (monthCounts.get(c.month) || 0) + 1);
-      }
-      for (const [, count] of monthCounts) {
-        if (count === 4) return true;
-      }
-      return false;
-    },
-  },
-
   // ── Seasonal combos ───────────────────────────────────────────────────────
   // Require at least one card from each month in the season.
 
