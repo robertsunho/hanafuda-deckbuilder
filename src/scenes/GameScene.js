@@ -7,72 +7,85 @@ import SpiritEffects         from '../systems/SpiritEffects.js';
 
 // ── Layout constants ───────────────────────────────────────────────────────────
 // Canvas is 1280 × 720.
-// Left panel  (x 0–170):  all four piles centred at x = DECK_X = 85
-//   Deck / Discard / Captured / Consumables (fanned)
-// Play area   (x 170–1120): field + hand, centred at PLAY_CX
-// Right panel (x 1120–1280): spirit column
+// Top bar    (y 0–55):   Spirit chips (horizontal row, 6 slots)
+// Left panel (x 0–140):  Score info + consumables, centred at INFO_X = 75
+// Center     (x 150–850): Field (hexagonal) + Deck, centred at FIELD_CX = 530
+// Right panel (x 900–1280): Capture fan + pile stacks
+// Bottom     (y 620–720): Hand (centred at HAND_CX = 530)
 
 const CARD_W     = 64;    // natural image width  (pixel-art assets 64×104)
 const CARD_H     = 104;   // natural image height
 const CARD_SCALE = 1.0;   // scale to match previous on-screen size
 
-const PLAY_CX = 530;
-
-// ── Left panel: four sections, all centred at x=85 ────────────────────────
-//
-// Each pile: label(12 px text, ~14 px tall) + 5 px gap + card(135 px)
-// Worked out bottom-up so the fanned consumable stack fits in the canvas:
-//
-//   Section     label-y   card-centre-y   card-bottom
-//   Deck           55         141           208.5
-//   Discard       213         300           367.5
-//   Captured      372         459           526.5
-//   Consumables   531         618           685 / 700 / 715  (fan cards 0/1/2)
-
-const DECK_X       = 85;
-const DECK_Y       = 141;   // deck card centre y
-const DISCARD_Y    = 300;   // discard card centre y  (also anim target)
-const CAP_STACK_X  = DECK_X;
-const CAP_STACK_Y  = 459;   // captured card centre y
-
-// Consumable fan base (card 0 centre).  Cards 1/2 are offset horizontally only.
-const CONS_BASE_X  = DECK_X;
-const CONS_BASE_Y  = 618;
-
-// Deck-flip reveal position.
-const FLIP_X    = DECK_X;
-const FLIP_Y    = DECK_Y;
-const FLIP_HOLD = 800;   // ms
-
-// ── Field ──────────────────────────────────────────────────────────────────
-const SLOT_COLS  = 4;
-const SLOT_XS    = [260, 415, 570, 725];
-const SLOT_YS    = [160, 400];
-const SLOT_FAN_X = 12;
-const SLOT_FAN_Y = 15;
-
-const SLOT_BG_W = Math.round(CARD_W * CARD_SCALE) + 8;   // ≈ 97
-const SLOT_BG_H = Math.round(CARD_H * CARD_SCALE) + 8;   // ≈ 143
-
-// ── Hand ───────────────────────────────────────────────────────────────────
-const HAND_STEP = 88;
-const HAND_Y    = 638;
-
-// ── Right panel: spirit column ────────────────────────────────────────────
-// Reduced card height (100 px) to fit all 6 slots with 8 px gaps.
-// Shifted down so slot tops clear the Ki counter (y≈28).
-// Centres at 100, 208, 316, 424, 532, 640.  Last card bottom = 690 px.
-const SPIRIT_CARD_W    = Math.round(CARD_W * CARD_SCALE);  // 89
-const SPIRIT_CARD_H    = 100;
-const SPIRIT_X         = 1195;
-const SPIRIT_TOP       = 100;
-const SPIRIT_STEP      = 108;   // 100 + 8 px gap
+// ── Spirit bar (top) ──────────────────────────────────────────────────────
+const SPIRIT_Y       = 32;    // chip centre y
+const SPIRIT_START_X = 160;   // first chip centre x
+const SPIRIT_GAP     = 90;    // x-distance between chips  (→ last at 160+5×90=610)
+const SPIRIT_CHIP_W  = 82;    // chip width
+const SPIRIT_CHIP_H  = 38;    // chip height
 const MAX_SPIRIT_SLOTS = RunManager.MAX_SPIRIT_SLOTS;  // 6
 
-// ── Consumable cards ───────────────────────────────────────────────────────
-// Same full-scale dimensions as spirit cards.
-const CONS_CARD_W      = Math.round(CARD_W * CARD_SCALE);  // 89
-const CONS_CARD_H      = Math.round(CARD_H * CARD_SCALE);  // 135
+// ── Left info panel ───────────────────────────────────────────────────────
+const INFO_X     = 75;    // centre x of info panel
+const INFO_TOP_Y = 70;    // first text y
+
+// ── Field + Deck (centre) ─────────────────────────────────────────────────
+const FIELD_CX    = 530;
+const FIELD_CY    = 320;
+const FIELD_ROW_H = Math.round(CARD_H * CARD_SCALE) + 12;   // 116
+const FIELD_COL_W = Math.round(CARD_W * CARD_SCALE) + 10;   // 74
+
+// Hexagonal arrangement: 3-top / 2-middle (flanking deck) / 3-bottom
+const SLOT_POSITIONS = [
+  { x: FIELD_CX - FIELD_COL_W,       y: FIELD_CY - FIELD_ROW_H },  // F1
+  { x: FIELD_CX,                     y: FIELD_CY - FIELD_ROW_H },  // F2
+  { x: FIELD_CX + FIELD_COL_W,       y: FIELD_CY - FIELD_ROW_H },  // F3
+  { x: FIELD_CX - FIELD_COL_W * 1.5, y: FIELD_CY               },  // F4 (left)
+  { x: FIELD_CX + FIELD_COL_W * 1.5, y: FIELD_CY               },  // F5 (right)
+  { x: FIELD_CX - FIELD_COL_W,       y: FIELD_CY + FIELD_ROW_H },  // F6
+  { x: FIELD_CX,                     y: FIELD_CY + FIELD_ROW_H },  // F7
+  { x: FIELD_CX + FIELD_COL_W,       y: FIELD_CY + FIELD_ROW_H },  // F8
+];
+
+const SLOT_FAN_X = 8;
+const SLOT_FAN_Y = 10;
+const SLOT_BG_W  = Math.round(CARD_W * CARD_SCALE) + 8;
+const SLOT_BG_H  = Math.round(CARD_H * CARD_SCALE) + 8;
+
+// Deck sits at the hexagonal centre.
+const DECK_X = FIELD_CX;
+const DECK_Y = FIELD_CY;
+
+// ── Capture fan (right panel) ─────────────────────────────────────────────
+const CAPTURE_X       = 1005;   // left edge of first card in each fan row
+const CAPTURE_TOP_Y   = 110;    // top of first fan row (card top edge)
+const CAPTURE_OVERLAP = 19;     // horizontal offset per card
+const CAPTURE_ROW_GAP = 10;     // vertical gap between type rows
+const CAPTURE_SCALE   = 0.5;
+const CAPTURE_CARD_W  = Math.round(CARD_W  * CAPTURE_SCALE);   // 32
+const CAPTURE_CARD_H  = Math.round(CARD_H  * CAPTURE_SCALE);   // 52
+
+// Pile stacks below the fan
+const CAP_PILE_X = 1060;
+const CAP_PILE_Y = 580;
+const DISCARD_X  = 1185;
+const DISCARD_Y  = 580;
+
+// ── Hand (bottom centre) ──────────────────────────────────────────────────
+const HAND_CX   = 530;
+const HAND_Y    = 635;
+const HAND_STEP = 78;
+
+// ── Deck-flip animation ───────────────────────────────────────────────────
+const FLIP_X    = FIELD_CX;
+const FLIP_Y    = FIELD_CY;
+const FLIP_HOLD = 800;   // ms
+
+// ── Consumable fan (left panel) ───────────────────────────────────────────
+const CONS_BASE_X = INFO_X;
+const CONS_BASE_Y = 465;
+const CONS_CARD_W = Math.round(CARD_W * CARD_SCALE);
+const CONS_CARD_H = Math.round(CARD_H * CARD_SCALE);
 const MAX_CONSUMABLE_SLOTS = 3;
 
 // ── Rarity colours ────────────────────────────────────────────────────────
@@ -108,6 +121,7 @@ export class GameScene extends Phaser.Scene {
     this._handObjs           = [];
     this._fieldObjs          = [];
     this._captureObjs        = [];
+    this._captureFanObjs     = [];
     this._spiritObjs         = [];
     this._consumableObjs     = [];
     this._overlayObjs        = [];
@@ -167,74 +181,56 @@ export class GameScene extends Phaser.Scene {
   // ── Static UI ─────────────────────────────────────────────────────────────
 
   _buildStaticUI() {
-    const labelStyle = { fontSize: '12px', color: '#556677' };
+    const labelStyle = { fontSize: '11px', color: '#556677' };
 
-    // ── Zone labels ───────────────────────────────────────────────────────
-    this.add.text(PLAY_CX,  38,  'FIELD',        labelStyle).setOrigin(0.5, 0);
-    this.add.text(PLAY_CX,  551, 'HAND',         labelStyle).setOrigin(0.5, 0);
-    this.add.text(SPIRIT_X, 30,  'SPIRITS',      labelStyle).setOrigin(0.5, 0);
-
-    // Left-panel pile labels (above each card).
-    this.add.text(DECK_X, 55,  'DECK',         labelStyle).setOrigin(0.5, 0);
-    // DISCARD label is interactive — wired to discard overlay below.
-    this.add.text(DECK_X, 372, 'CAPTURED',     labelStyle).setOrigin(0.5, 0);
-    this.add.text(DECK_X, 531, 'CONSUMABLES',  labelStyle).setOrigin(0.5, 0);
-
-    // ── Dividers ──────────────────────────────────────────────────────────
-    this.add.rectangle(PLAY_CX, 543, 940, 1, 0x2a3a50);
-    this.add.rectangle(170,  360, 1, 680, 0x1e2d40);
-    this.add.rectangle(1120, 360, 1, 680, 0x1e2d40);
-
-    // ── Status bar ────────────────────────────────────────────────────────
-    this._statusText = this.add.text(PLAY_CX, 14, '', {
-      fontSize: '17px', color: '#e8e8e8',
+    // ── Status bar (below spirit row) ────────────────────────────────────
+    this._statusText = this.add.text(FIELD_CX, 65, '', {
+      fontSize: '15px', color: '#e8e8e8',
       stroke: '#0a0f1e', strokeThickness: 3,
     }).setOrigin(0.5, 0);
 
-    // ── Score display ─────────────────────────────────────────────────────
-    this._baseText      = this.add.text(920, 258, '', { fontSize: '13px', color: '#aaccee' }).setOrigin(0.5, 0);
-    this._multiText     = this.add.text(920, 274, '', {
-      fontSize: '16px', color: '#ffee88', stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5, 0);
-    this._projText      = this.add.text(920, 295, '', { fontSize: '13px', color: '#ffffff' }).setOrigin(0.5, 0);
-    this._thresholdText = this.add.text(920, 313, '', { fontSize: '12px', color: '#667788' }).setOrigin(0.5, 0);
-
-    // ── Yaku Guide button ─────────────────────────────────────────────────
-    const guideBtn = this.add.rectangle(200, 18, 26, 20, 0x1a3550)
+    // ── Yaku Guide button (top-right of field) ────────────────────────────
+    const guideBtn = this.add.rectangle(FIELD_CX + 330, 75, 26, 20, 0x1a3550)
       .setStrokeStyle(1, 0x3a6080).setInteractive({ useHandCursor: true });
     guideBtn.on('pointerover',  () => guideBtn.setFillStyle(0x2a5a80));
     guideBtn.on('pointerout',   () => guideBtn.setFillStyle(0x1a3550));
     guideBtn.on('pointerdown',  () => this._showYakuGuide());
-    this.add.text(200, 18, '?', { fontSize: '13px', color: '#aaccee' }).setOrigin(0.5);
+    this.add.text(FIELD_CX + 330, 75, '?', { fontSize: '13px', color: '#aaccee' }).setOrigin(0.5);
 
-    // ── Turn / plays / ki ─────────────────────────────────────────────────
-    this._turnText     = this.add.text(10, 10, '', { fontSize: '13px', color: '#556677' });
-    this._playsText    = this.add.text(10, 26, '', { fontSize: '13px', color: '#556677' });
-    this._discardsText = this.add.text(10, 42, '', { fontSize: '13px', color: '#556677' });
-    this._actRoundText = this.add.text(10, 58, '', { fontSize: '13px', color: '#445566' });
-    this._kiText    = this.add.text(1270, 10, '', {
+    // ── Ki counter (top right) ─────────────────────────────────────────────
+    this._kiText = this.add.text(1270, 10, '', {
       fontSize: '13px', color: '#ffee88',
     }).setOrigin(1, 0);
 
-    // ── Deck pile ─────────────────────────────────────────────────────────
+    // ── Left info panel ───────────────────────────────────────────────────
+    // Vertical divider separating info panel from field.
+    this.add.rectangle(140, 380, 1, 720, 0x1e2d40);
+
+    let infoY = INFO_TOP_Y;
+    this._actRoundText  = this.add.text(INFO_X, infoY, '', { fontSize: '12px', color: '#445566' }).setOrigin(0.5, 0); infoY += 24;
+    this._baseText      = this.add.text(INFO_X, infoY, '', { fontSize: '15px', color: '#aaccee' }).setOrigin(0.5, 0); infoY += 22;
+    this._thresholdText = this.add.text(INFO_X, infoY, '', { fontSize: '15px', color: '#667788' }).setOrigin(0.5, 0); infoY += 26;
+    this.add.rectangle(INFO_X, infoY + 2, 120, 1, 0x1e2d40); infoY += 10;
+    this._multiText     = this.add.text(INFO_X, infoY, '', { fontSize: '12px', color: '#ffee88' }).setOrigin(0.5, 0); infoY += 18;
+    this._projText      = this.add.text(INFO_X, infoY, '', { fontSize: '12px', color: '#88ddaa' }).setOrigin(0.5, 0); infoY += 22;
+    this.add.rectangle(INFO_X, infoY + 2, 120, 1, 0x1e2d40); infoY += 10;
+    this._turnText      = this.add.text(INFO_X, infoY, '', { fontSize: '12px', color: '#556677' }).setOrigin(0.5, 0); infoY += 18;
+    this._playsText     = this.add.text(INFO_X, infoY, '', { fontSize: '12px', color: '#556677' }).setOrigin(0.5, 0); infoY += 18;
+    this._discardsText  = this.add.text(INFO_X, infoY, '', { fontSize: '12px', color: '#556677' }).setOrigin(0.5, 0);
+
+    // Consumables section label
+    this.add.rectangle(INFO_X, 338, 120, 1, 0x1e2d40);
+    this.add.text(INFO_X, 343, 'CONSUMABLES', labelStyle).setOrigin(0.5, 0);
+
+    // ── Deck pile (centre field) ──────────────────────────────────────────
     this._deckSprite = this.add.image(DECK_X, DECK_Y, 'card_back').setScale(CARD_SCALE);
-    this._deckCountText = this.add.text(DECK_X, DECK_Y + 30, '32', {
+    this._deckCountText = this.add.text(DECK_X, DECK_Y + 38, '32', {
       fontSize: '18px', color: '#aaccee', stroke: '#000000', strokeThickness: 3,
     }).setOrigin(0.5, 0);
 
-    // ── Discard pile ──────────────────────────────────────────────────────
-    this._discardSprite = this.add.image(DECK_X, DISCARD_Y, 'card_back')
-      .setScale(CARD_SCALE).setTint(0x667788).setVisible(false)
-      .setInteractive({ useHandCursor: true });
-    this._discardSprite.on('pointerdown', () => this._showDiscardOverlay());
-
-    // Make the DISCARD label also clickable for when the sprite is hidden.
-    const discardLabel = this.add.text(DECK_X, 213, 'DISCARD', labelStyle)
-      .setInteractive({ useHandCursor: true });
-    discardLabel.on('pointerdown', () => this._showDiscardOverlay());
-    this._discardCountText = this.add.text(DECK_X, DISCARD_Y + 30, '0', {
-      fontSize: '18px', color: '#cc6666', stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5, 0).setVisible(false);
+    // ── Right panel divider ───────────────────────────────────────────────
+    this.add.rectangle(980, 380, 1, 720, 0x1e2d40);
+    this.add.text(CAPTURE_X + 100, 90, 'CAPTURED', labelStyle).setOrigin(0.5, 1);
   }
 
   // ── Master render ──────────────────────────────────────────────────────────
@@ -249,7 +245,7 @@ export class GameScene extends Phaser.Scene {
     this._renderHand();
     this._renderField();
     this._renderSpiritColumn();
-    this._renderCaptureStack();
+    this._renderCaptureFan();
     this._renderConsumables();
     this._renderActionButtons();
     this._updateInfoTexts();
@@ -265,7 +261,7 @@ export class GameScene extends Phaser.Scene {
                         && !this._yakuGuideOpen && !this._captureOverlayOpen
                         && !fireWild;
     const markActive = this._markMode !== null;
-    const startX     = Math.round(PLAY_CX - ((n - 1) * HAND_STEP) / 2);
+    const startX     = Math.round(HAND_CX - ((n - 1) * HAND_STEP) / 2);
 
     for (let i = 0; i < n; i++) {
       const card     = cards[i];
@@ -312,22 +308,24 @@ export class GameScene extends Phaser.Scene {
     const markActive = this._markMode !== null;
     const fireWild   = this._fireWildCard !== null;
 
+    // Slot background rectangles (hexagonal arrangement)
     for (let i = 0; i < 8; i++) {
-      const col = i % SLOT_COLS;
-      const row = Math.floor(i / SLOT_COLS);
+      const { x, y } = SLOT_POSITIONS[i];
       this._fieldObjs.push(
-        this.add.rectangle(SLOT_XS[col], SLOT_YS[row], SLOT_BG_W, SLOT_BG_H, 0x0a1628)
+        this.add.rectangle(x, y, SLOT_BG_W, SLOT_BG_H, 0x0a1628)
       );
     }
+
+    // Cards in occupied slots
     for (let i = 0; i < slots.length; i++) {
       const slot = slots[i];
       if (!slot) continue;
-      const col = i % SLOT_COLS, row = Math.floor(i / SLOT_COLS);
+      const { x: sx, y: sy } = SLOT_POSITIONS[i];
       for (let j = 0; j < slot.cards.length; j++) {
         const card = slot.cards[j];
         const spr  = this.add.image(
-          SLOT_XS[col] + j * SLOT_FAN_X,
-          SLOT_YS[row] + j * SLOT_FAN_Y,
+          sx + j * SLOT_FAN_X,
+          sy + j * SLOT_FAN_Y,
           card.id
         ).setScale(CARD_SCALE);
 
@@ -357,8 +355,8 @@ export class GameScene extends Phaser.Scene {
 
         // Enhancement badge (only on the top card of the fan)
         if (j === slot.cards.length - 1) {
-          const bx = SLOT_XS[col] + j * SLOT_FAN_X;
-          const by = SLOT_YS[row] + j * SLOT_FAN_Y + Math.round(CARD_H * CARD_SCALE / 2) + 4;
+          const bx = sx + j * SLOT_FAN_X;
+          const by = sy + j * SLOT_FAN_Y + Math.round(CARD_H * CARD_SCALE / 2) + 4;
           const enhBadge = this._makeEnhancementBadge(card, bx, by);
           if (enhBadge) enhBadge.forEach(o => this._fieldObjs.push(o));
         }
@@ -366,61 +364,61 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // ── Spirit column (right panel, 6 slots) ─────────────────────────────────
+  // ── Spirit bar (top, horizontal row of 6 chips) ───────────────────────────
 
   _renderSpiritColumn() {
     const spirits = run.spirits;
 
     for (let i = 0; i < MAX_SPIRIT_SLOTS; i++) {
       const spirit = spirits[i];
-      const y      = SPIRIT_TOP + i * SPIRIT_STEP;
+      const x      = SPIRIT_START_X + i * SPIRIT_GAP;
+      const y      = SPIRIT_Y;
 
       if (!spirit) {
         this._spiritObjs.push(
-          this.add.rectangle(SPIRIT_X, y, SPIRIT_CARD_W, SPIRIT_CARD_H, 0x0a1628)
+          this.add.rectangle(x, y, SPIRIT_CHIP_W, SPIRIT_CHIP_H, 0x0a1628)
             .setStrokeStyle(1, 0x1e2d40)
         );
         continue;
       }
 
-      // Card background.
-      const card = this.add.rectangle(SPIRIT_X, y, SPIRIT_CARD_W, SPIRIT_CARD_H, 0x0d1b2a)
-        .setStrokeStyle(1, 0x2a3a50);
-      this._spiritObjs.push(card);
+      const rarityCol = RARITY_COLOR[spirit.rarity] ?? RARITY_COLOR.common;
+
+      // Chip background.
+      const chip = this.add.rectangle(x, y, SPIRIT_CHIP_W, SPIRIT_CHIP_H, 0x0d1b2a)
+        .setStrokeStyle(1, rarityCol);
+      this._spiritObjs.push(chip);
 
       // Rarity left-border strip.
-      const rarityCol = RARITY_COLOR[spirit.rarity] ?? RARITY_COLOR.common;
       this._spiritObjs.push(
-        this.add.rectangle(SPIRIT_X - SPIRIT_CARD_W / 2 + 2, y, 4, SPIRIT_CARD_H - 4, rarityCol)
+        this.add.rectangle(x - SPIRIT_CHIP_W / 2 + 2, y, 4, SPIRIT_CHIP_H - 4, rarityCol)
       );
 
-      // Name label.
+      // Name label (centred on chip).
       this._spiritObjs.push(
-        this.add.text(SPIRIT_X - SPIRIT_CARD_W / 2 + 10, y, spirit.name, {
-          fontSize: '11px', color: '#cce0ff',
-        }).setOrigin(0, 0.5)
+        this.add.text(x, y, spirit.name, { fontSize: '10px', color: '#cce0ff' }).setOrigin(0.5)
       );
 
-      // Hover tooltip — to the left of the card. Content updated on hover.
+      // Hover tooltip — below the chip.
       const tooltip = this.add.text(
-        SPIRIT_X - SPIRIT_CARD_W / 2 - 8, y, '',
+        x, y + SPIRIT_CHIP_H / 2 + 4, '',
         {
           fontSize: '11px', color: '#e8e8e8',
           backgroundColor: '#0a0f1e',
           padding: { x: 6, y: 4 },
-          wordWrap: { width: 200 },
+          wordWrap: { width: 180 },
         }
-      ).setOrigin(1, 0.5).setDepth(42).setVisible(false);
+      ).setOrigin(0.5, 0).setDepth(42).setVisible(false);
       this._spiritObjs.push(tooltip);
 
-      card.setInteractive();
-      card.on('pointerover', () => {
+      chip.setInteractive();
+      chip.on('pointerover', () => {
         const captured = this._round.capture.getAll();
         const contrib  = this._getSpiritContrib(spirit, captured);
         tooltip.setText(spirit.description + (contrib ? '\n\n' + contrib : ''));
         tooltip.setVisible(true);
       });
-      card.on('pointerout', () => tooltip.setVisible(false));
+      chip.on('pointerout', () => tooltip.setVisible(false));
     }
   }
 
@@ -491,25 +489,112 @@ export class GameScene extends Phaser.Scene {
     return lines.length > 0 ? lines.join('\n') : null;
   }
 
-  // ── Captured pile (left panel, face-down stack) ────────────────────────────
+  // ── Capture fan (right panel) ─────────────────────────────────────────────
+  // Four horizontal rows — one per card type — plus compact pile stacks below.
 
-  _renderCaptureStack() {
-    const count = this._round.capture.getAll().length;
+  _renderCaptureFan() {
+    const capturedCards = this._round.capture.getAll();
+    const discards      = this._round.allDiscards;
+    const spentIds      = run.scoringMode === 'additive' ? this._round.spentCardIds : new Set();
 
-    const stackSpr = this.add.image(CAP_STACK_X, CAP_STACK_Y, 'card_back')
-      .setScale(CARD_SCALE).setVisible(count > 0);
-    this._captureObjs.push(stackSpr);
+    const TYPE_ORDER   = ['bright', 'animal', 'ribbon', 'plain'];
+    const TYPE_SYMBOLS = { bright: '★', animal: '♦', ribbon: '║', plain: '□' };
+    const TYPE_COLORS  = { bright: '#ffee88', animal: '#88ccff', ribbon: '#ff8888', plain: '#aaaaaa' };
 
-    const badge = this.add.text(CAP_STACK_X, CAP_STACK_Y + 30, String(count), {
-      fontSize: '18px', color: '#aaccee', stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5, 0).setVisible(count > 0);
-    this._captureObjs.push(badge);
+    // Group by type (fire cards count as plain for fan purposes).
+    const byType = { bright: [], animal: [], ribbon: [], plain: [] };
+    for (const card of capturedCards) {
+      const t = card.enhancement?.element === 'fire' ? 'plain' : card.type;
+      (byType[t] ?? byType['plain']).push(card);
+    }
 
-    if (count > 0) {
-      stackSpr.setInteractive({ useHandCursor: true });
-      stackSpr.on('pointerover', () => stackSpr.setTint(TINT_HOVER));
-      stackSpr.on('pointerout',  () => stackSpr.clearTint());
-      stackSpr.on('pointerdown', () => this._showCaptureOverlay());
+    let fanY = CAPTURE_TOP_Y;
+
+    for (const type of TYPE_ORDER) {
+      const cards = byType[type];
+
+      // Type symbol label (always shown, even if empty).
+      this._captureObjs.push(
+        this.add.text(CAPTURE_X - 10, fanY + CAPTURE_CARD_H / 2, TYPE_SYMBOLS[type], {
+          fontSize: '12px', color: TYPE_COLORS[type],
+        }).setOrigin(1, 0.5)
+      );
+
+      // Fan cards.
+      for (let i = 0; i < cards.length; i++) {
+        const img = this.add.image(CAPTURE_X + i * CAPTURE_OVERLAP, fanY, cards[i].id)
+          .setScale(CAPTURE_SCALE).setOrigin(0, 0);
+        if (spentIds.has(cards[i].id)) img.setTint(0x334455).setAlpha(0.5);
+        this._captureObjs.push(img);
+      }
+
+      // Count label at end of fan.
+      if (cards.length > 0) {
+        const countX = CAPTURE_X + cards.length * CAPTURE_OVERLAP + CAPTURE_CARD_W + 2;
+        if (countX < 1274) {
+          this._captureObjs.push(
+            this.add.text(countX, fanY + CAPTURE_CARD_H / 2, `×${cards.length}`, {
+              fontSize: '10px', color: TYPE_COLORS[type],
+            }).setOrigin(0, 0.5)
+          );
+        }
+      }
+
+      fanY += CAPTURE_CARD_H + CAPTURE_ROW_GAP;
+    }
+
+    // ── Capture pile stack ─────────────────────────────────────────────────
+    const capCount = capturedCards.length;
+    this._captureObjs.push(
+      this.add.text(CAP_PILE_X, CAP_PILE_Y - 38, 'CAPTURED', {
+        fontSize: '10px', color: '#556677',
+      }).setOrigin(0.5, 1)
+    );
+    if (capCount > 0) {
+      const capTop = capturedCards[capCount - 1];
+      const capSpr = this.add.image(CAP_PILE_X, CAP_PILE_Y, capTop.id)
+        .setScale(0.6).setInteractive({ useHandCursor: true });
+      capSpr.on('pointerover', () => capSpr.setTint(TINT_HOVER));
+      capSpr.on('pointerout',  () => capSpr.clearTint());
+      capSpr.on('pointerdown', () => this._showCaptureOverlay());
+      this._captureObjs.push(capSpr);
+      this._captureObjs.push(
+        this.add.text(CAP_PILE_X, CAP_PILE_Y + 36, `×${capCount}`, {
+          fontSize: '13px', color: '#aaccee', stroke: '#000000', strokeThickness: 2,
+        }).setOrigin(0.5, 0)
+      );
+    } else {
+      this._captureObjs.push(
+        this.add.rectangle(CAP_PILE_X, CAP_PILE_Y, 42, 62, 0x0a1628)
+          .setStrokeStyle(1, 0x1e2d40)
+      );
+    }
+
+    // ── Discard pile stack ─────────────────────────────────────────────────
+    const discardCount = discards.length;
+    this._captureObjs.push(
+      this.add.text(DISCARD_X, CAP_PILE_Y - 38, 'DISCARD', {
+        fontSize: '10px', color: '#556677',
+      }).setOrigin(0.5, 1)
+    );
+    if (discardCount > 0) {
+      const dTop = discards[discardCount - 1];
+      const dSpr = this.add.image(DISCARD_X, CAP_PILE_Y, dTop.id)
+        .setScale(0.6).setTint(0x886655).setInteractive({ useHandCursor: true });
+      dSpr.on('pointerover', () => dSpr.setTint(TINT_HOVER));
+      dSpr.on('pointerout',  () => dSpr.setTint(0x886655));
+      dSpr.on('pointerdown', () => this._showDiscardOverlay());
+      this._captureObjs.push(dSpr);
+      this._captureObjs.push(
+        this.add.text(DISCARD_X, CAP_PILE_Y + 36, `×${discardCount}`, {
+          fontSize: '13px', color: '#cc6666', stroke: '#000000', strokeThickness: 2,
+        }).setOrigin(0.5, 0)
+      );
+    } else {
+      this._captureObjs.push(
+        this.add.rectangle(DISCARD_X, CAP_PILE_Y, 42, 62, 0x0a1628)
+          .setStrokeStyle(1, 0x1e2d40)
+      );
     }
   }
 
@@ -589,7 +674,7 @@ export class GameScene extends Phaser.Scene {
     this._renderHand();
 
     const cards = this._round.capture.getAll();
-    const cx    = PLAY_CX, cy = 330;
+    const cx    = FIELD_CX, cy = 330;
     const objs  = this._captureOverlayObjs;
 
     objs.push(
@@ -691,7 +776,7 @@ export class GameScene extends Phaser.Scene {
 
     const objs = [];
     const W = 420, H = Math.min(380, 60 + cards.length * 22 + 50);
-    const cx = PLAY_CX, cy = 360;
+    const cx = FIELD_CX, cy = 360;
 
     const bg = this.add.rectangle(cx, cy, W, H, 0x0a1a2e, 0.95)
       .setStrokeStyle(2, 0x4488cc).setDepth(20);
@@ -765,7 +850,7 @@ export class GameScene extends Phaser.Scene {
     // Fire wild targeting: replace normal buttons with a cancel button.
     if (this._fireWildCard) {
       const y         = 700;
-      const cancelBtn = this.add.rectangle(PLAY_CX, y, 180, 40, 0x3a1a0a)
+      const cancelBtn = this.add.rectangle(HAND_CX, y, 180, 40, 0x3a1a0a)
         .setStrokeStyle(2, 0xaa6622).setInteractive({ useHandCursor: true }).setDepth(5);
       cancelBtn.on('pointerover', () => cancelBtn.setFillStyle(0x5a2a0a));
       cancelBtn.on('pointerout',  () => cancelBtn.setFillStyle(0x3a1a0a));
@@ -777,7 +862,7 @@ export class GameScene extends Phaser.Scene {
       });
       this._actionBtnObjs.push(cancelBtn);
       this._actionBtnObjs.push(
-        this.add.text(PLAY_CX, y, 'Cancel (ESC)', { fontSize: '15px', color: '#ffaa66' })
+        this.add.text(HAND_CX, y, 'Cancel (ESC)', { fontSize: '15px', color: '#ffaa66' })
           .setOrigin(0.5).setDepth(5)
       );
       return;
@@ -796,7 +881,7 @@ export class GameScene extends Phaser.Scene {
         const isMark    = cons.id && (cons.id.startsWith('mark_') || cons.id.startsWith('element_'));
         const btnLabel  = isMark ? `Activate: ${cons.name}` : `Use: ${cons.name}`;
 
-        const useBtn = this.add.rectangle(PLAY_CX, y, 210, 40, 0x1a2a5a)
+        const useBtn = this.add.rectangle(HAND_CX, y, 210, 40, 0x1a2a5a)
           .setStrokeStyle(2, 0x4466cc).setInteractive({ useHandCursor: true }).setDepth(5);
         useBtn.on('pointerover',  () => useBtn.setFillStyle(0x2a4a8a));
         useBtn.on('pointerout',   () => useBtn.setFillStyle(0x1a2a5a));
@@ -823,7 +908,7 @@ export class GameScene extends Phaser.Scene {
         });
         this._actionBtnObjs.push(useBtn);
         this._actionBtnObjs.push(
-          this.add.text(PLAY_CX, y, btnLabel, {
+          this.add.text(HAND_CX, y, btnLabel, {
             fontSize: '15px', color: '#aaddff',
           }).setOrigin(0.5).setDepth(5)
         );
@@ -847,7 +932,7 @@ export class GameScene extends Phaser.Scene {
 
     const y = 700;
 
-    const playBtn = this.add.rectangle(PLAY_CX - 90, y, 160, 40,
+    const playBtn = this.add.rectangle(HAND_CX - 90, y, 160, 40,
       playEnabled ? 0x1a6a1a : 0x222a22)
       .setStrokeStyle(2, playEnabled ? 0x44aa44 : 0x334433).setDepth(5);
     if (playEnabled) {
@@ -858,14 +943,14 @@ export class GameScene extends Phaser.Scene {
     }
     this._actionBtnObjs.push(playBtn);
     this._actionBtnObjs.push(
-      this.add.text(PLAY_CX - 90, y, 'Play', {
+      this.add.text(HAND_CX - 90, y, 'Play', {
         fontSize: '16px', color: playEnabled ? '#ffffff' : '#445544',
       }).setOrigin(0.5).setDepth(5)
     );
 
     const discardsLeft    = this._round.discardsRemaining;
     const discardEnabled  = discardsLeft > 0;
-    const discardBtn = this.add.rectangle(PLAY_CX + 90, y, 160, 40,
+    const discardBtn = this.add.rectangle(HAND_CX + 90, y, 160, 40,
       discardEnabled ? 0x6a3a1a : 0x2a1a0a)
       .setStrokeStyle(2, discardEnabled ? 0xaa7744 : 0x443322).setDepth(5);
     if (discardEnabled) {
@@ -876,7 +961,7 @@ export class GameScene extends Phaser.Scene {
     }
     this._actionBtnObjs.push(discardBtn);
     this._actionBtnObjs.push(
-      this.add.text(PLAY_CX + 90, y, `Discard (${discardsLeft} left)`, {
+      this.add.text(HAND_CX + 90, y, `Discard (${discardsLeft} left)`, {
         fontSize: '15px', color: discardEnabled ? '#ffffff' : '#554433',
       }).setOrigin(0.5).setDepth(5)
     );
@@ -1076,7 +1161,7 @@ export class GameScene extends Phaser.Scene {
     this._renderAll();
 
     const handDiscardSprs = handResult.discarded.map((card, i) =>
-      this.add.image(DECK_X, DISCARD_Y - 40 + i * 20, card.id)
+      this.add.image(FLIP_X + 40, FLIP_Y - 60 + i * 20, card.id)
         .setScale(CARD_SCALE).setTint(TINT_DISCARD).setDepth(10)
     );
 
@@ -1123,7 +1208,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     for (let i = 0; i < result.discarded.length; i++) {
-      const spr = this.add.image(DECK_X, DISCARD_Y - 40 + i * 20, result.discarded[i].id)
+      const spr = this.add.image(FLIP_X + 40, FLIP_Y - 60 + i * 20, result.discarded[i].id)
         .setScale(CARD_SCALE).setTint(TINT_DISCARD).setDepth(10);
       temp.push(spr);
       this.tweens.add({ targets: spr, alpha: 0, duration: FLIP_HOLD - 100, ease: 'Linear' });
@@ -1143,8 +1228,8 @@ export class GameScene extends Phaser.Scene {
    * @param {{ name: string, bonus: number }[]} combos
    */
   _showStyleComboPopup(combos) {
-    const x = CAP_STACK_X + 110;
-    let y = CAP_STACK_Y - 30;
+    const x = CAPTURE_X - 20;
+    let y = CAPTURE_TOP_Y + 80;
 
     for (const combo of combos) {
       const label = `${combo.name}  +${combo.bonus.toFixed(1)} Style`;
@@ -1205,27 +1290,29 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    const drawSize     = this._round.deck.drawPileSize;
-    const discardCount = this._round.discardCount;
+    const drawSize = this._round.deck.drawPileSize;
 
     if (run.scoringMode === 'additive') {
-      this._baseText.setText(`Captured: ${this._round.runningScore} pts`);
+      const runScore = this._round.runningScore;
+      const thr      = run.threshold;
+      this._baseText.setStyle({ color: runScore >= thr ? '#44ff88' : '#aaccee' })
+        .setText(`Running: ${runScore}`);
       this._multiText.setText(`Events: ${this._round.eventCount}`);
-      this._projText.setText(`Running: ${this._round.runningScore}`);
+      this._projText.setText('');
     } else {
       const sc = this._round.getCurrentScoring();
-      // Base line — show point-boost detail when active (ratio differs from 1.0).
+      // Base line — show point-boost detail when active.
       const ptBoostActive = Math.abs(sc.pointBoost - 1.0) > 0.001;
       const baseStr = ptBoostActive
-        ? `Base: ${sc.rawBasePoints} (\xD7${sc.pointBoost.toFixed(2)} = ${sc.boostedBasePoints})`
+        ? `${sc.rawBasePoints} (\xD7${sc.pointBoost.toFixed(2)}=${sc.boostedBasePoints})`
         : `Base: ${sc.boostedBasePoints}`;
-      this._baseText.setText(baseStr);
+      this._baseText.setStyle({ color: '#aaccee' }).setText(baseStr);
 
-      // Mult line — show additive and multiplicative spirit channels when active.
-      let multStr = `\xD7${sc.yakuMult.toFixed(2)} yaku`;
-      if (sc.additiveMult !== 0)        multStr += `  +${sc.additiveMult.toFixed(2)} spirit`;
-      if (Math.abs(sc.multMult - 1.0) > 0.001) multStr += `  \xD7${sc.multMult.toFixed(2)} mm`;
-      multStr += `  \xD7${sc.flow.toFixed(2)} flow`;
+      // Mult line.
+      let multStr = `\xD7${sc.yakuMult.toFixed(2)}`;
+      if (sc.additiveMult !== 0)               multStr += ` +${sc.additiveMult.toFixed(2)}`;
+      if (Math.abs(sc.multMult - 1.0) > 0.001) multStr += ` \xD7${sc.multMult.toFixed(2)}mm`;
+      multStr += ` \xD7${sc.flow.toFixed(2)}f`;
       this._multiText.setText(multStr);
 
       this._projText.setText(`= ${sc.finalScore}`);
@@ -1240,10 +1327,6 @@ export class GameScene extends Phaser.Scene {
 
     this._deckSprite.setVisible(drawSize > 0);
     this._deckCountText.setText(String(drawSize));
-
-    const allDiscardCount = this._round.allDiscards.length;
-    this._discardSprite.setVisible(allDiscardCount > 0);
-    this._discardCountText.setVisible(allDiscardCount > 0).setText(String(allDiscardCount));
   }
 
   // ── End screen ────────────────────────────────────────────────────────────
@@ -1255,7 +1338,7 @@ export class GameScene extends Phaser.Scene {
     this._clearObjs(this._fieldObjs);
     this._clearObjs(this._actionBtnObjs);
     this._clearObjs(this._consumableObjs);
-    const cx = PLAY_CX, cy = 330;
+    const cx = FIELD_CX, cy = 330;
 
     // Compute threshold and ki reward before any state changes.
     const tr       = run.checkThreshold(result.finalScore);
@@ -1599,7 +1682,7 @@ export class GameScene extends Phaser.Scene {
   _showAdditiveEventOverlay(result) {
     this._bankPushOpen = true;
     this._clearObjs(this._overlayObjs);
-    const cx = PLAY_CX, cy = 270;
+    const cx = FIELD_CX, cy = 270;
 
     this._overlayObjs.push(
       this.add.rectangle(cx, cy, 490, 280, 0x080d1a, 0.96)
@@ -1691,7 +1774,7 @@ export class GameScene extends Phaser.Scene {
     }
     this._bankPushOpen = true;
     this._clearObjs(this._overlayObjs);
-    const cx = PLAY_CX, cy = 270;
+    const cx = FIELD_CX, cy = 270;
 
     this._overlayObjs.push(
       this.add.rectangle(cx, cy, 490, 230, 0x080d1a, 0.96)
@@ -1857,7 +1940,7 @@ export class GameScene extends Phaser.Scene {
     this._discardOverlayOpen = true;
 
     const cards = this._round.allDiscards;
-    const cx    = PLAY_CX, cy = 330;
+    const cx    = FIELD_CX, cy = 330;
     const objs  = this._discardOverlayObjs;
 
     objs.push(
