@@ -232,11 +232,10 @@ export class GameScene extends Phaser.Scene {
       fontSize: '10px', color: '#556677',
     }).setOrigin(0.5, 0.5).setRotation(-Math.PI / 2);
 
-    // ── Deck pile (centre field, rotated 90°) ─────────────────────────────
+    // ── Deck pile (portrait) ───────────────────────────────────────────────
     this._deckSprite = this.add.image(DECK_X, DECK_Y, 'card_back')
-      .setDisplaySize(CARD_W * CARD_SCALE, CARD_H * CARD_SCALE)
-      .setRotation(Math.PI / 2);
-    this._deckCountText = this.add.text(DECK_X, DECK_Y + 42, '32', {
+      .setDisplaySize(CARD_W * CARD_SCALE, CARD_H * CARD_SCALE);
+    this._deckCountText = this.add.text(DECK_X, DECK_Y + CARD_H * CARD_SCALE / 2 + 8, '32', {
       fontSize: '16px', color: '#aaccee', stroke: '#000000', strokeThickness: 3,
     }).setOrigin(0.5, 0);
 
