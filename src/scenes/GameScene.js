@@ -69,7 +69,7 @@ const CAPTURE_CARD_H  = Math.round(CARD_H * CAPTURE_SCALE);   // 104
 
 // ── Banked + Discard piles (centred in bottom-right zone between dividers) ─
 const PILE_ZONE_CX = Math.round((1036 + 1280) / 2);   // 1158
-const PILE_ZONE_CY = Math.round((570 + 720) / 2);      // 645
+const PILE_ZONE_CY = Math.round((600 + 720) / 2);      // 660
 const PILE_GAP     = CARD_W + 30;                       // 94 — space between pile centres
 const BANKED_X  = Math.round(PILE_ZONE_CX - PILE_GAP / 2);  // ~1111
 const BANKED_Y  = PILE_ZONE_CY;                              // 645
@@ -78,7 +78,7 @@ const DISCARD_Y = PILE_ZONE_CY;
 
 // ── Hand (bottom centre) ──────────────────────────────────────────────────
 const HAND_CX   = PLAY_CENTER_X;  // 596 — same axis as field and spirits
-const HAND_Y    = Math.round((570 + 720) / 2);  // 645 — centred in bottom zone, matches pile centres
+const HAND_Y    = Math.round((600 + 720) / 2);  // 660 — centred in bottom zone, matches pile centres
 const HAND_STEP = 72;
 
 // ── Deck-flip animation ───────────────────────────────────────────────────
@@ -86,15 +86,15 @@ const FLIP_X    = FIELD_CX;
 const FLIP_Y    = FIELD_CY;
 const FLIP_HOLD = 800;   // ms
 
-// ── Consumable slot (left panel, rectangular outline) ─────────────────────
-const CONS_CARD_W  = Math.round(CARD_W * CARD_SCALE);       // 64
-const CONS_CARD_H  = Math.round(CARD_H * CARD_SCALE);       // 104
-const CONS_SLOT_W  = CONS_CARD_W * 3 + 16;                  // 208
-const CONS_SLOT_H  = CONS_CARD_H + 8;                       // 112
-const CONS_SLOT_X  = INFO_X + CONS_SLOT_W / 2;              // 114
-const CONS_SLOT_Y  = 380;
-const CONS_BASE_X  = Math.round(CONS_SLOT_X - CONS_SLOT_W / 2 + CONS_CARD_W / 2 + 8);  // 50
-const CONS_BASE_Y  = CONS_SLOT_Y;                           // 380
+// ── Consumable slot (top-right, right edge flush against right divider) ───
+const CONS_CARD_W  = Math.round(CARD_W * CARD_SCALE);          // 64
+const CONS_CARD_H  = Math.round(CARD_H * CARD_SCALE);          // 104
+const CONS_SLOT_W  = CONS_CARD_W * 3 + 16;                     // 208
+const CONS_SLOT_H  = CONS_CARD_H + 8;                          // 112
+const CONS_SLOT_X  = 1036 - CONS_SLOT_W / 2;                   // 932 — right edge at x=1036
+const CONS_SLOT_Y  = SPIRIT_Y;                                 // 62 — aligned with spirit row
+const CONS_BASE_X  = Math.round(CONS_SLOT_X - CONS_SLOT_W / 2 + CONS_CARD_W / 2 + 8);  // 868
+const CONS_BASE_Y  = CONS_SLOT_Y;
 const MAX_CONSUMABLE_SLOTS = 3;
 
 // ── Rarity colours ────────────────────────────────────────────────────────
@@ -256,8 +256,15 @@ export class GameScene extends Phaser.Scene {
     // ── Left vertical divider (separates info/consumables from game board) ─
     this.add.rectangle(155, 360, 1, 720, 0x2a3a50);
 
-    // ── Hand / field divider ──────────────────────────────────────────────
-    this.add.rectangle(640, 570, 1280, 1, 0x2a3a50);
+    // ── Upper horizontal divider (between spirit row and field) ───────────
+    // Spans only between vertical dividers; spiritBottom≈114, fieldTop≈134
+    this.add.rectangle(
+      Math.round((155 + 1036) / 2), Math.round((114 + 134) / 2),
+      1036 - 155, 1, 0x2a3a50
+    );
+
+    // ── Lower horizontal divider (full-width, above hand/banked zone) ─────
+    this.add.rectangle(640, 600, 1280, 1, 0x2a3a50);
   }
 
   // ── Master render ──────────────────────────────────────────────────────────
