@@ -42,8 +42,8 @@ const SLOT_POSITIONS = [
   { x: FIELD_CX - FIELD_COL_W,        y: FIELD_CY - FIELD_ROW_H },  // F1
   { x: FIELD_CX,                      y: FIELD_CY - FIELD_ROW_H },  // F2
   { x: FIELD_CX + FIELD_COL_W,        y: FIELD_CY - FIELD_ROW_H },  // F3
-  { x: FIELD_CX - FIELD_COL_W * 1.5,  y: FIELD_CY               },  // F4 (left)
-  { x: FIELD_CX + FIELD_COL_W * 1.5,  y: FIELD_CY               },  // F5 (right)
+  { x: FIELD_CX - FIELD_COL_W * 2,     y: FIELD_CY               },  // F4 (left)
+  { x: FIELD_CX + FIELD_COL_W * 2,     y: FIELD_CY               },  // F5 (right)
   { x: FIELD_CX - FIELD_COL_W,        y: FIELD_CY + FIELD_ROW_H },  // F6
   { x: FIELD_CX,                      y: FIELD_CY + FIELD_ROW_H },  // F7
   { x: FIELD_CX + FIELD_COL_W,        y: FIELD_CY + FIELD_ROW_H },  // F8
@@ -67,11 +67,14 @@ const CAPTURE_SCALE   = CARD_SCALE;   // 1.0 — full size, no shrinking
 const CAPTURE_CARD_W  = Math.round(CARD_W * CAPTURE_SCALE);   // 64
 const CAPTURE_CARD_H  = Math.round(CARD_H * CAPTURE_SCALE);   // 104
 
-// ── Banked + Discard piles (bottom-right corner, flush with hand row) ────
-const BANKED_X  = 1140;
-const BANKED_Y  = 660;   // same vertical centre as hand cards — card bottom at 712, within canvas
-const DISCARD_X = 1240;
-const DISCARD_Y = 660;
+// ── Banked + Discard piles (centred in bottom-right zone between dividers) ─
+const PILE_ZONE_CX = Math.round((1036 + 1280) / 2);   // 1158
+const PILE_ZONE_CY = Math.round((570 + 720) / 2);      // 645
+const PILE_GAP     = CARD_W + 30;                       // 94 — space between pile centres
+const BANKED_X  = Math.round(PILE_ZONE_CX - PILE_GAP / 2);  // ~1111
+const BANKED_Y  = PILE_ZONE_CY;                              // 645
+const DISCARD_X = Math.round(PILE_ZONE_CX + PILE_GAP / 2);  // ~1205
+const DISCARD_Y = PILE_ZONE_CY;
 
 // ── Hand (bottom centre) ──────────────────────────────────────────────────
 const HAND_CX   = PLAY_CENTER_X;  // 596 — same axis as field and spirits
@@ -558,15 +561,15 @@ export class GameScene extends Phaser.Scene {
       fanY += CAPTURE_CARD_H + CAPTURE_ROW_GAP;
     }
 
-    // ── Banked pile (scored yaku cards only, right side of field) ─────────
+    // ── Banked pile (scored yaku cards only) ──────────────────────────────
     const bankedCards  = capturedCards.filter(c => spentIds.has(c.id));
     const bankedCount  = bankedCards.length;
-    const pileTopY     = BANKED_Y - CARD_H / 2 - 12;
     const pileBottomY  = BANKED_Y + CARD_H / 2 + 4;
+    // Rotated label runs vertically along left edge of pile card
     this._captureObjs.push(
-      this.add.text(BANKED_X, pileTopY, 'BANKED', {
+      this.add.text(BANKED_X - CARD_W / 2 - 12, BANKED_Y, 'BANKED', {
         fontSize: '10px', color: '#556677',
-      }).setOrigin(0.5, 1)
+      }).setOrigin(0.5, 0.5).setRotation(-Math.PI / 2)
     );
     if (bankedCount > 0) {
       const capTop = bankedCards[bankedCount - 1];
@@ -589,11 +592,12 @@ export class GameScene extends Phaser.Scene {
     }
 
     // ── Discard pile ───────────────────────────────────────────────────────
-    const discardCount = discards.length;
+    const discardCount  = discards.length;
+    const discardBotY   = DISCARD_Y + CARD_H / 2 + 4;
     this._captureObjs.push(
-      this.add.text(DISCARD_X, pileTopY, 'DISCARD', {
+      this.add.text(DISCARD_X - CARD_W / 2 - 12, DISCARD_Y, 'DISCARD', {
         fontSize: '10px', color: '#556677',
-      }).setOrigin(0.5, 1)
+      }).setOrigin(0.5, 0.5).setRotation(-Math.PI / 2)
     );
     if (discardCount > 0) {
       const dTop = discards[discardCount - 1];
@@ -604,7 +608,7 @@ export class GameScene extends Phaser.Scene {
       dSpr.on('pointerdown', () => this._showDiscardOverlay());
       this._captureObjs.push(dSpr);
       this._captureObjs.push(
-        this.add.text(DISCARD_X, pileBottomY, `×${discardCount}`, {
+        this.add.text(DISCARD_X, discardBotY, `×${discardCount}`, {
           fontSize: '12px', color: '#cc6666', stroke: '#000000', strokeThickness: 2,
         }).setOrigin(0.5, 0)
       );
