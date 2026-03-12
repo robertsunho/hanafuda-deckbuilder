@@ -78,7 +78,7 @@ const DISCARD_Y = PILE_ZONE_CY;
 
 // ── Hand (bottom centre) ──────────────────────────────────────────────────
 const HAND_CX   = PLAY_CENTER_X;  // 596 — same axis as field and spirits
-const HAND_Y    = 660;
+const HAND_Y    = Math.round((570 + 720) / 2);  // 645 — centred in bottom zone, matches pile centres
 const HAND_STEP = 72;
 
 // ── Deck-flip animation ───────────────────────────────────────────────────
