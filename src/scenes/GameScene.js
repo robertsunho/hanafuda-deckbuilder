@@ -31,8 +31,8 @@ const INFO_TOP_Y = 14;
 // ── Field + Deck (centre) ─────────────────────────────────────────────────
 const FIELD_CX    = 500;
 const FIELD_CY    = 340;
-const FIELD_COL_W = Math.round(CARD_W * CARD_SCALE) * 2;   // 128
-const FIELD_ROW_H = Math.round(CARD_H * CARD_SCALE) + 20;  // 124
+const FIELD_COL_W = Math.round(CARD_W * CARD_SCALE * 2.2);  // ~141
+const FIELD_ROW_H = Math.round(CARD_H * CARD_SCALE) + 50;   // 154
 
 // Hexagonal arrangement: 3-top / 2-middle (flanking deck) / 3-bottom
 const SLOT_POSITIONS = [
@@ -57,7 +57,7 @@ const DECK_Y = FIELD_CY;
 
 // ── Capture fan (right panel, full scale) ─────────────────────────────────
 const CAPTURE_X       = 1024;  // left edge of first card in each fan row
-const CAPTURE_TOP_Y   = 140;   // top of first fan row (card top edge)
+const CAPTURE_TOP_Y   = 100;   // top of first fan row (card top edge)
 const CAPTURE_OVERLAP = 16;    // horizontal offset per card
 const CAPTURE_ROW_GAP = 6;     // vertical gap between type rows
 const CAPTURE_SCALE   = CARD_SCALE;   // 1.0 — full size, no shrinking
@@ -65,13 +65,13 @@ const CAPTURE_CARD_W  = Math.round(CARD_W * CAPTURE_SCALE);   // 64
 const CAPTURE_CARD_H  = Math.round(CARD_H * CAPTURE_SCALE);   // 104
 
 // ── Banked + Discard piles (bottom-right corner, flush with hand row) ────
-const BANKED_X  = 1100;
+const BANKED_X  = 1140;
 const BANKED_Y  = 660;   // matches HAND_Y
-const DISCARD_X = 1200;
+const DISCARD_X = 1240;
 const DISCARD_Y = 660;   // matches HAND_Y
 
 // ── Hand (bottom centre) ──────────────────────────────────────────────────
-const HAND_CX   = 500;
+const HAND_CX   = Math.round((155 + 1100) / 2);  // 628 — centred between left and right dividers
 const HAND_Y    = 660;
 const HAND_STEP = 72;
 
@@ -207,6 +207,7 @@ export class GameScene extends Phaser.Scene {
     this._statusText = this.add.text(680, 62, '', {
       fontSize: '15px', color: '#e8e8e8',
       stroke: '#0a0f1e', strokeThickness: 3,
+      wordWrap: { width: 380 },
     }).setOrigin(0, 0.5);
 
     // ── Yaku Guide button (top right) ─────────────────────────────────────
@@ -228,9 +229,11 @@ export class GameScene extends Phaser.Scene {
       fontSize: '16px', color: '#aaccee', stroke: '#000000', strokeThickness: 3,
     }).setOrigin(0.5, 0);
 
-    // ── Right panel divider + label ───────────────────────────────────────
-    this.add.rectangle(CAPTURE_X - 12, 380, 1, 720, 0x1e2d40);
-    this.add.text(CAPTURE_X + 90, 120, 'CAPTURES', labelStyle).setOrigin(0.5, 1);
+    // ── Right vertical divider (separates field from captures) ───────────
+    this.add.rectangle(1100, 400, 1, 720, 0x2a3a50);
+    this.add.text(CAPTURE_X + 80, 62, 'CAPTURES', {
+      fontSize: '11px', color: '#556677',
+    }).setOrigin(0.5, 0.5);
 
     // ── Left vertical divider (separates info/consumables from game board) ─
     this.add.rectangle(155, 360, 1, 720, 0x2a3a50);
