@@ -544,7 +544,7 @@ export class GameScene extends Phaser.Scene {
   _renderCaptureFan() {
     const capturedCards = this._round.capture.getAll();
     const discards      = this._round.allDiscards;
-    const spentIds      = run.scoringMode === 'additive' ? this._round.spentCardIds : new Set();
+    const spentIds      = (run.scoringMode === 'capture' || run.scoringMode === 'additive') ? this._round.spentCardIds : new Set();
 
     const TYPE_ORDER   = ['bright', 'animal', 'ribbon', 'plain'];
     const TYPE_SYMBOLS = { bright: '★', animal: '♦', ribbon: '║', plain: '□' };
@@ -777,7 +777,7 @@ export class GameScene extends Phaser.Scene {
           const rowCards = group.slice(rowStart, rowStart + ROW_MAX);
           const rowW     = rowCards.length * (OV_W + OV_GAP) - OV_GAP;
           const startX   = Math.round(cx - rowW / 2 + OV_W / 2);
-          const spentIds = run.scoringMode === 'additive' ? this._round.spentCardIds : null;
+          const spentIds = (run.scoringMode === 'capture' || run.scoringMode === 'additive') ? this._round.spentCardIds : null;
           for (let j = 0; j < rowCards.length; j++) {
             const img = this.add.image(startX + j * (OV_W + OV_GAP), Math.round(y + OV_H / 2), rowCards[j].id)
               .setScale(OV_SCALE).setDepth(20);

@@ -1213,6 +1213,16 @@ export default class GameRoundManager {
 
       if (newYaku.length > 0) this._pushPenaltyActive = false;
 
+      // Spend the minimum qualifying cards for each newly triggered yaku so they
+      // disappear from the capture fan and appear in the banked pile.
+      if (newYaku.length > 0) {
+        const unspent = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
+        for (const yaku of newYaku) {
+          const yakuCards = this._selectAdditiveYakuCards(yaku.name, unspent);
+          for (const card of yakuCards) this._spentCardIds.add(card.id);
+        }
+      }
+
       // Round ends when hand is empty (no play counter in capture mode).
       const roundOver = this._hand.isEmpty();
       const penaltyApplied = roundOver && this._pushPenaltyActive && !this._dogProtection;
