@@ -11,6 +11,7 @@ export class BootScene extends Phaser.Scene {
     for (const [id, path] of Object.entries(cardImageMap)) {
       this.load.image(id, path);
     }
+    this.load.image('card_back', 'assets/card_back.png');
   }
 
   create() {
