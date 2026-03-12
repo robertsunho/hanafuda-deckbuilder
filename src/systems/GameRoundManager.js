@@ -1214,12 +1214,17 @@ export default class GameRoundManager {
 
     // ── CAPTURE MODE ──────────────────────────────────────────────────────────
     if (run.scoringMode === 'capture') {
-      const newYaku = yakuForDiff.filter(y => {
+      // Diff against unspent cards only — spent cards must not re-trigger yaku.
+      const unspentForDiff = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
+      const yakuFromUnspent = this._scoring.evaluate(unspentForDiff, run.yakuUpgrades, CAPTURE_YAKU_THRESHOLDS);
+      console.log('[finalize] turn:', this._turn, 'phase:', this._phase, 'yakuBefore:', [...this._yakuBeforeTurn.keys()]);
+
+      const newYaku = yakuFromUnspent.filter(y => {
         const prev = this._yakuBeforeTurn.get(y.name);
         return prev === undefined || y.bonus - prev > 0.3;
       });
-      this._yakuBeforeTurn = new Map(yakuForDiff.map(y => [y.name, y.bonus]));
-      logger.logYakuState(yakuForDiff, newYaku);
+      this._yakuBeforeTurn = new Map(yakuFromUnspent.map(y => [y.name, y.bonus]));
+      logger.logYakuState(yakuFromUnspent, newYaku);
 
       if (newYaku.length > 0) this._pushPenaltyActive = false;
 
@@ -1231,6 +1236,12 @@ export default class GameRoundManager {
           const yakuCards = this._selectAdditiveYakuCards(yaku.name, unspent);
           for (const card of yakuCards) this._spentCardIds.add(card.id);
         }
+        // Update snapshot to post-spend state so same yaku can't re-trigger next turn.
+        const unspentAfterSpend = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
+        this._yakuBeforeTurn = new Map(
+          this._scoring.evaluate(unspentAfterSpend, run.yakuUpgrades, CAPTURE_YAKU_THRESHOLDS)
+            .map(y => [y.name, y.bonus])
+        );
       }
 
       // Round ends when hand is empty (no play counter in capture mode).
