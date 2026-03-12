@@ -58,7 +58,7 @@ import logger           from "./GameplayLogger.js";
 
 // ── Capture mode yaku thresholds ────────────────────────────────────────────
 // Higher thresholds gate push decisions in capture scoring mode.
-const CAPTURE_YAKU_THRESHOLDS = { kasu: 8, tanzaku: 4, tane: 4, hikari: 2 };
+const CAPTURE_YAKU_THRESHOLDS = { kasu: 6, tanzaku: 3, tane: 3, hikari: 2 };
 
 export default class GameRoundManager {
 
