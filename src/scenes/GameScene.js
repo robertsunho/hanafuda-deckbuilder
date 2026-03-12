@@ -91,9 +91,9 @@ const CONS_CARD_W  = Math.round(CARD_W * CARD_SCALE);          // 64
 const CONS_CARD_H  = Math.round(CARD_H * CARD_SCALE);          // 104
 const CONS_SLOT_W  = CONS_CARD_W * 3 + 16;                     // 208
 const CONS_SLOT_H  = CONS_CARD_H + 8;                          // 112
-const CONS_SLOT_X  = 1036 - CONS_SLOT_W / 2;                   // 932 — right edge at x=1036
+const CONS_SLOT_X  = 1024 - CONS_SLOT_W / 2;                   // 920 — right edge at x=1024, 12px gap from divider
 const CONS_SLOT_Y  = SPIRIT_Y;                                 // 62 — aligned with spirit row
-const CONS_BASE_X  = Math.round(CONS_SLOT_X - CONS_SLOT_W / 2 + CONS_CARD_W / 2 + 8);  // 868
+const CONS_BASE_X  = Math.round(CONS_SLOT_X - CONS_SLOT_W / 2 + CONS_CARD_W / 2 + 8);  // 856
 const CONS_BASE_Y  = CONS_SLOT_Y;
 const MAX_CONSUMABLE_SLOTS = 3;
 
@@ -234,8 +234,7 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5, 0.5).setRotation(-Math.PI / 2);
 
     // ── Consumable slot — rectangle outline + vertical label ──────────────
-    this.add.rectangle(CONS_SLOT_X, CONS_SLOT_Y, CONS_SLOT_W, CONS_SLOT_H, 0x0a1628)
-      .setStrokeStyle(1, 0x1e2d40);
+    this._addRoundedRect(CONS_SLOT_X, CONS_SLOT_Y, CONS_SLOT_W, CONS_SLOT_H, 6, 0x0a1628, 1, 0x1e2d40);
     this.add.text(CONS_SLOT_X - CONS_SLOT_W / 2 - 14, CONS_SLOT_Y, 'CONSUMABLES', {
       fontSize: '10px', color: '#556677',
     }).setOrigin(0.5, 0.5).setRotation(-Math.PI / 2);
@@ -346,7 +345,7 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < 8; i++) {
       const { x, y } = SLOT_POSITIONS[i];
       this._fieldObjs.push(
-        this.add.rectangle(x, y, SLOT_BG_W, SLOT_BG_H, 0x0a1628)
+        this._addRoundedRect(x, y, SLOT_BG_W, SLOT_BG_H, 6, 0x0a1628)
       );
     }
 
@@ -410,8 +409,7 @@ export class GameScene extends Phaser.Scene {
 
       if (!spirit) {
         this._spiritObjs.push(
-          this.add.rectangle(x, y, SPIRIT_W, SPIRIT_H, 0x0a1628)
-            .setStrokeStyle(1, 0x1e2d40)
+          this._addRoundedRect(x, y, SPIRIT_W, SPIRIT_H, 6, 0x0a1628, 1, 0x1e2d40)
         );
         continue;
       }
@@ -419,8 +417,7 @@ export class GameScene extends Phaser.Scene {
       const rarityCol = RARITY_COLOR[spirit.rarity] ?? RARITY_COLOR.common;
 
       // Card background.
-      const card = this.add.rectangle(x, y, SPIRIT_W, SPIRIT_H, 0x0d1b2a)
-        .setStrokeStyle(1, rarityCol);
+      const card = this._addRoundedRect(x, y, SPIRIT_W, SPIRIT_H, 6, 0x0d1b2a, 1, rarityCol);
       this._spiritObjs.push(card);
 
       // Rarity left-border strip.
@@ -449,7 +446,10 @@ export class GameScene extends Phaser.Scene {
       ).setOrigin(0.5, 0).setDepth(42).setVisible(false);
       this._spiritObjs.push(tooltip);
 
-      card.setInteractive();
+      card.setInteractive(
+        new Phaser.Geom.Rectangle(x - SPIRIT_W / 2, y - SPIRIT_H / 2, SPIRIT_W, SPIRIT_H),
+        Phaser.Geom.Rectangle.Contains
+      );
       card.on('pointerover', () => {
         const captured = this._round.capture.getAll();
         const contrib  = this._getSpiritContrib(spirit, captured);
@@ -458,6 +458,24 @@ export class GameScene extends Phaser.Scene {
       });
       card.on('pointerout', () => tooltip.setVisible(false));
     }
+  }
+
+  /**
+   * Draw a rounded rectangle using Graphics and return it.
+   * All slot/card-holder rectangles use this instead of this.add.rectangle()
+   * so they get consistent rounded corners.
+   */
+  _addRoundedRect(x, y, w, h, radius, fillColor, fillAlpha = 1, strokeColor, strokeWidth = 1) {
+    const gfx = this.add.graphics();
+    if (fillColor !== undefined) {
+      gfx.fillStyle(fillColor, fillAlpha);
+      gfx.fillRoundedRect(x - w / 2, y - h / 2, w, h, radius);
+    }
+    if (strokeColor !== undefined) {
+      gfx.lineStyle(strokeWidth, strokeColor, 1);
+      gfx.strokeRoundedRect(x - w / 2, y - h / 2, w, h, radius);
+    }
+    return gfx;
   }
 
   /**
@@ -606,8 +624,7 @@ export class GameScene extends Phaser.Scene {
       );
     } else {
       this._captureObjs.push(
-        this.add.rectangle(BANKED_X, BANKED_Y, CARD_W + 4, CARD_H + 4, 0x0a1628)
-          .setStrokeStyle(1, 0x1e2d40)
+        this._addRoundedRect(BANKED_X, BANKED_Y, CARD_W + 4, CARD_H + 4, 6, 0x0a1628, 1, 0x1e2d40)
       );
     }
 
@@ -634,8 +651,7 @@ export class GameScene extends Phaser.Scene {
       );
     } else {
       this._captureObjs.push(
-        this.add.rectangle(DISCARD_X, DISCARD_Y, CARD_W + 4, CARD_H + 4, 0x0a1628)
-          .setStrokeStyle(1, 0x1e2d40)
+        this._addRoundedRect(DISCARD_X, DISCARD_Y, CARD_W + 4, CARD_H + 4, 6, 0x0a1628, 1, 0x1e2d40)
       );
     }
   }
@@ -664,8 +680,7 @@ export class GameScene extends Phaser.Scene {
       const rarityCol = RARITY_COLOR[cons.rarity] ?? RARITY_COLOR.common;
 
       // Card background.
-      const card = this.add.rectangle(x, y, CONS_CARD_W, CONS_CARD_H, 0x0d1b2a)
-        .setStrokeStyle(2, selected ? rarityCol : 0x2a3a50)
+      const card = this._addRoundedRect(x, y, CONS_CARD_W, CONS_CARD_H, 6, 0x0d1b2a, 1, selected ? rarityCol : 0x2a3a50, 2)
         .setDepth(depth);
       this._consumableObjs.push(card);
 
@@ -694,7 +709,11 @@ export class GameScene extends Phaser.Scene {
       this._consumableObjs.push(tooltip);
 
       if (idle) {
-        card.setInteractive({ useHandCursor: true });
+        card.setInteractive(
+          new Phaser.Geom.Rectangle(x - CONS_CARD_W / 2, y - CONS_CARD_H / 2, CONS_CARD_W, CONS_CARD_H),
+          Phaser.Geom.Rectangle.Contains
+        );
+        card.input.cursor = 'pointer';
         card.on('pointerover', () => tooltip.setVisible(true));
         card.on('pointerout',  () => tooltip.setVisible(false));
         card.on('pointerdown', () => {
