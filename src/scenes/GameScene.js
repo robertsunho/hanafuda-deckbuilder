@@ -7,32 +7,32 @@ import SpiritEffects         from '../systems/SpiritEffects.js';
 
 // ── Layout constants ───────────────────────────────────────────────────────────
 // Canvas is 1280 × 720.
-// Top bar    (y 0–32):   Horizontal score/game info
-// Left panel (x 0–120):  Spirit column (full portrait) + consumables
-// Center     (x 130–890): Field (hexagonal) + Deck, centred at FIELD_CX = 530
-// Right panel (x 910–1280): Capture fan + pile stacks
-// Bottom     (y 620–720): Hand (centred at HAND_CX = 530)
+// Top        (y 0–114):  Spirit row (horizontal) + info cluster (top-left)
+// Center     (x 130–890): Field (hexagonal) + Deck, centred at FIELD_CX = 500
+// Right panel (x 948–1280): Capture fan + pile stacks
+// Bottom     (y 590–720): Hand (centred at HAND_CX = 500) + consumables (left)
 
 const CARD_W     = 64;    // natural image width  (pixel-art assets 64×104)
 const CARD_H     = 104;   // natural image height
-const CARD_SCALE = 1.0;   // scale to match previous on-screen size
+const CARD_SCALE = 1.0;
 
-// ── Spirit column (left panel, vertical full-portrait) ────────────────────
-const SPIRIT_X         = 62;                           // centre x
-const SPIRIT_TOP       = 44;                           // first slot centre y
-const SPIRIT_STEP      = Math.round(CARD_H * CARD_SCALE) + 6;  // 110 per slot
-const SPIRIT_W         = Math.round(CARD_W * CARD_SCALE);       // 64
-const SPIRIT_H         = Math.round(CARD_H * CARD_SCALE);       // 104
+// ── Spirit row (top, horizontal full-portrait) ────────────────────────────
+const SPIRIT_START_X   = 220;                  // first spirit card centre x
+const SPIRIT_Y         = 62;                   // spirit card centre y
+const SPIRIT_GAP       = 76;                   // x-distance between card centres (64 + 12)
+const SPIRIT_W         = CARD_W * CARD_SCALE;  // 64
+const SPIRIT_H         = CARD_H * CARD_SCALE;  // 104
 const MAX_SPIRIT_SLOTS = RunManager.MAX_SPIRIT_SLOTS;  // 6
 
-// ── Top info bar (y = INFO_Y, single horizontal row) ─────────────────────
-const INFO_Y = 16;
+// ── Info box (top-left corner, clustered vertically) ──────────────────────
+const INFO_X     = 10;
+const INFO_TOP_Y = 14;
 
 // ── Field + Deck (centre) ─────────────────────────────────────────────────
-const FIELD_CX    = 530;
-const FIELD_CY    = 320;
-const FIELD_ROW_H = Math.round(CARD_H * CARD_SCALE) + 40;   // 144
-const FIELD_COL_W = Math.round(CARD_W * CARD_SCALE) + 32;   // 96
+const FIELD_CX    = 500;
+const FIELD_CY    = 340;
+const FIELD_COL_W = Math.round(CARD_W * CARD_SCALE) + 24;  // 88
+const FIELD_ROW_H = Math.round(CARD_H * CARD_SCALE) + 28;  // 132
 
 // Hexagonal arrangement: 3-top / 2-middle (flanking deck) / 3-bottom
 const SLOT_POSITIONS = [
@@ -46,8 +46,8 @@ const SLOT_POSITIONS = [
   { x: FIELD_CX + FIELD_COL_W,        y: FIELD_CY + FIELD_ROW_H },  // F8
 ];
 
-const SLOT_FAN_X = 8;
-const SLOT_FAN_Y = 12;
+const SLOT_FAN_X = 10;
+const SLOT_FAN_Y = 14;
 const SLOT_BG_W  = Math.round(CARD_W * CARD_SCALE) + 8;
 const SLOT_BG_H  = Math.round(CARD_H * CARD_SCALE) + 8;
 
@@ -56,35 +56,35 @@ const DECK_X = FIELD_CX;
 const DECK_Y = FIELD_CY;
 
 // ── Capture fan (right panel, full scale) ─────────────────────────────────
-const CAPTURE_X       = 920;   // left edge of first card in each fan row
-const CAPTURE_TOP_Y   = 55;    // top of first fan row (card top edge)
+const CAPTURE_X       = 960;   // left edge of first card in each fan row
+const CAPTURE_TOP_Y   = 140;   // top of first fan row (card top edge)
 const CAPTURE_OVERLAP = 16;    // horizontal offset per card
 const CAPTURE_ROW_GAP = 6;     // vertical gap between type rows
-const CAPTURE_SCALE   = CARD_SCALE;   // 1.0 — full size
+const CAPTURE_SCALE   = CARD_SCALE;   // 1.0 — full size, no shrinking
 const CAPTURE_CARD_W  = Math.round(CARD_W * CAPTURE_SCALE);   // 64
 const CAPTURE_CARD_H  = Math.round(CARD_H * CAPTURE_SCALE);   // 104
 
-// Pile stacks below the fan
-const CAP_PILE_X = 960;
-const CAP_PILE_Y = 570;
-const DISCARD_X  = 1090;
-const DISCARD_Y  = 570;
+// ── Banked + Discard piles (right side of field, below bottom row) ────────
+const BANKED_X  = Math.round(FIELD_CX + FIELD_COL_W * 1.5 + 20);  // 652
+const BANKED_Y  = FIELD_CY + FIELD_ROW_H;                          // 472
+const DISCARD_X = BANKED_X + CARD_W + 16;                          // 732
+const DISCARD_Y = BANKED_Y;
 
 // ── Hand (bottom centre) ──────────────────────────────────────────────────
-const HAND_CX   = 530;
-const HAND_Y    = 648;
-const HAND_STEP = 78;
+const HAND_CX   = 500;
+const HAND_Y    = 660;
+const HAND_STEP = 72;
 
 // ── Deck-flip animation ───────────────────────────────────────────────────
 const FLIP_X    = FIELD_CX;
 const FLIP_Y    = FIELD_CY;
 const FLIP_HOLD = 800;   // ms
 
-// ── Consumable fan (left panel, below spirits) ────────────────────────────
-const CONS_BASE_X = SPIRIT_X;
-const CONS_BASE_Y = 680;
-const CONS_CARD_W = Math.round(CARD_W * CARD_SCALE);
-const CONS_CARD_H = 76;   // shorter than full card to fit below spirit column
+// ── Consumable fan (bottom-left, below info cluster) ──────────────────────
+const CONS_BASE_X = 75;
+const CONS_BASE_Y = 630;
+const CONS_CARD_W = Math.round(CARD_W * CARD_SCALE);   // 64
+const CONS_CARD_H = Math.round(CARD_H * CARD_SCALE);   // 104
 const MAX_CONSUMABLE_SLOTS = 3;
 
 // ── Rarity colours ────────────────────────────────────────────────────────
@@ -182,55 +182,58 @@ export class GameScene extends Phaser.Scene {
   _buildStaticUI() {
     const labelStyle = { fontSize: '11px', color: '#556677' };
 
-    // ── Top info bar ──────────────────────────────────────────────────────
-    this._actRoundText  = this.add.text(10,   INFO_Y, '', { fontSize: '12px', color: '#445566' }).setOrigin(0, 0.5);
-    this._baseText      = this.add.text(175,  INFO_Y, '', { fontSize: '14px', color: '#aaccee' }).setOrigin(0, 0.5);
-    this._thresholdText = this.add.text(335,  INFO_Y, '', { fontSize: '13px', color: '#667788' }).setOrigin(0, 0.5);
-    this._multiText     = this.add.text(490,  INFO_Y, '', { fontSize: '12px', color: '#ffee88' }).setOrigin(0, 0.5);
-    this._projText      = this.add.text(635,  INFO_Y, '', { fontSize: '12px', color: '#88ddaa' }).setOrigin(0, 0.5);
-    this._turnText      = this.add.text(770,  INFO_Y, '', { fontSize: '12px', color: '#556677' }).setOrigin(0, 0.5);
-    this._playsText     = this.add.text(860,  INFO_Y, '', { fontSize: '12px', color: '#556677' }).setOrigin(0, 0.5);
-    this._discardsText  = this.add.text(960,  INFO_Y, '', { fontSize: '12px', color: '#556677' }).setOrigin(0, 0.5);
-    this._kiText        = this.add.text(1270, INFO_Y, '', { fontSize: '13px', color: '#ffee88' }).setOrigin(1, 0.5);
+    // ── Top-left info cluster (stacked vertically) ────────────────────────
+    let infoY = INFO_TOP_Y;
+    this._actRoundText  = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#445566' });
+    infoY += 18;
+    this._baseText      = this.add.text(INFO_X, infoY, '', { fontSize: '14px', color: '#aaccee' });
+    infoY += 18;
+    this._thresholdText = this.add.text(INFO_X, infoY, '', { fontSize: '13px', color: '#667788' });
+    infoY += 20;
+    this._multiText     = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#ffee88' });
+    infoY += 16;
+    this._projText      = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#88ddaa' });
+    infoY += 18;
+    this._turnText      = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#556677' });
+    infoY += 16;
+    this._playsText     = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#556677' });
+    infoY += 16;
+    this._discardsText  = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#556677' });
 
-    // Horizontal divider below info bar.
-    this.add.rectangle(640, 32, 1280, 1, 0x2a3a50);
+    // Ki — top right corner
+    this._kiText = this.add.text(1270, 14, '', { fontSize: '13px', color: '#ffee88' }).setOrigin(1, 0);
 
-    // ── Status text (centre, between info bar and field) ──────────────────
-    this._statusText = this.add.text(FIELD_CX, 36, '', {
+    // ── Status text (below spirit row) ────────────────────────────────────
+    this._statusText = this.add.text(FIELD_CX, SPIRIT_Y + SPIRIT_H / 2 + 6, '', {
       fontSize: '14px', color: '#e8e8e8',
       stroke: '#0a0f1e', strokeThickness: 3,
     }).setOrigin(0.5, 0);
 
-    // ── Yaku Guide button (right of info bar) ─────────────────────────────
-    const guideBtn = this.add.rectangle(1210, INFO_Y, 26, 20, 0x1a3550)
+    // ── Yaku Guide button (top right) ─────────────────────────────────────
+    const guideBtn = this.add.rectangle(1210, 14, 26, 20, 0x1a3550)
       .setStrokeStyle(1, 0x3a6080).setInteractive({ useHandCursor: true });
     guideBtn.on('pointerover',  () => guideBtn.setFillStyle(0x2a5a80));
     guideBtn.on('pointerout',   () => guideBtn.setFillStyle(0x1a3550));
     guideBtn.on('pointerdown',  () => this._showYakuGuide());
-    this.add.text(1210, INFO_Y, '?', { fontSize: '13px', color: '#aaccee' }).setOrigin(0.5);
+    this.add.text(1210, 14, '?', { fontSize: '13px', color: '#aaccee' }).setOrigin(0.5);
 
-    // ── Left panel divider ────────────────────────────────────────────────
-    this.add.rectangle(SPIRIT_X + SPIRIT_W / 2 + 8, 380, 1, 720, 0x1e2d40);
-
-    // ── Consumables label (below spirit column) ───────────────────────────
-    const consLabelY = SPIRIT_TOP + (MAX_SPIRIT_SLOTS - 1) * SPIRIT_STEP + SPIRIT_H / 2 + 8;
-    this.add.rectangle(SPIRIT_X, consLabelY + 2, SPIRIT_W + 10, 1, 0x1e2d40);
-    this.add.text(SPIRIT_X, consLabelY + 6, 'CONSUMABLES', labelStyle).setOrigin(0.5, 0);
+    // ── Consumables label (bottom-left, above consumable fan) ─────────────
+    this.add.text(CONS_BASE_X, CONS_BASE_Y - CONS_CARD_H / 2 - 10, 'CONSUMABLES', labelStyle)
+      .setOrigin(0.5, 1);
 
     // ── Deck pile (centre field, rotated 90°) ─────────────────────────────
     this._deckSprite = this.add.image(DECK_X, DECK_Y, 'card_back')
       .setScale(CARD_SCALE).setRotation(Math.PI / 2);
-    this._deckCountText = this.add.text(DECK_X + 62, DECK_Y, '32', {
+    this._deckCountText = this.add.text(DECK_X, DECK_Y + 42, '32', {
       fontSize: '16px', color: '#aaccee', stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0, 0.5);
+    }).setOrigin(0.5, 0);
 
-    // ── Right panel divider ───────────────────────────────────────────────
+    // ── Right panel divider + label ───────────────────────────────────────
     this.add.rectangle(CAPTURE_X - 12, 380, 1, 720, 0x1e2d40);
-    this.add.text(CAPTURE_X + 90, 38, 'CAPTURES', labelStyle).setOrigin(0.5, 0);
+    this.add.text(CAPTURE_X + 90, 120, 'CAPTURES', labelStyle).setOrigin(0.5, 1);
 
     // ── Hand / field divider ──────────────────────────────────────────────
-    this.add.rectangle(640, 592, 1280, 1, 0x2a3a50);
+    this.add.rectangle(640, 590, 1280, 1, 0x2a3a50);
   }
 
   // ── Master render ──────────────────────────────────────────────────────────
@@ -364,15 +367,15 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // ── Spirit column (left panel, vertical full-portrait) ───────────────────
+  // ── Spirit row (top, horizontal full-portrait) ───────────────────────────
 
   _renderSpiritColumn() {
     const spirits = run.spirits;
 
     for (let i = 0; i < MAX_SPIRIT_SLOTS; i++) {
       const spirit = spirits[i];
-      const x      = SPIRIT_X;
-      const y      = SPIRIT_TOP + i * SPIRIT_STEP;
+      const x      = SPIRIT_START_X + i * SPIRIT_GAP;
+      const y      = SPIRIT_Y;
 
       if (!spirit) {
         this._spiritObjs.push(
@@ -386,7 +389,7 @@ export class GameScene extends Phaser.Scene {
 
       // Card background.
       const card = this.add.rectangle(x, y, SPIRIT_W, SPIRIT_H, 0x0d1b2a)
-        .setStrokeStyle(1, 0x2a3a50);
+        .setStrokeStyle(1, rarityCol);
       this._spiritObjs.push(card);
 
       // Rarity left-border strip.
@@ -394,21 +397,25 @@ export class GameScene extends Phaser.Scene {
         this.add.rectangle(x - SPIRIT_W / 2 + 2, y, 4, SPIRIT_H - 4, rarityCol)
       );
 
-      // Name label (centred on card).
+      // Name label (centred on card, small font to fit portrait width).
       this._spiritObjs.push(
-        this.add.text(x, y, spirit.name, { fontSize: '11px', color: '#cce0ff' }).setOrigin(0.5)
+        this.add.text(x, y, spirit.name, {
+          fontSize: '9px', color: '#cce0ff',
+          wordWrap: { width: SPIRIT_W - 8 },
+          align: 'center',
+        }).setOrigin(0.5)
       );
 
-      // Hover tooltip — to the RIGHT of the card.
+      // Hover tooltip — appears BELOW the card.
       const tooltip = this.add.text(
-        x + SPIRIT_W / 2 + 8, y, '',
+        x, y + SPIRIT_H / 2 + 4, '',
         {
           fontSize: '11px', color: '#e8e8e8',
           backgroundColor: '#0a0f1e',
           padding: { x: 6, y: 4 },
-          wordWrap: { width: 180 },
+          wordWrap: { width: 200 },
         }
-      ).setOrigin(0, 0.5).setDepth(42).setVisible(false);
+      ).setOrigin(0.5, 0).setDepth(42).setVisible(false);
       this._spiritObjs.push(tooltip);
 
       card.setInteractive();
@@ -543,59 +550,59 @@ export class GameScene extends Phaser.Scene {
       fanY += CAPTURE_CARD_H + CAPTURE_ROW_GAP;
     }
 
-    // ── Banked pile stack (scored yaku cards only) ─────────────────────────
-    const bankedCards = capturedCards.filter(c => spentIds.has(c.id));
-    const bankedCount = bankedCards.length;
-    const PILE_LABEL_Y = CAP_PILE_Y - CAPTURE_CARD_H / 2 - 8;
-    const PILE_COUNT_Y = CAP_PILE_Y + CAPTURE_CARD_H / 2 + 4;
+    // ── Banked pile (scored yaku cards only, right side of field) ─────────
+    const bankedCards  = capturedCards.filter(c => spentIds.has(c.id));
+    const bankedCount  = bankedCards.length;
+    const pileTopY     = BANKED_Y - CARD_H / 2 - 12;
+    const pileBottomY  = BANKED_Y + CARD_H / 2 + 4;
     this._captureObjs.push(
-      this.add.text(CAP_PILE_X, PILE_LABEL_Y, 'BANKED', {
+      this.add.text(BANKED_X, pileTopY, 'BANKED', {
         fontSize: '10px', color: '#556677',
       }).setOrigin(0.5, 1)
     );
     if (bankedCount > 0) {
       const capTop = bankedCards[bankedCount - 1];
-      const capSpr = this.add.image(CAP_PILE_X, CAP_PILE_Y, capTop.id)
+      const capSpr = this.add.image(BANKED_X, BANKED_Y, capTop.id)
         .setScale(CARD_SCALE).setInteractive({ useHandCursor: true });
-      capSpr.on('pointerover', () => capSpr.setTint(TINT_HOVER));
+      capSpr.on('pointerover', () => capSpr.setTint(0x88aacc));
       capSpr.on('pointerout',  () => capSpr.clearTint());
       capSpr.on('pointerdown', () => this._showCaptureOverlay());
       this._captureObjs.push(capSpr);
       this._captureObjs.push(
-        this.add.text(CAP_PILE_X, PILE_COUNT_Y, `×${bankedCount}`, {
-          fontSize: '13px', color: '#aaccee', stroke: '#000000', strokeThickness: 2,
+        this.add.text(BANKED_X, pileBottomY, `×${bankedCount}`, {
+          fontSize: '12px', color: '#88ff88', stroke: '#000000', strokeThickness: 2,
         }).setOrigin(0.5, 0)
       );
     } else {
       this._captureObjs.push(
-        this.add.rectangle(CAP_PILE_X, CAP_PILE_Y, CAPTURE_CARD_W, CAPTURE_CARD_H, 0x0a1628)
+        this.add.rectangle(BANKED_X, BANKED_Y, CARD_W + 4, CARD_H + 4, 0x0a1628)
           .setStrokeStyle(1, 0x1e2d40)
       );
     }
 
-    // ── Discard pile stack ─────────────────────────────────────────────────
+    // ── Discard pile ───────────────────────────────────────────────────────
     const discardCount = discards.length;
     this._captureObjs.push(
-      this.add.text(DISCARD_X, PILE_LABEL_Y, 'DISCARD', {
+      this.add.text(DISCARD_X, pileTopY, 'DISCARD', {
         fontSize: '10px', color: '#556677',
       }).setOrigin(0.5, 1)
     );
     if (discardCount > 0) {
       const dTop = discards[discardCount - 1];
-      const dSpr = this.add.image(DISCARD_X, CAP_PILE_Y, dTop.id)
+      const dSpr = this.add.image(DISCARD_X, DISCARD_Y, dTop.id)
         .setScale(CARD_SCALE).setTint(0x886655).setInteractive({ useHandCursor: true });
       dSpr.on('pointerover', () => dSpr.setTint(TINT_HOVER));
       dSpr.on('pointerout',  () => dSpr.setTint(0x886655));
       dSpr.on('pointerdown', () => this._showDiscardOverlay());
       this._captureObjs.push(dSpr);
       this._captureObjs.push(
-        this.add.text(DISCARD_X, PILE_COUNT_Y, `×${discardCount}`, {
-          fontSize: '13px', color: '#cc6666', stroke: '#000000', strokeThickness: 2,
+        this.add.text(DISCARD_X, pileBottomY, `×${discardCount}`, {
+          fontSize: '12px', color: '#cc6666', stroke: '#000000', strokeThickness: 2,
         }).setOrigin(0.5, 0)
       );
     } else {
       this._captureObjs.push(
-        this.add.rectangle(DISCARD_X, CAP_PILE_Y, CAPTURE_CARD_W, CAPTURE_CARD_H, 0x0a1628)
+        this.add.rectangle(DISCARD_X, DISCARD_Y, CARD_W + 4, CARD_H + 4, 0x0a1628)
           .setStrokeStyle(1, 0x1e2d40)
       );
     }
