@@ -873,15 +873,16 @@ export default class GameRoundManager {
    */
   _selectAdditiveYakuCards(yakuName, unspentCards) {
     const isFireCard = c => c.enhancement?.element === 'fire';
+    const t = run.scoringMode === 'capture' ? CAPTURE_YAKU_THRESHOLDS : { kasu: 5, tanzaku: 3, tane: 3, hikari: 2 };
     switch (yakuName) {
       case 'Kasu':
-        return unspentCards.filter(c => c.type === 'plain'  || isFireCard(c)).slice(0, 5);
+        return unspentCards.filter(c => c.type === 'plain'  || isFireCard(c)).slice(0, t.kasu);
       case 'Tanzaku':
-        return unspentCards.filter(c => c.type === 'ribbon' || isFireCard(c)).slice(0, 3);
+        return unspentCards.filter(c => c.type === 'ribbon' || isFireCard(c)).slice(0, t.tanzaku);
       case 'Tane':
-        return unspentCards.filter(c => c.type === 'animal' || isFireCard(c)).slice(0, 3);
+        return unspentCards.filter(c => c.type === 'animal' || isFireCard(c)).slice(0, t.tane);
       case 'Hikari':
-        return unspentCards.filter(c => c.type === 'bright' || isFireCard(c)).slice(0, 2);
+        return unspentCards.filter(c => c.type === 'bright' || isFireCard(c)).slice(0, t.hikari);
       default:
         return [];
     }
