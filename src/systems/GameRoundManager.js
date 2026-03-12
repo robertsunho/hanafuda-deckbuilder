@@ -668,6 +668,12 @@ export default class GameRoundManager {
       const dealCount = this._getNextPushDealCount();
       const handCount = Math.min(dealCount, this._deck.drawPileSize);
       if (handCount > 0) this._hand.add(this._deck.draw(handCount));
+      // Re-snapshot yaku using only unspent cards so spent yaku can re-trigger.
+      const unspentAfterPush = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
+      this._yakuBeforeTurn = new Map(
+        this._scoring.evaluate(unspentAfterPush, run.yakuUpgrades, CAPTURE_YAKU_THRESHOLDS)
+          .map(y => [y.name, y.bonus])
+      );
       this._phase = "idle";
       const nextEscalation = 1.0 + this._pushCount * 0.3;
       return {
@@ -1019,6 +1025,7 @@ export default class GameRoundManager {
       const captureScore   = Math.round(capturePoints * (1 + additiveMult) * multMult * flow * pushEscalation);
 
       this._runningScore += captureScore;
+      console.log('[capture] cards:', cards.length, 'capturePoints:', capturePoints, 'captureScore:', captureScore, 'runningTotal:', this._runningScore);
 
       this._scoringEvents.push({
         type: 'capture', cards, capturePoints, additiveMult, multMult,
@@ -1227,6 +1234,7 @@ export default class GameRoundManager {
       // Round ends when hand is empty (no play counter in capture mode).
       const roundOver = this._hand.isEmpty();
       const penaltyApplied = roundOver && this._pushPenaltyActive && !this._dogProtection;
+      console.log('[capture penalty]', this._pushCount, this._pushPenaltyActive, this._runningScore);
 
       if (roundOver && penaltyApplied) {
         const PENALTY_RATES = [0.3, 0.5, 0.7, 0.9];
