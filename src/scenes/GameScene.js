@@ -42,8 +42,8 @@ const SLOT_POSITIONS = [
   { x: FIELD_CX - FIELD_COL_W,        y: FIELD_CY - FIELD_ROW_H },  // F1
   { x: FIELD_CX,                      y: FIELD_CY - FIELD_ROW_H },  // F2
   { x: FIELD_CX + FIELD_COL_W,        y: FIELD_CY - FIELD_ROW_H },  // F3
-  { x: FIELD_CX - FIELD_COL_W * 2,     y: FIELD_CY               },  // F4 (left)
-  { x: FIELD_CX + FIELD_COL_W * 2,     y: FIELD_CY               },  // F5 (right)
+  { x: FIELD_CX - FIELD_COL_W * 1.75,  y: FIELD_CY               },  // F4 (left)
+  { x: FIELD_CX + FIELD_COL_W * 1.75,  y: FIELD_CY               },  // F5 (right)
   { x: FIELD_CX - FIELD_COL_W,        y: FIELD_CY + FIELD_ROW_H },  // F6
   { x: FIELD_CX,                      y: FIELD_CY + FIELD_ROW_H },  // F7
   { x: FIELD_CX + FIELD_COL_W,        y: FIELD_CY + FIELD_ROW_H },  // F8
@@ -86,11 +86,15 @@ const FLIP_X    = FIELD_CX;
 const FLIP_Y    = FIELD_CY;
 const FLIP_HOLD = 800;   // ms
 
-// ── Consumable fan (bottom-left, below info cluster) ──────────────────────
-const CONS_BASE_X = 75;
-const CONS_BASE_Y = 340;
-const CONS_CARD_W = Math.round(CARD_W * CARD_SCALE);   // 64
-const CONS_CARD_H = Math.round(CARD_H * CARD_SCALE);   // 104
+// ── Consumable slot (left panel, rectangular outline) ─────────────────────
+const CONS_CARD_W  = Math.round(CARD_W * CARD_SCALE);       // 64
+const CONS_CARD_H  = Math.round(CARD_H * CARD_SCALE);       // 104
+const CONS_SLOT_W  = CONS_CARD_W * 3 + 16;                  // 208
+const CONS_SLOT_H  = CONS_CARD_H + 8;                       // 112
+const CONS_SLOT_X  = INFO_X + CONS_SLOT_W / 2;              // 114
+const CONS_SLOT_Y  = 380;
+const CONS_BASE_X  = Math.round(CONS_SLOT_X - CONS_SLOT_W / 2 + CONS_CARD_W / 2 + 8);  // 50
+const CONS_BASE_Y  = CONS_SLOT_Y;                           // 380
 const MAX_CONSUMABLE_SLOTS = 3;
 
 // ── Rarity colours ────────────────────────────────────────────────────────
@@ -224,8 +228,17 @@ export class GameScene extends Phaser.Scene {
     guideBtn.on('pointerdown',  () => this._showYakuGuide());
     this.add.text(1210, 14, '?', { fontSize: '13px', color: '#aaccee' }).setOrigin(0.5);
 
-    // ── Consumables label (left panel, above consumable fan) ─────────────
-    this.add.text(INFO_X, CONS_BASE_Y - 20, 'CONSUMABLES', labelStyle).setOrigin(0, 1);
+    // ── Spirits row — vertical label to the left of first card ───────────
+    this.add.text(SPIRIT_START_X - SPIRIT_W / 2 - 14, SPIRIT_Y, 'SPIRITS', {
+      fontSize: '10px', color: '#556677',
+    }).setOrigin(0.5, 0.5).setRotation(-Math.PI / 2);
+
+    // ── Consumable slot — rectangle outline + vertical label ──────────────
+    this.add.rectangle(CONS_SLOT_X, CONS_SLOT_Y, CONS_SLOT_W, CONS_SLOT_H, 0x0a1628)
+      .setStrokeStyle(1, 0x1e2d40);
+    this.add.text(CONS_SLOT_X - CONS_SLOT_W / 2 - 14, CONS_SLOT_Y, 'CONSUMABLES', {
+      fontSize: '10px', color: '#556677',
+    }).setOrigin(0.5, 0.5).setRotation(-Math.PI / 2);
 
     // ── Deck pile (centre field, rotated 90°) ─────────────────────────────
     this._deckSprite = this.add.image(DECK_X, DECK_Y, 'card_back')
