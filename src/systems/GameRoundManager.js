@@ -352,6 +352,9 @@ export default class GameRoundManager {
     this._eventCount    = 0;
     this._spentCardIds  = new Set();
 
+    // ── Empty-slot play tracking (for Fix D/E capture rules) ─────────────
+    this._lastHandPlayToEmptySlot = null;
+
     this._hand.add(this._deck.draw(GameRoundManager.HAND_SIZE));
 
     // Auto-capture any month where the opening hand holds all 4 cards.
@@ -442,6 +445,14 @@ export default class GameRoundManager {
         this._allDiscards.push(card);
         this._discardCount++;
       }
+    }
+
+    // Track whether the play went to an empty slot (no field match, no capture,
+    // no discard) — used in _doDeckPhase for Fix D/E capture rules.
+    if (!handResult.matched && !handResult.captured && !handResult.discarded) {
+      this._lastHandPlayToEmptySlot = { cards, month: cards[0].month };
+    } else {
+      this._lastHandPlayToEmptySlot = null;
     }
 
     this._phase = "awaiting_deck";
@@ -608,8 +619,8 @@ export default class GameRoundManager {
     const handCount  = Math.min(targetHand, this._deck.drawPileSize, this._hand.availableSlots);
     if (handCount > 0) this._hand.add(this._deck.draw(handCount));
 
-    // Fewer plays available with each successive push.
-    this._playsRemaining    = Math.max(2, GameRoundManager.PLAYS_PER_ROUND - this._pushCount);
+    // Fewer plays available with each successive push (floor is 1, not 2).
+    this._playsRemaining    = Math.max(1, GameRoundManager.PLAYS_PER_ROUND - this._pushCount);
     this._discardsRemaining = GameRoundManager.MAX_DISCARDS;
     this._phase = "idle";
 
@@ -993,17 +1004,49 @@ export default class GameRoundManager {
         }
       }
     } else {
-      // No pending match — deck card simply goes to the field.
-      const flipResult = this._field.addFlippedCard(deckCard);
-      if (flipResult.captured) {
-        this._addCapture(flipResult.captured);
+      // No pending match — deck card goes to the field.
+      // Fix D: 1 hand card played to empty slot + flip is same month → capture pair.
+      if (this._lastHandPlayToEmptySlot?.cards.length === 1 &&
+          deckCard.month === this._lastHandPlayToEmptySlot.month) {
+        const handCard = this._lastHandPlayToEmptySlot.cards[0];
+        this._field.removeCardById(handCard.id);
+        this._addCapture([handCard, deckCard]);
         _flipResult   = 'capture';
-        _flipCaptures = flipResult.captured;
-      } else if (flipResult.discarded) {
-        this._discardedThisTurn.push(deckCard);
-        this._allDiscards.push(deckCard);
-        this._discardCount++;
-        _flipResult = 'field_discard';
+        _flipCaptures = [handCard, deckCard];
+      // Fix E: 2 hand cards played to empty slot + flip is different month → capture the pair.
+      } else if (this._lastHandPlayToEmptySlot?.cards.length === 2 &&
+                 deckCard.month !== this._lastHandPlayToEmptySlot.month) {
+        const handCards = this._lastHandPlayToEmptySlot.cards;
+        for (const hc of handCards) this._field.removeCardById(hc.id);
+        this._addCapture(handCards);
+        _flipCaptures = [...handCards];
+        // Still place the flip card on the field normally.
+        const flipResult = this._field.addFlippedCard(deckCard);
+        if (flipResult.captured) {
+          this._addCapture(flipResult.captured);
+          _flipResult   = 'capture';
+          _flipCaptures = [..._flipCaptures, ...flipResult.captured];
+        } else if (flipResult.discarded) {
+          this._discardedThisTurn.push(deckCard);
+          this._allDiscards.push(deckCard);
+          this._discardCount++;
+          _flipResult = 'field_discard';
+        } else {
+          _flipResult = 'capture'; // hand pair captured even if flip just placed
+        }
+      } else {
+        // Standard: deck card simply goes to the field.
+        const flipResult = this._field.addFlippedCard(deckCard);
+        if (flipResult.captured) {
+          this._addCapture(flipResult.captured);
+          _flipResult   = 'capture';
+          _flipCaptures = flipResult.captured;
+        } else if (flipResult.discarded) {
+          this._discardedThisTurn.push(deckCard);
+          this._allDiscards.push(deckCard);
+          this._discardCount++;
+          _flipResult = 'field_discard';
+        }
       }
     }
 

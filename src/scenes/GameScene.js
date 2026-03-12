@@ -550,9 +550,10 @@ export class GameScene extends Phaser.Scene {
     const TYPE_SYMBOLS = { bright: '★', animal: '♦', ribbon: '║', plain: '□' };
     const TYPE_COLORS  = { bright: '#ffee88', animal: '#88ccff', ribbon: '#ff8888', plain: '#aaaaaa' };
 
-    // Group by type (fire cards count as plain for fan purposes).
+    // Group by type — exclude spent cards (they appear in the banked pile only).
+    const fanCards = capturedCards.filter(c => !spentIds.has(c.id));
     const byType = { bright: [], animal: [], ribbon: [], plain: [] };
-    for (const card of capturedCards) {
+    for (const card of fanCards) {
       const t = card.enhancement?.element === 'fire' ? 'plain' : card.type;
       (byType[t] ?? byType['plain']).push(card);
     }
@@ -573,7 +574,6 @@ export class GameScene extends Phaser.Scene {
       for (let i = 0; i < cards.length; i++) {
         const img = this.add.image(CAPTURE_X + i * CAPTURE_OVERLAP, fanY, cards[i].id)
           .setScale(CAPTURE_SCALE).setOrigin(0, 0);
-        if (spentIds.has(cards[i].id)) img.setTint(0x334455).setAlpha(0.5);
         this._captureObjs.push(img);
       }
 
@@ -1812,8 +1812,11 @@ export class GameScene extends Phaser.Scene {
       this._renderAll();
     });
     this._overlayObjs.push(pushBtn);
+    const nextMult    = (1.0 + (this._round.eventCount + 1) * 0.3).toFixed(1);
+    const PENALTY_RATES_PUSH = [0.3, 0.5, 0.7, 0.9];
+    const penaltyPct  = Math.round(PENALTY_RATES_PUSH[Math.min(this._round.pushCount, 3)] * 100);
     this._overlayObjs.push(
-      this.add.text(cx + 118, btnY, `Push  (risk flow \xD7${result.nextFailFlow.toFixed(2)})`, {
+      this.add.text(cx + 118, btnY, `Push  \xD7${nextMult} | -${penaltyPct}%`, {
         fontSize: '14px', color: '#ffffff',
       }).setOrigin(0.5).setDepth(25)
     );
