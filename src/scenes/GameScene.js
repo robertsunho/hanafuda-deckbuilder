@@ -21,7 +21,7 @@ const PLAY_CENTER_X = Math.round((155 + 1036) / 2);  // 596
 
 // ── Spirit row (top, horizontal full-portrait) ────────────────────────────
 const SPIRIT_GAP       = 76;                          // x-distance between card centres (64 + 12)
-const SPIRIT_START_X   = Math.round(PLAY_CENTER_X - 2.5 * SPIRIT_GAP);  // 406
+const SPIRIT_START_X   = 220;                          // flush left — 6 spirits span x=220 to x=600
 const SPIRIT_Y         = 62;                          // spirit card centre y
 const SPIRIT_W         = CARD_W * CARD_SCALE;  // 64
 const SPIRIT_H         = CARD_H * CARD_SCALE;  // 104
@@ -69,9 +69,9 @@ const CAPTURE_CARD_H  = Math.round(CARD_H * CAPTURE_SCALE);   // 104
 
 // ── Banked + Discard piles (bottom-right corner, flush with hand row) ────
 const BANKED_X  = 1140;
-const BANKED_Y  = 680;   // below horizontal divider, label sits above at y≈618
+const BANKED_Y  = 660;   // same vertical centre as hand cards — card bottom at 712, within canvas
 const DISCARD_X = 1240;
-const DISCARD_Y = 680;
+const DISCARD_Y = 660;
 
 // ── Hand (bottom centre) ──────────────────────────────────────────────────
 const HAND_CX   = PLAY_CENTER_X;  // 596 — same axis as field and spirits
@@ -85,7 +85,7 @@ const FLIP_HOLD = 800;   // ms
 
 // ── Consumable fan (bottom-left, below info cluster) ──────────────────────
 const CONS_BASE_X = 75;
-const CONS_BASE_Y = 630;
+const CONS_BASE_Y = 340;
 const CONS_CARD_W = Math.round(CARD_W * CARD_SCALE);   // 64
 const CONS_CARD_H = Math.round(CARD_H * CARD_SCALE);   // 104
 const MAX_CONSUMABLE_SLOTS = 3;
@@ -221,9 +221,8 @@ export class GameScene extends Phaser.Scene {
     guideBtn.on('pointerdown',  () => this._showYakuGuide());
     this.add.text(1210, 14, '?', { fontSize: '13px', color: '#aaccee' }).setOrigin(0.5);
 
-    // ── Consumables label (bottom-left, above consumable fan) ─────────────
-    this.add.text(CONS_BASE_X, CONS_BASE_Y - CONS_CARD_H / 2 - 10, 'CONSUMABLES', labelStyle)
-      .setOrigin(0.5, 1);
+    // ── Consumables label (left panel, above consumable fan) ─────────────
+    this.add.text(INFO_X, CONS_BASE_Y - 20, 'CONSUMABLES', labelStyle).setOrigin(0, 1);
 
     // ── Deck pile (centre field, rotated 90°) ─────────────────────────────
     this._deckSprite = this.add.image(DECK_X, DECK_Y, 'card_back')
@@ -242,7 +241,7 @@ export class GameScene extends Phaser.Scene {
     this.add.rectangle(155, 360, 1, 720, 0x2a3a50);
 
     // ── Hand / field divider ──────────────────────────────────────────────
-    this.add.rectangle(640, 580, 1280, 1, 0x2a3a50);
+    this.add.rectangle(640, 570, 1280, 1, 0x2a3a50);
   }
 
   // ── Master render ──────────────────────────────────────────────────────────
