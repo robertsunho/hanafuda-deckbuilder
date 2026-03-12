@@ -433,8 +433,11 @@ export default class GameRoundManager {
 
     // Snapshot active yaku (name → bonus) so _finalizeTurn() can diff.
     const _snapThresholds = run.scoringMode === 'capture' ? CAPTURE_YAKU_THRESHOLDS : null;
+    const _snapCards = run.scoringMode === 'capture'
+      ? this._capture.getAll().filter(c => !this._spentCardIds.has(c.id))
+      : this._capture.getAll();
     this._yakuBeforeTurn = new Map(
-      this._scoring.evaluate(this._capture.getAll(), run.yakuUpgrades, _snapThresholds).map(y => [y.name, y.bonus])
+      this._scoring.evaluate(_snapCards, run.yakuUpgrades, _snapThresholds).map(y => [y.name, y.bonus])
     );
 
     this._discardedThisTurn = [];   // reset each turn
