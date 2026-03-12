@@ -1002,23 +1002,25 @@ export class GameScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(5)
     );
 
-    const discardsLeft    = this._round.discardsRemaining;
-    const discardEnabled  = discardsLeft > 0;
-    const discardBtn = this.add.rectangle(HAND_CX + 90, y, 160, 40,
-      discardEnabled ? 0x6a3a1a : 0x2a1a0a)
-      .setStrokeStyle(2, discardEnabled ? 0xaa7744 : 0x443322).setDepth(5);
-    if (discardEnabled) {
-      discardBtn.setInteractive({ useHandCursor: true });
-      discardBtn.on('pointerover',  () => discardBtn.setFillStyle(0x9a5a2a));
-      discardBtn.on('pointerout',   () => discardBtn.setFillStyle(0x6a3a1a));
-      discardBtn.on('pointerdown',  () => this._onDiscardButton());
+    if (run.scoringMode !== 'capture') {
+      const discardsLeft    = this._round.discardsRemaining;
+      const discardEnabled  = discardsLeft > 0;
+      const discardBtn = this.add.rectangle(HAND_CX + 90, y, 160, 40,
+        discardEnabled ? 0x6a3a1a : 0x2a1a0a)
+        .setStrokeStyle(2, discardEnabled ? 0xaa7744 : 0x443322).setDepth(5);
+      if (discardEnabled) {
+        discardBtn.setInteractive({ useHandCursor: true });
+        discardBtn.on('pointerover',  () => discardBtn.setFillStyle(0x9a5a2a));
+        discardBtn.on('pointerout',   () => discardBtn.setFillStyle(0x6a3a1a));
+        discardBtn.on('pointerdown',  () => this._onDiscardButton());
+      }
+      this._actionBtnObjs.push(discardBtn);
+      this._actionBtnObjs.push(
+        this.add.text(HAND_CX + 90, y, `Discard (${discardsLeft} left)`, {
+          fontSize: '15px', color: discardEnabled ? '#ffffff' : '#554433',
+        }).setOrigin(0.5).setDepth(5)
+      );
     }
-    this._actionBtnObjs.push(discardBtn);
-    this._actionBtnObjs.push(
-      this.add.text(HAND_CX + 90, y, `Discard (${discardsLeft} left)`, {
-        fontSize: '15px', color: discardEnabled ? '#ffffff' : '#554433',
-      }).setOrigin(0.5).setDepth(5)
-    );
   }
 
   // ── Three Marks (in-round targeting) ──────────────────────────────────────
@@ -1346,7 +1348,15 @@ export class GameScene extends Phaser.Scene {
 
     const drawSize = this._round.deck.drawPileSize;
 
-    if (run.scoringMode === 'additive') {
+    if (run.scoringMode === 'capture') {
+      const runScore = this._round.runningScore;
+      const thr      = run.threshold;
+      this._baseText.setStyle({ color: runScore >= thr ? '#44ff88' : '#aaccee' })
+        .setText(`Running: ${runScore}`);
+      const escal = (1.0 + this._round.pushCount * 0.3).toFixed(1);
+      this._multiText.setText(`\xD7${escal} escalation`);
+      this._projText.setText('');
+    } else if (run.scoringMode === 'additive') {
       const runScore = this._round.runningScore;
       const thr      = run.threshold;
       this._baseText.setStyle({ color: runScore >= thr ? '#44ff88' : '#aaccee' })
@@ -1374,8 +1384,13 @@ export class GameScene extends Phaser.Scene {
 
     this._thresholdText.setText(`Target: ${run.threshold}`);
     this._turnText.setText(`Turn: ${this._round.turn}`);
-    this._playsText.setText(`Plays: ${this._round.playsRemaining}`);
-    this._discardsText.setText(`Discards: ${this._round.discardsRemaining}`);
+    if (run.scoringMode === 'capture') {
+      this._playsText.setText(`Cards: ${this._round.hand.getAll().length}`);
+      this._discardsText.setText('');
+    } else {
+      this._playsText.setText(`Plays: ${this._round.playsRemaining}`);
+      this._discardsText.setText(`Discards: ${this._round.discardsRemaining}`);
+    }
     this._actRoundText.setText(`Act ${run.act}  R${run.round}/18`);
     this._kiText.setText(`Ki: ${run.ki}`);
 
@@ -1397,9 +1412,9 @@ export class GameScene extends Phaser.Scene {
     // Compute threshold and ki reward before any state changes.
     const tr       = run.checkThreshold(result.finalScore);
     const kiEarned = run.calculateKiReward(result, tr.threshold);
-    // Surplus ki bonus for display (additive mode only).
+    // Surplus ki bonus for display (capture + additive modes).
     let surplusKiBonus = 0;
-    if (run.scoringMode === 'additive' && tr.passed) {
+    if ((run.scoringMode === 'capture' || run.scoringMode === 'additive') && tr.passed) {
       const surplusRatio = (result.finalScore - tr.threshold) / tr.threshold;
       if      (surplusRatio >= 3.0) surplusKiBonus = 3;
       else if (surplusRatio >= 2.0) surplusKiBonus = 2;
@@ -1433,7 +1448,59 @@ export class GameScene extends Phaser.Scene {
     // ── Score breakdown ───────────────────────────────────────────────────
     let y = cy - 204;
 
-    if (run.scoringMode === 'additive') {
+    if (run.scoringMode === 'capture') {
+      // Capture mode: show capture event summary.
+      const events = this._round.scoringEvents;
+      if (events.length === 0) {
+        this._overlayObjs.push(
+          this.add.text(cx, y, 'No captures this round.', {
+            fontSize: '15px', color: '#778899',
+          }).setOrigin(0.5)
+        );
+        y += 24;
+      } else {
+        this._overlayObjs.push(
+          this.add.text(cx, y, `Captures  (${events.length} total)`, {
+            fontSize: '14px', color: '#778899',
+          }).setOrigin(0.5)
+        );
+        y += 20;
+        const displayEvents = events.slice(-6);
+        if (events.length > 6) {
+          this._overlayObjs.push(
+            this.add.text(cx, y, `\u2026 and ${events.length - 6} earlier captures`, {
+              fontSize: '12px', color: '#556677',
+            }).setOrigin(0.5)
+          );
+          y += 16;
+        }
+        for (const ev of displayEvents) {
+          const esc  = (ev.pushEscalation ?? 1.0).toFixed(1);
+          const tags = ev.cards.map(c => c.type[0].toUpperCase()).join('');
+          const line = `[${tags}]  ${ev.capturePoints}pt \xD7${esc} \u2192 +${ev.captureScore}`;
+          this._overlayObjs.push(
+            this.add.text(cx, y, line, { fontSize: '13px', color: '#cce0ff' }).setOrigin(0.5)
+          );
+          y += 18;
+        }
+      }
+      y += 6;
+      if (result.penaltyApplied) {
+        this._overlayObjs.push(
+          this.add.text(cx, y, '\u26A0 Push penalty applied — score reduced', {
+            fontSize: '13px', color: '#ff8866',
+          }).setOrigin(0.5)
+        );
+        y += 20;
+      }
+      this._overlayObjs.push(
+        this.add.text(cx, y, `Final Score: ${result.finalScore}`, {
+          fontSize: '24px', color: '#ffffff', stroke: '#000000', strokeThickness: 3,
+        }).setOrigin(0.5)
+      );
+      y += 32;
+
+    } else if (run.scoringMode === 'additive') {
       // Additive mode: show per-event summary from the round manager.
       const events = this._round.scoringEvents;
       if (events.length === 0) {
@@ -1731,6 +1798,99 @@ export class GameScene extends Phaser.Scene {
     this._renderAll();
   }
 
+  // ── Capture yaku overlay ──────────────────────────────────────────────────
+
+  _showCaptureYakuOverlay(result) {
+    this._bankPushOpen = true;
+    this._clearObjs(this._overlayObjs);
+    const cx = FIELD_CX, cy = 270;
+
+    this._overlayObjs.push(
+      this.add.rectangle(cx, cy, 490, 280, 0x080d1a, 0.96)
+        .setStrokeStyle(2, 0x6a9a3a).setDepth(25)
+    );
+    this._overlayObjs.push(
+      this.add.text(cx, cy - 122, 'Yaku Reached!', {
+        fontSize: '20px', color: '#e8c96a', stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(25)
+    );
+
+    let y = cy - 92;
+    for (const yaku of result.newYaku) {
+      this._overlayObjs.push(
+        this.add.text(cx, y, yaku.name, { fontSize: '16px', color: '#ffee88' })
+          .setOrigin(0.5).setDepth(25)
+      );
+      y += 22;
+    }
+    y += 8;
+    this._overlayObjs.push(
+      this.add.text(cx, y, `Running: ${result.runningScore}`, {
+        fontSize: '15px', color: '#88ffcc',
+      }).setOrigin(0.5).setDepth(25)
+    );
+    y += 20;
+    const threshold   = run.threshold;
+    const surplus     = result.runningScore - threshold;
+    const threshColor = surplus >= 0 ? '#88ff88' : '#ff8888';
+    const threshLabel = surplus >= 0
+      ? `Threshold: ${threshold}  (\u2713 +${surplus} surplus)`
+      : `Threshold: ${threshold}  (need ${-surplus} more)`;
+    this._overlayObjs.push(
+      this.add.text(cx, y, threshLabel, { fontSize: '13px', color: threshColor })
+        .setOrigin(0.5).setDepth(25)
+    );
+
+    const btnY = cy + 118;
+
+    const bankLabel = surplus >= 0
+      ? `Bank ${result.runningScore}  (+${surplus})`
+      : `Bank ${result.runningScore}  (need ${-surplus})`;
+    const bankBtn = this.add.rectangle(cx - 118, btnY, 206, 42, 0x1a6a1a)
+      .setStrokeStyle(2, 0x44aa44).setInteractive({ useHandCursor: true }).setDepth(25);
+    bankBtn.on('pointerover', () => bankBtn.setFillStyle(0x2a9a2a));
+    bankBtn.on('pointerout',  () => bankBtn.setFillStyle(0x1a6a1a));
+    bankBtn.on('pointerdown', () => {
+      this._bankPushOpen = false;
+      logger.logBankPushDecision('bank', this._round.pushCount);
+      const bankedResult = this._round.bankScore();
+      this._clearObjs(this._overlayObjs);
+      this._renderAll();
+      this._showEndScreen(bankedResult);
+    });
+    this._overlayObjs.push(bankBtn);
+    this._overlayObjs.push(
+      this.add.text(cx - 118, btnY, bankLabel, {
+        fontSize: '13px', color: '#ffffff',
+      }).setOrigin(0.5).setDepth(25)
+    );
+
+    const pushCount       = this._round.pushCount;
+    const PUSH_DEALS      = [4, 2, 1];
+    const nextDeal        = PUSH_DEALS[Math.min(pushCount, PUSH_DEALS.length - 1)];
+    const PENALTY_RATES   = [0.3, 0.5, 0.7, 0.9];
+    const penaltyPct      = Math.round(PENALTY_RATES[Math.min(pushCount, 3)] * 100);
+    const nextEscalMult   = (1.0 + (pushCount + 1) * 0.3).toFixed(1);
+    const pushBtn = this.add.rectangle(cx + 118, btnY, 206, 42, 0x6a1a1a)
+      .setStrokeStyle(2, 0xaa4444).setInteractive({ useHandCursor: true }).setDepth(25);
+    pushBtn.on('pointerover', () => pushBtn.setFillStyle(0x9a2a2a));
+    pushBtn.on('pointerout',  () => pushBtn.setFillStyle(0x6a1a1a));
+    pushBtn.on('pointerdown', () => {
+      this._bankPushOpen = false;
+      logger.logBankPushDecision('push', this._round.pushCount);
+      this._round.pushOn();
+      this._clearObjs(this._overlayObjs);
+      this._setStatus(`Pushed! +${nextDeal} cards dealt. ×${nextEscalMult} escalation active.`);
+      this._renderAll();
+    });
+    this._overlayObjs.push(pushBtn);
+    this._overlayObjs.push(
+      this.add.text(cx + 118, btnY, `Push +${nextDeal}  ×${nextEscalMult}  -${penaltyPct}%`, {
+        fontSize: '13px', color: '#ffffff',
+      }).setOrigin(0.5).setDepth(25)
+    );
+  }
+
   // ── Additive event overlay ────────────────────────────────────────────────
 
   _showAdditiveEventOverlay(result) {
@@ -1825,6 +1985,10 @@ export class GameScene extends Phaser.Scene {
   // ── Yaku decision overlay ─────────────────────────────────────────────────
 
   _showYakuDecision(result) {
+    if (run.scoringMode === 'capture') {
+      this._showCaptureYakuOverlay(result);
+      return;
+    }
     if (run.scoringMode === 'additive') {
       this._showAdditiveEventOverlay(result);
       return;

@@ -67,15 +67,15 @@ export default class ScoringEngine {
    *                                  Each level adds +0.2 to the base bonus.
    * @returns {{ name: string, bonus: number, count: number, threshold: number }[]}
    */
-  evaluate(capturedCards, upgrades = {}) {
+  evaluate(capturedCards, upgrades = {}, thresholds = null) {
     const results = [];
     const byType  = this._partition(capturedCards);
 
-    this._push(results, this._checkKasu(byType.plain, upgrades));
-    this._push(results, this._checkTanzaku(byType.ribbon, upgrades));
-    this._push(results, this._checkTane(byType.animal, upgrades));
+    this._push(results, this._checkKasu(byType.plain, upgrades, thresholds?.kasu ?? 5));
+    this._push(results, this._checkTanzaku(byType.ribbon, upgrades, thresholds?.tanzaku ?? 3));
+    this._push(results, this._checkTane(byType.animal, upgrades, thresholds?.tane ?? 3));
     // this._push(results, this._checkTsukiNarabi(capturedCards));  // removed
-    this._push(results, this._checkHikari(byType.bright, upgrades));
+    this._push(results, this._checkHikari(byType.bright, upgrades, thresholds?.hikari ?? 2));
 
     return results;
   }
@@ -244,28 +244,28 @@ export default class ScoringEngine {
   /**
    * Kasu — 5+ Plain cards. Flat +0.3 bonus + upgrades.
    */
-  _checkKasu(plains, upgrades = {}) {
-    if (plains.length < 5) return null;
+  _checkKasu(plains, upgrades = {}, threshold = 5) {
+    if (plains.length < threshold) return null;
     const bonus = YAKU_INFO.KASU.baseBonus + (upgrades.kasu ?? 0) * 0.2;
-    return { name: YAKU_INFO.KASU.name, bonus, count: plains.length, threshold: 5 };
+    return { name: YAKU_INFO.KASU.name, bonus, count: plains.length, threshold };
   }
 
   /**
    * Tanzaku — 3+ Ribbon cards. Flat +0.3 bonus + upgrades.
    */
-  _checkTanzaku(ribbons, upgrades = {}) {
-    if (ribbons.length < 3) return null;
+  _checkTanzaku(ribbons, upgrades = {}, threshold = 3) {
+    if (ribbons.length < threshold) return null;
     const bonus = YAKU_INFO.TANZAKU.baseBonus + (upgrades.tanzaku ?? 0) * 0.2;
-    return { name: YAKU_INFO.TANZAKU.name, bonus, count: ribbons.length, threshold: 3 };
+    return { name: YAKU_INFO.TANZAKU.name, bonus, count: ribbons.length, threshold };
   }
 
   /**
    * Tane — 3+ Animal cards. Flat +0.4 bonus + upgrades.
    */
-  _checkTane(animals, upgrades = {}) {
-    if (animals.length < 3) return null;
+  _checkTane(animals, upgrades = {}, threshold = 3) {
+    if (animals.length < threshold) return null;
     const bonus = YAKU_INFO.TANE.baseBonus + (upgrades.tane ?? 0) * 0.2;
-    return { name: YAKU_INFO.TANE.name, bonus, count: animals.length, threshold: 3 };
+    return { name: YAKU_INFO.TANE.name, bonus, count: animals.length, threshold };
   }
 
   /**
@@ -297,12 +297,12 @@ export default class ScoringEngine {
    * All 5 brights (Goko) still scores +0.7 base — no special override.
    * Accepts any captured card with type='bright' (covers promoted cards).
    */
-  _checkHikari(brights, upgrades = {}) {
+  _checkHikari(brights, upgrades = {}, threshold = 2) {
     // brights is already pre-filtered to type='bright' cards by _partition.
     // Original BRIGHT_IDS check is kept for canonical ids; promoted cards
     // that land on a canonical id will also pass.
-    if (brights.length < 2) return null;
+    if (brights.length < threshold) return null;
     const bonus = YAKU_INFO.HIKARI.baseBonus + (upgrades.hikari ?? 0) * 0.2;
-    return { name: YAKU_INFO.HIKARI.name, bonus, count: brights.length, threshold: 2 };
+    return { name: YAKU_INFO.HIKARI.name, bonus, count: brights.length, threshold };
   }
 }

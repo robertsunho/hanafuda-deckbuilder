@@ -56,6 +56,10 @@ import SpiritEffects    from "./SpiritEffects.js";
 import run              from "./RunManager.js";
 import logger           from "./GameplayLogger.js";
 
+// ── Capture mode yaku thresholds ────────────────────────────────────────────
+// Higher thresholds gate push decisions in capture scoring mode.
+const CAPTURE_YAKU_THRESHOLDS = { kasu: 8, tanzaku: 4, tane: 4, hikari: 2 };
+
 export default class GameRoundManager {
 
   // ── Round configuration (adjust freely for playtesting) ────────────────────
@@ -424,12 +428,13 @@ export default class GameRoundManager {
     // Remove all played cards from hand.
     this._hand.removeMany(cardIds);
 
-    // Count this play against the round limit.
-    this._playsRemaining--;
+    // Count this play against the round limit (not used in capture mode).
+    if (run.scoringMode !== 'capture') this._playsRemaining--;
 
     // Snapshot active yaku (name → bonus) so _finalizeTurn() can diff.
+    const _snapThresholds = run.scoringMode === 'capture' ? CAPTURE_YAKU_THRESHOLDS : null;
     this._yakuBeforeTurn = new Map(
-      this._scoring.evaluate(this._capture.getAll(), run.yakuUpgrades).map(y => [y.name, y.bonus])
+      this._scoring.evaluate(this._capture.getAll(), run.yakuUpgrades, _snapThresholds).map(y => [y.name, y.bonus])
     );
 
     this._discardedThisTurn = [];   // reset each turn
@@ -498,6 +503,52 @@ export default class GameRoundManager {
   bankScore() {
     if (this._phase !== "yaku_decision") {
       throw new Error(`bankScore() called while phase is "${this._phase}".`);
+    }
+
+    // ── CAPTURE MODE ──────────────────────────────────────────────────────────
+    if (run.scoringMode === 'capture') {
+      const flow = Math.max(1.0, this._styleBase);
+      const sc = this._scoring.calculateFinalScore(
+        this._capture.getAll(), this._spirits, 1.0, run.yakuUpgrades, true
+      );
+      this._applyPostRoundEnhancements(this._capture.getAll(), sc.metalConsumableCount);
+      logger.logRoundEnd(
+        { finalScore: this._runningScore, basePoints: this._runningScore,
+          boostedBasePoints: this._runningScore, yakuList: [], yakuMult: 1.0,
+          additiveMult: 0, multMult: 1.0, flow,
+          pointBoost: 1.0, rawBasePoints: this._runningScore },
+        run.threshold, this._runningScore >= run.threshold,
+        this._capture.getAll(), this._styleBase,
+        this._style.getTriggeredCombos(), this._lastEnhancementEvents ?? []
+      );
+      this._roundEndingAfterDecision = false;
+      this._phase = "round_over";
+      return {
+        status:          "banked",
+        finalScore:      this._runningScore,
+        runningScore:    this._runningScore,
+        captureEvents:   [...this._scoringEvents],
+        newYaku:         [],
+        allYaku:         [],
+        totalMultiplier: 1.0,
+        basePoints:      this._runningScore,
+        boostedBasePoints: this._runningScore,
+        yakuMult:        1.0,
+        effectiveMult:   1.0,
+        additiveMult:    0,
+        multMult:        1.0,
+        flow,
+        pushEscalation:  1.0 + this._pushCount * 0.3,
+        pointBoost:      1.0,
+        rawBasePoints:   this._runningScore,
+        pushFactor:      1.0,
+        styleBase:       this._styleBase,
+        penaltyApplied:  false,
+        pushCount:       this._pushCount,
+        pigDoubleKi:     this._pigDoubleKi,
+        turn:            this._turn,
+        deckCard:        this._lastDeckCard,
+      };
     }
 
     // ── ADDITIVE MODE ─────────────────────────────────────────────────────────
@@ -609,6 +660,24 @@ export default class GameRoundManager {
     this._roundEndingAfterDecision = false;
     this._pushCount++;
 
+    // ── CAPTURE MODE ──────────────────────────────────────────────────────────
+    if (run.scoringMode === 'capture') {
+      this._atRiskScore       = this._runningScore;
+      this._pushPenaltyActive = true;
+      // Hand cards carry over; deal a fixed number of additional cards.
+      const dealCount = this._getNextPushDealCount();
+      const handCount = Math.min(dealCount, this._deck.drawPileSize, this._hand.availableSlots);
+      if (handCount > 0) this._hand.add(this._deck.draw(handCount));
+      this._phase = "idle";
+      const nextEscalation = 1.0 + this._pushCount * 0.3;
+      return {
+        failedPushFactor: 1.0,
+        failedFlow:       Math.max(1.0, this._styleBase),
+        nextEscalation,
+        dealCount: handCount,
+      };
+    }
+
     const allYaku         = this._scoring.evaluate(this._capture.getAll(), run.yakuUpgrades);
     const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
     this._atRiskScore       = Math.round(this._basePoints * totalMultiplier);
@@ -642,6 +711,9 @@ export default class GameRoundManager {
    * @throws {Error} if no discards remain or called outside the 'idle' phase
    */
   discardCards(cardIds) {
+    if (run.scoringMode === 'capture') {
+      throw new Error('discardCards() is not available in capture scoring mode.');
+    }
     if (this._phase !== "idle") {
       throw new Error(`discardCards() called while phase is "${this._phase}".`);
     }
@@ -815,6 +887,16 @@ export default class GameRoundManager {
     }
   }
 
+  /**
+   * Returns the number of cards to deal on the next push in capture mode.
+   * Push 1: +4, Push 2: +2, Push 3+: +1.
+   */
+  _getNextPushDealCount() {
+    if (this._pushCount === 1) return 4;
+    if (this._pushCount === 2) return 2;
+    return 1;
+  }
+
   // ── Three Marks helpers ────────────────────────────────────────────────────
 
   /**
@@ -890,6 +972,57 @@ export default class GameRoundManager {
     if (run.scoringMode === 'additive') {
       for (const card of cards) this._runningScore += card.points;
       if (cards.length === 4) this._runningScore += 5; // full-month bonus
+    }
+
+    if (run.scoringMode === 'capture') {
+      // Score this capture group immediately.
+      const allCaptured = this._capture.getAll();
+      const allYaku     = this._scoring.evaluate(allCaptured, run.yakuUpgrades, CAPTURE_YAKU_THRESHOLDS);
+
+      // Spirit channels.
+      let additiveMult = 0;
+      let multMult     = 1.0;
+      for (const spirit of this._spirits) {
+        const effect = SpiritEffects.get(spirit.id);
+        if (effect?.getAdditiveMult)
+          additiveMult += effect.getAdditiveMult({ capturedCards: allCaptured, yakuList: allYaku, spirits: this._spirits });
+        if (effect?.getMultMult)
+          multMult *= effect.getMultMult({ capturedCards: allCaptured, yakuList: allYaku, spirits: this._spirits });
+      }
+
+      // Card points — Water mult, Fire override, spirit point boosts.
+      let capturePoints = 0;
+      for (const card of cards) {
+        const enh    = card.enhancement;
+        const isFire = enh?.element === 'fire';
+        let pts = isFire ? (enh.tier === 'upgraded' ? 20 : 10) : card.points;
+        if (!isFire) {
+          for (const spirit of this._spirits) {
+            const effect = SpiritEffects.get(spirit.id);
+            if (effect?.getPointBoosts) {
+              const boosts = effect.getPointBoosts({ capturedCards: allCaptured, spirits: this._spirits });
+              if (boosts?.has(card.id)) pts *= boosts.get(card.id);
+            }
+          }
+        }
+        if (enh?.element === 'water') {
+          const multArr = enh.tier === 'upgraded' ? ICE_MULT : SNOW_MULT;
+          pts = Math.round(pts * multArr[Math.min(enh.depLevel ?? 0, multArr.length - 1)]);
+        }
+        capturePoints += pts;
+      }
+      if (cards.length === 4) capturePoints += 5; // full-month bonus
+
+      const pushEscalation = 1.0 + this._pushCount * 0.3;
+      const flow           = Math.max(1.0, this._styleBase);
+      const captureScore   = Math.round(capturePoints * (1 + additiveMult) * multMult * flow * pushEscalation);
+
+      this._runningScore += captureScore;
+
+      this._scoringEvents.push({
+        type: 'capture', cards, capturePoints, additiveMult, multMult,
+        flow, pushEscalation, captureScore, runningTotal: this._runningScore,
+      });
     }
 
     run.onCardsCaptured(cards);
@@ -1066,7 +1199,86 @@ export default class GameRoundManager {
     this._turn++;
     this._capture.recordTurn();
 
-    const yakuForDiff = this._scoring.evaluate(this._capture.getAll(), run.yakuUpgrades);
+    const _yakuThresholds = run.scoringMode === 'capture' ? CAPTURE_YAKU_THRESHOLDS : null;
+    const yakuForDiff = this._scoring.evaluate(this._capture.getAll(), run.yakuUpgrades, _yakuThresholds);
+
+    // ── CAPTURE MODE ──────────────────────────────────────────────────────────
+    if (run.scoringMode === 'capture') {
+      const newYaku = yakuForDiff.filter(y => {
+        const prev = this._yakuBeforeTurn.get(y.name);
+        return prev === undefined || y.bonus - prev > 0.3;
+      });
+      this._yakuBeforeTurn = new Map(yakuForDiff.map(y => [y.name, y.bonus]));
+      logger.logYakuState(yakuForDiff, newYaku);
+
+      if (newYaku.length > 0) this._pushPenaltyActive = false;
+
+      // Round ends when hand is empty (no play counter in capture mode).
+      const roundOver = this._hand.isEmpty();
+      const penaltyApplied = roundOver && this._pushPenaltyActive && !this._dogProtection;
+
+      if (roundOver && penaltyApplied) {
+        const PENALTY_RATES = [0.3, 0.5, 0.7, 0.9];
+        const rate = PENALTY_RATES[Math.min(this._pushCount - 1, 3)];
+        this._runningScore = Math.round(this._runningScore * (1 - rate));
+      }
+
+      const pushEscalation = 1.0 + this._pushCount * 0.3;
+      const flow           = Math.max(1.0, this._styleBase);
+
+      if (newYaku.length > 0) {
+        this._roundEndingAfterDecision = roundOver;
+        this._phase = "yaku_decision";
+      } else if (roundOver) {
+        const sc = this._scoring.calculateFinalScore(
+          this._capture.getAll(), this._spirits, 1.0, run.yakuUpgrades, true
+        );
+        this._applyPostRoundEnhancements(this._capture.getAll(), sc.metalConsumableCount);
+        logger.logRoundEnd(
+          { finalScore: this._runningScore, basePoints: this._runningScore,
+            boostedBasePoints: this._runningScore, yakuList: [], yakuMult: 1.0,
+            additiveMult: 0, multMult: 1.0, flow,
+            pointBoost: 1.0, rawBasePoints: this._runningScore },
+          run.threshold, this._runningScore >= run.threshold,
+          this._capture.getAll(), this._styleBase,
+          this._style.getTriggeredCombos(), this._lastEnhancementEvents ?? []
+        );
+        this._phase = "round_over";
+      } else {
+        this._phase = "idle";
+      }
+
+      const status = newYaku.length > 0 ? "yaku_decision" : roundOver ? "round_over" : "ok";
+      return {
+        status,
+        newYaku,
+        captureEvents:    [...this._scoringEvents],
+        runningScore:     this._runningScore,
+        allYaku:          yakuForDiff,
+        totalMultiplier:  1.0,
+        basePoints:       this._runningScore,
+        boostedBasePoints: this._runningScore,
+        finalScore:       this._runningScore,
+        yakuMult:         1.0,
+        effectiveMult:    1.0,
+        additiveMult:     0,
+        multMult:         1.0,
+        flow,
+        pushEscalation,
+        pointBoost:       1.0,
+        rawBasePoints:    this._runningScore,
+        pushFactor:       1.0,
+        styleBase:        this._styleBase,
+        penaltyApplied,
+        pushCount:        this._pushCount,
+        pigDoubleKi:      this._pigDoubleKi,
+        nextFailFlow:     Math.max(1.0, this._styleBase),
+        turn:             this._turn,
+        deckCard:         this._lastDeckCard,
+        discarded:        [...this._discardedThisTurn],
+        roundDiscardCount: this._discardCount,
+      };
+    }
 
     // ── ADDITIVE MODE ─────────────────────────────────────────────────────────
     if (run.scoringMode === 'additive') {
@@ -1077,6 +1289,12 @@ export default class GameRoundManager {
       let keepChecking = true;
       while (keepChecking) {
         const unspent   = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
+        console.log('[additive] unspent:', {
+          bright: unspent.filter(c => c.type === 'bright').length,
+          animal: unspent.filter(c => c.type === 'animal').length,
+          ribbon: unspent.filter(c => c.type === 'ribbon').length,
+          plain:  unspent.filter(c => c.type === 'plain').length,
+        });
         const triggered = this._scoring.evaluate(unspent, run.yakuUpgrades);
         if (triggered.length === 0) { keepChecking = false; break; }
         for (const yaku of triggered) {

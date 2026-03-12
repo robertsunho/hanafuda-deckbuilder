@@ -123,8 +123,8 @@ class RunManager {
     this._deck = JSON.parse(JSON.stringify(ALL_CARDS));
 
     // ── Scoring mode ─────────────────────────────────────────────────────────
-    /** @type {'multiplicative'|'additive'} */
-    this._scoringMode = 'additive';
+    /** @type {'multiplicative'|'additive'|'capture'} */
+    this._scoringMode = 'capture';
 
     logger.logRunStart();
   }
