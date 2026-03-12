@@ -666,7 +666,7 @@ export default class GameRoundManager {
       this._pushPenaltyActive = true;
       // Hand cards carry over; deal a fixed number of additional cards.
       const dealCount = this._getNextPushDealCount();
-      const handCount = Math.min(dealCount, this._deck.drawPileSize, this._hand.availableSlots);
+      const handCount = Math.min(dealCount, this._deck.drawPileSize);
       if (handCount > 0) this._hand.add(this._deck.draw(handCount));
       this._phase = "idle";
       const nextEscalation = 1.0 + this._pushCount * 0.3;
