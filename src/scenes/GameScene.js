@@ -175,12 +175,9 @@ export class GameScene extends Phaser.Scene {
   // ── Card-back texture ──────────────────────────────────────────────────────
 
   _createCardBackTexture() {
-    // Compute uniform scale so card_back fits within CARD_W×CARD_H at CARD_SCALE.
+    // Debug: log card_back source dimensions.
     const backTex = this.textures.get('card_back').getSourceImage();
-    this._cardBackScale = Math.min(
-      (CARD_W * CARD_SCALE) / backTex.width,
-      (CARD_H * CARD_SCALE) / backTex.height
-    );
+    console.log('[card_back] source size:', backTex.width, '×', backTex.height);
   }
 
   // ── Static UI ─────────────────────────────────────────────────────────────
@@ -237,7 +234,8 @@ export class GameScene extends Phaser.Scene {
 
     // ── Deck pile (centre field, rotated 90°) ─────────────────────────────
     this._deckSprite = this.add.image(DECK_X, DECK_Y, 'card_back')
-      .setScale(this._cardBackScale).setRotation(Math.PI / 2);
+      .setDisplaySize(CARD_W * CARD_SCALE, CARD_H * CARD_SCALE)
+      .setRotation(Math.PI / 2);
     this._deckCountText = this.add.text(DECK_X, DECK_Y + 42, '32', {
       fontSize: '16px', color: '#aaccee', stroke: '#000000', strokeThickness: 3,
     }).setOrigin(0.5, 0);
