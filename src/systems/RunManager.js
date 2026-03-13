@@ -177,8 +177,9 @@ class RunManager {
     this._ki -= spiritDef.cost;
     const spirit = { id: spiritDef.id, name: spiritDef.name };
     // Initialize persistent state for stateful spirits.
-    if (spiritDef.id === 'kasu_abundance') spirit.state = { plainsCaptured: 0 };
-    if (spiritDef.id === 'tane_wildlife')  spirit.state = { seenAnimals: [] };
+    if (spiritDef.id === 'engine_wildlife')  spirit.state = { seenAnimals: [] };
+    if (spiritDef.id === 'engine_plenty')    spirit.state = { seenPlains: [] };
+    if (spiritDef.id === 'util_irrigation')  spirit.state = { irrigationBonus: 0 };
     this._spirits.push(spirit);
     return { success: true };
   }
@@ -193,14 +194,17 @@ class RunManager {
    */
   onCardsCaptured(newlyCapturedCards) {
     for (const spirit of this._spirits) {
-      if (spirit.id === 'kasu_abundance' && spirit.state) {
-        spirit.state.plainsCaptured +=
-          newlyCapturedCards.filter(c => c.type === 'plain').length;
-      }
-      if (spirit.id === 'tane_wildlife' && spirit.state) {
+      if (spirit.id === 'engine_wildlife' && spirit.state) {
         for (const card of newlyCapturedCards) {
           if (card.type === 'animal' && !spirit.state.seenAnimals.includes(card.id)) {
             spirit.state.seenAnimals.push(card.id);
+          }
+        }
+      }
+      if (spirit.id === 'engine_plenty' && spirit.state) {
+        for (const card of newlyCapturedCards) {
+          if (card.type === 'plain' && !spirit.state.seenPlains.includes(card.id)) {
+            spirit.state.seenPlains.push(card.id);
           }
         }
       }

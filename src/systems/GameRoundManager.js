@@ -1018,7 +1018,7 @@ export default class GameRoundManager {
             const effect = SpiritEffects.get(spirit.id);
             if (effect?.getPointBoosts) {
               const boosts = effect.getPointBoosts({ capturedCards: allCaptured, spirits: this._spirits });
-              if (boosts?.has(card.id)) pts *= boosts.get(card.id);
+              if (boosts?.has(card.id)) pts += boosts.get(card.id);
             }
           }
         }
@@ -1040,6 +1040,32 @@ export default class GameRoundManager {
         type: 'capture', cards, capturePoints, additiveMult, multMult,
         flow, pushEscalation, captureScore, runningTotal: this._runningScore,
       });
+
+      // util_glory: draw 3 cards on any bright capture.
+      for (const spirit of this._spirits) {
+        if (spirit.id === 'util_glory') {
+          const brightCount = cards.filter(c => c.type === 'bright').length;
+          if (brightCount > 0) {
+            const drawN = Math.min(3, this._deck.drawPileSize);
+            const drawn = drawN > 0 ? this._deck.draw(drawN) : [];
+            if (drawn.length > 0) this._hand.add(drawn);
+            if (drawn.length > 0)
+              this._scoringEvents.push({ type: 'glory_draw', count: drawn.length });
+          }
+        }
+      }
+
+      // util_irrigation: +10 pts per plain captured.
+      for (const spirit of this._spirits) {
+        if (spirit.id === 'util_irrigation' && spirit.state) {
+          const plainCount = cards.filter(c => c.type === 'plain').length;
+          if (plainCount > 0) {
+            const bonus = plainCount * 10;
+            spirit.state.irrigationBonus += bonus;
+            this._runningScore += bonus;
+          }
+        }
+      }
     }
 
     run.onCardsCaptured(cards);

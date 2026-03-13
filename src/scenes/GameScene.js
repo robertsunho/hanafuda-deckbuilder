@@ -512,24 +512,18 @@ export class GameScene extends Phaser.Scene {
       const mm = fx.getMultMult({ capturedCards: captured, yakuList: [], spirits });
 
       // Persistent spirits: show underlying state for clarity.
-      if (spirit.id === 'kasu_abundance') {
-        const n = spirit.state?.plainsCaptured ?? 0;
-        lines.push(`Plains this run: ${n}  →  \u00D7${mm.toFixed(2)} mult`);
-      } else if (spirit.id === 'tane_wildlife') {
+      if (spirit.id === 'engine_wildlife') {
         const n = spirit.state?.seenAnimals?.length ?? 0;
         lines.push(`Unique animals: ${n}/9  →  \u00D7${mm.toFixed(2)} mult`);
-      } else if (spirit.id === 'tanzaku_festival') {
-        const RED_WRITING = new Set(['january_ribbon', 'february_ribbon', 'march_ribbon']);
-        const BLUE        = new Set(['june_ribbon', 'september_ribbon', 'october_ribbon']);
-        const ids         = new Set(captured.map(c => c.id));
-        let sg = 0;
-        if ([...RED_WRITING].some(id => ids.has(id))) sg++;
-        if ([...BLUE].some(id => ids.has(id)))        sg++;
-        if (captured.some(c => c.type === 'ribbon' && !RED_WRITING.has(c.id) && !BLUE.has(c.id))) sg++;
-        lines.push(`Ribbon types: ${sg}  →  \u00D7${mm.toFixed(2)} mult`);
-      } else if (spirit.id === 'hikari_radiance') {
+      } else if (spirit.id === 'engine_plenty') {
+        const n = spirit.state?.seenPlains?.length ?? 0;
+        lines.push(`Unique plains: ${n}  →  \u00D7${mm.toFixed(2)} mult`);
+      } else if (spirit.id === 'engine_radiance') {
         const n = captured.filter(c => c.type === 'bright').length;
         lines.push(`Brights: ${n}  →  \u00D7${mm.toFixed(2)} mult`);
+      } else if (spirit.id === 'engine_banner') {
+        const n = captured.filter(c => c.type === 'ribbon').length;
+        lines.push(`Ribbons: ${n}  →  \u00D7${mm.toFixed(2)} mult`);
       } else {
         lines.push(`\u00D7${mm.toFixed(2)} mult`);
       }
