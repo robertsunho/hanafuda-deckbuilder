@@ -233,6 +233,17 @@ class RunManager {
   }
 
   /**
+   * Release a spirit, removing it from the loadout. No ki refund.
+   * @param {number} index
+   * @returns {{ released: object }}
+   * @throws {Error} if the index is out of range.
+   */
+  releaseSpirit(index) {
+    const released = this.removeSpirit(index);
+    return { released };
+  }
+
+  /**
    * Fuse two equipped spirits into one using a known fusion recipe.
    * Removes both input spirits and adds the fused result, freeing one slot.
    * No ki cost — the cost was purchasing both inputs.

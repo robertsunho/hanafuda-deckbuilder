@@ -177,7 +177,7 @@ export class ShrineScene extends Phaser.Scene {
         rowX + col * (slotW + slotGap),
         topCY + row * rowH,
         owned[i] ?? null,
-        slotW, slotH,
+        slotW, slotH, i,
       );
     }
   }
@@ -246,7 +246,7 @@ export class ShrineScene extends Phaser.Scene {
     }
   }
 
-  _drawLoadoutSlot(cx, cy, spirit, w, h) {
+  _drawLoadoutSlot(cx, cy, spirit, w, h, spiritIndex = -1) {
     const borderColor = spirit ? 0x3a6080 : 0x1e2d40;
     this.add.rectangle(cx, cy, w, h, 0x0a1220).setStrokeStyle(1, borderColor);
     if (spirit) {
@@ -261,9 +261,62 @@ export class ShrineScene extends Phaser.Scene {
       this.add.text(cx, cy + 14, badge.label, {
         fontSize: '7px', color: badge.textColor, fontStyle: 'bold',
       }).setOrigin(0.5);
+      // Release "×" button in top-right corner of slot
+      const rel = this.add.text(cx + w / 2 - 7, cy - h / 2 + 7, '\u00D7', {
+        fontSize: '11px', color: '#774444',
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      rel.on('pointerover', () => rel.setColor('#ff6666'));
+      rel.on('pointerout',  () => rel.setColor('#774444'));
+      rel.on('pointerdown', () => this._confirmRelease(spiritIndex, spirit));
     } else {
       this.add.text(cx, cy, '\u2014', { fontSize: '14px', color: '#1e2d40' }).setOrigin(0.5);
     }
+  }
+
+  _confirmRelease(index, spirit) {
+    for (const o of this._confirmObjs) o.destroy();
+    this._confirmObjs = [];
+
+    const cx = 640, cy = 360;
+    const push = obj => { this._confirmObjs.push(obj); return obj; };
+
+    push(this.add.rectangle(cx, cy, 400, 150, 0x0a0f1e, 0.97)
+      .setStrokeStyle(2, 0xaa4444).setDepth(50));
+    push(this.add.text(cx, cy - 44, `Release ${spirit.name}?`, {
+      fontSize: '16px', color: '#ff8888',
+    }).setOrigin(0.5).setDepth(50));
+    push(this.add.text(cx, cy - 22, 'No ki refund. This cannot be undone.', {
+      fontSize: '11px', color: '#887777',
+    }).setOrigin(0.5).setDepth(50));
+
+    const yesBtn = push(this.add.rectangle(cx - 60, cy + 20, 90, 30, 0x6a1a1a)
+      .setStrokeStyle(1, 0xaa4444).setInteractive({ useHandCursor: true }).setDepth(50));
+    yesBtn.on('pointerover', () => yesBtn.setFillStyle(0x8a2a2a));
+    yesBtn.on('pointerout',  () => yesBtn.setFillStyle(0x6a1a1a));
+    yesBtn.on('pointerdown', () => {
+      run.releaseSpirit(index);
+      logger.logShopPurchase('release', spirit.name, 0, 'Spirit released');
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._offering  = this._generateOffering();
+      this._purchased = new Array(this._offering.length).fill(false);
+      this._buildUI();
+    });
+    push(this.add.text(cx - 60, cy + 20, 'Release', {
+      fontSize: '12px', color: '#ff8888',
+    }).setOrigin(0.5).setDepth(50));
+
+    const noBtn = push(this.add.rectangle(cx + 60, cy + 20, 90, 30, 0x1a1a2a)
+      .setStrokeStyle(1, 0x445566).setInteractive({ useHandCursor: true }).setDepth(50));
+    noBtn.on('pointerover', () => noBtn.setFillStyle(0x2a2a4a));
+    noBtn.on('pointerout',  () => noBtn.setFillStyle(0x1a1a2a));
+    noBtn.on('pointerdown', () => {
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+    });
+    push(this.add.text(cx + 60, cy + 20, 'Cancel', {
+      fontSize: '12px', color: '#aaaaaa',
+    }).setOrigin(0.5).setDepth(50));
   }
 
   // ── Right column ──────────────────────────────────────────────────────────
