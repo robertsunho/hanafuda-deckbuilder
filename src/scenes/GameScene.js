@@ -864,6 +864,91 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(20));
   }
 
+  /**
+   * Show a target-picker overlay for zodiac consumables that need a target.
+   * targetType: 'slot' (Ox/Monkey) or 'yaku' (Snake).
+   * On selection, re-executes the consumable with params and removes it from inventory.
+   */
+  _showZodiacTargetPicker(cons, inventoryIndex, targetType) {
+    const objs = [];
+    const cx = FIELD_CX, cy = 360;
+    const W = 400, H = 280;
+
+    const bg = this.add.rectangle(cx, cy, W, H, 0x0a1a2e, 0.95)
+      .setStrokeStyle(2, 0x44cc88).setDepth(25);
+    objs.push(bg);
+    objs.push(this.add.text(cx, cy - H / 2 + 18, `${cons.name} — Pick Target`, {
+      fontSize: '15px', color: '#88ffcc', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(25));
+
+    const cancel = () => {
+      objs.forEach(o => o.destroy());
+      this._renderAll();
+    };
+
+    if (targetType === 'slot') {
+      const slots = this._round.field.getSlots();
+      objs.push(this.add.text(cx, cy - H / 2 + 44, 'Select a field slot:', {
+        fontSize: '13px', color: '#aaaaaa',
+      }).setOrigin(0.5).setDepth(25));
+
+      slots.forEach((slot, i) => {
+        if (!slot) return;
+        const btnY = cy - H / 2 + 70 + i * 28;
+        const lbl = `Slot ${i + 1}: ${slot.cards.map(c => c.name ?? c.id).join(', ')}`;
+        const btn = this.add.rectangle(cx, btnY, 340, 24, 0x1a3a2a)
+          .setStrokeStyle(1, 0x44cc88).setInteractive({ useHandCursor: true }).setDepth(25);
+        btn.on('pointerover', () => btn.setFillStyle(0x2a5a3a));
+        btn.on('pointerout',  () => btn.setFillStyle(0x1a3a2a));
+        btn.on('pointerdown', () => {
+          objs.forEach(o => o.destroy());
+          const result = this._round.useConsumable(cons, { slotIndex: i });
+          run.useConsumable(inventoryIndex);
+          this._setStatus(result.message ?? `Used ${cons.name}.`);
+          this._renderAll();
+          this._updateInfoTexts();
+        });
+        objs.push(btn);
+        objs.push(this.add.text(cx, btnY, lbl, { fontSize: '12px', color: '#ccddcc' }).setOrigin(0.5).setDepth(25));
+      });
+
+    } else if (targetType === 'yaku') {
+      const YAKU_NAMES = ['Kasu', 'Tanzaku', 'Tane', 'Hikari'];
+      objs.push(this.add.text(cx, cy - H / 2 + 44, 'Select a yaku to lower threshold:', {
+        fontSize: '13px', color: '#aaaaaa',
+      }).setOrigin(0.5).setDepth(25));
+
+      YAKU_NAMES.forEach((yakuName, i) => {
+        const btnY = cy - H / 2 + 70 + i * 36;
+        const btn = this.add.rectangle(cx, btnY, 260, 28, 0x2a1a3a)
+          .setStrokeStyle(1, 0xaa44cc).setInteractive({ useHandCursor: true }).setDepth(25);
+        btn.on('pointerover', () => btn.setFillStyle(0x3a2a5a));
+        btn.on('pointerout',  () => btn.setFillStyle(0x2a1a3a));
+        btn.on('pointerdown', () => {
+          objs.forEach(o => o.destroy());
+          const result = this._round.useConsumable(cons, { yakuName });
+          run.useConsumable(inventoryIndex);
+          this._setStatus(result.message ?? `Used ${cons.name}.`);
+          this._renderAll();
+          this._updateInfoTexts();
+        });
+        objs.push(btn);
+        objs.push(this.add.text(cx, btnY, yakuName, { fontSize: '13px', color: '#ddaaff' }).setOrigin(0.5).setDepth(25));
+      });
+    }
+
+    // Cancel button
+    const cancelBtn = this.add.rectangle(cx, cy + H / 2 - 22, 100, 28, 0x3a1a1a)
+      .setStrokeStyle(1, 0xff6666).setInteractive({ useHandCursor: true }).setDepth(25);
+    cancelBtn.on('pointerover', () => cancelBtn.setFillStyle(0x5a2a2a));
+    cancelBtn.on('pointerout',  () => cancelBtn.setFillStyle(0x3a1a1a));
+    cancelBtn.on('pointerdown', cancel);
+    objs.push(cancelBtn);
+    objs.push(this.add.text(cx, cy + H / 2 - 22, 'Cancel', {
+      fontSize: '13px', color: '#ffaaaa',
+    }).setOrigin(0.5).setDepth(25));
+  }
+
   // ── Card selection ─────────────────────────────────────────────────────────
 
   _toggleCardSelection(cardId) {
@@ -935,7 +1020,8 @@ export class GameScene extends Phaser.Scene {
         const isMark    = cons.id && (cons.id.startsWith('mark_') || cons.id.startsWith('element_'));
         const btnLabel  = isMark ? `Activate: ${cons.name}` : `Use: ${cons.name}`;
 
-        const useBtn = this.add.rectangle(HAND_CX, y, 210, 40, 0x1a2a5a)
+        const useBtnX = isMark ? HAND_CX : HAND_CX - 60;
+        const useBtn = this.add.rectangle(useBtnX, y, isMark ? 210 : 160, 40, 0x1a2a5a)
           .setStrokeStyle(2, 0x4466cc).setInteractive({ useHandCursor: true }).setDepth(5);
         useBtn.on('pointerover',  () => useBtn.setFillStyle(0x2a4a8a));
         useBtn.on('pointerout',   () => useBtn.setFillStyle(0x1a2a5a));
@@ -944,28 +1030,58 @@ export class GameScene extends Phaser.Scene {
             this._activateMark(cons, this._selectedConsumableIndex);
             this._selectedConsumableIndex = null;
           } else {
-            const idx    = this._selectedConsumableIndex;
-            const result = this._round.useConsumable(cons);
-            this._selectedConsumableIndex = null;
-            run.useConsumable(idx);
-            this._clearObjs(this._consumableObjs);
-            this._clearObjs(this._actionBtnObjs);
-            if (result.revealedCards) {
-              this._showRoosterOverlay(result.revealedCards, result.message);
+            const idx = this._selectedConsumableIndex;
+            // Check if this consumable needs a target before executing.
+            const precheck = this._round.useConsumable(cons, {});
+            if (!precheck.success && precheck.needsTarget) {
+              this._selectedConsumableIndex = null;
+              this._showZodiacTargetPicker(cons, idx, precheck.needsTarget);
             } else {
-              this._setStatus(result.message ?? `Used ${cons.name}.`);
+              this._selectedConsumableIndex = null;
+              run.useConsumable(idx);
+              this._clearObjs(this._consumableObjs);
+              this._clearObjs(this._actionBtnObjs);
+              if (precheck.revealedCards) {
+                this._showRoosterOverlay(precheck.revealedCards, precheck.message);
+              } else {
+                this._setStatus(precheck.message ?? `Used ${cons.name}.`);
+              }
+              this._renderConsumables();
+              this._renderActionButtons();
+              this._updateInfoTexts();
             }
-            this._renderConsumables();
-            this._renderActionButtons();
-            this._updateInfoTexts();
           }
         });
         this._actionBtnObjs.push(useBtn);
         this._actionBtnObjs.push(
-          this.add.text(HAND_CX, y, btnLabel, {
+          this.add.text(useBtnX, y, btnLabel, {
             fontSize: '15px', color: '#aaddff',
           }).setOrigin(0.5).setDepth(5)
         );
+
+        // Sell button for zodiac consumables (50% refund).
+        if (!isMark && cons.id.startsWith('zodiac_')) {
+          const sellBtn = this.add.rectangle(HAND_CX + 70, y, 100, 40, 0x3a1a1a)
+            .setStrokeStyle(2, 0xff6666).setInteractive({ useHandCursor: true }).setDepth(5);
+          sellBtn.on('pointerover', () => sellBtn.setFillStyle(0x5a2a2a));
+          sellBtn.on('pointerout',  () => sellBtn.setFillStyle(0x3a1a1a));
+          sellBtn.on('pointerdown', () => {
+            const idx = this._selectedConsumableIndex;
+            const sr  = run.sellConsumable(idx);
+            this._selectedConsumableIndex = null;
+            this._clearObjs(this._consumableObjs);
+            this._clearObjs(this._actionBtnObjs);
+            this._setStatus(`Sold ${cons.name}. +${sr.kiReturned} ki.`);
+            this._renderConsumables();
+            this._renderActionButtons();
+            this._updateInfoTexts();
+          });
+          this._actionBtnObjs.push(sellBtn);
+          this._actionBtnObjs.push(
+            this.add.text(HAND_CX + 70, y, 'Sell', { fontSize: '15px', color: '#ff8888' })
+              .setOrigin(0.5).setDepth(5)
+          );
+        }
       }
       return;
     }

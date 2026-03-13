@@ -21,6 +21,7 @@ import { getAvailableFusions }                  from '../data/fusionRecipes.js';
 import { THREE_MARKS, WUXING_CONSUMABLES,
          getElementDef }                        from '../data/consumables.js';
 import { RIBBON_STAMPS, getRibbonStampDef }    from '../data/ribbonStamps.js';
+import { ZODIAC_CONSUMABLES }                  from '../data/zodiacConsumables.js';
 import logger                                   from '../systems/GameplayLogger.js';
 
 // ── Channel badge display ──────────────────────────────────────────────────────
@@ -54,10 +55,11 @@ export class ShrineScene extends Phaser.Scene {
 
   create() {
     const { isGrove } = this.scene.settings.data || {};
-    this._isGrove     = isGrove ?? false;
-    this._offering    = this._generateOffering();
-    this._purchased   = new Array(this._offering.length).fill(false);
-    this._confirmObjs = [];
+    this._isGrove       = isGrove ?? false;
+    this._offering      = this._generateOffering();
+    this._purchased     = new Array(this._offering.length).fill(false);
+    this._zodiacOffering = this._generateZodiacOffering();
+    this._confirmObjs   = [];
     this._buildUI();
   }
 
@@ -73,6 +75,11 @@ export class ShrineScene extends Phaser.Scene {
       s => s.tier === 1 && !ownedIds.has(s.id)
     );
     return [...pool].sort(() => Math.random() - 0.5).slice(0, 3);
+  }
+
+  /** Pick 3 random zodiac consumables to offer in the shop this visit. */
+  _generateZodiacOffering() {
+    return [...ZODIAC_CONSUMABLES].sort(() => Math.random() - 0.5).slice(0, 3);
   }
 
   // ── UI construction ──────────────────────────────────────────────────────
@@ -326,12 +333,14 @@ export class ShrineScene extends Phaser.Scene {
     let topY = HEADER_H + 6;
 
     // Fixed-height sections
-    this._drawConsumablesSection(RCX, topY, 220);
-    topY += 220;
+    this._drawConsumablesSection(RCX, topY, 200);
+    topY += 200;
+    this._drawZodiacSection(RCX, topY, 130);
+    topY += 130;
     this._drawWuXingForgeSection(RCX, topY, 80);
     topY += 80;
-    this._drawRibbonStampsSection(RCX, topY, 120);
-    topY += 120;
+    this._drawRibbonStampsSection(RCX, topY, 40);
+    topY += 40;
 
     if (this._isGrove) {
       const remaining = BTN_Y - 38 - topY;
@@ -657,6 +666,70 @@ export class ShrineScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(51));
   }
 
+  // ── Zodiac Items section ──────────────────────────────────────────────────
+
+  _drawZodiacSection(cx, topY, height) {
+    this.add.text(cx, topY + 4, 'Zodiac Items', {
+      fontSize: '15px', color: '#ffdd88',
+    }).setOrigin(0.5, 0);
+    this.add.text(cx, topY + 22, 'Tactical consumables for use in rounds', {
+      fontSize: '10px', color: '#334455',
+    }).setOrigin(0.5, 0);
+
+    const offers  = this._zodiacOffering;
+    const tileW   = 182;
+    const tileH   = height - 36;
+    const tileGap = 8;
+    const totalW  = offers.length * tileW + (offers.length - 1) * tileGap;
+    const startX  = cx - totalW / 2 + tileW / 2;
+    const tileY   = topY + 34 + tileH / 2;
+
+    const CATEGORY_COLOR = {
+      hand: '#88ddcc', field: '#88ccee', yaku: '#ddaaff', ki: '#ffdd88',
+    };
+
+    for (let i = 0; i < offers.length; i++) {
+      const def    = offers[i];
+      const x      = startX + i * (tileW + tileGap);
+      const canBuy = run.canAddConsumable && run.ki >= def.cost;
+      const color  = CATEGORY_COLOR[def.category] ?? '#cccccc';
+
+      this.add.rectangle(x, tileY, tileW, tileH, canBuy ? 0x1a1500 : 0x0e0e0a)
+        .setStrokeStyle(1, canBuy ? 0x554400 : 0x1a1a2a);
+
+      this.add.text(x, tileY - tileH / 2 + 6, def.name, {
+        fontSize: '12px', color, fontStyle: 'bold',
+      }).setOrigin(0.5, 0);
+
+      this.add.text(x, tileY - tileH / 2 + 22, def.description, {
+        fontSize: '9px', color: '#445566',
+        wordWrap: { width: tileW - 10 }, align: 'center',
+      }).setOrigin(0.5, 0);
+
+      const btnY2  = tileY + tileH / 2 - 14;
+      const inv    = !run.canAddConsumable;
+      const btnLbl = inv ? 'Inv Full' : !canBuy ? `${def.cost}ki` : `Buy  ${def.cost}ki`;
+      const btnClr = canBuy ? color : '#334455';
+      const btn    = this.add.rectangle(x, btnY2, tileW - 10, 20, canBuy ? 0x1a1200 : 0x0a0a0a)
+        .setStrokeStyle(1, canBuy ? 0x554400 : 0x1a1a2a);
+      this.add.text(x, btnY2, btnLbl, { fontSize: '10px', color: btnClr }).setOrigin(0.5);
+
+      if (canBuy) {
+        btn.setInteractive({ useHandCursor: true });
+        btn.on('pointerover', () => btn.setFillStyle(0x2a2000));
+        btn.on('pointerout',  () => btn.setFillStyle(0x1a1200));
+        btn.on('pointerdown', () => {
+          const result = run.buyConsumable(def.id);
+          if (result.success) {
+            logger.logConsumableUse(def.name, 'purchased');
+            this._zodiacOffering = this._zodiacOffering.filter(d => d.id !== def.id);
+            this._buildUI();
+          }
+        });
+      }
+    }
+  }
+
   // ── Wu Xing Forge section ─────────────────────────────────────────────────
 
   _drawWuXingForgeSection(cx, topY, height) {
@@ -721,6 +794,31 @@ export class ShrineScene extends Phaser.Scene {
   // ── Ribbon Stamps section ─────────────────────────────────────────────────
 
   _drawRibbonStampsSection(cx, topY, height) {
+    // Compact mode (height ≤ 40px): single row of mini buttons, no tile cards.
+    if (height <= 40) {
+      this.add.text(cx - 280, topY + 10, 'Ribbon Stamps:', {
+        fontSize: '11px', color: '#ddaacc',
+      }).setOrigin(0, 0.5);
+      const stamps = Object.values(RIBBON_STAMPS);
+      stamps.forEach((stamp, i) => {
+        const x = cx - 100 + i * 78;
+        const afford = run.ki >= stamp.cost;
+        const btn = this.add.rectangle(x, topY + 10, 72, 22, afford ? 0x1a1020 : 0x0a0a0a)
+          .setStrokeStyle(1, afford ? stamp.hexColor * 0.4 : 0x1a1a2a);
+        this.add.text(x, topY + 10, `${stamp.name.split(' ')[0]}  ${stamp.cost}ki`, {
+          fontSize: '9px', color: afford ? stamp.color : '#334455',
+        }).setOrigin(0.5);
+        if (afford) {
+          btn.setInteractive({ useHandCursor: true });
+          btn.on('pointerover', () => btn.setFillStyle(0x2a1830));
+          btn.on('pointerout',  () => btn.setFillStyle(0x1a1020));
+          btn.on('pointerdown', () => this._showStampCardSelector(stamp));
+        }
+      });
+      return;
+    }
+
+    // Full-size mode (height > 40px)
     this.add.text(cx, topY + 4, 'Ribbon Stamps', {
       fontSize: '15px', color: '#ddaacc',
     }).setOrigin(0.5, 0);

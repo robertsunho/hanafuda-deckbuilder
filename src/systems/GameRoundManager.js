@@ -56,10 +56,6 @@ import SpiritEffects    from "./SpiritEffects.js";
 import run              from "./RunManager.js";
 import logger           from "./GameplayLogger.js";
 
-// ── Capture mode yaku thresholds ────────────────────────────────────────────
-// Higher thresholds gate push decisions in capture scoring mode.
-const CAPTURE_YAKU_THRESHOLDS = { kasu: 6, tanzaku: 3, tane: 3, hikari: 2 };
-
 export default class GameRoundManager {
 
   // ── Round configuration (adjust freely for playtesting) ────────────────────
@@ -221,6 +217,23 @@ export default class GameRoundManager {
   /** True when the Pig consumable has queued a ki-reward double. */
   get pigDoubleKi()   { return this._pigDoubleKi; }
 
+  /** True when the Goat consumable is active (+1 ki per capture). */
+  get goatActive()    { return this._goatActive; }
+
+  /**
+   * Returns the effective capture-mode yaku thresholds, accounting for any
+   * Snake consumable modifier applied this round.
+   */
+  _getCaptureThresholds() {
+    const base = { kasu: 6, tanzaku: 3, tane: 3, hikari: 2 };
+    if (!this._snakeThresholdMods) return base;
+    const result = { ...base };
+    for (const [key, reduction] of Object.entries(this._snakeThresholdMods)) {
+      if (key in result) result[key] = Math.max(1, result[key] - reduction);
+    }
+    return result;
+  }
+
   /**
    * Style combos newly triggered on the last capture event.
    * Clears the internal buffer after reading so each event is consumed once.
@@ -352,6 +365,10 @@ export default class GameRoundManager {
     this._roundEndingAfterDecision = false;
     this._dogProtection            = false;
     this._pigDoubleKi              = false;
+    this._rabbitActive             = false;
+    this._goatActive               = false;
+    this._tigerPushActive          = false;
+    this._snakeThresholdMods       = {};
     this._lastStyleCombos          = [];
     this._style.resetRound();
 
@@ -437,7 +454,7 @@ export default class GameRoundManager {
     if (run.scoringMode !== 'capture') this._playsRemaining--;
 
     // Snapshot active yaku (name → bonus) so _finalizeTurn() can diff.
-    const _snapThresholds = run.scoringMode === 'capture' ? CAPTURE_YAKU_THRESHOLDS : null;
+    const _snapThresholds = run.scoringMode === 'capture' ? this._getCaptureThresholds() : null;
     const _snapCards = run.scoringMode === 'capture'
       ? this._capture.getAll().filter(c => !this._spentCardIds.has(c.id))
       : this._capture.getAll();
@@ -681,7 +698,7 @@ export default class GameRoundManager {
       // Re-snapshot yaku using only unspent cards so spent yaku can re-trigger.
       const unspentAfterPush = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
       this._yakuBeforeTurn = new Map(
-        this._scoring.evaluate(unspentAfterPush, run.yakuUpgrades, CAPTURE_YAKU_THRESHOLDS)
+        this._scoring.evaluate(unspentAfterPush, run.yakuUpgrades, this._getCaptureThresholds())
           .map(y => [y.name, y.bonus])
       );
       this._phase = "idle";
@@ -889,7 +906,7 @@ export default class GameRoundManager {
    */
   _selectAdditiveYakuCards(yakuName, unspentCards) {
     const isFireCard = c => c.enhancement?.element === 'fire';
-    const t = run.scoringMode === 'capture' ? CAPTURE_YAKU_THRESHOLDS : { kasu: 5, tanzaku: 3, tane: 3, hikari: 2 };
+    const t = run.scoringMode === 'capture' ? this._getCaptureThresholds() : { kasu: 5, tanzaku: 3, tane: 3, hikari: 2 };
     switch (yakuName) {
       case 'Kasu':
         return unspentCards.filter(c => c.type === 'plain'  || isFireCard(c)).slice(0, t.kasu);
@@ -994,7 +1011,7 @@ export default class GameRoundManager {
     if (run.scoringMode === 'capture') {
       // Score this capture group immediately.
       const allCaptured = this._capture.getAll();
-      const allYaku     = this._scoring.evaluate(allCaptured, run.yakuUpgrades, CAPTURE_YAKU_THRESHOLDS);
+      const allYaku     = this._scoring.evaluate(allCaptured, run.yakuUpgrades, this._getCaptureThresholds());
 
       // Spirit channels.
       let additiveMult = 0;
@@ -1121,6 +1138,10 @@ export default class GameRoundManager {
     }
 
     run.onCardsCaptured(cards);
+
+    // Goat consumable: +1 ki per card captured.
+    if (this._goatActive) run.addKi(cards.length);
+
     logger.logCapture(cards, 'capture');
 
     // Check for newly triggered style combos against the full capture pile.
@@ -1294,14 +1315,14 @@ export default class GameRoundManager {
     this._turn++;
     this._capture.recordTurn();
 
-    const _yakuThresholds = run.scoringMode === 'capture' ? CAPTURE_YAKU_THRESHOLDS : null;
+    const _yakuThresholds = run.scoringMode === 'capture' ? this._getCaptureThresholds() : null;
     const yakuForDiff = this._scoring.evaluate(this._capture.getAll(), run.yakuUpgrades, _yakuThresholds);
 
     // ── CAPTURE MODE ──────────────────────────────────────────────────────────
     if (run.scoringMode === 'capture') {
       // Diff against unspent cards only — spent cards must not re-trigger yaku.
       const unspentForDiff = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
-      const yakuFromUnspent = this._scoring.evaluate(unspentForDiff, run.yakuUpgrades, CAPTURE_YAKU_THRESHOLDS);
+      const yakuFromUnspent = this._scoring.evaluate(unspentForDiff, run.yakuUpgrades, this._getCaptureThresholds());
 
       const newYaku = yakuFromUnspent.filter(y => {
         const prev = this._yakuBeforeTurn.get(y.name);
@@ -1323,7 +1344,7 @@ export default class GameRoundManager {
         // Update snapshot to post-spend state so same yaku can't re-trigger next turn.
         const unspentAfterSpend = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
         this._yakuBeforeTurn = new Map(
-          this._scoring.evaluate(unspentAfterSpend, run.yakuUpgrades, CAPTURE_YAKU_THRESHOLDS)
+          this._scoring.evaluate(unspentAfterSpend, run.yakuUpgrades, this._getCaptureThresholds())
             .map(y => [y.name, y.bonus])
         );
       }

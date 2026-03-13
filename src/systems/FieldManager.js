@@ -383,7 +383,31 @@ export default class FieldManager {
    */
   clear() {
     this._slots = [];
+    this._maxSlots = undefined;
     return this;
+  }
+
+  /**
+   * Override the maximum number of field slots for this round.
+   * (Used by Rooster consumable to open a 9th slot.)
+   * @param {number} n
+   */
+  setMaxSlots(n) {
+    this._maxSlots = n;
+  }
+
+  /**
+   * Remove the slot at the given display index and return its cards.
+   * (Used by Ox / Monkey consumables.)
+   * @param {number} index   Display-index (0–7+) in the getSlots() array.
+   * @returns {object[]|null} Cards that were in the slot, or null if empty.
+   */
+  clearSlot(index) {
+    const slot = this._slots[index];
+    if (!slot) return null;
+    const cards = [...slot.cards];
+    this._slots[index] = null;
+    return cards;
   }
 
   // ── Snapshot ───────────────────────────────────────────────────────────────
@@ -409,9 +433,10 @@ export default class FieldManager {
    * @returns {number}
    */
   _firstEmptyIndex() {
+    const maxSlots = this._maxSlots ?? FieldManager.MAX_SLOTS;
     const i = this._slots.indexOf(null);
     if (i !== -1) return i;
-    if (this._slots.length < FieldManager.MAX_SLOTS) return this._slots.length;
+    if (this._slots.length < maxSlots) return this._slots.length;
     return -1;
   }
 

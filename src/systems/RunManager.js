@@ -8,6 +8,7 @@ import { getSpiritDef }                         from '../data/spirits.js';
 import { cards as ALL_CARDS }                   from '../data/cards.js';
 import { THREE_MARKS, WUXING_CONSUMABLES }      from '../data/consumables.js';
 import { getRibbonStampDef }                    from '../data/ribbonStamps.js';
+import { ZODIAC_CONSUMABLES, getZodiacDef }     from '../data/zodiacConsumables.js';
 import logger                                   from './GameplayLogger.js';
 //
 //   import run from './systems/RunManager.js';
@@ -315,6 +316,37 @@ class RunManager {
    */
   useConsumable(index) {
     return this.removeConsumable(index);
+  }
+
+  /**
+   * Purchase a zodiac consumable from the shrine shop.
+   * Deducts ki and adds the consumable to the inventory.
+   * @param {string} consumableId  e.g. 'zodiac_rat'
+   * @returns {{ success: boolean, reason?: string }}
+   */
+  buyConsumable(consumableId) {
+    if (!this.canAddConsumable) return { success: false, reason: 'Consumable inventory full' };
+    const def = getZodiacDef(consumableId);
+    if (!def) return { success: false, reason: 'Unknown consumable' };
+    if (this._ki < def.cost) return { success: false, reason: 'Not enough ki' };
+    this._ki -= def.cost;
+    this._consumables.push({ id: def.id, name: def.name, description: def.description, category: def.category });
+    return { success: true };
+  }
+
+  /**
+   * Sell (discard) a consumable from the inventory for 50% of its cost.
+   * @param {number} index  Inventory slot index.
+   * @returns {{ success: boolean, kiReturned?: number, reason?: string }}
+   */
+  sellConsumable(index) {
+    if (index < 0 || index >= this._consumables.length) return { success: false, reason: 'Invalid index' };
+    const cons = this._consumables[index];
+    const def  = getZodiacDef(cons.id);
+    const refund = def ? Math.floor(def.cost / 2) : 0;
+    this._consumables.splice(index, 1);
+    if (refund > 0) this._ki += refund;
+    return { success: true, kiReturned: refund };
   }
 
   // ── Run progression ────────────────────────────────────────────────────────
