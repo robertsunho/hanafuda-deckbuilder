@@ -31,6 +31,10 @@ const CHANNEL_BADGE = {
   additive:       { label: 'MULT+',    bgColor: 0x7a5500, textColor: '#ffdd44' },
   multiplicative: { label: 'MULT\xD7', bgColor: 0x882222, textColor: '#ff8888' },
   both:           { label: 'PT+MULT',  bgColor: 0x3a4a00, textColor: '#ccee55' },
+  rank:           { label: 'RANK',     bgColor: 0x4a3a00, textColor: '#ddcc55' },
+  utility:        { label: 'UTILITY',  bgColor: 0x2a2a55, textColor: '#9999ff' },
+  economy:        { label: 'ECONOMY',  bgColor: 0x1a4422, textColor: '#55cc77' },
+  gameplay:       { label: 'GAMEPLAY', bgColor: 0x441a44, textColor: '#cc77cc' },
 };
 
 // ── Layout constants ──────────────────────────────────────────────────────────
@@ -195,7 +199,8 @@ export class ShrineScene extends Phaser.Scene {
 
   _drawSpiritCard(cx, cy, spiritDef, index) {
     const purchased = this._purchased[index];
-    const canAfford = run.ki >= spiritDef.cost;
+    const effectiveCost = this._price(spiritDef.cost);
+    const canAfford = run.ki >= effectiveCost;
     const hasSlot   = run.canAddSpirit;
     const buyable   = !purchased && canAfford && hasSlot;
     const alpha     = purchased ? 0.5 : 1.0;
@@ -234,7 +239,10 @@ export class ShrineScene extends Phaser.Scene {
     }
 
     const costColor = canAfford ? '#ffee88' : '#cc6644';
-    this.add.text(cx, bot - 50, `${spiritDef.cost} ki`, {
+    const costLabel = effectiveCost < spiritDef.cost
+      ? `${effectiveCost} ki (was ${spiritDef.cost})`
+      : `${spiritDef.cost} ki`;
+    this.add.text(cx, bot - 50, costLabel, {
       fontSize: '13px', color: costColor,
     }).setOrigin(0.5, 0).setAlpha(alpha);
 
@@ -378,7 +386,8 @@ export class ShrineScene extends Phaser.Scene {
     for (let i = 0; i < FOUR_PRACTICES.length; i++) {
       const def    = FOUR_PRACTICES[i];
       const x      = startX + i * (tileW + tileGap);
-      const afford = run.ki >= def.cost;
+      const pCost  = this._price(def.cost);
+      const afford = run.ki >= pCost;
       const color  = PRACTICE_COLORS[def.id] ?? '#88ccee';
 
       this.add.rectangle(x, tileY, tileW, tileH, afford ? 0x0a1a1e : 0x080e12)
@@ -394,7 +403,7 @@ export class ShrineScene extends Phaser.Scene {
       }).setOrigin(0.5, 0);
 
       const btnY2  = tileY + tileH / 2 - 14;
-      const btnLbl = !afford ? `Need ${def.cost} ki` : `Use  ${def.cost} ki`;
+      const btnLbl = !afford ? `Need ${pCost} ki` : `Use  ${pCost} ki`;
       const btnTxt = afford ? color : '#334455';
       const btn    = this.add.rectangle(x, btnY2, tileW - 12, 22, afford ? 0x112222 : 0x080e0e)
         .setStrokeStyle(1, afford ? 0x336655 : 0x1a2233);
@@ -405,8 +414,8 @@ export class ShrineScene extends Phaser.Scene {
         btn.on('pointerover', () => btn.setFillStyle(0x1a3333));
         btn.on('pointerout',  () => btn.setFillStyle(0x112222));
         btn.on('pointerdown', () => {
-          run.spendKi(def.cost);
-          logger.logShopPurchase('practice', def.name, def.cost);
+          run.spendKi(pCost);
+          logger.logShopPurchase('practice', def.name, pCost);
           this._showPracticeOverlay(def);
         });
       }
@@ -641,9 +650,10 @@ export class ShrineScene extends Phaser.Scene {
   // ── Buy consumable → booster pack overlay ────────────────────────────────
 
   _buyConsumable(markDef) {
-    if (run.ki < markDef.cost) return;
-    run.spendKi(markDef.cost);
-    logger.logShopPurchase('consumable', markDef.name, markDef.cost);
+    const pCost = this._price(markDef.cost);
+    if (run.ki < pCost) return;
+    run.spendKi(pCost);
+    logger.logShopPurchase('consumable', markDef.name, pCost);
     this._showUseOrCarryChoice(markDef);
   }
 
@@ -913,7 +923,8 @@ export class ShrineScene extends Phaser.Scene {
     for (let i = 0; i < offers.length; i++) {
       const def    = offers[i];
       const x      = startX + i * (tileW + tileGap);
-      const canBuy = run.canAddConsumable && run.ki >= def.cost;
+      const zCost  = this._price(def.cost);
+      const canBuy = run.canAddConsumable && run.ki >= zCost;
       const color  = CATEGORY_COLOR[def.category] ?? '#cccccc';
 
       this.add.rectangle(x, tileY, tileW, tileH, canBuy ? 0x1a1500 : 0x0e0e0a)
@@ -930,7 +941,7 @@ export class ShrineScene extends Phaser.Scene {
 
       const btnY2  = tileY + tileH / 2 - 14;
       const inv    = !run.canAddConsumable;
-      const btnLbl = inv ? 'Inv Full' : !canBuy ? `${def.cost}ki` : `Buy  ${def.cost}ki`;
+      const btnLbl = inv ? 'Inv Full' : !canBuy ? `${zCost}ki` : `Buy  ${zCost}ki`;
       const btnClr = canBuy ? color : '#334455';
       const btn    = this.add.rectangle(x, btnY2, tileW - 10, 20, canBuy ? 0x1a1200 : 0x0a0a0a)
         .setStrokeStyle(1, canBuy ? 0x554400 : 0x1a1a2a);
@@ -943,6 +954,9 @@ export class ShrineScene extends Phaser.Scene {
         btn.on('pointerdown', () => {
           const result = run.buyConsumable(def.id);
           if (result.success) {
+            // Apply coupon discount (buyConsumable deducts full cost internally).
+            const discount = def.cost - zCost;
+            if (discount > 0) run.addKi(discount);
             logger.logConsumableUse(def.name, 'purchased');
             this._zodiacOffering = this._zodiacOffering.filter(d => d.id !== def.id);
             this._buildUI();
@@ -980,7 +994,8 @@ export class ShrineScene extends Phaser.Scene {
       const def     = WUXING_CONSUMABLES[i];
       const x       = startX + i * (tileW + tileGap);
       const full    = !run.canAddConsumable;
-      const afford  = run.ki >= def.cost;
+      const wCost   = this._price(def.cost);
+      const afford  = run.ki >= wCost;
       const buyable = afford && !full;
       const color   = ELEMENT_COLORS[def.element] ?? '#aaaaaa';
       const bdr     = ELEMENT_BORDER[def.element] ?? 0x555555;
@@ -998,7 +1013,7 @@ export class ShrineScene extends Phaser.Scene {
       }).setOrigin(0.5, 0);
 
       const btnY2  = tileY + tileH / 2 - 14;
-      const btnLbl = full ? 'Full' : !afford ? 'N/A' : '5 ki';
+      const btnLbl = full ? 'Full' : !afford ? 'N/A' : `${wCost} ki`;
       const btnTxt = buyable ? color : '#334455';
       const btn    = this.add.rectangle(x, btnY2, tileW - 10, 20, buyable ? 0x111e1e : 0x080e0e)
         .setStrokeStyle(1, buyable ? bdr : 0x1a2233);
@@ -1024,10 +1039,11 @@ export class ShrineScene extends Phaser.Scene {
       const stamps = Object.values(RIBBON_STAMPS);
       stamps.forEach((stamp, i) => {
         const x = cx - 100 + i * 78;
-        const afford = run.ki >= stamp.cost;
+        const sCost  = this._price(stamp.cost);
+        const afford = run.ki >= sCost;
         const btn = this.add.rectangle(x, topY + 10, 72, 22, afford ? 0x1a1020 : 0x0a0a0a)
           .setStrokeStyle(1, afford ? stamp.hexColor * 0.4 : 0x1a1a2a);
-        this.add.text(x, topY + 10, `${stamp.name.split(' ')[0]}  ${stamp.cost}ki`, {
+        this.add.text(x, topY + 10, `${stamp.name.split(' ')[0]}  ${sCost}ki`, {
           fontSize: '9px', color: afford ? stamp.color : '#334455',
         }).setOrigin(0.5);
         if (afford) {
@@ -1059,7 +1075,8 @@ export class ShrineScene extends Phaser.Scene {
     for (let i = 0; i < stamps.length; i++) {
       const stamp   = stamps[i];
       const x       = startX + i * (tileW + tileGap);
-      const afford  = run.ki >= stamp.cost;
+      const sCost   = this._price(stamp.cost);
+      const afford  = run.ki >= sCost;
       const buyable = afford;
 
       this.add.rectangle(x, tileY, tileW, tileH, buyable ? 0x1a0f1a : 0x0e0a0e)
@@ -1076,7 +1093,7 @@ export class ShrineScene extends Phaser.Scene {
       }).setOrigin(0.5, 0);
 
       const btnY2  = tileY + tileH / 2 - 14;
-      const btnLbl = !afford ? `N/A  ${stamp.cost}ki` : `Stamp  ${stamp.cost}ki`;
+      const btnLbl = !afford ? `N/A  ${sCost}ki` : `Stamp  ${sCost}ki`;
       const btnTxt = buyable ? stamp.color : '#334455';
       const btn    = this.add.rectangle(x, btnY2, tileW - 10, 20, buyable ? 0x1a1020 : 0x0a0a0a)
         .setStrokeStyle(1, buyable ? stamp.hexColor * 0.4 : 0x1a1a2a);
@@ -1153,6 +1170,9 @@ export class ShrineScene extends Phaser.Scene {
         spr.on('pointerdown', () => {
           const result = run.applyRibbonStamp(card.id, stampDef.id);
           if (result.success) {
+            // Apply coupon discount (applyRibbonStamp deducts full cost internally).
+            const discount = stampDef.cost - this._price(stampDef.cost);
+            if (discount > 0) run.addKi(discount);
             logger.logConsumableUse(stampDef.name, `stamped ${card.id}`);
             for (const o of this._confirmObjs) o.destroy();
             this._confirmObjs = [];
@@ -1349,7 +1369,8 @@ export class ShrineScene extends Phaser.Scene {
       const offer  = offers[i];
       const card   = offer.card;
       const x      = startX + i * (CW + GAP);
-      const afford = run.ki >= offer.price;
+      const oCost  = this._price(offer.price);
+      const afford = run.ki >= oCost;
 
       // Card image (texture key = original card id without shop suffix)
       const spr = this.add.image(x, cardY, card.id).setScale(SCALE);
@@ -1383,7 +1404,7 @@ export class ShrineScene extends Phaser.Scene {
       const btnY   = cardY + CH / 2 + 17;
       const btnBg  = afford ? 0x1a3a1a : 0x0e180e;
       const btnBdr = afford ? 0x44aa66 : 0x1a2a1a;
-      const btnLbl = afford ? `${offer.price}ki` : `${offer.price}ki`;
+      const btnLbl = `${oCost}ki`;
       const btn    = this.add.rectangle(x, btnY, CW + 4, 16, btnBg)
         .setStrokeStyle(1, btnBdr);
       this.add.text(x, btnY, btnLbl, {
@@ -1394,9 +1415,9 @@ export class ShrineScene extends Phaser.Scene {
         btn.setInteractive({ useHandCursor: true });
         spr.setInteractive({ useHandCursor: true });
         const doBuy = () => {
-          const result = run.buyCard(card, offer.price);
+          const result = run.buyCard(card, oCost);
           if (result.success) {
-            logger.logShopPurchase('card', card.name ?? card.id, offer.price);
+            logger.logShopPurchase('card', card.name ?? card.id, oCost);
             this._cardOffers = this._cardOffers.filter(o => o !== offer);
             this._buildUI();
           }
@@ -1413,13 +1434,21 @@ export class ShrineScene extends Phaser.Scene {
 
   // ── Purchase ──────────────────────────────────────────────────────────────
 
+  /** Apply econ_coupon discount (20% off, ceil). */
+  _price(base) {
+    return run.spirits.some(s => s.id === 'econ_coupon') ? Math.ceil(base * 0.8) : base;
+  }
+
   _buySpirit(index) {
     const spiritDef = this._offering[index];
     if (!spiritDef || this._purchased[index]) return;
     const result = run.buySpirit(spiritDef);
     if (result.success) {
+      // Apply coupon discount after the fact (buySpirit deducts full cost).
+      const discount = spiritDef.cost - this._price(spiritDef.cost);
+      if (discount > 0) run.addKi(discount);
       this._purchased[index] = true;
-      logger.logShopPurchase('spirit', spiritDef.name, spiritDef.cost);
+      logger.logShopPurchase('spirit', spiritDef.name, this._price(spiritDef.cost));
       this._buildUI();
     }
   }

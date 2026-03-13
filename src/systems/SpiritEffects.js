@@ -325,6 +325,72 @@ const _effects = {
   util_symbiosis:  {},  // placeholder
   util_festival:   {},  // ribbon captured → stamp (TBD)
   util_irrigation: {},  // plain captured → +10 pts added to running score
+
+  // ── Economy Spirits ────────────────────────────────────────────────────────
+  // Most effects are event-driven (interest, push, round-end) — handled in
+  // RunManager / GameRoundManager.  Entries here so SpiritEffects.get() returns non-null.
+
+  econ_bonds:        {},  // +10% interest rate — RunManager.interestRate getter
+  econ_ingot:        {},  // +0.1% interest per ki — RunManager.interestRate getter
+  econ_grace:        {},  // double style combo ki — RunManager.calculateKiReward
+  econ_recycling:    {},  // +5 ki per overflow discard — GameRoundManager._doDeckPhase / playHandCard
+  econ_lucky_charm:  {},  // +50% ki on push — GameRoundManager.pushOn
+  econ_piggybank:    {},  // 3× hand ki at round end — RunManager.calculateKiReward
+  econ_coupon:       {},  // 20% shop discount — ShrineScene price multiplier
+  econ_replica:      {},  // placeholder
+  econ_print:        {},  // placeholder
+  econ_present:      {},  // placeholder
+  econ_collector:    {},  // placeholder
+
+  // ── Gameplay Spirits ───────────────────────────────────────────────────────
+
+  game_expanse:  {},  // +2 field slots — GameRoundManager.startRound sets field.maxSlots=10
+  game_well:     {},  // draw +1 on capture — GameRoundManager._addCapture
+  game_catcher:  {},  // overflow→hand — GameRoundManager field-full discard path
+  game_surplus:  {},  // +2 starting hand cards — GameRoundManager.startRound
+  game_gankyil:  {},  // 3-stack capture — GameRoundManager capture threshold
+  game_angel:    {},  // +1 card per push — GameRoundManager._getNextPushDealCount
+  game_mirror:   {},  // placeholder
+  game_echo:     {},  // placeholder
+
+  // ── Wu Xing Engine Spirits ─────────────────────────────────────────────────
+  // State incremented in _applyPostRoundEnhancements; read here for mult-mult channel.
+
+  engine_glacier: {
+    getMultMult({ spirits }) {
+      const self = spirits.find(s => s.id === 'engine_glacier');
+      return 1.0 + (self?.state?.waterDepCount ?? 0) * 0.3;
+    },
+  },
+
+  engine_carbon: {
+    getMultMult({ spirits }) {
+      const self = spirits.find(s => s.id === 'engine_carbon');
+      return 1.0 + (self?.state?.fireCombustCount ?? 0) * 0.5;
+    },
+  },
+
+  engine_velocity: {
+    getMultMult({ spirits }) {
+      const self = spirits.find(s => s.id === 'engine_velocity');
+      return 1.0 + (self?.state?.metalProcCount ?? 0) * 0.3;
+    },
+  },
+
+  engine_fossil: {
+    getMultMult({ spirits }) {
+      // Use the cached count updated at round end by _applyPostRoundEnhancements.
+      const self = spirits.find(s => s.id === 'engine_fossil');
+      return 1.0 + (self?.state?.earthCardCount ?? 0) * 0.2;
+    },
+  },
+
+  engine_moths: {
+    getMultMult({ spirits }) {
+      const self = spirits.find(s => s.id === 'engine_moths');
+      return 1.0 + (self?.state?.silkTriggerCount ?? 0) * 0.4;
+    },
+  },
 };
 
 // ── Public interface ──────────────────────────────────────────────────────────

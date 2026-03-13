@@ -182,6 +182,11 @@ class RunManager {
     if (spiritDef.id === 'engine_wildlife')  spirit.state = { seenAnimals: [] };
     if (spiritDef.id === 'engine_plenty')    spirit.state = { seenPlains: [] };
     if (spiritDef.id === 'util_irrigation')  spirit.state = { irrigationBonus: 0 };
+    if (spiritDef.id === 'engine_glacier')   spirit.state = { waterDepCount: 0 };
+    if (spiritDef.id === 'engine_carbon')    spirit.state = { fireCombustCount: 0 };
+    if (spiritDef.id === 'engine_velocity')  spirit.state = { metalProcCount: 0 };
+    if (spiritDef.id === 'engine_fossil')    spirit.state = { earthCardCount: 0 };
+    if (spiritDef.id === 'engine_moths')     spirit.state = { silkTriggerCount: 0 };
     this._spirits.push(spirit);
     return { success: true };
   }
@@ -480,13 +485,22 @@ class RunManager {
   calculateKiReward(result) {
     const cardsInHand = result.cardsInHand ?? 0;
     const styleCombos = result.styleCombos ?? 0;
-    return 5 + cardsInHand + styleCombos;
+    const hasPiggyBank = this._spirits.some(s => s.id === 'econ_piggybank');
+    const hasGrace     = this._spirits.some(s => s.id === 'econ_grace');
+    const handKi   = hasPiggyBank ? cardsInHand * 3 : cardsInHand;
+    const comboKi  = hasGrace     ? styleCombos  * 2 : styleCombos;
+    return 5 + handKi + comboKi;
   }
 
   // ── Interest system ────────────────────────────────────────────────────────
 
   /** Base interest rate applied at the start of each round. */
-  get interestRate() { return 0.10; }
+  get interestRate() {
+    let rate = 0.10;
+    if (this._spirits.some(s => s.id === 'econ_bonds')) rate += 0.10;
+    if (this._spirits.some(s => s.id === 'econ_ingot'))  rate += this._ki * 0.001;
+    return rate;
+  }
 
   /**
    * Apply interest to the ki balance at the start of a round.

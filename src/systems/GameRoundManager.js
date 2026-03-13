@@ -381,7 +381,13 @@ export default class GameRoundManager {
     // ── Empty-slot play tracking (for Fix D/E capture rules) ─────────────
     this._lastHandPlayToEmptySlot = null;
 
-    this._hand.add(this._deck.draw(GameRoundManager.HAND_SIZE));
+    // game_expanse: +2 field slots (10 total).
+    if (this._spirits.some(s => s.id === 'game_expanse')) {
+      this._field.setMaxSlots(10);
+    }
+
+    const surplusExtra = this._spirits.some(s => s.id === 'game_surplus') ? 2 : 0;
+    this._hand.add(this._deck.draw(GameRoundManager.HAND_SIZE + surplusExtra));
 
     // Auto-capture any month where the opening hand holds all 4 cards.
     this._checkNaturalCaptures();
@@ -474,6 +480,8 @@ export default class GameRoundManager {
         this._discardedThisTurn.push(card);
         this._allDiscards.push(card);
         this._discardCount++;
+        // econ_recycling: +5 ki per field-full discard.
+        if (this._spirits.some(s => s.id === 'econ_recycling')) run.addKi(5);
       }
     }
 
@@ -691,6 +699,10 @@ export default class GameRoundManager {
     if (run.scoringMode === 'capture') {
       this._atRiskScore       = this._runningScore;
       this._pushPenaltyActive = true;
+      // econ_lucky_charm: gain ki equal to 50% of current balance (max 20).
+      if (this._spirits.some(s => s.id === 'econ_lucky_charm')) {
+        run.addKi(Math.min(20, Math.floor(run.ki * 0.5)));
+      }
       // Hand cards carry over; deal a fixed number of additional cards.
       const dealCount = this._getNextPushDealCount();
       const handCount = Math.min(dealCount, this._deck.drawPileSize, this._hand.availableSlots);
@@ -806,6 +818,10 @@ export default class GameRoundManager {
         const maxLevel = multArr.length - 1;
         card.enhancement.depLevel = Math.min((card.enhancement.depLevel ?? 0) + 1, maxLevel);
         events.push(`${card.id} Water dep → level ${card.enhancement.depLevel}`);
+        // engine_glacier: +0.3 mult per water depreciation.
+        for (const spirit of this._spirits) {
+          if (spirit.id === 'engine_glacier' && spirit.state) spirit.state.waterDepCount++;
+        }
       }
       if (card.enhancement?.element === 'fire') {
         const breakChance = card.enhancement.tier === 'upgraded' ? 2 / 7 : 1 / 7;
@@ -813,6 +829,10 @@ export default class GameRoundManager {
           run.deleteCard(card.id);
           card._broken = true;
           events.push(`${card.id} Fire BROKE — card destroyed`);
+          // engine_carbon: +0.5 mult per fire combustion.
+          for (const spirit of this._spirits) {
+            if (spirit.id === 'engine_carbon' && spirit.state) spirit.state.fireCombustCount++;
+          }
         }
       }
     }
@@ -820,6 +840,16 @@ export default class GameRoundManager {
     for (let i = 0; i < metalConsumableCount; i++) {
       run.generateRandomConsumable();
       events.push('Metal proc → free consumable generated');
+      // engine_velocity: +0.3 mult per metal proc.
+      for (const spirit of this._spirits) {
+        if (spirit.id === 'engine_velocity' && spirit.state) spirit.state.metalProcCount++;
+      }
+    }
+    // engine_fossil: set earthCardCount = current earth-enhanced cards in deck.
+    for (const spirit of this._spirits) {
+      if (spirit.id === 'engine_fossil' && spirit.state) {
+        spirit.state.earthCardCount = run.getDeck().filter(c => c.enhancement?.element === 'earth').length;
+      }
     }
     this._lastEnhancementEvents = events;
   }
@@ -926,9 +956,10 @@ export default class GameRoundManager {
    * Push 1: +4, Push 2: +2, Push 3+: +1.
    */
   _getNextPushDealCount() {
-    if (this._pushCount === 1) return 4;
-    if (this._pushCount === 2) return 2;
-    return 1;
+    const angel = this._spirits.some(s => s.id === 'game_angel') ? 1 : 0;
+    if (this._pushCount === 1) return 4 + angel;
+    if (this._pushCount === 2) return 2 + angel;
+    return 1 + angel;
   }
 
   // ── Three Marks helpers ────────────────────────────────────────────────────
@@ -998,6 +1029,24 @@ export default class GameRoundManager {
    *
    * @param {object[]} cards
    */
+  /**
+   * Handle a field-full discard for a single deck card.
+   * Applies econ_recycling (+5 ki) and game_catcher (→hand) if active.
+   * @param {object} card  The deck card being discarded.
+   * @returns {string} The flip result string ('field_discard' or 'catcher').
+   */
+  _handleFieldDiscard(card) {
+    if (this._spirits.some(s => s.id === 'game_catcher') && this._hand.availableSlots > 0) {
+      this._hand.add([card]);
+      return 'catcher';
+    }
+    this._discardedThisTurn.push(card);
+    this._allDiscards.push(card);
+    this._discardCount++;
+    if (this._spirits.some(s => s.id === 'econ_recycling')) run.addKi(5);
+    return 'field_discard';
+  }
+
   _addCapture(cards) {
     this._capture.add(cards);
     this._basePoints += cards.reduce((sum, c) => sum + c.points, 0);
@@ -1057,6 +1106,11 @@ export default class GameRoundManager {
         type: 'capture', cards, capturePoints, additiveMult, multMult,
         flow, pushEscalation, captureScore, runningTotal: this._runningScore,
       });
+
+      // game_well: draw 1 extra card on any capture.
+      if (this._spirits.some(s => s.id === 'game_well') && this._deck.drawPileSize > 0) {
+        this._hand.add(this._deck.draw(1));
+      }
 
       // util_glory: draw 3 cards on any bright capture.
       for (const spirit of this._spirits) {
@@ -1210,6 +1264,10 @@ export default class GameRoundManager {
             this._addCapture(captured);
             _flipResult   = 'silk_capture';
             _flipCaptures = captured;
+            // engine_moths: +0.4 mult per silk trigger.
+            for (const spirit of this._spirits) {
+              if (spirit.id === 'engine_moths' && spirit.state) spirit.state.silkTriggerCount++;
+            }
           }
         } else {
           // Standard addToPendingMatch handles 4-card auto-capture and stranding.
@@ -1246,10 +1304,7 @@ export default class GameRoundManager {
           _flipResult   = 'capture';
           _flipCaptures = [..._flipCaptures, ...flipResult.captured];
         } else if (flipResult.discarded) {
-          this._discardedThisTurn.push(deckCard);
-          this._allDiscards.push(deckCard);
-          this._discardCount++;
-          _flipResult = 'field_discard';
+          _flipResult = this._handleFieldDiscard(deckCard);
         }
       }
     } else {
@@ -1276,10 +1331,7 @@ export default class GameRoundManager {
           _flipResult   = 'capture';
           _flipCaptures = [..._flipCaptures, ...flipResult.captured];
         } else if (flipResult.discarded) {
-          this._discardedThisTurn.push(deckCard);
-          this._allDiscards.push(deckCard);
-          this._discardCount++;
-          _flipResult = 'field_discard';
+          _flipResult = this._handleFieldDiscard(deckCard);
         } else {
           _flipResult = 'capture'; // hand pair captured even if flip just placed
         }
@@ -1291,10 +1343,7 @@ export default class GameRoundManager {
           _flipResult   = 'capture';
           _flipCaptures = flipResult.captured;
         } else if (flipResult.discarded) {
-          this._discardedThisTurn.push(deckCard);
-          this._allDiscards.push(deckCard);
-          this._discardCount++;
-          _flipResult = 'field_discard';
+          _flipResult = this._handleFieldDiscard(deckCard);
         }
       }
     }
