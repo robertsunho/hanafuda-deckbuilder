@@ -219,6 +219,27 @@ class RunManager {
   }
 
   /**
+   * Add a symbiont spirit generated during gameplay.
+   * Symbionts cost no ki and bypass the normal shop flow.
+   * @param {object} spiritDef  Entry from SPIRIT_CATALOG (tier 0, channel 'symbiont').
+   * @returns {{ success: boolean }}
+   */
+  addSymbiontSpirit(spiritDef) {
+    if (!this.canAddSpirit) return { success: false };
+    const spirit = { id: spiritDef.id, name: spiritDef.name, symbiont: true };
+    if (spiritDef.id === 'sym_caterpillar') spirit.state = { leafsEaten: 0 };
+    if (spiritDef.id === 'sym_cuckoo_egg')  spirit.state = { roundsRemaining: 3 };
+    if (spiritDef.id === 'sym_algae')       spirit.state = { summonCount: 0 };
+    if (spiritDef.id === 'sym_ducks')       spirit.state = { pairsThisRound: 0 };
+    if (spiritDef.id === 'sym_snails')      spirit.state = { totalUnplayed: 0 };
+    if (spiritDef.id === 'sym_magpie')      spirit.state = {};
+    if (spiritDef.id === 'sym_crow')        spirit.state = { usedThisRound: false };
+    if (spiritDef.id === 'sym_osprey')      spirit.state = { usedThisRound: false };
+    this._spirits.push(spirit);
+    return { success: true };
+  }
+
+  /**
    * Equip a spirit into the loadout.
    * @param {object} spirit
    * @throws {Error} if all slots are occupied.

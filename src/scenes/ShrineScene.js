@@ -35,6 +35,7 @@ const CHANNEL_BADGE = {
   utility:        { label: 'UTILITY',  bgColor: 0x2a2a55, textColor: '#9999ff' },
   economy:        { label: 'ECONOMY',  bgColor: 0x1a4422, textColor: '#55cc77' },
   gameplay:       { label: 'GAMEPLAY', bgColor: 0x441a44, textColor: '#cc77cc' },
+  symbiont:       { label: 'SYMBIONT', bgColor: 0x1a2a00, textColor: '#99ee44' },
 };
 
 // ── Layout constants ──────────────────────────────────────────────────────────

@@ -55,6 +55,7 @@ import StyleEngine      from "./StyleEngine.js";
 import SpiritEffects    from "./SpiritEffects.js";
 import run              from "./RunManager.js";
 import logger           from "./GameplayLogger.js";
+import { SPIRIT_CATALOG, getSpiritDef, ANIMAL_SYMBIONT_MAP } from "../data/spirits.js";
 
 export default class GameRoundManager {
 
@@ -372,6 +373,26 @@ export default class GameRoundManager {
     this._lastStyleCombos          = [];
     this._style.resetRound();
 
+    // ── Symbiont per-round resets ─────────────────────────────────────────
+    for (const spirit of this._spirits) {
+      if (spirit.id === 'sym_ducks'   && spirit.state) spirit.state.pairsThisRound = 0;
+      if (spirit.id === 'sym_crow'    && spirit.state) spirit.state.usedThisRound  = false;
+      if (spirit.id === 'sym_osprey'  && spirit.state) spirit.state.usedThisRound  = false;
+      // sym_cuckoo_egg: countdown — hatch when it reaches 0.
+      if (spirit.id === 'sym_cuckoo_egg' && spirit.state) {
+        spirit.state.roundsRemaining--;
+        if (spirit.state.roundsRemaining <= 0) {
+          const fusions = SPIRIT_CATALOG.filter(s => s.tier === 2);
+          const target  = fusions[Math.floor(Math.random() * fusions.length)];
+          if (target) {
+            spirit.id    = target.id;
+            spirit.name  = target.name;
+            spirit.state = null;
+          }
+        }
+      }
+    }
+
     // ── Additive scoring state ────────────────────────────────────────────
     this._runningScore  = 0;
     this._scoringEvents = [];
@@ -585,6 +606,9 @@ export default class GameRoundManager {
         styleCombos:     this._style.getTriggeredCombos().length,
       };
     }
+
+    // sym_snails: accumulate unplayed cards at round end (before additive/mult paths).
+    this._trackSnailsUnplayed();
 
     // ── ADDITIVE MODE ─────────────────────────────────────────────────────────
     if (run.scoringMode === 'additive') {
@@ -1029,6 +1053,17 @@ export default class GameRoundManager {
    *
    * @param {object[]} cards
    */
+  /** sym_snails: accumulate hand card count at round end (permanent). */
+  _trackSnailsUnplayed() {
+    const handCount = this._hand.getAll().length;
+    if (handCount === 0) return;
+    for (const spirit of this._spirits) {
+      if (spirit.id === 'sym_snails' && spirit.state) {
+        spirit.state.totalUnplayed += handCount;
+      }
+    }
+  }
+
   /**
    * Handle a field-full discard for a single deck card.
    * Applies econ_recycling (+5 ki) and game_catcher (→hand) if active.
@@ -1193,6 +1228,60 @@ export default class GameRoundManager {
 
     run.onCardsCaptured(cards);
 
+    // sym_ducks: track 2-card pair captures.
+    for (const spirit of this._spirits) {
+      if (spirit.id === 'sym_ducks' && spirit.state && cards.length === 2) {
+        spirit.state.pairsThisRound++;
+      }
+    }
+
+    // sym_caterpillar: eat leaf-enhanced cards (Wood element).
+    for (const spirit of this._spirits) {
+      if (spirit.id === 'sym_caterpillar' && spirit.state) {
+        for (const card of cards) {
+          if (card.enhancement?.element === 'wood') {
+            spirit.state.leafsEaten++;
+            run.deleteCard(card.id);
+            this._spentCardIds.add(card.id);
+            if (spirit.state.leafsEaten >= 3) {
+              const others = run.spirits.filter(s => s.id !== 'sym_caterpillar' && s.id !== 'sym_cuckoo_egg');
+              if (others.length > 0) {
+                const target = others[Math.floor(Math.random() * others.length)];
+                const idx = run.spirits.findIndex(s => s.id === 'sym_caterpillar');
+                if (idx >= 0) {
+                  const copy = JSON.parse(JSON.stringify(target));
+                  copy.name += ' (Moth)';
+                  copy.metamorphosed = true;
+                  run.spirits[idx] = copy;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // util_symbiosis: generate symbiont spirit on animal capture.
+    if (this._spirits.some(s => s.id === 'util_symbiosis')) {
+      for (const card of cards) {
+        if (card.type === 'animal') {
+          const symbiontId = ANIMAL_SYMBIONT_MAP[card.id];
+          if (symbiontId && run.canAddSpirit && !run.spirits.some(s => s.id === symbiontId)) {
+            const symDef = getSpiritDef(symbiontId);
+            if (symDef) {
+              run.addSymbiontSpirit(symDef);
+              // sym_algae: increment on summon.
+              for (const spirit of run.spirits) {
+                if (spirit.id === 'sym_algae' && spirit.state) {
+                  spirit.state.summonCount = (spirit.state.summonCount ?? 0) + 1;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
     // Goat consumable: +1 ki per card captured.
     if (this._goatActive) run.addKi(cards.length);
 
@@ -1218,6 +1307,10 @@ export default class GameRoundManager {
     }
     this._lastStyleCombos = combos;
     logger.logStyleCombos(combos);
+    // sym_magpie: +3 ki per style combo triggered.
+    if (combos.length > 0 && this._spirits.some(s => s.id === 'sym_magpie')) {
+      run.addKi(3 * combos.length);
+    }
   }
 
   /**
@@ -1241,6 +1334,15 @@ export default class GameRoundManager {
 
     const deckCard = this._deck.draw(1)[0];
     this._lastDeckCard = deckCard;
+
+    // sym_crow: first deck flip each round is captured directly.
+    const crowSpirit = this._spirits.find(s => s.id === 'sym_crow');
+    if (crowSpirit?.state && !crowSpirit.state.usedThisRound) {
+      crowSpirit.state.usedThisRound = true;
+      this._addCapture([deckCard]);
+      logger.logDeckFlip(deckCard, 'crow_capture', [deckCard]);
+      return this._finalizeTurn();
+    }
 
     // Track the deck flip outcome for logging.
     let _flipResult   = 'field_place';
@@ -1401,6 +1503,7 @@ export default class GameRoundManager {
       // Round ends when hand is empty (no play counter in capture mode).
       const roundOver = this._hand.isEmpty();
       const penaltyApplied = roundOver && this._pushPenaltyActive && !this._dogProtection;
+      if (roundOver) this._trackSnailsUnplayed();
 
       if (roundOver && penaltyApplied) {
         const PENALTY_RATES = [0.3, 0.5, 0.7, 0.9];
@@ -1491,6 +1594,7 @@ export default class GameRoundManager {
 
       const roundOver      = this._hand.isEmpty() || this._playsRemaining <= 0;
       const penaltyApplied = roundOver && this._pushPenaltyActive && !this._dogProtection;
+      if (roundOver) this._trackSnailsUnplayed();
 
       // Compute the actual flow for display (same formula used inside each event).
       const pushFactor = penaltyApplied

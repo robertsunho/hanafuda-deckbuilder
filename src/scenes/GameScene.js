@@ -530,9 +530,29 @@ export class GameScene extends Phaser.Scene {
       } else if (spirit.id === 'engine_banner') {
         const n = captured.filter(c => c.type === 'ribbon').length;
         lines.push(`Ribbons: ${n}  →  \u00D7${mm.toFixed(2)} mult`);
+      } else if (spirit.id === 'sym_algae') {
+        lines.push(`Symbionts summoned: ${spirit.state?.summonCount ?? 0}  →  \u00D7${mm.toFixed(2)} mult`);
+      } else if (spirit.id === 'sym_ants') {
+        lines.push(`Spirits equipped: ${spirits.length}  →  \u00D7${mm.toFixed(2)} mult`);
+      } else if (spirit.id === 'sym_ducks') {
+        lines.push(`Pairs this round: ${spirit.state?.pairsThisRound ?? 0}  →  \u00D7${mm.toFixed(2)} mult`);
+      } else if (spirit.id === 'sym_snails') {
+        lines.push(`Total unplayed: ${spirit.state?.totalUnplayed ?? 0}  →  \u00D7${mm.toFixed(2)} mult`);
       } else {
         lines.push(`\u00D7${mm.toFixed(2)} mult`);
       }
+    }
+
+    // ── Symbiont state (non-scoring channel) ─────────────────────────────
+    if (spirit.id === 'sym_caterpillar') {
+      const eaten = spirit.state?.leafsEaten ?? 0;
+      lines.push(`Leafs eaten: ${eaten}/3${eaten >= 3 ? ' — metamorphosed!' : ''}`);
+    } else if (spirit.id === 'sym_cuckoo_egg') {
+      lines.push(`Rounds until hatch: ${spirit.state?.roundsRemaining ?? '?'}`);
+    } else if (spirit.id === 'sym_crow') {
+      lines.push(spirit.state?.usedThisRound ? 'Used this round' : 'Ready — first flip captures');
+    } else if (spirit.id === 'sym_osprey') {
+      lines.push(spirit.state?.usedThisRound ? 'Used this round' : 'Ready — capture a field card');
     }
 
     return lines.length > 0 ? lines.join('\n') : null;

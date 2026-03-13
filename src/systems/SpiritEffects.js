@@ -353,6 +353,45 @@ const _effects = {
   game_mirror:   {},  // placeholder
   game_echo:     {},  // placeholder
 
+  // ── Symbiont Spirits ───────────────────────────────────────────────────────
+
+  sym_caterpillar: {},  // event-driven: eats leaf cards in _addCapture
+
+  sym_cuckoo_egg:  {},  // event-driven: counts down in startRound, blocks slot
+
+  sym_algae: {
+    getMultMult({ spirits }) {
+      const self = spirits.find(s => s.id === 'sym_algae');
+      return 1.0 + (self?.state?.summonCount ?? 0) * 0.3;
+    },
+  },
+
+  sym_ants: {
+    getMultMult({ spirits }) {
+      return 1.0 + spirits.length * 1.0;
+    },
+  },
+
+  sym_crow:   {},  // event-driven: first deck flip in _doDeckPhase
+
+  sym_ducks: {
+    getMultMult({ spirits }) {
+      const self = spirits.find(s => s.id === 'sym_ducks');
+      return 1.0 + (self?.state?.pairsThisRound ?? 0) * 0.3;
+    },
+  },
+
+  sym_snails: {
+    getMultMult({ spirits }) {
+      const self = spirits.find(s => s.id === 'sym_snails');
+      return 1.0 + (self?.state?.totalUnplayed ?? 0) * 0.2;
+    },
+  },
+
+  sym_magpie: {},  // event-driven: +3 ki on style combo in _onStyleCombos
+
+  sym_osprey: {},  // event-driven: pre-play field capture (placeholder)
+
   // ── Wu Xing Engine Spirits ─────────────────────────────────────────────────
   // State incremented in _applyPostRoundEnhancements; read here for mult-mult channel.
 
