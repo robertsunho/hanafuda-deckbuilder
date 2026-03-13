@@ -20,7 +20,6 @@ import { SPIRIT_CATALOG, getSpiritDef }         from '../data/spirits.js';
 import { getAvailableFusions }                  from '../data/fusionRecipes.js';
 import { THREE_MARKS, WUXING_CONSUMABLES,
          getElementDef }                        from '../data/consumables.js';
-import { YAKU_INFO }                            from '../systems/ScoringEngine.js';
 import logger                                   from '../systems/GameplayLogger.js';
 
 // ── Channel badge display ──────────────────────────────────────────────────────
@@ -273,8 +272,6 @@ export class ShrineScene extends Phaser.Scene {
     let topY = HEADER_H + 6;
 
     // Fixed-height sections
-    this._drawParamitaSection(RCX, topY, 140);
-    topY += 140;
     this._drawConsumablesSection(RCX, topY, 220);
     topY += 220;
     this._drawWuXingForgeSection(RCX, topY, 80);
@@ -283,93 +280,6 @@ export class ShrineScene extends Phaser.Scene {
     if (this._isGrove) {
       const remaining = BTN_Y - 38 - topY;
       this._drawFusionSection(RCX, topY, remaining);
-    }
-  }
-
-  // ── Paramita Upgrades section ─────────────────────────────────────────────
-
-  _drawParamitaSection(cx, topY, height) {
-    this.add.text(cx, topY + 4, 'Paramita Upgrades', {
-      fontSize: '15px', color: '#cc99ff',
-    }).setOrigin(0.5, 0);
-    this.add.text(cx, topY + 22, 'Permanently raise yaku bonuses  —  5 ki each', {
-      fontSize: '10px', color: '#664488',
-    }).setOrigin(0.5, 0);
-
-    // 4 upgrade tiles
-    const UPGRADES = [
-      { id: 'kasu',    name: 'Rice',   yaku: 'Kasu',    color: '#ddccaa' },
-      { id: 'tanzaku', name: 'Tea',    yaku: 'Tanzaku', color: '#aaccdd' },
-      { id: 'tane',    name: 'Broth',  yaku: 'Tane',    color: '#aaddaa' },
-      { id: 'hikari',  name: 'Honey',  yaku: 'Hikari',  color: '#ffee88' },
-    ];
-
-    const tileW   = 128;
-    const tileH   = 90;
-    const tileGap = 8;
-    const totalW  = UPGRADES.length * tileW + (UPGRADES.length - 1) * tileGap;
-    const startX  = cx - totalW / 2 + tileW / 2;
-    const tileY   = topY + 42 + tileH / 2;
-
-    const upgrades = run.yakuUpgrades;
-
-    for (let i = 0; i < UPGRADES.length; i++) {
-      const u        = UPGRADES[i];
-      const x        = startX + i * (tileW + tileGap);
-      const level    = upgrades[u.id] ?? 0;
-      const canAfford = run.ki >= 5;
-
-      // Base bonus from YAKU_INFO
-      const yakuKey  = u.yaku.toUpperCase().replace('-', '_');
-      const info     = YAKU_INFO[yakuKey] ?? Object.values(YAKU_INFO).find(v => v.name === u.yaku);
-      const base     = info ? info.baseBonus : 0;
-      const current  = +(base + level * 0.2).toFixed(1);
-      const next     = +(base + (level + 1) * 0.2).toFixed(1);
-
-      const bgCol  = canAfford ? 0x1a1030 : 0x0e0818;
-      const border = canAfford ? 0x553377 : 0x2a1a3a;
-      this.add.rectangle(x, tileY, tileW, tileH, bgCol)
-        .setStrokeStyle(1, border);
-
-      this.add.text(x, tileY - tileH / 2 + 8, u.name, {
-        fontSize: '12px', color: u.color, fontStyle: 'bold',
-      }).setOrigin(0.5, 0);
-
-      this.add.text(x, tileY - tileH / 2 + 22, u.yaku, {
-        fontSize: '10px', color: '#665577',
-      }).setOrigin(0.5, 0);
-
-      this.add.text(x, tileY - 4, `+${current} → +${next}`,
-        { fontSize: '11px', color: '#ccaaee' }
-      ).setOrigin(0.5);
-
-      // Buy button
-      const btnY    = tileY + tileH / 2 - 16;
-      const buyable = canAfford;
-      const btnBg   = buyable ? 0x3a1a5a : 0x1a0e2a;
-      const btnBdr  = buyable ? 0xaa55dd : 0x3a2a4a;
-      const btnTxt  = buyable ? '#cc88ff' : '#443355';
-
-      const btn = this.add.rectangle(x, btnY, tileW - 12, 22, btnBg)
-        .setStrokeStyle(1, btnBdr);
-      this.add.text(x, btnY, `${buyable ? '' : ''}5 ki`, {
-        fontSize: '11px', color: btnTxt,
-      }).setOrigin(0.5);
-
-      if (buyable) {
-        btn.setInteractive({ useHandCursor: true });
-        btn.on('pointerover', () => btn.setFillStyle(0x5a2a8a));
-        btn.on('pointerout',  () => btn.setFillStyle(btnBg));
-        btn.on('pointerdown', () => {
-          try {
-            run.buyYakuUpgrade(u.id);
-            logger.logShopPurchase('upgrade', u.name, 5, `${u.yaku} now +${next.toFixed(1)}`);
-            this._buildUI();
-          } catch (e) {
-            console.warn('[ShrineScene] buyYakuUpgrade:', e.message);
-          }
-        });
-      }
     }
   }
 

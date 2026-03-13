@@ -237,6 +237,8 @@ export default class GameRoundManager {
 
   /** Ki gained from Earth enhancements at the start of this round (0 if none). */
   get lastEarthKiGain() { return this._lastEarthKiGain ?? 0; }
+  /** Ki gained from base interest at the start of this round (0 if none). */
+  get lastInterestGain() { return this._lastInterestGain ?? 0; }
 
   /** All style combos triggered this round (for end-of-round display). */
   get triggeredStyleCombos() { return this._style.getTriggeredCombos(); }
@@ -312,6 +314,9 @@ export default class GameRoundManager {
    * @returns {this} for chaining
    */
   startRound() {
+    // ── Base interest (10% of ki balance) ────────────────────────────────
+    this._lastInterestGain = run.applyInterest();
+
     // ── Earth enhancement ki generation (before dealing) ─────────────────
     // Each Clay card contributes 2% ki interest; Pottery contributes 5%.
     const deckCards = run.getDeck();
@@ -551,6 +556,8 @@ export default class GameRoundManager {
         pigDoubleKi:     this._pigDoubleKi,
         turn:            this._turn,
         deckCard:        this._lastDeckCard,
+        cardsInHand:     this._hand.getAll().length,
+        styleCombos:     this._style.getTriggeredCombos().length,
       };
     }
 
@@ -1217,7 +1224,6 @@ export default class GameRoundManager {
       // Diff against unspent cards only — spent cards must not re-trigger yaku.
       const unspentForDiff = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
       const yakuFromUnspent = this._scoring.evaluate(unspentForDiff, run.yakuUpgrades, CAPTURE_YAKU_THRESHOLDS);
-      console.log('[finalize] turn:', this._turn, 'phase:', this._phase, 'yakuBefore:', [...this._yakuBeforeTurn.keys()]);
 
       const newYaku = yakuFromUnspent.filter(y => {
         const prev = this._yakuBeforeTurn.get(y.name);
@@ -1308,6 +1314,8 @@ export default class GameRoundManager {
         deckCard:         this._lastDeckCard,
         discarded:        [...this._discardedThisTurn],
         roundDiscardCount: this._discardCount,
+        cardsInHand:      this._hand.getAll().length,
+        styleCombos:      this._style.getTriggeredCombos().length,
       };
     }
 
@@ -1320,12 +1328,6 @@ export default class GameRoundManager {
       let keepChecking = true;
       while (keepChecking) {
         const unspent   = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
-        console.log('[additive] unspent:', {
-          bright: unspent.filter(c => c.type === 'bright').length,
-          animal: unspent.filter(c => c.type === 'animal').length,
-          ribbon: unspent.filter(c => c.type === 'ribbon').length,
-          plain:  unspent.filter(c => c.type === 'plain').length,
-        });
         const triggered = this._scoring.evaluate(unspent, run.yakuUpgrades);
         if (triggered.length === 0) { keepChecking = false; break; }
         for (const yaku of triggered) {

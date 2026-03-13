@@ -422,49 +422,33 @@ class RunManager {
    * automatically — call addKi() with the result to apply it).
    *
    * Formula:
-   *   base            = 3
-   *   + unique yaku   = result.allYaku.length
-   *   + surplus bonus = +1 if finalScore >= threshold × 2
-   *                     +2 if finalScore >= threshold × 3
-   *   raw total       = base + unique yaku + surplus bonus
-   *   × push mult     = × (1.0 + 0.25 × successfulPushCount) on success
-   *                     × 0.5 if penaltyApplied (failed push)
-   *   × pig double    = × 2 if result.pigDoubleKi is true (Pig consumable)
-   *   → round to nearest integer
+   *   base          = 5
+   *   + cardsInHand = +1 per card remaining in hand when banking
+   *   + styleCombos = +1 per style combo triggered this round
    *
-   * @param {{ allYaku: object[], finalScore: number,
-   *            penaltyApplied: boolean, pushCount: number,
-   *            pigDoubleKi?: boolean }} result
-   * @param {number} threshold  Score threshold for surplus bonus — pass the
-   *                            round threshold from checkThreshold().threshold.
+   * @param {{ cardsInHand?: number, styleCombos?: number }} result
    * @returns {number}  Ki earned (integer ≥ 0).
    */
-  calculateKiReward(result, threshold) {
-    const { allYaku, finalScore, penaltyApplied, pushCount, pigDoubleKi } = result;
+  calculateKiReward(result) {
+    const cardsInHand = result.cardsInHand ?? 0;
+    const styleCombos = result.styleCombos ?? 0;
+    return 5 + cardsInHand + styleCombos;
+  }
 
-    const base         = 3;
-    const yakuBonus    = allYaku.length;
-    let   surplusBonus = 0;
-    if (this._scoringMode === 'additive') {
-      // Additive mode: extra tier (+3 for 4× threshold) plus existing tiers.
-      const surplusRatio = (finalScore - threshold) / threshold;
-      if      (surplusRatio >= 3.0) surplusBonus = 3;
-      else if (surplusRatio >= 2.0) surplusBonus = 2;
-      else if (surplusRatio >= 1.0) surplusBonus = 1;
-    } else {
-      if      (finalScore >= threshold * 3) surplusBonus = 2;
-      else if (finalScore >= threshold * 2) surplusBonus = 1;
-    }
+  // ── Interest system ────────────────────────────────────────────────────────
 
-    const raw = base + yakuBonus + surplusBonus;
+  /** Base interest rate applied at the start of each round. */
+  get interestRate() { return 0.10; }
 
-    const pushMultiplier = penaltyApplied
-      ? 0.5
-      : 1.0 + 0.25 * (pushCount ?? 0);
-
-    const pigMultiplier = pigDoubleKi ? 2 : 1;
-
-    return Math.round(raw * pushMultiplier * pigMultiplier);
+  /**
+   * Apply interest to the ki balance at the start of a round.
+   * Earns floor(ki × 10%) ki.
+   * @returns {number} Interest earned.
+   */
+  applyInterest() {
+    const interest = Math.floor(this._ki * this.interestRate);
+    this._ki += interest;
+    return interest;
   }
 
   // ── Yaku upgrades ──────────────────────────────────────────────────────────

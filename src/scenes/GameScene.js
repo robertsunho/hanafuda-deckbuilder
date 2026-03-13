@@ -1411,15 +1411,7 @@ export class GameScene extends Phaser.Scene {
 
     // Compute threshold and ki reward before any state changes.
     const tr       = run.checkThreshold(result.finalScore);
-    const kiEarned = run.calculateKiReward(result, tr.threshold);
-    // Surplus ki bonus for display (capture + additive modes).
-    let surplusKiBonus = 0;
-    if ((run.scoringMode === 'capture' || run.scoringMode === 'additive') && tr.passed) {
-      const surplusRatio = (result.finalScore - tr.threshold) / tr.threshold;
-      if      (surplusRatio >= 3.0) surplusKiBonus = 3;
-      else if (surplusRatio >= 2.0) surplusKiBonus = 2;
-      else if (surplusRatio >= 1.0) surplusKiBonus = 1;
-    }
+    const kiEarned = run.calculateKiReward(result);
 
     this._overlayObjs.push(
       this.add.rectangle(cx, cy, 720, 560, 0x080d1a, 0.93).setStrokeStyle(2, 0x3a6080)
@@ -1629,9 +1621,12 @@ export class GameScene extends Phaser.Scene {
 
     } // end else (multiplicative scoring breakdown)
 
-    const kiLabel = surplusKiBonus > 0
-      ? `Ki earned: +${kiEarned}  (includes +${surplusKiBonus} surplus bonus)`
-      : `Ki earned: +${kiEarned}`;
+    const cardsInHand = result.cardsInHand ?? 0;
+    const styleCombos = result.styleCombos ?? 0;
+    let kiLabel = `Ki earned: +${kiEarned}  (base 5`;
+    if (cardsInHand > 0) kiLabel += ` +${cardsInHand} cards`;
+    if (styleCombos > 0) kiLabel += ` +${styleCombos} style`;
+    kiLabel += ')';
     this._overlayObjs.push(
       this.add.text(cx, y, kiLabel, {
         fontSize: '16px', color: '#ffee88', stroke: '#000000', strokeThickness: 2,
@@ -2077,6 +2072,7 @@ export class GameScene extends Phaser.Scene {
   // ── Round-start helper ────────────────────────────────────────────────────
 
   _afterRoundStart() {
+    const interest = this._round.lastInterestGain;
     const naturals = this._round.naturalCaptures;
     if (naturals.length > 0) {
       const names = naturals.map(cards => {
@@ -2087,6 +2083,8 @@ export class GameScene extends Phaser.Scene {
         `Natural full month${naturals.length > 1 ? 's' : ''} captured: ` +
         `${names.join(', ')}!  Play a card.`
       );
+    } else if (interest > 0) {
+      this._setStatus(`Interest: +${interest} ki  —  Play a card.`);
     } else {
       this._setStatus('Play a card from your hand.');
     }
