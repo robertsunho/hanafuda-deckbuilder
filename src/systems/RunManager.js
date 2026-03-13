@@ -7,6 +7,7 @@ import { findFusionRecipe }                     from '../data/fusionRecipes.js';
 import { getSpiritDef }                         from '../data/spirits.js';
 import { cards as ALL_CARDS }                   from '../data/cards.js';
 import { THREE_MARKS, WUXING_CONSUMABLES }      from '../data/consumables.js';
+import { getRibbonStampDef }                    from '../data/ribbonStamps.js';
 import logger                                   from './GameplayLogger.js';
 //
 //   import run from './systems/RunManager.js';
@@ -563,6 +564,26 @@ class RunManager {
     }
     // Copy all target properties (deep enough for plain objects / arrays).
     Object.assign(source, JSON.parse(JSON.stringify(target)));
+  }
+
+  // ── Ribbon stamps ─────────────────────────────────────────────────────────
+
+  /**
+   * Apply a ribbon stamp to a card in the deck.
+   * @param {string} cardId
+   * @param {string} stampId  'red' | 'blue' | 'green' | 'yellow'
+   * @returns {{ success: boolean, reason?: string }}
+   */
+  applyRibbonStamp(cardId, stampId) {
+    const card = this._deck.find(c => c.id === cardId);
+    if (!card) return { success: false, reason: 'Card not found' };
+    if (card.ribbonStamp) return { success: false, reason: 'Card already has a ribbon stamp' };
+    const stampDef = getRibbonStampDef(stampId);
+    if (!stampDef) return { success: false, reason: 'Unknown stamp type' };
+    if (this._ki < stampDef.cost) return { success: false, reason: 'Not enough ki' };
+    this._ki -= stampDef.cost;
+    card.ribbonStamp = stampId;
+    return { success: true };
   }
 
   // ── Wu Xing enhancements ───────────────────────────────────────────────────

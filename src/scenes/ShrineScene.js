@@ -20,6 +20,7 @@ import { SPIRIT_CATALOG, getSpiritDef }         from '../data/spirits.js';
 import { getAvailableFusions }                  from '../data/fusionRecipes.js';
 import { THREE_MARKS, WUXING_CONSUMABLES,
          getElementDef }                        from '../data/consumables.js';
+import { RIBBON_STAMPS, getRibbonStampDef }    from '../data/ribbonStamps.js';
 import logger                                   from '../systems/GameplayLogger.js';
 
 // ── Channel badge display ──────────────────────────────────────────────────────
@@ -329,6 +330,8 @@ export class ShrineScene extends Phaser.Scene {
     topY += 220;
     this._drawWuXingForgeSection(RCX, topY, 80);
     topY += 80;
+    this._drawRibbonStampsSection(RCX, topY, 120);
+    topY += 120;
 
     if (this._isGrove) {
       const remaining = BTN_Y - 38 - topY;
@@ -713,6 +716,144 @@ export class ShrineScene extends Phaser.Scene {
         btn.on('pointerdown', () => this._buyConsumable(def));
       }
     }
+  }
+
+  // ── Ribbon Stamps section ─────────────────────────────────────────────────
+
+  _drawRibbonStampsSection(cx, topY, height) {
+    this.add.text(cx, topY + 4, 'Ribbon Stamps', {
+      fontSize: '15px', color: '#ddaacc',
+    }).setOrigin(0.5, 0);
+    this.add.text(cx, topY + 22, 'Apply permanent effects to deck cards', {
+      fontSize: '10px', color: '#334455',
+    }).setOrigin(0.5, 0);
+
+    const stamps   = Object.values(RIBBON_STAMPS);
+    const tileW    = 128;
+    const tileH    = height - 36;
+    const tileGap  = 8;
+    const totalW   = stamps.length * tileW + (stamps.length - 1) * tileGap;
+    const startX   = cx - totalW / 2 + tileW / 2;
+    const tileY    = topY + 34 + tileH / 2;
+
+    for (let i = 0; i < stamps.length; i++) {
+      const stamp   = stamps[i];
+      const x       = startX + i * (tileW + tileGap);
+      const afford  = run.ki >= stamp.cost;
+      const buyable = afford;
+
+      this.add.rectangle(x, tileY, tileW, tileH, buyable ? 0x1a0f1a : 0x0e0a0e)
+        .setStrokeStyle(1, buyable ? stamp.hexColor * 0.6 : 0x1a1a2a);
+
+      this.add.text(x, tileY - tileH / 2 + 6, stamp.name, {
+        fontSize: '11px', color: stamp.color, fontStyle: 'bold',
+        wordWrap: { width: tileW - 8 }, align: 'center',
+      }).setOrigin(0.5, 0);
+
+      this.add.text(x, tileY - tileH / 2 + 20, stamp.description, {
+        fontSize: '8px', color: '#445566',
+        wordWrap: { width: tileW - 8 }, align: 'center',
+      }).setOrigin(0.5, 0);
+
+      const btnY2  = tileY + tileH / 2 - 14;
+      const btnLbl = !afford ? `N/A  ${stamp.cost}ki` : `Stamp  ${stamp.cost}ki`;
+      const btnTxt = buyable ? stamp.color : '#334455';
+      const btn    = this.add.rectangle(x, btnY2, tileW - 10, 20, buyable ? 0x1a1020 : 0x0a0a0a)
+        .setStrokeStyle(1, buyable ? stamp.hexColor * 0.4 : 0x1a1a2a);
+      this.add.text(x, btnY2, btnLbl, { fontSize: '10px', color: btnTxt }).setOrigin(0.5);
+
+      if (buyable) {
+        btn.setInteractive({ useHandCursor: true });
+        btn.on('pointerover', () => btn.setFillStyle(0x2a1830));
+        btn.on('pointerout',  () => btn.setFillStyle(0x1a1020));
+        btn.on('pointerdown', () => this._showStampCardSelector(stamp));
+      }
+    }
+  }
+
+  // ── Stamp card selector overlay ───────────────────────────────────────────
+
+  _showStampCardSelector(stampDef) {
+    for (const o of this._confirmObjs) o.destroy();
+    this._confirmObjs = [];
+
+    // Only show cards that don't already have a ribbon stamp.
+    const deck     = run.getDeck().filter(c => !c.ribbonStamp);
+    const shuffled = [...deck].sort(() => Math.random() - 0.5);
+    const preview  = shuffled.slice(0, Math.min(8, shuffled.length));
+
+    const cx = 640, cy = 360;
+    const W  = 900, H = 460;
+    const push = obj => { this._confirmObjs.push(obj); return obj; };
+
+    push(this.add.rectangle(cx, cy, W, H, 0x0a0612, 0.97)
+      .setStrokeStyle(2, stampDef.hexColor).setDepth(50));
+
+    push(this.add.text(cx, cy - H / 2 + 14, `${stampDef.name} — Select a Card  (${stampDef.cost} ki)`, {
+      fontSize: '18px', color: stampDef.color, stroke: '#000000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(50));
+
+    push(this.add.text(cx, cy - H / 2 + 36, stampDef.description, {
+      fontSize: '12px', color: '#667788',
+    }).setOrigin(0.5).setDepth(50));
+
+    if (preview.length === 0) {
+      push(this.add.text(cx, cy, 'All cards already have ribbon stamps.', {
+        fontSize: '14px', color: '#667788',
+      }).setOrigin(0.5).setDepth(50));
+    } else {
+      const SCALE    = 0.68;
+      const CW       = Math.round(64 * SCALE);
+      const CH       = Math.round(104 * SCALE);
+      const GAP      = 12;
+      const perRow   = 4;
+      const gridW    = perRow * CW + (perRow - 1) * GAP;
+      const gridStartX = cx - gridW / 2 + CW / 2;
+      const gridStartY = cy - 60;
+
+      for (let i = 0; i < preview.length; i++) {
+        const card = preview[i];
+        const col  = i % perRow;
+        const row  = Math.floor(i / perRow);
+        const x    = gridStartX + col * (CW + GAP);
+        const y    = gridStartY + row * (CH + GAP + 22);
+
+        const spr = push(this.add.image(x, y, card.id).setScale(SCALE).setDepth(51));
+        push(this.add.text(x, y + CH / 2 + 2, card.name, {
+          fontSize: '8px', color: '#8899aa',
+          wordWrap: { width: CW + GAP - 4 }, align: 'center',
+        }).setOrigin(0.5, 0).setDepth(51));
+        push(this.add.text(x, y + CH / 2 + 12, `[${card.type}]`, {
+          fontSize: '8px', color: '#556677',
+        }).setOrigin(0.5, 0).setDepth(51));
+
+        spr.setInteractive({ useHandCursor: true });
+        spr.on('pointerover', () => spr.setTint(0xffccee));
+        spr.on('pointerout',  () => spr.clearTint());
+        spr.on('pointerdown', () => {
+          const result = run.applyRibbonStamp(card.id, stampDef.id);
+          if (result.success) {
+            logger.logConsumableUse(stampDef.name, `stamped ${card.id}`);
+            for (const o of this._confirmObjs) o.destroy();
+            this._confirmObjs = [];
+            this._buildUI();
+          }
+        });
+      }
+    }
+
+    // Cancel button (no cost deducted — ki is spent only on success)
+    const cancelBtn = push(this.add.rectangle(cx, cy + H / 2 - 30, 140, 36, 0x2a1a1a)
+      .setStrokeStyle(1, 0x664444).setInteractive({ useHandCursor: true }).setDepth(51));
+    cancelBtn.on('pointerover', () => cancelBtn.setFillStyle(0x4a2a2a));
+    cancelBtn.on('pointerout',  () => cancelBtn.setFillStyle(0x2a1a1a));
+    cancelBtn.on('pointerdown', () => {
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+    });
+    push(this.add.text(cx, cy + H / 2 - 30, 'Cancel', {
+      fontSize: '13px', color: '#ffaaaa',
+    }).setOrigin(0.5).setDepth(51));
   }
 
   // ── Fusion Ritual section (Sacred Grove only) ─────────────────────────────

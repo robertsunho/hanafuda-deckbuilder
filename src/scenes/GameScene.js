@@ -324,6 +324,10 @@ export class GameScene extends Phaser.Scene {
       // Enhancement badge — placed above the card to avoid overlapping action buttons.
       const enhBadge = this._makeEnhancementBadge(card, x, y - Math.round(CARD_H * CARD_SCALE / 2) - 20);
       if (enhBadge) enhBadge.forEach(o => this._handObjs.push(o));
+
+      // Ribbon stamp dot — top-left corner of the card.
+      const stampDot = this._makeRibbonStampDot(card, x, y);
+      if (stampDot) this._handObjs.push(stampDot);
     }
   }
 
@@ -385,6 +389,8 @@ export class GameScene extends Phaser.Scene {
           const by = sy + j * SLOT_FAN_Y + Math.round(CARD_H * CARD_SCALE / 2) + 4;
           const enhBadge = this._makeEnhancementBadge(card, bx, by);
           if (enhBadge) enhBadge.forEach(o => this._fieldObjs.push(o));
+          const stampDot = this._makeRibbonStampDot(card, bx, sy + j * SLOT_FAN_Y);
+          if (stampDot) this._fieldObjs.push(stampDot);
         }
       }
     }
@@ -2280,5 +2286,32 @@ export class GameScene extends Phaser.Scene {
     }
 
     return objs;
+  }
+
+  // ── Ribbon stamp dot ──────────────────────────────────────────────────────
+
+  /**
+   * Create a small colored circle in the top-left corner of a card to indicate
+   * a ribbon stamp.  Returns null if the card has no stamp.
+   *
+   * @param {object} card   Card object (may have card.ribbonStamp)
+   * @param {number} cx     Horizontal centre of the card
+   * @param {number} cy     Vertical centre of the card
+   * @returns {Phaser.GameObjects.Arc|null}
+   */
+  _makeRibbonStampDot(card, cx, cy) {
+    if (!card.ribbonStamp) return null;
+    const STAMP_COLORS = {
+      red:    0xcc3333,
+      blue:   0x3366cc,
+      green:  0x33aa55,
+      yellow: 0xccaa33,
+    };
+    const color = STAMP_COLORS[card.ribbonStamp] ?? 0xffffff;
+    const hw = Math.round(CARD_W * CARD_SCALE / 2);
+    const hh = Math.round(CARD_H * CARD_SCALE / 2);
+    return this.add.circle(cx - hw + 6, cy - hh + 6, 4, color)
+      .setDepth(5)
+      .setStrokeStyle(1, 0x000000);
   }
 }

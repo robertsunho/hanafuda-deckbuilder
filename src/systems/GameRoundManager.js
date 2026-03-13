@@ -1066,6 +1066,58 @@ export default class GameRoundManager {
           }
         }
       }
+
+      // Ribbon stamp effects.
+      for (const card of cards) {
+        if (!card.ribbonStamp) continue;
+        switch (card.ribbonStamp) {
+          case 'red': {
+            const drawN = Math.min(1, this._deck.drawPileSize);
+            if (drawN > 0) this._hand.add(this._deck.draw(drawN));
+            break;
+          }
+          case 'blue': {
+            if (this._deck.drawPileSize > 0) {
+              const extraFlip = this._deck.draw(1)[0];
+              const flipResult = this._field.addFlippedCard(extraFlip);
+              if (flipResult.captured) this._addCapture(flipResult.captured);
+            }
+            break;
+          }
+          case 'green': {
+            run.onCardsCaptured([card]);
+            break;
+          }
+          case 'yellow': {
+            const allCaptured2 = this._capture.getAll();
+            let additiveMult2  = 0;
+            let multMult2      = 1.0;
+            for (const spirit of this._spirits) {
+              const effect = SpiritEffects.get(spirit.id);
+              if (effect?.getAdditiveMult)
+                additiveMult2 += effect.getAdditiveMult({ capturedCards: allCaptured2, yakuList: [], spirits: this._spirits });
+              if (effect?.getMultMult)
+                multMult2 *= effect.getMultMult({ capturedCards: allCaptured2, yakuList: [], spirits: this._spirits });
+            }
+            let pts2 = card.points;
+            for (const spirit of this._spirits) {
+              const effect = SpiritEffects.get(spirit.id);
+              if (effect?.getPointBoosts) {
+                const boosts = effect.getPointBoosts({ capturedCards: allCaptured2, spirits: this._spirits });
+                if (boosts?.has(card.id)) pts2 += boosts.get(card.id);
+              }
+            }
+            const pushEscalation2 = 1.0 + this._pushCount * 0.3;
+            const flow2           = Math.max(1.0, this._styleBase);
+            const retriggerScore  = Math.round(pts2 * (1 + additiveMult2) * multMult2 * flow2 * pushEscalation2);
+            this._runningScore   += retriggerScore;
+            this._scoringEvents.push({
+              type: 'retrigger', card, retriggerScore, runningTotal: this._runningScore,
+            });
+            break;
+          }
+        }
+      }
     }
 
     run.onCardsCaptured(cards);
