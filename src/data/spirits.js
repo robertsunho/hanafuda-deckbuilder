@@ -407,6 +407,31 @@ export const SPIRIT_CATALOG = [
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'swallow',
   },
 
+  // ── Cross-Fusion Spirits (Tier 3 — Sacred Grove only) ─────────────────────
+
+  // Polarity Path
+  { id: 'cross_yang',    name: 'Yang',     description: 'Sky and Day cards score at ×2.0 mult.',       channel: 'cross', cost: 0, tier: 3, fusionGroup: 'polarity' },
+  { id: 'cross_yin',     name: 'Yin',      description: 'Land and Night cards score at ×2.0 mult.',    channel: 'cross', cost: 0, tier: 3, fusionGroup: 'polarity' },
+
+  // Quadrant Path
+  { id: 'cross_space',   name: 'Space',    description: 'Sky and Night cards score at ×1.5 mult.',     channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant' },
+  { id: 'cross_core',    name: 'Core',     description: 'Land and Day cards score at ×1.5 mult.',      channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant' },
+
+  // Seasonal Extremes
+  { id: 'cross_solstice', name: 'Solstice', description: 'Summer and Winter cards score at ×2.0 mult.', channel: 'cross', cost: 0, tier: 3, fusionGroup: 'seasonal_extreme' },
+  { id: 'cross_equinox',  name: 'Equinox',  description: 'Spring and Autumn cards score at ×2.0 mult.', channel: 'cross', cost: 0, tier: 3, fusionGroup: 'seasonal_extreme' },
+
+  // Half-Year
+  { id: 'cross_tropic',  name: 'Tropic',   description: 'Spring and Summer cards score at ×1.5 mult.',  channel: 'cross', cost: 0, tier: 3, fusionGroup: 'halfyear' },
+  { id: 'cross_arctic',  name: 'Arctic',   description: 'Autumn and Winter cards score at ×1.5 mult.',  channel: 'cross', cost: 0, tier: 3, fusionGroup: 'halfyear' },
+
+  // ── Unity Spirits (Tier 4 — Sacred Grove only) ─────────────────────────────
+
+  { id: 'unity_yinyang', name: 'Yin-Yang', description: 'Ultimate axis spirit. Effect TBD.',      channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_axis' },
+  { id: 'unity_gravity', name: 'Gravity',  description: 'Ultimate quadrant spirit. Effect TBD.',  channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_axis' },
+  { id: 'unity_time',    name: 'Time',     description: 'Ultimate seasonal spirit. Effect TBD.',  channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_seasonal' },
+  { id: 'unity_planet',  name: 'Planet',   description: 'Ultimate half-year spirit. Effect TBD.', channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_seasonal' },
+
   // ── Economy Spirits ────────────────────────────────────────────────────────
 
   {

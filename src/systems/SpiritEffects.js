@@ -392,6 +392,69 @@ const _effects = {
 
   sym_osprey: {},  // event-driven: pre-play field capture (placeholder)
 
+  // ── Cross-Fusion Spirits (Tier 3) ─────────────────────────────────────────
+  // Each matching card contributes to additive mult.
+  // ×2.0 effective = +1.0 additive per card; ×1.5 = +0.5 additive per card.
+
+  cross_yang: {
+    getAdditiveMult({ capturedCards }) {
+      return capturedCards.filter(c => c.vertical === 'sky' || c.temporal === 'day').length * 1.0;
+    },
+  },
+
+  cross_yin: {
+    getAdditiveMult({ capturedCards }) {
+      return capturedCards.filter(c => c.vertical === 'ground' || c.temporal === 'night').length * 1.0;
+    },
+  },
+
+  cross_space: {
+    getAdditiveMult({ capturedCards }) {
+      return capturedCards.filter(c => c.vertical === 'sky' || c.temporal === 'night').length * 0.5;
+    },
+  },
+
+  cross_core: {
+    getAdditiveMult({ capturedCards }) {
+      return capturedCards.filter(c => c.vertical === 'ground' || c.temporal === 'day').length * 0.5;
+    },
+  },
+
+  cross_solstice: {
+    getAdditiveMult({ capturedCards }) {
+      const months = new Set([6, 7, 8, 12, 1, 2]);
+      return capturedCards.filter(c => months.has(c.month)).length * 1.0;
+    },
+  },
+
+  cross_equinox: {
+    getAdditiveMult({ capturedCards }) {
+      const months = new Set([3, 4, 5, 9, 10, 11]);
+      return capturedCards.filter(c => months.has(c.month)).length * 1.0;
+    },
+  },
+
+  cross_tropic: {
+    getAdditiveMult({ capturedCards }) {
+      const months = new Set([3, 4, 5, 6, 7, 8]);
+      return capturedCards.filter(c => months.has(c.month)).length * 0.5;
+    },
+  },
+
+  cross_arctic: {
+    getAdditiveMult({ capturedCards }) {
+      const months = new Set([9, 10, 11, 12, 1, 2]);
+      return capturedCards.filter(c => months.has(c.month)).length * 0.5;
+    },
+  },
+
+  // ── Unity Spirits (Tier 4) ─────────────────────────────────────────────────
+
+  unity_yinyang: {},  // TBD
+  unity_gravity: {},  // TBD
+  unity_time:    {},  // TBD
+  unity_planet:  {},  // TBD
+
   // ── Wu Xing Engine Spirits ─────────────────────────────────────────────────
   // State incremented in _applyPostRoundEnhancements; read here for mult-mult channel.
 
