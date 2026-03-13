@@ -980,7 +980,7 @@ export default class GameRoundManager {
             const retriggerScore  = Math.round(pts2 * (1 + additiveMult2) * multMult2 * flow2 * pushEscalation2);
             this._runningScore   += retriggerScore;
             this._scoringEvents.push({
-              type: 'retrigger', card, retriggerScore, runningTotal: this._runningScore,
+              type: 'retrigger', cards: [card], card, retriggerScore, runningTotal: this._runningScore,
             });
             break;
           }

@@ -29,6 +29,7 @@ class GameplayLogger {
   _log(entry) {
     if (!this._enabled) return;
     this._entries.push(entry);
+    console.log(entry);
   }
 
   _separator(label) {
