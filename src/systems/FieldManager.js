@@ -270,9 +270,8 @@ export default class FieldManager {
    * @returns {{ discarded: boolean, captured: object[]|null }}
    */
   addFlippedCard(card) {
-    const slot = this._slots.find(
-      s => s && s.month === card.month && s.state === 'normal'
-    );
+    const matches = this._slots.filter(s => s && s.month === card.month && s.state === 'normal');
+    const slot    = matches.reduce((best, s) => (!best || s.cards.length < best.cards.length) ? s : best, null);
     if (slot) {
       slot.cards.push(card);
       const len = slot.cards.length;
@@ -316,7 +315,7 @@ export default class FieldManager {
     const slot = this.getPendingSlot();
     if (!slot) throw new Error('addToPendingMatch: no pending match on the field');
     slot.cards.push(card);
-    if (slot.cards.length === 4) {
+    if (slot.cards.length >= 4) {
       const captured = [...slot.cards];
       this._nullify(slot);
       return { captured };

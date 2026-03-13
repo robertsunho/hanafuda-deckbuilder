@@ -124,17 +124,8 @@ class RunManager {
      */
     this._deck = JSON.parse(JSON.stringify(ALL_CARDS));
 
-    // ── Scoring mode ─────────────────────────────────────────────────────────
-    /** @type {'multiplicative'|'additive'|'capture'} */
-    this._scoringMode = 'capture';
-
     logger.logRunStart();
   }
-
-  // ── Scoring mode ───────────────────────────────────────────────────────────
-
-  get scoringMode() { return this._scoringMode; }
-  setScoringMode(mode) { this._scoringMode = mode; }
 
   // ── Ki economy ─────────────────────────────────────────────────────────────
 

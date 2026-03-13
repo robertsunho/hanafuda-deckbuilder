@@ -257,13 +257,13 @@ export default class GameRoundManager {
   /** All style combos triggered this round (for end-of-round display). */
   get triggeredStyleCombos() { return this._style.getTriggeredCombos(); }
 
-  /** Running total of additive event score earned this round. */
+  /** Running total of score accumulated this round (capture events). */
   get runningScore() { return this._runningScore; }
-  /** Set of card IDs already consumed by additive scoring events. */
+  /** Set of card IDs already spent by yaku scoring. */
   get spentCardIds()  { return new Set(this._spentCardIds); }
-  /** Number of additive scoring events fired this round. */
+  /** Number of yaku scoring events fired this round. */
   get eventCount()    { return this._eventCount; }
-  /** All scoring events fired this round (additive mode). */
+  /** All scoring events fired this round. */
   get scoringEvents() { return [...(this._scoringEvents ?? [])]; }
 
   /**
@@ -410,9 +410,6 @@ export default class GameRoundManager {
     const surplusExtra = this._spirits.some(s => s.id === 'game_surplus') ? 2 : 0;
     this._hand.add(this._deck.draw(GameRoundManager.HAND_SIZE + surplusExtra));
 
-    // Auto-capture any month where the opening hand holds all 4 cards.
-    this._checkNaturalCaptures();
-
     // Deal field cards one at a time so stacking rules are applied per card.
     for (const card of this._deck.draw(GameRoundManager.FIELD_DEAL)) {
       this._field.dealCard(card);
@@ -477,14 +474,9 @@ export default class GameRoundManager {
     // Remove all played cards from hand.
     this._hand.removeMany(cardIds);
 
-    // Count this play against the round limit (not used in capture mode).
-    if (run.scoringMode !== 'capture') this._playsRemaining--;
-
     // Snapshot active yaku (name → bonus) so _finalizeTurn() can diff.
-    const _snapThresholds = run.scoringMode === 'capture' ? this._getCaptureThresholds() : null;
-    const _snapCards = run.scoringMode === 'capture'
-      ? this._capture.getAll().filter(c => !this._spentCardIds.has(c.id))
-      : this._capture.getAll();
+    const _snapThresholds = this._getCaptureThresholds();
+    const _snapCards = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
     this._yakuBeforeTurn = new Map(
       this._scoring.evaluate(_snapCards, run.yakuUpgrades, _snapThresholds).map(y => [y.name, y.bonus])
     );
@@ -559,141 +551,49 @@ export default class GameRoundManager {
       throw new Error(`bankScore() called while phase is "${this._phase}".`);
     }
 
-    // ── CAPTURE MODE ──────────────────────────────────────────────────────────
-    if (run.scoringMode === 'capture') {
-      const flow = Math.max(1.0, this._styleBase);
-      const sc = this._scoring.calculateFinalScore(
-        this._capture.getAll(), this._spirits, 1.0, run.yakuUpgrades, true
-      );
-      this._applyPostRoundEnhancements(this._capture.getAll(), sc.metalConsumableCount);
-      logger.logRoundEnd(
-        { finalScore: this._runningScore, basePoints: this._runningScore,
-          boostedBasePoints: this._runningScore, yakuList: [], yakuMult: 1.0,
-          additiveMult: 0, multMult: 1.0, flow,
-          pointBoost: 1.0, rawBasePoints: this._runningScore },
-        run.threshold, this._runningScore >= run.threshold,
-        this._capture.getAll(), this._styleBase,
-        this._style.getTriggeredCombos(), this._lastEnhancementEvents ?? []
-      );
-      this._roundEndingAfterDecision = false;
-      this._phase = "round_over";
-      return {
-        status:          "banked",
-        finalScore:      this._runningScore,
-        runningScore:    this._runningScore,
-        captureEvents:   [...this._scoringEvents],
-        newYaku:         [],
-        allYaku:         [],
-        totalMultiplier: 1.0,
-        basePoints:      this._runningScore,
-        boostedBasePoints: this._runningScore,
-        yakuMult:        1.0,
-        effectiveMult:   1.0,
-        additiveMult:    0,
-        multMult:        1.0,
-        flow,
-        pushEscalation:  1.0 + this._pushCount * 0.3,
-        pointBoost:      1.0,
-        rawBasePoints:   this._runningScore,
-        pushFactor:      1.0,
-        styleBase:       this._styleBase,
-        penaltyApplied:  false,
-        pushCount:       this._pushCount,
-        pigDoubleKi:     this._pigDoubleKi,
-        turn:            this._turn,
-        deckCard:        this._lastDeckCard,
-        cardsInHand:     this._hand.getAll().length,
-        styleCombos:     this._style.getTriggeredCombos().length,
-      };
-    }
-
-    // sym_snails: accumulate unplayed cards at round end (before additive/mult paths).
-    this._trackSnailsUnplayed();
-
-    // ── ADDITIVE MODE ─────────────────────────────────────────────────────────
-    if (run.scoringMode === 'additive') {
-      const bankPushFactor = Math.min(1.5, 1.0 + this._pushCount * 0.1);
-      const bankFlow       = Math.max(1.0, this._styleBase * bankPushFactor);
-      const sc = this._scoring.calculateFinalScore(
-        this._capture.getAll(), this._spirits, 1.0, run.yakuUpgrades, true
-      );
-      this._applyPostRoundEnhancements(this._capture.getAll(), sc.metalConsumableCount);
-      logger.logRoundEnd(
-        { finalScore: this._runningScore, basePoints: this._runningScore,
-          boostedBasePoints: this._runningScore, yakuList: [], yakuMult: 1.0,
-          additiveMult: 0, multMult: 1.0, flow: bankFlow,
-          pointBoost: 1.0, rawBasePoints: this._runningScore },
-        run.threshold,
-        this._runningScore >= run.threshold,
-        this._capture.getAll(),
-        this._styleBase,
-        this._style.getTriggeredCombos(),
-        this._lastEnhancementEvents ?? []
-      );
-      this._roundEndingAfterDecision = false;
-      this._phase = "round_over";
-      return {
-        status:          "banked",
-        finalScore:      this._runningScore,
-        runningScore:    this._runningScore,
-        newYaku:         [],
-        additiveEvents:  [],
-        allYaku:         [],
-        totalMultiplier: 1.0,
-        basePoints:      this._runningScore,
-        boostedBasePoints: this._runningScore,
-        yakuMult:        1.0,
-        effectiveMult:   1.0,
-        additiveMult:    0,
-        multMult:        1.0,
-        flow:            bankFlow,
-        pointBoost:      1.0,
-        rawBasePoints:   this._runningScore,
-        pushFactor:      bankPushFactor,
-        styleBase:       this._styleBase,
-        penaltyApplied:  false,
-        pushCount:       this._pushCount,
-        pigDoubleKi:     this._pigDoubleKi,
-        turn:            this._turn,
-        deckCard:        this._lastDeckCard,
-      };
-    }
-
-    // ── MULTIPLICATIVE MODE (unchanged) ───────────────────────────────────────
-    // Banking counts as a successful outcome — Push Factor is positive.
-    const pushFactor = Math.min(1.5, 1.0 + this._pushCount * 0.1);
-    const flow       = Math.max(1.0, this._styleBase * pushFactor);
+    const flow = Math.max(1.0, this._styleBase);
     const sc = this._scoring.calculateFinalScore(
-      this._capture.getAll(), this._spirits, flow, run.yakuUpgrades, true
+      this._capture.getAll(), this._spirits, 1.0, run.yakuUpgrades, true
     );
-    // Apply post-round enhancement effects (Water dep increment, Fire breaks,
-    // Metal consumable generation).
     this._applyPostRoundEnhancements(this._capture.getAll(), sc.metalConsumableCount);
     logger.logRoundEnd(
-      { ...sc, basePoints: sc.boostedBasePoints },
-      run.threshold,
-      sc.finalScore >= run.threshold,
-      this._capture.getAll(),
-      this._styleBase,
-      this._style.getTriggeredCombos(),
-      this._lastEnhancementEvents ?? []
+      { finalScore: this._runningScore, basePoints: this._runningScore,
+        boostedBasePoints: this._runningScore, yakuList: [], yakuMult: 1.0,
+        additiveMult: 0, multMult: 1.0, flow,
+        pointBoost: 1.0, rawBasePoints: this._runningScore },
+      run.threshold, this._runningScore >= run.threshold,
+      this._capture.getAll(), this._styleBase,
+      this._style.getTriggeredCombos(), this._lastEnhancementEvents ?? []
     );
     this._roundEndingAfterDecision = false;
     this._phase = "round_over";
     return {
       status:          "banked",
+      finalScore:      this._runningScore,
+      runningScore:    this._runningScore,
+      captureEvents:   [...this._scoringEvents],
       newYaku:         [],
-      ...sc,
-      allYaku:         sc.yakuList,
-      totalMultiplier: sc.yakuMult,
-      basePoints:      sc.boostedBasePoints,
-      pushFactor,
+      allYaku:         [],
+      totalMultiplier: 1.0,
+      basePoints:      this._runningScore,
+      boostedBasePoints: this._runningScore,
+      yakuMult:        1.0,
+      effectiveMult:   1.0,
+      additiveMult:    0,
+      multMult:        1.0,
+      flow,
+      pushEscalation:  1.0 + this._pushCount * 0.3,
+      pointBoost:      1.0,
+      rawBasePoints:   this._runningScore,
+      pushFactor:      1.0,
       styleBase:       this._styleBase,
       penaltyApplied:  false,
       pushCount:       this._pushCount,
       pigDoubleKi:     this._pigDoubleKi,
       turn:            this._turn,
       deckCard:        this._lastDeckCard,
+      cardsInHand:     this._hand.getAll().length,
+      styleCombos:     this._style.getTriggeredCombos().length,
     };
   }
 
@@ -719,91 +619,30 @@ export default class GameRoundManager {
     this._roundEndingAfterDecision = false;
     this._pushCount++;
 
-    // ── CAPTURE MODE ──────────────────────────────────────────────────────────
-    if (run.scoringMode === 'capture') {
-      this._atRiskScore       = this._runningScore;
-      this._pushPenaltyActive = true;
-      // econ_lucky_charm: gain ki equal to 50% of current balance (max 20).
-      if (this._spirits.some(s => s.id === 'econ_lucky_charm')) {
-        run.addKi(Math.min(20, Math.floor(run.ki * 0.5)));
-      }
-      // Hand cards carry over; deal a fixed number of additional cards.
-      const dealCount = this._getNextPushDealCount();
-      const handCount = Math.min(dealCount, this._deck.drawPileSize, this._hand.availableSlots);
-      if (handCount > 0) this._hand.add(this._deck.draw(handCount));
-      // Re-snapshot yaku using only unspent cards so spent yaku can re-trigger.
-      const unspentAfterPush = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
-      this._yakuBeforeTurn = new Map(
-        this._scoring.evaluate(unspentAfterPush, run.yakuUpgrades, this._getCaptureThresholds())
-          .map(y => [y.name, y.bonus])
-      );
-      this._phase = "idle";
-      const nextEscalation = 1.0 + this._pushCount * 0.3;
-      return {
-        failedPushFactor: 1.0,
-        failedFlow:       Math.max(1.0, this._styleBase),
-        nextEscalation,
-        dealCount: handCount,
-      };
-    }
-
-    const allYaku         = this._scoring.evaluate(this._capture.getAll(), run.yakuUpgrades);
-    const totalMultiplier = this._scoring.calculateTotalMultiplier(allYaku);
-    this._atRiskScore       = Math.round(this._basePoints * totalMultiplier);
+    this._atRiskScore       = this._runningScore;
     this._pushPenaltyActive = true;
-
-    // Deal a scaled hand — fewer cards with each successive push.
-    const targetHand = Math.max(2, GameRoundManager.HAND_SIZE - this._pushCount * 2);
-    const handCount  = Math.min(targetHand, this._deck.drawPileSize, this._hand.availableSlots);
+    // econ_lucky_charm: gain ki equal to 50% of current balance (max 20).
+    if (this._spirits.some(s => s.id === 'econ_lucky_charm')) {
+      run.addKi(Math.min(20, Math.floor(run.ki * 0.5)));
+    }
+    // Hand cards carry over; deal a fixed number of additional cards.
+    const dealCount = this._getNextPushDealCount();
+    const handCount = Math.min(dealCount, this._deck.drawPileSize, this._hand.availableSlots);
     if (handCount > 0) this._hand.add(this._deck.draw(handCount));
-
-    // Fewer plays available with each successive push (floor is 1, not 2).
-    this._playsRemaining    = Math.max(1, GameRoundManager.PLAYS_PER_ROUND - this._pushCount);
-    this._discardsRemaining = GameRoundManager.MAX_DISCARDS;
+    // Re-snapshot yaku using only unspent cards so spent yaku can re-trigger.
+    const unspentAfterPush = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
+    this._yakuBeforeTurn = new Map(
+      this._scoring.evaluate(unspentAfterPush, run.yakuUpgrades, this._getCaptureThresholds())
+        .map(y => [y.name, y.bonus])
+    );
     this._phase = "idle";
-
-    // Return the Flow that would apply if this push fails (for the status bar).
-    const failedPushFactor = this._dogProtection
-      ? 1.0
-      : Math.max(0.5, 1.0 - this._pushCount * 0.1);
-    const failedFlow = Math.max(1.0, this._styleBase * failedPushFactor);
-    return { failedPushFactor, failedFlow };
-  }
-
-  /**
-   * Discard selected hand cards and draw replacements from the deck.
-   * Free action — costs 1 discard (decrements _discardsRemaining), NOT a play.
-   * Only callable during the 'idle' phase.
-   *
-   * @param {string[]} cardIds  IDs of cards currently in hand to discard.
-   * @returns {{ status: 'ok', removed: object[], drawn: object[], discardsRemaining: number }}
-   * @throws {Error} if no discards remain or called outside the 'idle' phase
-   */
-  discardCards(cardIds) {
-    if (run.scoringMode === 'capture') {
-      throw new Error('discardCards() is not available in capture scoring mode.');
-    }
-    if (this._phase !== "idle") {
-      throw new Error(`discardCards() called while phase is "${this._phase}".`);
-    }
-    if (this._discardsRemaining <= 0) {
-      throw new Error("No discards remaining.");
-    }
-
-    const removed = this._hand.removeMany(cardIds);
-    if (removed.length === 0) {
-      return { status: "ok", removed: [], drawn: [], discardsRemaining: this._discardsRemaining };
-    }
-
-    for (const c of removed) this._allDiscards.push(c);
-    this._discardsRemaining--;
-
-    // Draw replacements (capped by deck size and remaining hand capacity).
-    const drawCount = Math.min(removed.length, this._deck.drawPileSize, this._hand.availableSlots);
-    const drawn     = drawCount > 0 ? this._deck.draw(drawCount) : [];
-    if (drawn.length > 0) this._hand.add(drawn);
-
-    return { status: "ok", removed, drawn, discardsRemaining: this._discardsRemaining };
+    const nextEscalation = 1.0 + this._pushCount * 0.3;
+    return {
+      failedPushFactor: 1.0,
+      failedFlow:       Math.max(1.0, this._styleBase),
+      nextEscalation,
+      dealCount: handCount,
+    };
   }
 
   /**
@@ -878,78 +717,6 @@ export default class GameRoundManager {
     this._lastEnhancementEvents = events;
   }
 
-  // ── Additive scoring helpers ───────────────────────────────────────────────
-
-  /**
-   * Score one additive event for the given yaku name.
-   * Selects yaku cards from the unspent capture pile, computes an escalating
-   * event score, marks those cards as spent, and accumulates the running total.
-   *
-   * @param {string} yakuName
-   * @returns {object} event record
-   */
-  _scoreAdditiveEvent(yakuName) {
-    const unspent     = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
-    const yakuCards   = this._selectAdditiveYakuCards(yakuName, unspent);
-
-    // Card points — honour Water mult; Fire uses fixed pts.
-    let yakuCardPoints = 0;
-    for (const card of yakuCards) {
-      const enh    = card.enhancement;
-      const isFire = enh?.element === 'fire';
-      let pts = isFire ? (enh.tier === 'upgraded' ? 20 : 10) : card.points;
-      if (enh?.element === 'water') {
-        const multArr = enh.tier === 'upgraded' ? ICE_MULT : SNOW_MULT;
-        pts = Math.round(pts * multArr[Math.min(enh.depLevel ?? 0, multArr.length - 1)]);
-      }
-      yakuCardPoints += pts;
-    }
-
-    // Yaku bonus from evaluate on the current unspent pool.
-    const yakuInfo  = this._scoring.evaluate(unspent, run.yakuUpgrades)
-      .find(y => y.name === yakuName);
-    const yakuBonus = yakuInfo?.bonus ?? 0;
-
-    // Spirit channels (additive mult + mult-mult) on all captured cards.
-    const allCaptured = this._capture.getAll();
-    const allYaku     = this._scoring.evaluate(allCaptured, run.yakuUpgrades);
-    let additiveMult  = 0;
-    let multMult      = 1.0;
-    for (const spirit of this._spirits) {
-      const effect = SpiritEffects.get(spirit.id);
-      if (effect?.getAdditiveMult)
-        additiveMult += effect.getAdditiveMult({ capturedCards: allCaptured, yakuList: allYaku, spirits: this._spirits });
-      if (effect?.getMultMult)
-        multMult     *= effect.getMultMult({ capturedCards: allCaptured, yakuList: allYaku, spirits: this._spirits });
-    }
-
-    // Flow — optimistic (success push factor).
-    const pushFactor = Math.min(1.5, 1.0 + this._pushCount * 0.1);
-    const flow       = Math.max(1.0, this._styleBase * pushFactor);
-
-    // Event escalation multiplier — uncapped: +0.3 per event, starting at ×1.0.
-    const eventMult  = 1.0 + this._eventCount * 0.3;
-
-    const eventScore = Math.round(
-      yakuCardPoints * (1 + yakuBonus + additiveMult) * multMult * flow * eventMult
-    );
-
-    // Spend cards and update state.
-    for (const card of yakuCards) this._spentCardIds.add(card.id);
-    this._runningScore += eventScore;
-    this._eventCount++;
-
-    const event = {
-      yakuName, yakuCards, yakuCardPoints, yakuBonus,
-      additiveMult, multMult, flow, eventMult, eventScore,
-      eventNumber:  this._eventCount,
-      runningTotal: this._runningScore,
-    };
-    this._scoringEvents.push(event);
-    logger.logScoringEvent(event);
-    return event;
-  }
-
   /**
    * Select which unspent cards are attributed to the named yaku for scoring.
    * Returns at most the minimum threshold needed to trigger the yaku.
@@ -960,7 +727,7 @@ export default class GameRoundManager {
    */
   _selectAdditiveYakuCards(yakuName, unspentCards) {
     const isFireCard = c => c.enhancement?.element === 'fire';
-    const t = run.scoringMode === 'capture' ? this._getCaptureThresholds() : { kasu: 5, tanzaku: 3, tane: 3, hikari: 2 };
+    const t = this._getCaptureThresholds();
     switch (yakuName) {
       case 'Kasu':
         return unspentCards.filter(c => c.type === 'plain'  || isFireCard(c)).slice(0, t.kasu);
@@ -1087,12 +854,7 @@ export default class GameRoundManager {
     this._basePoints += cards.reduce((sum, c) => sum + c.points, 0);
     if (cards.length === 4) this._basePoints += 5;   // full-month bonus
 
-    if (run.scoringMode === 'additive') {
-      for (const card of cards) this._runningScore += card.points;
-      if (cards.length === 4) this._runningScore += 5; // full-month bonus
-    }
-
-    if (run.scoringMode === 'capture') {
+    {
       // Score this capture group immediately.
       const allCaptured = this._capture.getAll();
       const allYaku     = this._scoring.evaluate(allCaptured, run.yakuUpgrades, this._getCaptureThresholds());
@@ -1466,11 +1228,10 @@ export default class GameRoundManager {
     this._turn++;
     this._capture.recordTurn();
 
-    const _yakuThresholds = run.scoringMode === 'capture' ? this._getCaptureThresholds() : null;
+    const _yakuThresholds = this._getCaptureThresholds();
     const yakuForDiff = this._scoring.evaluate(this._capture.getAll(), run.yakuUpgrades, _yakuThresholds);
 
-    // ── CAPTURE MODE ──────────────────────────────────────────────────────────
-    if (run.scoringMode === 'capture') {
+    {
       // Diff against unspent cards only — spent cards must not re-trigger yaku.
       const unspentForDiff = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
       const yakuFromUnspent = this._scoring.evaluate(unspentForDiff, run.yakuUpgrades, this._getCaptureThresholds());
@@ -1569,197 +1330,5 @@ export default class GameRoundManager {
         styleCombos:      this._style.getTriggeredCombos().length,
       };
     }
-
-    // ── ADDITIVE MODE ─────────────────────────────────────────────────────────
-    if (run.scoringMode === 'additive') {
-      this._yakuBeforeTurn = new Map(yakuForDiff.map(y => [y.name, y.bonus]));
-
-      // Score all currently-triggerable yaku on unspent cards.
-      const additiveEvents = [];
-      let keepChecking = true;
-      while (keepChecking) {
-        const unspent   = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
-        const triggered = this._scoring.evaluate(unspent, run.yakuUpgrades);
-        if (triggered.length === 0) { keepChecking = false; break; }
-        for (const yaku of triggered) {
-          additiveEvents.push(this._scoreAdditiveEvent(yaku.name));
-        }
-      }
-      logger.logYakuState(
-        yakuForDiff,
-        additiveEvents.map(e => ({ name: e.yakuName, bonus: e.yakuBonus }))
-      );
-
-      if (additiveEvents.length > 0) this._pushPenaltyActive = false;
-
-      const roundOver      = this._hand.isEmpty() || this._playsRemaining <= 0;
-      const penaltyApplied = roundOver && this._pushPenaltyActive && !this._dogProtection;
-      if (roundOver) this._trackSnailsUnplayed();
-
-      // Compute the actual flow for display (same formula used inside each event).
-      const pushFactor = penaltyApplied
-        ? Math.max(0.5, 1.0 - this._pushCount * 0.1)
-        : Math.min(1.5, 1.0 + this._pushCount * 0.1);
-      const flow = Math.max(1.0, this._styleBase * pushFactor);
-
-      if (roundOver && penaltyApplied) {
-        const PENALTY_RATES = [0.3, 0.5, 0.7, 0.9];
-        const rate = PENALTY_RATES[Math.min(this._pushCount - 1, 3)];
-        this._runningScore = Math.round(this._runningScore * (1 - rate));
-      }
-
-      const nextPushCount      = this._pushCount + 1;
-      const nextFailPushFactor = this._dogProtection
-        ? 1.0
-        : Math.max(0.5, 1.0 - nextPushCount * 0.1);
-      const nextFailFlow = Math.max(1.0, this._styleBase * nextFailPushFactor);
-
-      const hasNewEvents = additiveEvents.length > 0;
-
-      if (hasNewEvents) {
-        this._roundEndingAfterDecision = roundOver;
-        this._phase = "yaku_decision";
-      } else if (roundOver) {
-        const sc = this._scoring.calculateFinalScore(
-          this._capture.getAll(), this._spirits, 1.0, run.yakuUpgrades, true
-        );
-        this._applyPostRoundEnhancements(this._capture.getAll(), sc.metalConsumableCount);
-        logger.logRoundEnd(
-          { finalScore: this._runningScore, basePoints: this._runningScore,
-            boostedBasePoints: this._runningScore, yakuList: [], yakuMult: 1.0,
-            additiveMult: 0, multMult: 1.0, flow,
-            pointBoost: 1.0, rawBasePoints: this._runningScore },
-          run.threshold,
-          this._runningScore >= run.threshold,
-          this._capture.getAll(),
-          this._styleBase,
-          this._style.getTriggeredCombos(),
-          this._lastEnhancementEvents ?? []
-        );
-        this._phase = "round_over";
-      } else {
-        this._phase = "idle";
-      }
-
-      const status = hasNewEvents ? "yaku_decision" : roundOver ? "round_over" : "ok";
-      return {
-        status,
-        newYaku:          additiveEvents.map(e => ({ name: e.yakuName, bonus: e.yakuBonus })),
-        additiveEvents,
-        runningScore:     this._runningScore,
-        allYaku:          yakuForDiff,
-        totalMultiplier:  1.0,
-        basePoints:       this._runningScore,
-        boostedBasePoints: this._runningScore,
-        finalScore:       this._runningScore,
-        yakuMult:         1.0,
-        effectiveMult:    1.0,
-        additiveMult:     0,
-        multMult:         1.0,
-        flow,
-        pointBoost:       1.0,
-        rawBasePoints:    this._runningScore,
-        pushFactor,
-        styleBase:        this._styleBase,
-        penaltyApplied,
-        pushCount:        this._pushCount,
-        pigDoubleKi:      this._pigDoubleKi,
-        nextFailFlow,
-        turn:             this._turn,
-        deckCard:         this._lastDeckCard,
-        discarded:        [...this._discardedThisTurn],
-        roundDiscardCount: this._discardCount,
-      };
-    }
-
-    // ── MULTIPLICATIVE MODE (unchanged) ───────────────────────────────────────
-    // Evaluate yaku (spirits excluded) for the Bank/Push new-yaku diff.
-    // A yaku counts as "new" if its name wasn't present before, OR if its
-    // bonus jumped by more than 0.3 (no sub-combinations exist in the current
-    // system, so in practice only newly appearing yaku trigger a decision).
-    const newYaku = yakuForDiff.filter(y => {
-      const prev = this._yakuBeforeTurn.get(y.name);
-      return prev === undefined || y.bonus - prev > 0.3;
-    });
-    this._yakuBeforeTurn = new Map(yakuForDiff.map(y => [y.name, y.bonus]));
-    logger.logYakuState(yakuForDiff, newYaku);
-
-    // Completing a new yaku clears the push penalty regardless of outcome.
-    if (newYaku.length > 0) this._pushPenaltyActive = false;
-
-    // Round ends when the hand is empty OR the play limit is reached.
-    const roundOver = this._hand.isEmpty() || this._playsRemaining <= 0;
-
-    // Dog consumable suppresses the push penalty (treats the outcome as success).
-    const penaltyApplied = roundOver && this._pushPenaltyActive && !this._dogProtection;
-
-    // ── Push Factor ───────────────────────────────────────────────────────────
-    // Success (or no push): +0.1 per push, capped at ×1.5 after 5 pushes.
-    // Failure (round ends under penalty): −0.1 per push, floored at ×0.5.
-    const pushFactor = penaltyApplied
-      ? Math.max(0.5, 1.0 - this._pushCount * 0.1)
-      : Math.min(1.5, 1.0 + this._pushCount * 0.1);
-
-    // ── Flow = Style Base × Push Factor, floored at 1.0 ─────────────────────
-    const flow = Math.max(1.0, this._styleBase * pushFactor);
-
-    // ── Full three-channel score ──────────────────────────────────────────────
-    // Roll Metal procs only when the round is ending without a yaku decision
-    // (the yaku_decision → bankScore() path applies procs there instead).
-    const isTerminal = roundOver && newYaku.length === 0;
-    const sc = this._scoring.calculateFinalScore(
-      this._capture.getAll(), this._spirits, flow, run.yakuUpgrades, isTerminal
-    );
-
-    // For the Bank/Push decision overlay: what Flow would result if the NEXT
-    // push also fails?  Used by the UI to show the downside risk.
-    const nextPushCount      = this._pushCount + 1;
-    const nextFailPushFactor = this._dogProtection
-      ? 1.0
-      : Math.max(0.5, 1.0 - nextPushCount * 0.1);
-    const nextFailFlow = Math.max(1.0, this._styleBase * nextFailPushFactor);
-
-    if (newYaku.length > 0) {
-      // A new yaku always triggers a Bank/Push decision, even on the final play.
-      // If the round would also end, defer that transition until after the decision.
-      this._roundEndingAfterDecision = roundOver;
-      this._phase = "yaku_decision";
-    } else if (roundOver) {
-      // Apply post-round enhancement mutations (Water dep, Fire breaks, Metal cons).
-      this._applyPostRoundEnhancements(this._capture.getAll(), sc.metalConsumableCount);
-      logger.logRoundEnd(
-        { ...sc, basePoints: sc.boostedBasePoints },
-        run.threshold,
-        sc.finalScore >= run.threshold,
-        this._capture.getAll(),
-        this._styleBase,
-        this._style.getTriggeredCombos(),
-        this._lastEnhancementEvents ?? []
-      );
-      this._phase = "round_over";
-    } else {
-      this._phase = "idle";
-    }
-
-    const status = newYaku.length > 0 ? "yaku_decision" :
-                   roundOver          ? "round_over"    : "ok";
-    return {
-      status,
-      newYaku,
-      ...sc,
-      allYaku:         sc.yakuList,
-      totalMultiplier: sc.yakuMult,
-      basePoints:      sc.boostedBasePoints,
-      pushFactor,
-      styleBase:       this._styleBase,
-      penaltyApplied,
-      pushCount:       this._pushCount,
-      pigDoubleKi:     this._pigDoubleKi,
-      nextFailFlow,
-      turn:            this._turn,
-      deckCard:        this._lastDeckCard,
-      discarded:       [...this._discardedThisTurn],
-      roundDiscardCount: this._discardCount,
-    };
   }
 }

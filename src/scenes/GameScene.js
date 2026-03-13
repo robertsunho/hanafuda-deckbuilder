@@ -2,6 +2,7 @@ import GameRoundManager      from '../systems/GameRoundManager.js';
 import { YAKU_INFO }         from '../systems/ScoringEngine.js';
 import run, { RunManager }   from '../systems/RunManager.js';
 import { getElementDef }     from '../data/consumables.js';
+import { getSpiritDef }      from '../data/spirits.js';
 import logger                from '../systems/GameplayLogger.js';
 import SpiritEffects         from '../systems/SpiritEffects.js';
 
@@ -146,7 +147,10 @@ export class GameScene extends Phaser.Scene {
      * Active Three Marks targeting state, or null when not in mark mode.
      * @type {{ id: string, index: number, step: 'select_source'|'select_target', sourceCard: object|null }|null}
      */
-    this._markMode = null;
+    this._markMode         = null;
+    this._fannedSlot       = null;
+    this._cardTooltipBg    = null;
+    this._cardTooltipText  = null;
 
     this._createCardBackTexture();
     this._buildStaticUI();
@@ -174,11 +178,7 @@ export class GameScene extends Phaser.Scene {
 
   // ── Card-back texture ──────────────────────────────────────────────────────
 
-  _createCardBackTexture() {
-    // Debug: log card_back source dimensions.
-    const backTex = this.textures.get('card_back').getSourceImage();
-    console.log('[card_back] source size:', backTex.width, '×', backTex.height);
-  }
+  _createCardBackTexture() {}
 
   // ── Static UI ─────────────────────────────────────────────────────────────
 
@@ -262,6 +262,7 @@ export class GameScene extends Phaser.Scene {
   // ── Master render ──────────────────────────────────────────────────────────
 
   _renderAll() {
+    this._fannedSlot = null;
     this._clearObjs(this._handObjs);
     this._clearObjs(this._fieldObjs);
     this._clearObjs(this._captureObjs);
@@ -296,6 +297,7 @@ export class GameScene extends Phaser.Scene {
       const y        = HAND_Y - (selected || (fireWild && card.id === this._fireWildCard.id) ? 20 : 0);
       const spr      = this.add.image(x, y, card.id).setScale(CARD_SCALE);
 
+      const ttY = y - Math.round(CARD_H * CARD_SCALE / 2) - 5;
       if (markActive) {
         // In mark mode: cards are selectable targets regardless of game phase.
         const MARK_TINT        = 0x44ffcc;
@@ -304,8 +306,8 @@ export class GameScene extends Phaser.Scene {
                                   && this._markMode.sourceCard?.id === card.id;
         spr.setTint(isTranscendSrc ? TINT_PENDING : MARK_TINT);
         spr.setInteractive({ useHandCursor: true });
-        spr.on('pointerover',  () => { if (!isTranscendSrc) spr.setTint(MARK_HOVER); });
-        spr.on('pointerout',   () => { spr.setTint(isTranscendSrc ? TINT_PENDING : MARK_TINT); });
+        spr.on('pointerover',  () => { if (!isTranscendSrc) spr.setTint(MARK_HOVER); this._showCardTooltip(card, x, ttY); });
+        spr.on('pointerout',   () => { spr.setTint(isTranscendSrc ? TINT_PENDING : MARK_TINT); this._hideCardTooltip(); });
         spr.on('pointerdown',  () => this._onMarkCardSelected(card));
       } else if (fireWild) {
         // Fire wild targeting: selected fire card stays elevated; others dimmed.
@@ -313,8 +315,8 @@ export class GameScene extends Phaser.Scene {
       } else if (idle) {
         spr.setInteractive({ useHandCursor: true });
         if (selected) spr.setTint(TINT_HOVER);
-        spr.on('pointerover',  () => spr.setTint(TINT_HOVER));
-        spr.on('pointerout',   () => { if (!selected) spr.clearTint(); });
+        spr.on('pointerover',  () => { spr.setTint(TINT_HOVER); this._showCardTooltip(card, x, ttY); });
+        spr.on('pointerout',   () => { if (!selected) spr.clearTint(); this._hideCardTooltip(); });
         spr.on('pointerdown',  () => this._toggleCardSelection(card.id));
       } else {
         spr.setTint(TINT_DIM);
@@ -338,26 +340,31 @@ export class GameScene extends Phaser.Scene {
     const markActive = this._markMode !== null;
     const fireWild   = this._fireWildCard !== null;
 
-    // Slot background rectangles (hexagonal arrangement)
     for (let i = 0; i < 8; i++) {
-      const { x, y } = SLOT_POSITIONS[i];
-      this._fieldObjs.push(
-        this._addRoundedRect(x, y, SLOT_BG_W, SLOT_BG_H, 6, 0x0a1628)
-      );
-    }
-
-    // Cards in occupied slots
-    for (let i = 0; i < slots.length; i++) {
-      const slot = slots[i];
-      if (!slot) continue;
       const { x: sx, y: sy } = SLOT_POSITIONS[i];
+      const slot     = slots[i];
+      const isFanned = this._fannedSlot === i;
+
+      // Slot background
+      const bg = this._addRoundedRect(sx, sy, SLOT_BG_W, SLOT_BG_H, 6, 0x0a1628);
+      this._fieldObjs.push(bg);
+
+      if (!slot) continue;
+
+      // Click slot background to toggle card fan when 2+ cards
+      if (!markActive && !fireWild && slot.cards.length >= 2) {
+        bg.setInteractive({ useHandCursor: true });
+        bg.on('pointerdown', () => this._toggleFieldFan(i));
+      }
+
       for (let j = 0; j < slot.cards.length; j++) {
         const card = slot.cards[j];
-        const spr  = this.add.image(
-          sx + j * SLOT_FAN_X,
-          sy + j * SLOT_FAN_Y,
-          card.id
-        ).setScale(CARD_SCALE);
+        const offX = isFanned ? j * 20 : j * SLOT_FAN_X;
+        const offY = isFanned ? j * 28 : j * SLOT_FAN_Y;
+        const cx   = sx + offX;
+        const cy   = sy + offY;
+        const spr  = this.add.image(cx, cy, card.id).setScale(CARD_SCALE);
+        const ttY  = cy - Math.round(CARD_H * CARD_SCALE / 2) - 5;
 
         if (markActive) {
           const MARK_TINT      = 0x44ffcc;
@@ -366,30 +373,31 @@ export class GameScene extends Phaser.Scene {
                                   && this._markMode.sourceCard?.id === card.id;
           spr.setTint(isTranscendSrc ? TINT_PENDING : MARK_TINT);
           spr.setInteractive({ useHandCursor: true });
-          spr.on('pointerover',  () => { if (!isTranscendSrc) spr.setTint(MARK_HOVER); });
-          spr.on('pointerout',   () => { spr.setTint(isTranscendSrc ? TINT_PENDING : MARK_TINT); });
+          spr.on('pointerover',  () => { if (!isTranscendSrc) spr.setTint(MARK_HOVER); this._showCardTooltip(card, cx, ttY); });
+          spr.on('pointerout',   () => { spr.setTint(isTranscendSrc ? TINT_PENDING : MARK_TINT); this._hideCardTooltip(); });
           spr.on('pointerdown',  () => this._onMarkCardSelected(card));
         } else if (fireWild) {
-          // Fire wild targeting: all occupied field slots are valid targets.
           const FIRE_TINT  = 0xff9944;
           const FIRE_HOVER = 0xffcc66;
           spr.setTint(FIRE_TINT);
           spr.setInteractive({ useHandCursor: true });
-          spr.on('pointerover', () => spr.setTint(FIRE_HOVER));
-          spr.on('pointerout',  () => spr.setTint(FIRE_TINT));
+          spr.on('pointerover', () => { spr.setTint(FIRE_HOVER); this._showCardTooltip(card, cx, ttY); });
+          spr.on('pointerout',  () => { spr.setTint(FIRE_TINT); this._hideCardTooltip(); });
           spr.on('pointerdown', () => this._playFireWild(slot.month));
-        } else if (slot.state === 'pending') {
-          spr.setTint(TINT_PENDING);
+        } else {
+          if (slot.state === 'pending') spr.setTint(TINT_PENDING);
+          spr.setInteractive();
+          spr.on('pointerover', () => this._showCardTooltip(card, cx, ttY));
+          spr.on('pointerout',  () => this._hideCardTooltip());
         }
         this._fieldObjs.push(spr);
 
-        // Enhancement badge (only on the top card of the fan)
+        // Enhancement badge and stamp (only on the top card of the fan)
         if (j === slot.cards.length - 1) {
-          const bx = sx + j * SLOT_FAN_X;
-          const by = sy + j * SLOT_FAN_Y + Math.round(CARD_H * CARD_SCALE / 2) + 4;
-          const enhBadge = this._makeEnhancementBadge(card, bx, by);
+          const by = cy + Math.round(CARD_H * CARD_SCALE / 2) + 4;
+          const enhBadge = this._makeEnhancementBadge(card, cx, by);
           if (enhBadge) enhBadge.forEach(o => this._fieldObjs.push(o));
-          const stampDot = this._makeRibbonStampDot(card, bx, sy + j * SLOT_FAN_Y);
+          const stampDot = this._makeRibbonStampDot(card, cx, cy);
           if (stampDot) this._fieldObjs.push(stampDot);
         }
       }
@@ -452,7 +460,7 @@ export class GameScene extends Phaser.Scene {
       card.on('pointerover', () => {
         const captured = this._round.capture.getAll();
         const contrib  = this._getSpiritContrib(spirit, captured);
-        tooltip.setText(spirit.description + (contrib ? '\n\n' + contrib : ''));
+        tooltip.setText((getSpiritDef(spirit.id)?.description ?? spirit.name) + (contrib ? '\n\n' + contrib : ''));
         tooltip.setVisible(true);
       });
       card.on('pointerout', () => tooltip.setVisible(false));
@@ -564,7 +572,7 @@ export class GameScene extends Phaser.Scene {
   _renderCaptureFan() {
     const capturedCards = this._round.capture.getAll();
     const discards      = this._round.allDiscards;
-    const spentIds      = (run.scoringMode === 'capture' || run.scoringMode === 'additive') ? this._round.spentCardIds : new Set();
+    const spentIds      = this._round.spentCardIds;
 
     const TYPE_ORDER   = ['bright', 'animal', 'ribbon', 'plain'];
     const TYPE_SYMBOLS = { bright: '★', animal: '♦', ribbon: '║', plain: '□' };
@@ -797,7 +805,7 @@ export class GameScene extends Phaser.Scene {
           const rowCards = group.slice(rowStart, rowStart + ROW_MAX);
           const rowW     = rowCards.length * (OV_W + OV_GAP) - OV_GAP;
           const startX   = Math.round(cx - rowW / 2 + OV_W / 2);
-          const spentIds = (run.scoringMode === 'capture' || run.scoringMode === 'additive') ? this._round.spentCardIds : null;
+          const spentIds = this._round.spentCardIds;
           for (let j = 0; j < rowCards.length; j++) {
             const img = this.add.image(startX + j * (OV_W + OV_GAP), Math.round(y + OV_H / 2), rowCards[j].id)
               .setScale(OV_SCALE).setDepth(20);
@@ -1138,25 +1146,6 @@ export class GameScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(5)
     );
 
-    if (run.scoringMode !== 'capture') {
-      const discardsLeft    = this._round.discardsRemaining;
-      const discardEnabled  = discardsLeft > 0;
-      const discardBtn = this.add.rectangle(HAND_CX + 90, y, 160, 40,
-        discardEnabled ? 0x6a3a1a : 0x2a1a0a)
-        .setStrokeStyle(2, discardEnabled ? 0xaa7744 : 0x443322).setDepth(5);
-      if (discardEnabled) {
-        discardBtn.setInteractive({ useHandCursor: true });
-        discardBtn.on('pointerover',  () => discardBtn.setFillStyle(0x9a5a2a));
-        discardBtn.on('pointerout',   () => discardBtn.setFillStyle(0x6a3a1a));
-        discardBtn.on('pointerdown',  () => this._onDiscardButton());
-      }
-      this._actionBtnObjs.push(discardBtn);
-      this._actionBtnObjs.push(
-        this.add.text(HAND_CX + 90, y, `Discard (${discardsLeft} left)`, {
-          fontSize: '15px', color: discardEnabled ? '#ffffff' : '#554433',
-        }).setOrigin(0.5).setDepth(5)
-      );
-    }
   }
 
   // ── Three Marks (in-round targeting) ──────────────────────────────────────
@@ -1484,49 +1473,18 @@ export class GameScene extends Phaser.Scene {
 
     const drawSize = this._round.deck.drawPileSize;
 
-    if (run.scoringMode === 'capture') {
-      const runScore = this._round.runningScore;
-      const thr      = run.threshold;
-      this._baseText.setStyle({ color: runScore >= thr ? '#44ff88' : '#aaccee' })
-        .setText(`Running: ${runScore}`);
-      const escal = (1.0 + this._round.pushCount * 0.3).toFixed(1);
-      this._multiText.setText(`\xD7${escal} escalation`);
-      this._projText.setText('');
-    } else if (run.scoringMode === 'additive') {
-      const runScore = this._round.runningScore;
-      const thr      = run.threshold;
-      this._baseText.setStyle({ color: runScore >= thr ? '#44ff88' : '#aaccee' })
-        .setText(`Running: ${runScore}`);
-      this._multiText.setText(`Events: ${this._round.eventCount}`);
-      this._projText.setText('');
-    } else {
-      const sc = this._round.getCurrentScoring();
-      // Base line — show point-boost detail when active.
-      const ptBoostActive = Math.abs(sc.pointBoost - 1.0) > 0.001;
-      const baseStr = ptBoostActive
-        ? `${sc.rawBasePoints} (\xD7${sc.pointBoost.toFixed(2)}=${sc.boostedBasePoints})`
-        : `Base: ${sc.boostedBasePoints}`;
-      this._baseText.setStyle({ color: '#aaccee' }).setText(baseStr);
-
-      // Mult line.
-      let multStr = `\xD7${sc.yakuMult.toFixed(2)}`;
-      if (sc.additiveMult !== 0)               multStr += ` +${sc.additiveMult.toFixed(2)}`;
-      if (Math.abs(sc.multMult - 1.0) > 0.001) multStr += ` \xD7${sc.multMult.toFixed(2)}mm`;
-      multStr += ` \xD7${sc.flow.toFixed(2)}f`;
-      this._multiText.setText(multStr);
-
-      this._projText.setText(`= ${sc.finalScore}`);
-    }
+    const runScore = this._round.runningScore;
+    const thr      = run.threshold;
+    this._baseText.setStyle({ color: runScore >= thr ? '#44ff88' : '#aaccee' })
+      .setText(`Running: ${runScore}`);
+    const escal = (1.0 + this._round.pushCount * 0.3).toFixed(1);
+    this._multiText.setText(`\xD7${escal} escalation`);
+    this._projText.setText('');
 
     this._thresholdText.setText(`Target: ${run.threshold}`);
     this._turnText.setText(`Turn: ${this._round.turn}`);
-    if (run.scoringMode === 'capture') {
-      this._playsText.setText(`Cards: ${this._round.hand.getAll().length}`);
-      this._discardsText.setText('');
-    } else {
-      this._playsText.setText(`Plays: ${this._round.playsRemaining}`);
-      this._discardsText.setText(`Discards: ${this._round.discardsRemaining}`);
-    }
+    this._playsText.setText(`Cards: ${this._round.hand.getAll().length}`);
+    this._discardsText.setText('');
     this._actRoundText.setText(`Act ${run.act}  R${run.round}/18`);
     this._kiText.setText(`Ki: ${run.ki}`);
 
@@ -1576,186 +1534,56 @@ export class GameScene extends Phaser.Scene {
     // ── Score breakdown ───────────────────────────────────────────────────
     let y = cy - 204;
 
-    if (run.scoringMode === 'capture') {
-      // Capture mode: show capture event summary.
-      const events = this._round.scoringEvents;
-      if (events.length === 0) {
-        this._overlayObjs.push(
-          this.add.text(cx, y, 'No captures this round.', {
-            fontSize: '15px', color: '#778899',
-          }).setOrigin(0.5)
-        );
-        y += 24;
-      } else {
-        this._overlayObjs.push(
-          this.add.text(cx, y, `Captures  (${events.length} total)`, {
-            fontSize: '14px', color: '#778899',
-          }).setOrigin(0.5)
-        );
-        y += 20;
-        const displayEvents = events.slice(-6);
-        if (events.length > 6) {
-          this._overlayObjs.push(
-            this.add.text(cx, y, `\u2026 and ${events.length - 6} earlier captures`, {
-              fontSize: '12px', color: '#556677',
-            }).setOrigin(0.5)
-          );
-          y += 16;
-        }
-        for (const ev of displayEvents) {
-          const esc  = (ev.pushEscalation ?? 1.0).toFixed(1);
-          const tags = ev.cards.map(c => c.type[0].toUpperCase()).join('');
-          const line = `[${tags}]  ${ev.capturePoints}pt \xD7${esc} \u2192 +${ev.captureScore}`;
-          this._overlayObjs.push(
-            this.add.text(cx, y, line, { fontSize: '13px', color: '#cce0ff' }).setOrigin(0.5)
-          );
-          y += 18;
-        }
-      }
-      y += 6;
-      if (result.penaltyApplied) {
-        this._overlayObjs.push(
-          this.add.text(cx, y, '\u26A0 Push penalty applied — score reduced', {
-            fontSize: '13px', color: '#ff8866',
-          }).setOrigin(0.5)
-        );
-        y += 20;
-      }
+    // Show capture event summary.
+    const events = this._round.scoringEvents;
+    if (events.length === 0) {
       this._overlayObjs.push(
-        this.add.text(cx, y, `Final Score: ${result.finalScore}`, {
-          fontSize: '24px', color: '#ffffff', stroke: '#000000', strokeThickness: 3,
-        }).setOrigin(0.5)
-      );
-      y += 32;
-
-    } else if (run.scoringMode === 'additive') {
-      // Additive mode: show per-event summary from the round manager.
-      const events = this._round.scoringEvents;
-      if (events.length === 0) {
-        this._overlayObjs.push(
-          this.add.text(cx, y, 'No scoring events this round.', {
-            fontSize: '15px', color: '#778899',
-          }).setOrigin(0.5)
-        );
-        y += 24;
-      } else {
-        this._overlayObjs.push(
-          this.add.text(cx, y, `Scoring Events  (${events.length})`, {
-            fontSize: '14px', color: '#778899',
-          }).setOrigin(0.5)
-        );
-        y += 20;
-        for (const ev of events) {
-          const line = `#${ev.eventNumber} ${ev.yakuName}  ${ev.yakuCardPoints}pt × ×${ev.eventMult.toFixed(1)} = +${ev.eventScore}`;
-          this._overlayObjs.push(
-            this.add.text(cx, y, line, { fontSize: '13px', color: '#cce0ff' }).setOrigin(0.5)
-          );
-          y += 18;
-        }
-      }
-      y += 6;
-      if (result.penaltyApplied) {
-        this._overlayObjs.push(
-          this.add.text(cx, y, '\u26A0 Push penalty applied — score reduced', {
-            fontSize: '13px', color: '#ff8866',
-          }).setOrigin(0.5)
-        );
-        y += 20;
-      }
-      this._overlayObjs.push(
-        this.add.text(cx, y, `Final Score: ${result.finalScore}`, {
-          fontSize: '24px', color: '#ffffff', stroke: '#000000', strokeThickness: 3,
-        }).setOrigin(0.5)
-      );
-      y += 32;
-    } else {
-
-    // Base — show point-boost detail when active.
-    const ptBoostActive = Math.abs(result.pointBoost - 1.0) > 0.001;
-    const baseLabel = ptBoostActive
-      ? `Base: ${result.rawBasePoints}  (\xD7${result.pointBoost.toFixed(2)} pt boost \u2192 ${result.boostedBasePoints})`
-      : `Base: ${result.boostedBasePoints}`;
-    this._overlayObjs.push(
-      this.add.text(cx, y, baseLabel, { fontSize: '17px', color: '#aaccee' }).setOrigin(0.5)
-    );
-    y += 26;
-
-    if (result.allYaku.length === 0) {
-      this._overlayObjs.push(
-        this.add.text(cx, y, 'No yaku scored this round.', {
+        this.add.text(cx, y, 'No captures this round.', {
           fontSize: '15px', color: '#778899',
         }).setOrigin(0.5)
       );
       y += 24;
     } else {
-      for (const yaku of result.allYaku) {
+      this._overlayObjs.push(
+        this.add.text(cx, y, `Captures  (${events.length} total)`, {
+          fontSize: '14px', color: '#778899',
+        }).setOrigin(0.5)
+      );
+      y += 20;
+      const displayEvents = events.slice(-6);
+      if (events.length > 6) {
         this._overlayObjs.push(
-          this.add.text(cx, y, `${yaku.name}  +${yaku.bonus.toFixed(2)}`, {
-            fontSize: '16px', color: '#cce0ff',
+          this.add.text(cx, y, `\u2026 and ${events.length - 6} earlier captures`, {
+            fontSize: '12px', color: '#556677',
           }).setOrigin(0.5)
         );
-        y += 22;
+        y += 16;
       }
-    }
-    y += 6;
-
-    // Multiplier line — additive yaku construction + spirit channels.
-    let multLabel = '1.0';
-    for (const yaku of result.allYaku) {
-      multLabel += ` +${yaku.bonus.toFixed(2)} (${yaku.name})`;
-    }
-    multLabel += ` = \xD7${result.yakuMult.toFixed(2)} yaku`;
-    if (result.additiveMult !== 0)
-      multLabel += `  +${result.additiveMult.toFixed(2)} spirit`;
-    if (Math.abs(result.multMult - 1.0) > 0.001)
-      multLabel += `  \xD7${result.multMult.toFixed(2)} mm`;
-    multLabel += `  = \xD7${result.effectiveMult.toFixed(2)} eff.`;
-    this._overlayObjs.push(
-      this.add.text(cx, y, multLabel, { fontSize: '15px', color: '#ffee88' }).setOrigin(0.5)
-    );
-    y += 24;
-
-    const flowLabel = result.penaltyApplied
-      ? `\u26A0 Flow: \xD7${result.flow.toFixed(2)}  (Style \xD7${result.styleBase.toFixed(2)} \xD7 Push \xD7${result.pushFactor.toFixed(1)})  [penalty]`
-      : `Flow: \xD7${result.flow.toFixed(2)}  (Style \xD7${result.styleBase.toFixed(2)} \xD7 Push \xD7${result.pushFactor.toFixed(1)})`;
-    this._overlayObjs.push(
-      this.add.text(cx, y, flowLabel, {
-        fontSize: '13px', color: result.penaltyApplied ? '#ff8866' : '#88ddaa',
-      }).setOrigin(0.5)
-    );
-    y += 24;
-
-    // ── Style combos ──────────────────────────────────────────────────────
-    const styleCombos = this._round.triggeredStyleCombos;
-    const styleTotal  = this._round.roundStyleTotal;
-    if (styleCombos.length > 0) {
-      this._overlayObjs.push(this.add.rectangle(cx, y + 4, 580, 1, 0x2a3a50));
-      y += 14;
-      for (const sc of styleCombos) {
+      for (const ev of displayEvents) {
+        const esc  = (ev.pushEscalation ?? 1.0).toFixed(1);
+        const tags = ev.cards.map(c => c.type[0].toUpperCase()).join('');
+        const line = `[${tags}]  ${ev.capturePoints}pt \xD7${esc} \u2192 +${ev.captureScore}`;
         this._overlayObjs.push(
-          this.add.text(cx, y, `${sc.name}  +${sc.bonus.toFixed(1)} Style`, {
-            fontSize: '13px', color: '#ffcc44',
-          }).setOrigin(0.5)
+          this.add.text(cx, y, line, { fontSize: '13px', color: '#cce0ff' }).setOrigin(0.5)
         );
         y += 18;
       }
+    }
+    y += 6;
+    if (result.penaltyApplied) {
       this._overlayObjs.push(
-        this.add.text(cx, y,
-          `Style total: +${styleTotal.toFixed(1)}  \u2192  Style Base now \xD7${run.styleBase.toFixed(2)}`,
-          { fontSize: '12px', color: '#bbaa55' }
-        ).setOrigin(0.5)
+        this.add.text(cx, y, '\u26A0 Push penalty applied — score reduced', {
+          fontSize: '13px', color: '#ff8866',
+        }).setOrigin(0.5)
       );
       y += 20;
     }
-
     this._overlayObjs.push(
       this.add.text(cx, y, `Final Score: ${result.finalScore}`, {
         fontSize: '24px', color: '#ffffff', stroke: '#000000', strokeThickness: 3,
       }).setOrigin(0.5)
     );
     y += 32;
-
-    } // end else (multiplicative scoring breakdown)
 
     const cardsInHand = result.cardsInHand ?? 0;
     const styleCombos = result.styleCombos ?? 0;
@@ -2022,187 +1850,10 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
-  // ── Additive event overlay ────────────────────────────────────────────────
-
-  _showAdditiveEventOverlay(result) {
-    this._bankPushOpen = true;
-    this._clearObjs(this._overlayObjs);
-    const cx = FIELD_CX, cy = 270;
-
-    this._overlayObjs.push(
-      this.add.rectangle(cx, cy, 490, 280, 0x080d1a, 0.96)
-        .setStrokeStyle(2, 0x6a9a3a).setDepth(25)
-    );
-    this._overlayObjs.push(
-      this.add.text(cx, cy - 122, 'Scoring Events!', {
-        fontSize: '20px', color: '#e8c96a', stroke: '#000000', strokeThickness: 3,
-      }).setOrigin(0.5).setDepth(25)
-    );
-
-    let y = cy - 92;
-    const events = result.additiveEvents ?? [];
-    for (const ev of events) {
-      const line = `${ev.yakuName}  ${ev.yakuCardPoints}pts × ×${ev.eventMult.toFixed(1)} → +${ev.eventScore}`;
-      this._overlayObjs.push(
-        this.add.text(cx, y, line, { fontSize: '14px', color: '#ffee88' }).setOrigin(0.5).setDepth(25)
-      );
-      y += 22;
-    }
-    y += 4;
-    this._overlayObjs.push(
-      this.add.text(cx, y, `Running total: ${result.runningScore}`, {
-        fontSize: '15px', color: '#88ffcc',
-      }).setOrigin(0.5).setDepth(25)
-    );
-    y += 20;
-    const threshold   = run.threshold;
-    const surplus     = result.runningScore - threshold;
-    const threshColor = surplus >= 0 ? '#88ff88' : '#ff8888';
-    const threshLabel = surplus >= 0
-      ? `Threshold: ${threshold}  (\u2713 +${surplus} surplus)`
-      : `Threshold: ${threshold}  (need ${-surplus} more)`;
-    this._overlayObjs.push(
-      this.add.text(cx, y, threshLabel, { fontSize: '13px', color: threshColor })
-        .setOrigin(0.5).setDepth(25)
-    );
-
-    const btnY = cy + 118;
-
-    const bankLabel = surplus >= 0
-      ? `Bank ${result.runningScore}  (+${surplus})`
-      : `Bank ${result.runningScore}  (need ${-surplus})`;
-    const bankBtn = this.add.rectangle(cx - 118, btnY, 206, 42, 0x1a6a1a)
-      .setStrokeStyle(2, 0x44aa44).setInteractive({ useHandCursor: true }).setDepth(25);
-    bankBtn.on('pointerover', () => bankBtn.setFillStyle(0x2a9a2a));
-    bankBtn.on('pointerout',  () => bankBtn.setFillStyle(0x1a6a1a));
-    bankBtn.on('pointerdown', () => {
-      this._bankPushOpen = false;
-      logger.logBankPushDecision('bank', this._round.pushCount);
-      const bankedResult = this._round.bankScore();
-      this._clearObjs(this._overlayObjs);
-      this._renderAll();
-      this._showEndScreen(bankedResult);
-    });
-    this._overlayObjs.push(bankBtn);
-    this._overlayObjs.push(
-      this.add.text(cx - 118, btnY, bankLabel, {
-        fontSize: '13px', color: '#ffffff',
-      }).setOrigin(0.5).setDepth(25)
-    );
-
-    const pushBtn = this.add.rectangle(cx + 118, btnY, 206, 42, 0x6a1a1a)
-      .setStrokeStyle(2, 0xaa4444).setInteractive({ useHandCursor: true }).setDepth(25);
-    pushBtn.on('pointerover', () => pushBtn.setFillStyle(0x9a2a2a));
-    pushBtn.on('pointerout',  () => pushBtn.setFillStyle(0x6a1a1a));
-    pushBtn.on('pointerdown', () => {
-      this._bankPushOpen = false;
-      logger.logBankPushDecision('push', this._round.pushCount);
-      const { failedFlow } = this._round.pushOn();
-      this._clearObjs(this._overlayObjs);
-      this._setStatus(`Pushed! Complete another yaku or flow drops to \xD7${failedFlow.toFixed(2)}.`);
-      this._renderAll();
-    });
-    this._overlayObjs.push(pushBtn);
-    const nextMult    = (1.0 + (this._round.eventCount + 1) * 0.3).toFixed(1);
-    const PENALTY_RATES_PUSH = [0.3, 0.5, 0.7, 0.9];
-    const penaltyPct  = Math.round(PENALTY_RATES_PUSH[Math.min(this._round.pushCount, 3)] * 100);
-    this._overlayObjs.push(
-      this.add.text(cx + 118, btnY, `Push  \xD7${nextMult} | -${penaltyPct}%`, {
-        fontSize: '14px', color: '#ffffff',
-      }).setOrigin(0.5).setDepth(25)
-    );
-  }
-
   // ── Yaku decision overlay ─────────────────────────────────────────────────
 
   _showYakuDecision(result) {
-    if (run.scoringMode === 'capture') {
-      this._showCaptureYakuOverlay(result);
-      return;
-    }
-    if (run.scoringMode === 'additive') {
-      this._showAdditiveEventOverlay(result);
-      return;
-    }
-    this._bankPushOpen = true;
-    this._clearObjs(this._overlayObjs);
-    const cx = FIELD_CX, cy = 270;
-
-    this._overlayObjs.push(
-      this.add.rectangle(cx, cy, 490, 230, 0x080d1a, 0.96)
-        .setStrokeStyle(2, 0x6a9a3a).setDepth(25)
-    );
-    this._overlayObjs.push(
-      this.add.text(cx, cy - 97, 'Yaku Completed!', {
-        fontSize: '20px', color: '#e8c96a', stroke: '#000000', strokeThickness: 3,
-      }).setOrigin(0.5).setDepth(25)
-    );
-
-    let y = cy - 68;
-    for (const yaku of result.newYaku) {
-      this._overlayObjs.push(
-        this.add.text(cx, y, `${yaku.name}  +${yaku.bonus.toFixed(2)}`, {
-          fontSize: '16px', color: '#ffee88',
-        }).setOrigin(0.5).setDepth(25)
-      );
-      y += 23;
-    }
-    y += 6;
-    // Formula line: show non-default channels only.
-    let formulaParts = [`Base ${result.boostedBasePoints}`];
-    if (Math.abs(result.pointBoost - 1.0) > 0.001)
-      formulaParts[0] += ` (\xD7${result.pointBoost.toFixed(2)} pt)`;
-    let multPart = `\xD7${result.yakuMult.toFixed(2)}`;
-    if (result.additiveMult !== 0) multPart += `+${result.additiveMult.toFixed(2)}`;
-    formulaParts.push(multPart);
-    if (Math.abs(result.multMult - 1.0) > 0.001)
-      formulaParts.push(`\xD7${result.multMult.toFixed(2)} mm`);
-    formulaParts.push(`\xD7${result.flow.toFixed(2)} flow`);
-    formulaParts.push(`= ${result.finalScore} pts`);
-    this._overlayObjs.push(
-      this.add.text(cx, y, formulaParts.join('  '), { fontSize: '13px', color: '#cce0ff' })
-        .setOrigin(0.5).setDepth(25)
-    );
-
-    const btnY = cy + 86;
-
-    const bankBtn = this.add.rectangle(cx - 118, btnY, 206, 42, 0x1a6a1a)
-      .setStrokeStyle(2, 0x44aa44).setInteractive({ useHandCursor: true }).setDepth(25);
-    bankBtn.on('pointerover',  () => bankBtn.setFillStyle(0x2a9a2a));
-    bankBtn.on('pointerout',   () => bankBtn.setFillStyle(0x1a6a1a));
-    bankBtn.on('pointerdown',  () => {
-      this._bankPushOpen = false;
-      logger.logBankPushDecision('bank', this._round.pushCount);
-      const bankedResult = this._round.bankScore();
-      this._clearObjs(this._overlayObjs);
-      this._renderAll();
-      this._showEndScreen(bankedResult);
-    });
-    this._overlayObjs.push(bankBtn);
-    this._overlayObjs.push(
-      this.add.text(cx - 118, btnY, `Bank  (keep ${result.finalScore})`, {
-        fontSize: '14px', color: '#ffffff',
-      }).setOrigin(0.5).setDepth(25)
-    );
-
-    const pushBtn = this.add.rectangle(cx + 118, btnY, 206, 42, 0x6a1a1a)
-      .setStrokeStyle(2, 0xaa4444).setInteractive({ useHandCursor: true }).setDepth(25);
-    pushBtn.on('pointerover',  () => pushBtn.setFillStyle(0x9a2a2a));
-    pushBtn.on('pointerout',   () => pushBtn.setFillStyle(0x6a1a1a));
-    pushBtn.on('pointerdown',  () => {
-      this._bankPushOpen = false;
-      logger.logBankPushDecision('push', this._round.pushCount);
-      const { failedFlow } = this._round.pushOn();
-      this._clearObjs(this._overlayObjs);
-      this._setStatus(`Pushed! Complete another yaku or flow drops to \xD7${failedFlow.toFixed(2)}.`);
-      this._renderAll();
-    });
-    this._overlayObjs.push(pushBtn);
-    this._overlayObjs.push(
-      this.add.text(cx + 118, btnY, `Push  (risk flow \xD7${result.nextFailFlow.toFixed(2)})`, {
-        fontSize: '14px', color: '#ffffff',
-      }).setOrigin(0.5).setDepth(25)
-    );
+    this._showCaptureYakuOverlay(result);
   }
 
   // ── Round-start helper ────────────────────────────────────────────────────
@@ -2449,5 +2100,44 @@ export class GameScene extends Phaser.Scene {
     return this.add.circle(cx - hw + 6, cy - hh + 6, 4, color)
       .setDepth(5)
       .setStrokeStyle(1, 0x000000);
+  }
+
+  // ── Field fan toggle ──────────────────────────────────────────────────────
+
+  _toggleFieldFan(i) {
+    this._fannedSlot = this._fannedSlot === i ? null : i;
+    this._clearObjs(this._fieldObjs);
+    this._renderField();
+  }
+
+  // ── Card tooltip ──────────────────────────────────────────────────────────
+
+  _showCardTooltip(card, x, y) {
+    if (!this._cardTooltipBg) {
+      this._cardTooltipBg = this.add.rectangle(0, 0, 1, 1, 0x080d1a, 0.92)
+        .setStrokeStyle(1, 0x2a4a60).setOrigin(0.5, 1).setDepth(60).setVisible(false);
+      this._cardTooltipText = this.add.text(0, 0, '', {
+        fontSize: '11px', color: '#ddeeff', lineSpacing: 2,
+      }).setOrigin(0.5, 1).setDepth(61).setVisible(false);
+    }
+    const lines = [card.name, `${card.monthName} · ${card.type} · ${card.points}pt`];
+    if (card.vertical && card.temporal) lines.push(`${card.vertical} / ${card.temporal}`);
+    if (card.enhancement) {
+      const e = card.enhancement;
+      lines.push(`${e.element}${e.tier === 'upgraded' ? '+' : ''} enhanced`);
+    }
+    this._cardTooltipText.setText(lines.join('\n'));
+    const tx = Phaser.Math.Clamp(x, 100, 1180);
+    this._cardTooltipText.setPosition(tx, y);
+    const tw = Math.max(150, this._cardTooltipText.width + 16);
+    const th = this._cardTooltipText.height + 12;
+    this._cardTooltipBg.setSize(tw, th).setPosition(tx, y);
+    this._cardTooltipBg.setVisible(true);
+    this._cardTooltipText.setVisible(true);
+  }
+
+  _hideCardTooltip() {
+    this._cardTooltipBg?.setVisible(false);
+    this._cardTooltipText?.setVisible(false);
   }
 }
