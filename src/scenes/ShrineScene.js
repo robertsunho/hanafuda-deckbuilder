@@ -18,8 +18,8 @@
 import run, { RunManager }                      from '../systems/RunManager.js';
 import { SPIRIT_CATALOG, getSpiritDef }         from '../data/spirits.js';
 import { getAvailableFusions }                  from '../data/fusionRecipes.js';
-import { THREE_MARKS, WUXING_CONSUMABLES,
-         getElementDef }                        from '../data/consumables.js';
+import { FOUR_PRACTICES, THREE_MARKS,
+         WUXING_CONSUMABLES, getElementDef }    from '../data/consumables.js';
 import { RIBBON_STAMPS, getRibbonStampDef }    from '../data/ribbonStamps.js';
 import { ZODIAC_CONSUMABLES }                  from '../data/zodiacConsumables.js';
 import logger                                   from '../systems/GameplayLogger.js';
@@ -348,81 +348,291 @@ export class ShrineScene extends Phaser.Scene {
     }
   }
 
-  // ── Consumables section ───────────────────────────────────────────────────
+  // ── Four Practices section ────────────────────────────────────────────────
 
   _drawConsumablesSection(cx, topY, height) {
-    this.add.text(cx, topY + 4, 'Consumables', {
+    this.add.text(cx, topY + 4, 'Four Practices', {
       fontSize: '15px', color: '#88ccee',
     }).setOrigin(0.5, 0);
-    this.add.text(cx, topY + 22, 'Deck-modification marks  —  5 ki each', {
+    this.add.text(cx, topY + 22, 'Permanent deck modifications — instant use, no inventory', {
       fontSize: '10px', color: '#334455',
     }).setOrigin(0.5, 0);
 
-    // Inventory slots display
-    const slotCount = run.consumables.length;
-    this.add.text(cx, topY + 38,
-      `Inventory: ${slotCount} / ${RunManager.MAX_CONSUMABLE_SLOTS}`,
-      { fontSize: '11px', color: slotCount >= RunManager.MAX_CONSUMABLE_SLOTS ? '#cc4444' : '#556677' }
-    ).setOrigin(0.5, 0);
+    const tileW   = 138;
+    const tileH   = height - 40;
+    const tileGap = 6;
+    const totalW  = FOUR_PRACTICES.length * tileW + (FOUR_PRACTICES.length - 1) * tileGap;
+    const startX  = cx - totalW / 2 + tileW / 2;
+    const tileY   = topY + 38 + tileH / 2;
 
-    // Show current inventory names
-    if (slotCount > 0) {
-      const names = run.consumables.map(c => c.name).join(', ');
-      this.add.text(cx, topY + 54, names, {
-        fontSize: '10px', color: '#445566',
-        wordWrap: { width: 560 }, align: 'center',
-      }).setOrigin(0.5, 0);
-    }
+    const PRACTICE_COLORS = {
+      practice_path:    '#88eebb',
+      practice_fasting: '#ddbb88',
+      practice_mind:    '#bb88ee',
+      practice_tree:    '#88ddbb',
+    };
 
-    // 3 mark shop cards
-    const CARD_W2  = 168;
-    const CARD_H2  = 110;
-    const CARD_GAP2 = 10;
-    const totalW   = THREE_MARKS.length * CARD_W2 + (THREE_MARKS.length - 1) * CARD_GAP2;
-    const startX   = cx - totalW / 2 + CARD_W2 / 2;
-    const cardY    = topY + 72 + CARD_H2 / 2;
+    for (let i = 0; i < FOUR_PRACTICES.length; i++) {
+      const def    = FOUR_PRACTICES[i];
+      const x      = startX + i * (tileW + tileGap);
+      const afford = run.ki >= def.cost;
+      const color  = PRACTICE_COLORS[def.id] ?? '#88ccee';
 
-    for (let i = 0; i < THREE_MARKS.length; i++) {
-      const mark    = THREE_MARKS[i];
-      const x       = startX + i * (CARD_W2 + CARD_GAP2);
-      const full    = !run.canAddConsumable;
-      const afford  = run.ki >= mark.cost;
-      const buyable = afford && !full;
+      this.add.rectangle(x, tileY, tileW, tileH, afford ? 0x0a1a1e : 0x080e12)
+        .setStrokeStyle(1, afford ? 0x224433 : 0x111a22);
 
-      const bgCol  = 0x0a1a2a;
-      const border = buyable ? 0x2a6688 : 0x1a2a3a;
-      this.add.rectangle(x, cardY, CARD_W2, CARD_H2, bgCol)
-        .setStrokeStyle(1, border);
-
-      this.add.text(x, cardY - CARD_H2 / 2 + 8, mark.name, {
-        fontSize: '13px', color: '#88ddff', fontStyle: 'bold',
+      this.add.text(x, tileY - tileH / 2 + 7, def.name, {
+        fontSize: '13px', color, fontStyle: 'bold',
       }).setOrigin(0.5, 0);
 
-      this.add.text(x, cardY - CARD_H2 / 2 + 24, mark.description, {
+      this.add.text(x, tileY - tileH / 2 + 23, def.description, {
         fontSize: '9px', color: '#445566',
-        wordWrap: { width: CARD_W2 - 14 }, align: 'center',
+        wordWrap: { width: tileW - 12 }, align: 'center',
       }).setOrigin(0.5, 0);
 
-      // Buy button
-      const btnY2   = cardY + CARD_H2 / 2 - 16;
-      const btnBg   = buyable ? 0x1a3a5a : 0x0e1a28;
-      const btnBdr  = buyable ? 0x44aacc : 0x1a2a3a;
-      const btnLbl  = full ? 'Slots full' : !afford ? "Can't afford" : 'Buy  5 ki';
-      const btnTxt  = buyable ? '#88ddff' : '#334455';
+      const btnY2  = tileY + tileH / 2 - 14;
+      const btnLbl = !afford ? `Need ${def.cost} ki` : `Use  ${def.cost} ki`;
+      const btnTxt = afford ? color : '#334455';
+      const btn    = this.add.rectangle(x, btnY2, tileW - 12, 22, afford ? 0x112222 : 0x080e0e)
+        .setStrokeStyle(1, afford ? 0x336655 : 0x1a2233);
+      this.add.text(x, btnY2, btnLbl, { fontSize: '11px', color: btnTxt }).setOrigin(0.5);
 
-      const btn = this.add.rectangle(x, btnY2, CARD_W2 - 12, 22, btnBg)
-        .setStrokeStyle(1, btnBdr);
-      this.add.text(x, btnY2, btnLbl, {
-        fontSize: '11px', color: btnTxt,
-      }).setOrigin(0.5);
-
-      if (buyable) {
+      if (afford) {
         btn.setInteractive({ useHandCursor: true });
-        btn.on('pointerover', () => btn.setFillStyle(0x2a5a88));
-        btn.on('pointerout',  () => btn.setFillStyle(btnBg));
-        btn.on('pointerdown', () => this._buyConsumable(mark));
+        btn.on('pointerover', () => btn.setFillStyle(0x1a3333));
+        btn.on('pointerout',  () => btn.setFillStyle(0x112222));
+        btn.on('pointerdown', () => {
+          run.spendKi(def.cost);
+          logger.logShopPurchase('practice', def.name, def.cost);
+          this._showPracticeOverlay(def);
+        });
       }
     }
+  }
+
+  // ── Four Practices overlays ───────────────────────────────────────────────
+
+  _showPracticeOverlay(def) {
+    if (def.id === 'practice_path')    { this._showPathOverlay(def);    return; }
+    if (def.id === 'practice_fasting') { this._showFastingOverlay(def); return; }
+    if (def.id === 'practice_mind')    { this._showMindOverlay(def);    return; }
+    if (def.id === 'practice_tree')    { this._showTreeOverlay(def);    return; }
+  }
+
+  /**
+   * Shared card-grid overlay builder for Four Practices.
+   * Renders a modal with all deck cards in a grid, selection state, and action/cancel buttons.
+   */
+  _buildPracticeGrid({ title, instruction, cards, selectedIds, disabledFn, onSelect, actionLabel, onAction, onCancel }) {
+    for (const o of this._confirmObjs) o.destroy();
+    this._confirmObjs = [];
+    const push = obj => { this._confirmObjs.push(obj); return obj; };
+
+    const cx = 640, cy = 356, W = 920, H = 556;
+    const SCALE = 0.50;
+    const CW    = Math.round(64 * SCALE);    // 32
+    const CH    = Math.round(104 * SCALE);   // 52
+    const COLS  = 8, GAP = 6, ROWH = CH + 22;
+
+    push(this.add.rectangle(cx, cy, W, H, 0x040810, 0.97)
+      .setStrokeStyle(2, 0x2a5a88).setDepth(50));
+    push(this.add.text(cx, cy - H / 2 + 16, title, {
+      fontSize: '16px', color: '#88ddff', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(50));
+    push(this.add.text(cx, cy - H / 2 + 36, instruction, {
+      fontSize: '11px', color: '#557799', wordWrap: { width: W - 40 }, align: 'center',
+    }).setOrigin(0.5, 0).setDepth(50));
+
+    const gridW      = COLS * CW + (COLS - 1) * GAP;
+    const gridStartX = cx - gridW / 2 + CW / 2;
+    const gridStartY = cy - H / 2 + 58;
+    const noDisabled = disabledFn ?? (() => false);
+
+    for (let i = 0; i < cards.length; i++) {
+      const card     = cards[i];
+      const col      = i % COLS;
+      const row      = Math.floor(i / COLS);
+      const x        = gridStartX + col * (CW + GAP);
+      const y        = gridStartY + row * ROWH + CH / 2;
+      const disabled = noDisabled(card);
+      const selected = selectedIds ? selectedIds.has(card.id) : false;
+
+      const spr = push(this.add.image(x, y, card.id).setScale(SCALE).setDepth(51));
+      if (disabled)       spr.setAlpha(0.3);
+      else if (selected)  spr.setTint(0xffcc44);
+
+      push(this.add.text(x, y + CH / 2 + 2,
+        `${card.name?.split(' ')[0] ?? ''} [${card.type[0]}]`,
+        { fontSize: '7px', color: selected ? '#ffcc44' : '#667788', align: 'center' }
+      ).setOrigin(0.5, 0).setDepth(51));
+
+      if (!disabled) {
+        spr.setInteractive({ useHandCursor: true });
+        spr.on('pointerover', () => { if (!selected) spr.setTint(0xaaddff); });
+        spr.on('pointerout',  () => { if (selected) spr.setTint(0xffcc44); else spr.clearTint(); });
+        spr.on('pointerdown', () => onSelect(card));
+      }
+    }
+
+    const btnY = cy + H / 2 - 28;
+    if (actionLabel && onAction) {
+      const aBtn = push(this.add.rectangle(cx - 80, btnY, 150, 34, 0x1a4a1a)
+        .setStrokeStyle(1, 0x44cc66).setInteractive({ useHandCursor: true }).setDepth(52));
+      aBtn.on('pointerover', () => aBtn.setFillStyle(0x2a6a2a));
+      aBtn.on('pointerout',  () => aBtn.setFillStyle(0x1a4a1a));
+      aBtn.on('pointerdown', onAction);
+      push(this.add.text(cx - 80, btnY, actionLabel, { fontSize: '12px', color: '#aaffcc' })
+        .setOrigin(0.5).setDepth(52));
+    }
+    const cBtn = push(this.add.rectangle(cx + 70, btnY, 140, 34, 0x2a1a1a)
+      .setStrokeStyle(1, 0x664444).setInteractive({ useHandCursor: true }).setDepth(52));
+    cBtn.on('pointerover', () => cBtn.setFillStyle(0x4a2a2a));
+    cBtn.on('pointerout',  () => cBtn.setFillStyle(0x2a1a1a));
+    cBtn.on('pointerdown', onCancel);
+    push(this.add.text(cx + 70, btnY, 'Cancel (refund)', { fontSize: '11px', color: '#ffaaaa' })
+      .setOrigin(0.5).setDepth(52));
+  }
+
+  _showPathOverlay(def) {
+    let targetCard = null;
+    const selectedIds = new Set();
+    const refund = () => {
+      run.addKi(def.cost);
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    };
+    const render = () => {
+      const deck     = run.getDeck();
+      const phase2   = targetCard !== null;
+      this._buildPracticeGrid({
+        title: `Path  (${def.cost} ki paid)`,
+        instruction: phase2
+          ? `Target: ${targetCard.name} (month ${targetCard.month}). Select up to 4 cards to change. Selected: ${selectedIds.size}/4`
+          : 'Step 1: Click the card whose month you want to copy to others.',
+        cards:       phase2 ? deck.filter(c => c.id !== targetCard.id) : deck,
+        selectedIds: phase2 ? selectedIds : new Set(),
+        onSelect: (card) => {
+          if (!phase2) { targetCard = card; selectedIds.clear(); render(); }
+          else {
+            if (selectedIds.has(card.id)) selectedIds.delete(card.id);
+            else if (selectedIds.size < 4) selectedIds.add(card.id);
+            render();
+          }
+        },
+        actionLabel: phase2 && selectedIds.size > 0 ? `Confirm (${selectedIds.size})` : null,
+        onAction: () => {
+          run.applyPath(targetCard.id, [...selectedIds]);
+          logger.logConsumableUse(def.name, `month ${targetCard.month} → ${selectedIds.size} cards`);
+          for (const o of this._confirmObjs) o.destroy();
+          this._confirmObjs = [];
+          this._buildUI();
+        },
+        onCancel: refund,
+      });
+    };
+    render();
+  }
+
+  _showFastingOverlay(def) {
+    const selectedIds = new Set();
+    const refund = () => {
+      run.addKi(def.cost);
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    };
+    const render = () => {
+      this._buildPracticeGrid({
+        title: `Fasting  (${def.cost} ki paid)`,
+        instruction: `Select up to 3 cards to promote. Bright cards cannot be promoted. Selected: ${selectedIds.size}/3`,
+        cards:       run.getDeck(),
+        selectedIds,
+        disabledFn:  (c) => c.type === 'bright',
+        onSelect: (card) => {
+          if (selectedIds.has(card.id)) selectedIds.delete(card.id);
+          else if (selectedIds.size < 3) selectedIds.add(card.id);
+          render();
+        },
+        actionLabel: selectedIds.size > 0 ? `Confirm (${selectedIds.size})` : null,
+        onAction: () => {
+          run.applyFasting([...selectedIds]);
+          logger.logConsumableUse(def.name, `promoted ${selectedIds.size} cards`);
+          for (const o of this._confirmObjs) o.destroy();
+          this._confirmObjs = [];
+          this._buildUI();
+        },
+        onCancel: refund,
+      });
+    };
+    render();
+  }
+
+  _showMindOverlay(def) {
+    const selectedIds = new Set();
+    const refund = () => {
+      run.addKi(def.cost);
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    };
+    const render = () => {
+      this._buildPracticeGrid({
+        title: `Mind  (${def.cost} ki paid)`,
+        instruction: `Select up to 2 cards to permanently delete from your deck. Selected: ${selectedIds.size}/2`,
+        cards:       run.getDeck(),
+        selectedIds,
+        onSelect: (card) => {
+          if (selectedIds.has(card.id)) selectedIds.delete(card.id);
+          else if (selectedIds.size < 2) selectedIds.add(card.id);
+          render();
+        },
+        actionLabel: selectedIds.size > 0 ? `Delete (${selectedIds.size})` : null,
+        onAction: () => {
+          run.applyMind([...selectedIds]);
+          logger.logConsumableUse(def.name, `deleted ${selectedIds.size} cards`);
+          for (const o of this._confirmObjs) o.destroy();
+          this._confirmObjs = [];
+          this._buildUI();
+        },
+        onCancel: refund,
+      });
+    };
+    render();
+  }
+
+  _showTreeOverlay(def) {
+    let sourceCard = null;
+    const refund = () => {
+      run.addKi(def.cost);
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    };
+    const render = () => {
+      const deck  = run.getDeck();
+      const phase2 = sourceCard !== null;
+      this._buildPracticeGrid({
+        title: `Tree  (${def.cost} ki paid)`,
+        instruction: phase2
+          ? `Transforming: ${sourceCard.name}. Step 2: Click the card to copy its properties from.`
+          : 'Step 1: Click the card you want to transform (it will be replaced).',
+        cards:       phase2 ? deck.filter(c => c.id !== sourceCard.id) : deck,
+        selectedIds: new Set(sourceCard ? [sourceCard.id] : []),
+        onSelect: (card) => {
+          if (!phase2) { sourceCard = card; render(); }
+          else {
+            run.applyTree(sourceCard.id, card.id);
+            logger.logConsumableUse(def.name, `${sourceCard.id} → copy of ${card.id}`);
+            for (const o of this._confirmObjs) o.destroy();
+            this._confirmObjs = [];
+            this._buildUI();
+          }
+        },
+        onCancel: refund,
+      });
+    };
+    render();
   }
 
   // ── Buy consumable → booster pack overlay ────────────────────────────────
@@ -676,13 +886,22 @@ export class ShrineScene extends Phaser.Scene {
       fontSize: '10px', color: '#334455',
     }).setOrigin(0.5, 0);
 
+    // Inventory status
+    const slotCount = run.consumables.length;
+    const invColor  = slotCount >= RunManager.MAX_CONSUMABLE_SLOTS ? '#cc4444' : '#556677';
+    const invNames  = slotCount > 0 ? run.consumables.map(c => c.name).join(', ') : 'empty';
+    this.add.text(cx, topY + 36,
+      `Inventory: ${slotCount}/${RunManager.MAX_CONSUMABLE_SLOTS}  [${invNames}]`,
+      { fontSize: '10px', color: invColor, wordWrap: { width: 560 }, align: 'center' }
+    ).setOrigin(0.5, 0);
+
     const offers  = this._zodiacOffering;
     const tileW   = 182;
-    const tileH   = height - 36;
+    const tileH   = height - 54;  // extra 18px for inventory row
     const tileGap = 8;
     const totalW  = offers.length * tileW + (offers.length - 1) * tileGap;
     const startX  = cx - totalW / 2 + tileW / 2;
-    const tileY   = topY + 34 + tileH / 2;
+    const tileY   = topY + 52 + tileH / 2;
 
     const CATEGORY_COLOR = {
       hand: '#88ddcc', field: '#88ccee', yaku: '#ddaaff', ki: '#ffdd88',

@@ -1,15 +1,52 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// consumables.js — Three Marks of Existence consumable items
+// consumables.js — Deck modification tools
 //
-// Each mark is a deck-modification consumable usable at the shrine (preview)
-// or during a round (interactive card targeting via GameScene mark mode).
+// Four Practices: shop-only instant-apply deck tools (replace old Three Marks).
+// Three Marks: kept for backward compatibility with any save state.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Primary deck tool set (replaces Three Marks). Shop-only, instant-apply. */
+export const FOUR_PRACTICES = [
+  {
+    id:          'practice_path',
+    name:        'Path',
+    description: 'Change up to 4 cards to a target card\'s month.',
+    cost:        6,
+    maxTargets:  4,
+    category:    'four_practices',
+  },
+  {
+    id:          'practice_fasting',
+    name:        'Fasting',
+    description: 'Promote the type of up to 3 cards (plain→ribbon→animal→bright).',
+    cost:        6,
+    maxTargets:  3,
+    category:    'four_practices',
+  },
+  {
+    id:          'practice_mind',
+    name:        'Mind',
+    description: 'Delete up to 2 cards from your deck permanently.',
+    cost:        5,
+    maxTargets:  2,
+    category:    'four_practices',
+  },
+  {
+    id:          'practice_tree',
+    name:        'Tree',
+    description: 'Transform one card into an exact copy of a target card.',
+    cost:        7,
+    maxTargets:  1,
+    category:    'four_practices',
+  },
+];
+
+/** @deprecated — kept for backward compatibility; use FOUR_PRACTICES instead. */
 export const THREE_MARKS = [
   {
     id:          'mark_impermanence',
     name:        'Impermanence',
-    description: 'Promote one card to the next card type in its month. If the next type is missing, stores progress for the following use.',
+    description: 'Promote one card to the next card type in its month.',
     cost:        5,
     category:    'three_marks',
   },
@@ -23,7 +60,7 @@ export const THREE_MARKS = [
   {
     id:          'mark_transcendence',
     name:        'Transcendence',
-    description: 'Copy all properties from a target card onto a source card. The source card becomes the target.',
+    description: 'Copy all properties from a target card onto a source card.',
     cost:        5,
     category:    'three_marks',
   },

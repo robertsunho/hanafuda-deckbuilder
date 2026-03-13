@@ -598,6 +598,71 @@ class RunManager {
     Object.assign(source, JSON.parse(JSON.stringify(target)));
   }
 
+  // ── Four Practices ────────────────────────────────────────────────────────
+
+  /**
+   * Path: Change up to 4 cards to share a target card's month.
+   * @param {string}   targetCardId  Card whose month will be copied.
+   * @param {string[]} cardIds       Up to 4 cards to change.
+   */
+  applyPath(targetCardId, cardIds) {
+    const target = this._deck.find(c => c.id === targetCardId);
+    if (!target) throw new Error('Target card not found');
+    if (cardIds.length > 4) throw new Error('Path can change up to 4 cards');
+    for (const id of cardIds) {
+      const card = this._deck.find(c => c.id === id);
+      if (card && card.id !== targetCardId) card.month = target.month;
+    }
+  }
+
+  /**
+   * Fasting: Promote the type of up to 3 cards (plain→ribbon→animal→bright).
+   * @param {string[]} cardIds  Up to 3 cards to promote.
+   */
+  applyFasting(cardIds) {
+    if (cardIds.length > 3) throw new Error('Fasting can promote up to 3 cards');
+    const PROMOTION = { plain: 'ribbon', ribbon: 'animal', animal: 'bright' };
+    const POINTS    = { plain: 3, ribbon: 10, animal: 12, bright: 20 };
+    for (const id of cardIds) {
+      const card = this._deck.find(c => c.id === id);
+      if (card && PROMOTION[card.type]) {
+        card.type   = PROMOTION[card.type];
+        card.points = POINTS[card.type];
+      }
+    }
+  }
+
+  /**
+   * Mind: Delete up to 2 cards permanently from the deck.
+   * @param {string[]} cardIds  Up to 2 card IDs to remove.
+   */
+  applyMind(cardIds) {
+    if (cardIds.length > 2) throw new Error('Mind can delete up to 2 cards');
+    this._deck = this._deck.filter(c => !cardIds.includes(c.id));
+  }
+
+  /**
+   * Tree: Transform a source card into an exact copy of a target card.
+   * The source card's id is preserved so it remains a distinct deck entry.
+   * @param {string} sourceCardId  The card to transform.
+   * @param {string} targetCardId  The card to copy properties from.
+   */
+  applyTree(sourceCardId, targetCardId) {
+    const source = this._deck.find(c => c.id === sourceCardId);
+    const target = this._deck.find(c => c.id === targetCardId);
+    if (!source || !target) throw new Error('Card not found');
+    const savedId          = source.id;
+    const savedEnhancement = source.enhancement;
+    const savedRibbonStamp = source.ribbonStamp;
+    source.month  = target.month;
+    source.type   = target.type;
+    source.points = target.points;
+    source.name   = target.name + ' (copy)';
+    source.id     = savedId;
+    if (savedEnhancement !== undefined) source.enhancement = savedEnhancement;
+    if (savedRibbonStamp !== undefined) source.ribbonStamp = savedRibbonStamp;
+  }
+
   // ── Ribbon stamps ─────────────────────────────────────────────────────────
 
   /**
