@@ -415,7 +415,7 @@ export const SPIRIT_CATALOG = [
 
   // Quadrant Path
   { id: 'cross_space',   name: 'Space',    description: 'Sky and Night cards score at ×1.5 mult.',     channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant' },
-  { id: 'cross_core',    name: 'Core',     description: 'Land and Day cards score at ×1.5 mult.',      channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant' },
+  { id: 'cross_energy',  name: 'Energy',   description: 'Land and Day cards score at ×1.5 mult.',      channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant' },
 
   // Seasonal Extremes
   { id: 'cross_solstice', name: 'Solstice', description: 'Summer and Winter cards score at ×2.0 mult.', channel: 'cross', cost: 0, tier: 3, fusionGroup: 'seasonal_extreme' },

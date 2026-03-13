@@ -27,7 +27,7 @@ export const FUSION_RECIPES = [
   { input: ['fusion_continent',  'fusion_moon'],           output: 'cross_yin'       },
   // Quadrant
   { input: ['fusion_atmosphere', 'fusion_moon'],           output: 'cross_space'     },
-  { input: ['fusion_continent',  'fusion_sun'],            output: 'cross_core'      },
+  { input: ['fusion_continent',  'fusion_sun'],            output: 'cross_energy'      },
   // Seasonal Extremes
   { input: ['fusion_thunderstorm', 'fusion_blizzard'],     output: 'cross_solstice'  },
   { input: ['fusion_bloom',        'fusion_decay'],        output: 'cross_equinox'   },
@@ -37,7 +37,7 @@ export const FUSION_RECIPES = [
 
   // ── Tier 4: Unity Spirits (two Tier 3 → one Tier 4) ──────────────────────
   { input: ['cross_yang',      'cross_yin'],         output: 'unity_yinyang' },
-  { input: ['cross_space',     'cross_core'],        output: 'unity_gravity' },
+  { input: ['cross_space',     'cross_energy'],        output: 'unity_gravity' },
   { input: ['cross_solstice',  'cross_equinox'],     output: 'unity_time'    },
   { input: ['cross_tropic',    'cross_arctic'],      output: 'unity_planet'  },
 ];

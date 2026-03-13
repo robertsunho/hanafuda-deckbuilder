@@ -191,17 +191,16 @@ const _effects = {
   winter_aridity:  monthAdditiveMult([12, 1, 2],  5),
 
   // ── Axis Point Boost ──────────────────────────────────────────────────────
-  // Land uses card.vertical === 'ground' internally.
 
-  sky_clouds: verticalPointBoost('sky',    10),
-  land_soil:  verticalPointBoost('ground', 10),
-  day_light:  temporalPointBoost('day',    10),
-  night_dark: temporalPointBoost('night',  10),
+  sky_clouds: verticalPointBoost('air',  10),
+  land_soil:  verticalPointBoost('land', 10),
+  day_light:  temporalPointBoost('day',  10),
+  night_dark: temporalPointBoost('night',10),
 
   // ── Axis Additive Mult ────────────────────────────────────────────────────
 
-  sky_wind:        verticalAdditiveMult('sky',    5),
-  land_rock:       verticalAdditiveMult('ground', 5),
+  sky_wind:        verticalAdditiveMult('air',  5),
+  land_rock:       verticalAdditiveMult('land', 5),
   day_movement:    temporalAdditiveMult('day',    5),
   night_stillness: temporalAdditiveMult('night',  5),
 
@@ -214,8 +213,8 @@ const _effects = {
 
   // ── Axis Fusion Spirits ───────────────────────────────────────────────────
 
-  fusion_atmosphere: verticalFusion('sky',    8, 3),
-  fusion_continent:  verticalFusion('ground', 8, 3),
+  fusion_atmosphere: verticalFusion('air',  8, 3),
+  fusion_continent:  verticalFusion('land', 8, 3),
   fusion_sun:        temporalFusion('day',    8, 3),
   fusion_moon:       temporalFusion('night',  8, 3),
 
@@ -398,25 +397,25 @@ const _effects = {
 
   cross_yang: {
     getAdditiveMult({ capturedCards }) {
-      return capturedCards.filter(c => c.vertical === 'sky' || c.temporal === 'day').length * 1.0;
+      return capturedCards.filter(c => c.vertical === 'air' || c.temporal === 'day').length * 1.0;
     },
   },
 
   cross_yin: {
     getAdditiveMult({ capturedCards }) {
-      return capturedCards.filter(c => c.vertical === 'ground' || c.temporal === 'night').length * 1.0;
+      return capturedCards.filter(c => c.vertical === 'land' || c.temporal === 'night').length * 1.0;
     },
   },
 
   cross_space: {
     getAdditiveMult({ capturedCards }) {
-      return capturedCards.filter(c => c.vertical === 'sky' || c.temporal === 'night').length * 0.5;
+      return capturedCards.filter(c => c.vertical === 'air' || c.temporal === 'night').length * 0.5;
     },
   },
 
-  cross_core: {
+  cross_energy: {
     getAdditiveMult({ capturedCards }) {
-      return capturedCards.filter(c => c.vertical === 'ground' || c.temporal === 'day').length * 0.5;
+      return capturedCards.filter(c => c.vertical === 'land' || c.temporal === 'day').length * 0.5;
     },
   },
 
