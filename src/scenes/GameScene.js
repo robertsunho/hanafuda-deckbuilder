@@ -351,12 +351,6 @@ export class GameScene extends Phaser.Scene {
 
       if (!slot) continue;
 
-      // Click slot background to toggle card fan when 2+ cards
-      if (!markActive && !fireWild && slot.cards.length >= 2) {
-        bg.setInteractive({ useHandCursor: true });
-        bg.on('pointerdown', () => this._toggleFieldFan(i));
-      }
-
       for (let j = 0; j < slot.cards.length; j++) {
         const card = slot.cards[j];
         const offX = isFanned ? j * 20 : j * SLOT_FAN_X;
@@ -386,9 +380,13 @@ export class GameScene extends Phaser.Scene {
           spr.on('pointerdown', () => this._playFireWild(slot.month));
         } else {
           if (slot.state === 'pending') spr.setTint(TINT_PENDING);
-          spr.setInteractive();
+          spr.setInteractive({ useHandCursor: slot.state === 'normal' && slot.cards.length >= 2 });
           spr.on('pointerover', () => this._showCardTooltip(card, cx, ttY));
           spr.on('pointerout',  () => this._hideCardTooltip());
+          // Click any card in a normal multi-card stack to toggle fan
+          if (slot.state === 'normal' && slot.cards.length >= 2) {
+            spr.on('pointerdown', () => this._toggleFieldFan(i));
+          }
         }
         this._fieldObjs.push(spr);
 
