@@ -1558,9 +1558,10 @@ export class GameScene extends Phaser.Scene {
         y += 16;
       }
       for (const ev of displayEvents) {
+        if (!ev.cards || ev.cards.length === 0) continue;
         const esc  = (ev.pushEscalation ?? 1.0).toFixed(1);
         const tags = ev.cards.map(c => c.type[0].toUpperCase()).join('');
-        const line = `[${tags}]  ${ev.capturePoints}pt \xD7${esc} \u2192 +${ev.captureScore}`;
+        const line = `[${tags}]  ${ev.capturePoints ?? 0}pt \xD7${esc} \u2192 +${ev.captureScore ?? 0}`;
         this._overlayObjs.push(
           this.add.text(cx, y, line, { fontSize: '13px', color: '#cce0ff' }).setOrigin(0.5)
         );
