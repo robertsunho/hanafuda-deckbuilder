@@ -598,6 +598,28 @@ class RunManager {
     Object.assign(source, JSON.parse(JSON.stringify(target)));
   }
 
+  // ── Card shop ─────────────────────────────────────────────────────────────
+
+  /**
+   * Buy a card and add it to the permanent deck.
+   * Generates a unique id to avoid conflicts with existing cards.
+   * @param {object} cardData  Card object (may include enhancement/ribbonStamp).
+   * @param {number} price     Ki cost.
+   * @returns {{ success: boolean, reason?: string, card?: object }}
+   */
+  buyCard(cardData, price) {
+    if (this._ki < price) return { success: false, reason: 'Not enough ki' };
+    this._ki -= price;
+    const suffix  = `_shop_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const newCard = {
+      ...JSON.parse(JSON.stringify(cardData)),
+      id:            cardData.id + suffix,
+      shopPurchased: true,
+    };
+    this._deck.push(newCard);
+    return { success: true, card: newCard };
+  }
+
   // ── Four Practices ────────────────────────────────────────────────────────
 
   /**

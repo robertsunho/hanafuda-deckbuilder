@@ -22,6 +22,7 @@ import { FOUR_PRACTICES, THREE_MARKS,
          WUXING_CONSUMABLES, getElementDef }    from '../data/consumables.js';
 import { RIBBON_STAMPS, getRibbonStampDef }    from '../data/ribbonStamps.js';
 import { ZODIAC_CONSUMABLES }                  from '../data/zodiacConsumables.js';
+import { generateShopCards }                   from '../data/shopCards.js';
 import logger                                   from '../systems/GameplayLogger.js';
 
 // ── Channel badge display ──────────────────────────────────────────────────────
@@ -59,6 +60,7 @@ export class ShrineScene extends Phaser.Scene {
     this._offering      = this._generateOffering();
     this._purchased     = new Array(this._offering.length).fill(false);
     this._zodiacOffering = this._generateZodiacOffering();
+    this._cardOffers     = generateShopCards(this._isGrove ? 4 : 3, this._isGrove);
     this._confirmObjs   = [];
     this._buildUI();
   }
@@ -91,6 +93,7 @@ export class ShrineScene extends Phaser.Scene {
     this._drawBg();
     this._drawHeader();
     this._drawSpiritsSection();
+    this._drawCardShopSection();
     this._drawRightColumn();
     this._drawContinueButton();
   }
@@ -1306,6 +1309,106 @@ export class ShrineScene extends Phaser.Scene {
       fontSize: '16px', color: '#ffffff',
       stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5);
+  }
+
+  // ── Card shop (left column, below loadout) ───────────────────────────────
+
+  _drawCardShopSection() {
+    const cx = LCX;
+
+    // Loadout ends at: CARD_ROW_Y + CARD_H/2 + 22 (divider) + 44 (label) + 2 rows * 58 + 25 (half-slot)
+    // = 278 + 102 + 22 + 44 + 116 + 25 = 587. Add 8 gap → topY = 540.
+    const topY = 540;
+
+    this.add.text(cx, topY, 'Cards for Sale', {
+      fontSize: '13px', color: '#ccddaa',
+    }).setOrigin(0.5, 0);
+
+    const offers = this._cardOffers;
+    if (offers.length === 0) {
+      this.add.text(cx, topY + 20, 'No cards available.', {
+        fontSize: '11px', color: '#334455',
+      }).setOrigin(0.5, 0);
+      return;
+    }
+
+    const SCALE  = 0.50;
+    const CW     = Math.round(64 * SCALE);   // 32
+    const CH     = Math.round(104 * SCALE);  // 52
+    const GAP    = 12;
+    const totalW = offers.length * CW + (offers.length - 1) * GAP;
+    const startX = cx - totalW / 2 + CW / 2;
+    const cardY  = topY + 20 + CH / 2;      // center Y of card image
+
+    // Element name abbreviations for badge
+    const ELEM_SHORT = { water: 'W', wood: 'L', fire: 'F', earth: 'E', metal: 'M' };
+    const ELEM_COLOR = { water: '#4488ff', wood: '#44cc44', fire: '#ff6644', earth: '#cc8822', metal: '#aaaaaa' };
+    const STAMP_COLOR = { red: 0xcc3333, blue: 0x3366cc, green: 0x33aa55, yellow: 0xccaa33 };
+
+    for (let i = 0; i < offers.length; i++) {
+      const offer  = offers[i];
+      const card   = offer.card;
+      const x      = startX + i * (CW + GAP);
+      const afford = run.ki >= offer.price;
+
+      // Card image (texture key = original card id without shop suffix)
+      const spr = this.add.image(x, cardY, card.id).setScale(SCALE);
+      if (!afford) spr.setAlpha(0.6);
+
+      // Enhancement badge (top-left corner)
+      if (offer.preEnhancement) {
+        const enh   = offer.preEnhancement;
+        const label = (enh.tier === 'upgraded' ? '\u2605' : '') + ELEM_SHORT[enh.element];
+        const col   = ELEM_COLOR[enh.element] ?? '#ffffff';
+        this.add.rectangle(x - CW / 2 + 8, cardY - CH / 2 + 6, 14, 10, 0x000000, 0.7);
+        this.add.text(x - CW / 2 + 8, cardY - CH / 2 + 6, label, {
+          fontSize: '7px', color: col, fontStyle: 'bold',
+        }).setOrigin(0.5);
+      }
+
+      // Ribbon stamp dot (top-right corner)
+      if (offer.preRibbon) {
+        const dotColor = STAMP_COLOR[offer.preRibbon] ?? 0xffffff;
+        this.add.circle(x + CW / 2 - 5, cardY - CH / 2 + 5, 4, dotColor)
+          .setStrokeStyle(1, 0x000000);
+      }
+
+      // Type + month label
+      const typeLabel = `[${card.type[0]}] M${card.month}`;
+      this.add.text(x, cardY + CH / 2 + 3, typeLabel, {
+        fontSize: '8px', color: afford ? '#889aaa' : '#445566',
+      }).setOrigin(0.5, 0);
+
+      // Price + buy button
+      const btnY   = cardY + CH / 2 + 17;
+      const btnBg  = afford ? 0x1a3a1a : 0x0e180e;
+      const btnBdr = afford ? 0x44aa66 : 0x1a2a1a;
+      const btnLbl = afford ? `${offer.price}ki` : `${offer.price}ki`;
+      const btn    = this.add.rectangle(x, btnY, CW + 4, 16, btnBg)
+        .setStrokeStyle(1, btnBdr);
+      this.add.text(x, btnY, btnLbl, {
+        fontSize: '9px', color: afford ? '#aaffcc' : '#334455',
+      }).setOrigin(0.5);
+
+      if (afford) {
+        btn.setInteractive({ useHandCursor: true });
+        spr.setInteractive({ useHandCursor: true });
+        const doBuy = () => {
+          const result = run.buyCard(card, offer.price);
+          if (result.success) {
+            logger.logShopPurchase('card', card.name ?? card.id, offer.price);
+            this._cardOffers = this._cardOffers.filter(o => o !== offer);
+            this._buildUI();
+          }
+        };
+        btn.on('pointerover', () => btn.setFillStyle(0x2a5a2a));
+        btn.on('pointerout',  () => btn.setFillStyle(btnBg));
+        btn.on('pointerdown', doBuy);
+        spr.on('pointerover', () => spr.setTint(0xccffcc));
+        spr.on('pointerout',  () => spr.clearTint());
+        spr.on('pointerdown', doBuy);
+      }
+    }
   }
 
   // ── Purchase ──────────────────────────────────────────────────────────────
