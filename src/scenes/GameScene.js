@@ -491,65 +491,76 @@ export class GameScene extends Phaser.Scene {
    * @returns {string|null}
    */
   _getSpiritContrib(spirit, captured) {
-    const fx = SpiritEffects.get(spirit.id);
-    if (!fx) return null;
-
+    const fx      = SpiritEffects.get(spirit.id);
     const spirits = run.spirits;
     const lines   = [];
 
-    // ── Channel 1: point boosts ───────────────────────────────────────────
-    if (fx.getPointBoosts) {
-      const boosts = fx.getPointBoosts({ capturedCards: captured, spirits });
-      if (boosts && boosts.size > 0) {
-        // All boosted cards share the same mult for a given spirit.
-        const [, mult] = [...boosts][0];
-        lines.push(`\u00D7${mult.toFixed(1)} on ${boosts.size} card${boosts.size !== 1 ? 's' : ''}`);
+    // ── Per-card spirit (onCardScored) ────────────────────────────────────
+    if (fx?.onCardScored) {
+      // Count how many captured cards would trigger this spirit.
+      let matchCount = 0;
+      for (const card of captured) {
+        const r = fx.onCardScored({ card, spirit, spirits });
+        if (r) matchCount++;
+      }
+      if (matchCount > 0) {
+        lines.push(`Per-card effect — ${matchCount} matching card${matchCount !== 1 ? 's' : ''} captured`);
       } else {
-        lines.push('No matching cards captured yet');
+        lines.push('Per-card — no matching cards captured yet');
       }
     }
 
-    // ── Channel 2: additive mult ──────────────────────────────────────────
-    if (fx.getAdditiveMult) {
-      const add = fx.getAdditiveMult({ capturedCards: captured, yakuList: [], spirits });
-      if (add !== 0) {
-        lines.push(`+${add.toFixed(2)} additive mult`);
-      } else {
-        lines.push('+0.00 additive mult');
-      }
-    }
-
-    // ── Channel 3: mult-mult ──────────────────────────────────────────────
-    if (fx.getMultMult) {
-      const mm = fx.getMultMult({ capturedCards: captured, yakuList: [], spirits });
-
-      // Persistent spirits: show underlying state for clarity.
-      if (spirit.id === 'engine_wildlife') {
+    // ── Engine spirit (applyEngine) ───────────────────────────────────────
+    if (fx?.applyEngine) {
+      if (spirit.id === 'engine_radiance') {
+        const n = spirit.state?.count ?? 0;
+        const m = n > 0 ? Math.pow(2.0, n) : 1.0;
+        lines.push(`Brights seen: ${n}  →  \u00D7${m.toFixed(2)} mult`);
+      } else if (spirit.id === 'engine_wildlife') {
         const n = spirit.state?.seenAnimals?.length ?? 0;
-        lines.push(`Unique animals: ${n}/9  →  \u00D7${mm.toFixed(2)} mult`);
+        lines.push(`Unique animals: ${n}/9  →  \u00D7${(1 + n * 0.5).toFixed(2)} mult`);
+      } else if (spirit.id === 'engine_banner') {
+        const n = spirit.state?.count ?? 0;
+        lines.push(`Ribbons seen: ${n}  →  \u00D7${(1 + n).toFixed(2)} mult`);
       } else if (spirit.id === 'engine_plenty') {
         const n = spirit.state?.seenPlains?.length ?? 0;
-        lines.push(`Unique plains: ${n}  →  \u00D7${mm.toFixed(2)} mult`);
-      } else if (spirit.id === 'engine_radiance') {
-        const n = captured.filter(c => c.type === 'bright').length;
-        lines.push(`Brights: ${n}  →  \u00D7${mm.toFixed(2)} mult`);
-      } else if (spirit.id === 'engine_banner') {
-        const n = captured.filter(c => c.type === 'ribbon').length;
-        lines.push(`Ribbons: ${n}  →  \u00D7${mm.toFixed(2)} mult`);
+        lines.push(`Unique plains: ${n}  →  \u00D7${(1 + n * 0.1).toFixed(2)} mult`);
       } else if (spirit.id === 'sym_algae') {
-        lines.push(`Symbionts summoned: ${spirit.state?.summonCount ?? 0}  →  \u00D7${mm.toFixed(2)} mult`);
+        const n = spirit.state?.summonCount ?? 0;
+        lines.push(`Symbionts summoned: ${n}  →  \u00D7${(1 + n * 0.3).toFixed(2)} mult`);
       } else if (spirit.id === 'sym_ants') {
-        lines.push(`Spirits equipped: ${spirits.length}  →  \u00D7${mm.toFixed(2)} mult`);
+        lines.push(`Spirits equipped: ${spirits.length}  →  +${spirits.length} mult`);
       } else if (spirit.id === 'sym_ducks') {
-        lines.push(`Pairs this round: ${spirit.state?.pairsThisRound ?? 0}  →  \u00D7${mm.toFixed(2)} mult`);
+        const n = spirit.state?.pairsThisRound ?? 0;
+        lines.push(`Pairs this round: ${n}  →  \u00D7${(1 + n * 0.3).toFixed(2)} mult`);
       } else if (spirit.id === 'sym_snails') {
-        lines.push(`Total unplayed: ${spirit.state?.totalUnplayed ?? 0}  →  \u00D7${mm.toFixed(2)} mult`);
+        const n = spirit.state?.totalUnplayed ?? 0;
+        lines.push(`Total unplayed: ${n}  →  \u00D7${(1 + n * 0.2).toFixed(2)} mult`);
+      } else if (spirit.id === 'engine_glacier') {
+        const n = spirit.state?.waterDepCount ?? 0;
+        lines.push(`Water dep count: ${n}  →  \u00D7${(1 + n * 0.3).toFixed(2)} mult`);
+      } else if (spirit.id === 'engine_carbon') {
+        const n = spirit.state?.fireCombustCount ?? 0;
+        lines.push(`Fire combustions: ${n}  →  \u00D7${(1 + n * 0.5).toFixed(2)} mult`);
+      } else if (spirit.id === 'engine_velocity') {
+        const n = spirit.state?.metalProcCount ?? 0;
+        lines.push(`Metal procs: ${n}  →  \u00D7${(1 + n * 0.3).toFixed(2)} mult`);
+      } else if (spirit.id === 'engine_fossil') {
+        const n = spirit.state?.earthCardCount ?? 0;
+        lines.push(`Earth cards in deck: ${n}  →  \u00D7${(1 + n * 0.2).toFixed(2)} mult`);
+      } else if (spirit.id === 'engine_moths') {
+        const n = spirit.state?.silkTriggerCount ?? 0;
+        lines.push(`Silk triggers: ${n}  →  \u00D7${(1 + n * 0.4).toFixed(2)} mult`);
       } else {
-        lines.push(`\u00D7${mm.toFixed(2)} mult`);
+        const r = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits });
+        if (r) {
+          if (r.multiplyMult) lines.push(`\u00D7${r.multiplyMult.toFixed(2)} mult`);
+          if (r.addMult)      lines.push(`+${r.addMult.toFixed(2)} mult`);
+        }
       }
     }
 
-    // ── Symbiont state (non-scoring channel) ─────────────────────────────
+    // ── Symbiont non-scoring state ─────────────────────────────────────────
     if (spirit.id === 'sym_caterpillar') {
       const eaten = spirit.state?.leafsEaten ?? 0;
       lines.push(`Leafs eaten: ${eaten}/3${eaten >= 3 ? ' — metamorphosed!' : ''}`);
@@ -1475,8 +1486,7 @@ export class GameScene extends Phaser.Scene {
     const thr      = run.threshold;
     this._baseText.setStyle({ color: runScore >= thr ? '#44ff88' : '#aaccee' })
       .setText(`Running: ${runScore}`);
-    const escal = (1.0 + this._round.pushCount * 0.3).toFixed(1);
-    this._multiText.setText(`\xD7${escal} escalation`);
+    this._multiText.setText(`Flow: \xD7${run.flow.toFixed(2)}`);
     this._projText.setText('');
 
     this._thresholdText.setText(`Target: ${run.threshold}`);
@@ -1559,9 +1569,10 @@ export class GameScene extends Phaser.Scene {
       }
       for (const ev of displayEvents) {
         if (ev.type !== 'capture') continue;
-        const esc  = (ev.pushEscalation ?? 1.0).toFixed(1);
         const tags = ev.cards.map(c => c.type[0].toUpperCase()).join('');
-        const line = `[${tags}]  ${ev.capturePoints ?? 0}pt \xD7${esc} \u2192 +${ev.captureScore ?? 0}`;
+        const mult = (ev.mult ?? 1.0).toFixed(1);
+        const fl   = (ev.flow ?? 1.0).toFixed(2);
+        const line = `[${tags}]  ${ev.capturePoints ?? 0}pt \xD7${mult}m \xD7${fl}f \u2192 +${ev.captureScore ?? 0}`;
         this._overlayObjs.push(
           this.add.text(cx, y, line, { fontSize: '13px', color: '#cce0ff' }).setOrigin(0.5)
         );
@@ -1571,7 +1582,7 @@ export class GameScene extends Phaser.Scene {
     y += 6;
     if (result.penaltyApplied) {
       this._overlayObjs.push(
-        this.add.text(cx, y, '\u26A0 Push penalty applied — score reduced', {
+        this.add.text(cx, y, `\u26A0 Push failed — Flow reduced to \xD7${run.flow.toFixed(2)}`, {
           fontSize: '13px', color: '#ff8866',
         }).setOrigin(0.5)
       );
@@ -1823,12 +1834,11 @@ export class GameScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(25)
     );
 
-    const pushCount       = this._round.pushCount;
-    const PUSH_DEALS      = [4, 2, 1];
-    const nextDeal        = PUSH_DEALS[Math.min(pushCount, PUSH_DEALS.length - 1)];
-    const PENALTY_RATES   = [0.3, 0.5, 0.7, 0.9];
-    const penaltyPct      = Math.round(PENALTY_RATES[Math.min(pushCount, 3)] * 100);
-    const nextEscalMult   = (1.0 + (pushCount + 1) * 0.3).toFixed(1);
+    const pushCount  = this._round.pushCount;
+    const PUSH_DEALS = [4, 2, 1];
+    const nextDeal   = PUSH_DEALS[Math.min(pushCount, PUSH_DEALS.length - 1)];
+    const failFlow   = (run.flow * 0.9).toFixed(2);
+    const winFlow    = (run.flow * 1.1).toFixed(2);
     const pushBtn = this.add.rectangle(cx + 118, btnY, 206, 42, 0x6a1a1a)
       .setStrokeStyle(2, 0xaa4444).setInteractive({ useHandCursor: true }).setDepth(25);
     pushBtn.on('pointerover', () => pushBtn.setFillStyle(0x9a2a2a));
@@ -1838,12 +1848,12 @@ export class GameScene extends Phaser.Scene {
       logger.logBankPushDecision('push', this._round.pushCount);
       this._round.pushOn();
       this._clearObjs(this._overlayObjs);
-      this._setStatus(`Pushed! +${nextDeal} cards dealt. ×${nextEscalMult} escalation active.`);
+      this._setStatus(`Pushed! +${nextDeal} cards. Win: Flow ×${winFlow}  Fail: Flow ×${failFlow}`);
       this._renderAll();
     });
     this._overlayObjs.push(pushBtn);
     this._overlayObjs.push(
-      this.add.text(cx + 118, btnY, `Push +${nextDeal}  ×${nextEscalMult}  -${penaltyPct}%`, {
+      this.add.text(cx + 118, btnY, `Push +${nextDeal}  W:\xD7${winFlow} / F:\xD7${failFlow}`, {
         fontSize: '13px', color: '#ffffff',
       }).setOrigin(0.5).setDepth(25)
     );

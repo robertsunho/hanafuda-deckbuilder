@@ -5,7 +5,8 @@
 // checkCombos() after every capture event with the full capture pile so
 // feedback is immediate rather than deferred to round end.
 //
-// Style combos accumulate Style Base (via run.addStyleBase), which feeds Flow.
+// Style combos trigger once per round; each combo adds to run.flow ONCE per run
+// (via run.onStyleCombo).  Repeat triggers in later rounds display but add no flow.
 // They do NOT trigger Bank/Push decisions.
 // ─────────────────────────────────────────────────────────────────────────────
 

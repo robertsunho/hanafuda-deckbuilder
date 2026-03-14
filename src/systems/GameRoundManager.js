@@ -393,11 +393,17 @@ export default class GameRoundManager {
       }
     }
 
-    // ── Additive scoring state ────────────────────────────────────────────
+    // ── Scoring state ─────────────────────────────────────────────────────
     this._runningScore  = 0;
     this._scoringEvents = [];
     this._eventCount    = 0;
     this._spentCardIds  = new Set();
+
+    // Reset per-round engine spirit state.
+    for (const spirit of this._spirits) {
+      if (spirit.id === 'engine_radiance') spirit.state = null;
+      if (spirit.id === 'engine_banner')   spirit.state = null;
+    }
 
     // ── Empty-slot play tracking (for Fix D/E capture rules) ─────────────
     this._lastHandPlayToEmptySlot = null;
@@ -551,7 +557,10 @@ export default class GameRoundManager {
       throw new Error(`bankScore() called while phase is "${this._phase}".`);
     }
 
-    const flow = Math.max(1.0, this._styleBase);
+    // Push success: player pushed at least once and is now banking after a yaku.
+    if (this._pushCount > 0) run.onPushSuccess();
+
+    const flow = run.flow;
     const sc = this._scoring.calculateFinalScore(
       this._capture.getAll(), this._spirits, 1.0, run.yakuUpgrades, true
     );
@@ -582,7 +591,7 @@ export default class GameRoundManager {
       additiveMult:    0,
       multMult:        1.0,
       flow,
-      pushEscalation:  1.0 + this._pushCount * 0.3,
+      pushEscalation:  1.0,
       pointBoost:      1.0,
       rawBasePoints:   this._runningScore,
       pushFactor:      1.0,
@@ -636,12 +645,11 @@ export default class GameRoundManager {
         .map(y => [y.name, y.bonus])
     );
     this._phase = "idle";
-    const nextEscalation = 1.0 + this._pushCount * 0.3;
     return {
       failedPushFactor: 1.0,
-      failedFlow:       Math.max(1.0, this._styleBase),
-      nextEscalation,
-      dealCount: handCount,
+      failedFlow:       run.flow * 0.9,  // flow if push fails
+      successFlow:      run.flow * 1.1,  // flow if push succeeds
+      dealCount:        handCount,
     };
   }
 
@@ -855,53 +863,59 @@ export default class GameRoundManager {
     if (cards.length === 4) this._basePoints += 5;   // full-month bonus
 
     {
-      // Score this capture group immediately.
-      const allCaptured = this._capture.getAll();
-      const allYaku     = this._scoring.evaluate(allCaptured, run.yakuUpgrades, this._getCaptureThresholds());
+      // ── Phase 1: Process each card through spirits left-to-right ──────────
+      let points = 0;
+      let mult   = 1.0;
 
-      // Spirit channels.
-      let additiveMult = 0;
-      let multMult     = 1.0;
-      for (const spirit of this._spirits) {
-        const effect = SpiritEffects.get(spirit.id);
-        if (effect?.getAdditiveMult)
-          additiveMult += effect.getAdditiveMult({ capturedCards: allCaptured, yakuList: allYaku, spirits: this._spirits });
-        if (effect?.getMultMult)
-          multMult *= effect.getMultMult({ capturedCards: allCaptured, yakuList: allYaku, spirits: this._spirits });
-      }
-
-      // Card points — Water mult, Fire override, spirit point boosts.
-      let capturePoints = 0;
       for (const card of cards) {
         const enh    = card.enhancement;
         const isFire = enh?.element === 'fire';
-        let pts = isFire ? (enh.tier === 'upgraded' ? 20 : 10) : card.points;
-        if (!isFire) {
-          for (const spirit of this._spirits) {
-            const effect = SpiritEffects.get(spirit.id);
-            if (effect?.getPointBoosts) {
-              const boosts = effect.getPointBoosts({ capturedCards: allCaptured, spirits: this._spirits });
-              if (boosts?.has(card.id)) pts += boosts.get(card.id);
+        let cardPts = isFire ? (enh.tier === 'upgraded' ? 20 : 10) : card.points;
+        if (!isFire && enh?.element === 'water') {
+          const multArr = enh.tier === 'upgraded' ? ICE_MULT : SNOW_MULT;
+          cardPts = Math.round(cardPts * multArr[Math.min(enh.depLevel ?? 0, multArr.length - 1)]);
+        }
+        points += cardPts;
+
+        // Per-card spirit effects + engine state updates.
+        for (const spirit of this._spirits) {
+          const effect = SpiritEffects.get(spirit.id);
+          if (!effect) continue;
+          if (effect.onCardScored) {
+            const r = effect.onCardScored({ card, spirit, spirits: this._spirits });
+            if (r) {
+              if (r.addPoints)    points += r.addPoints;
+              if (r.addMult)      mult   += r.addMult;
+              if (r.multiplyMult) mult   *= r.multiplyMult;
             }
           }
+          if (effect.onCardSeen) {
+            effect.onCardSeen({ card, spirit });
+          }
         }
-        if (enh?.element === 'water') {
-          const multArr = enh.tier === 'upgraded' ? ICE_MULT : SNOW_MULT;
-          pts = Math.round(pts * multArr[Math.min(enh.depLevel ?? 0, multArr.length - 1)]);
-        }
-        capturePoints += pts;
       }
-      if (cards.length === 4) capturePoints += 5; // full-month bonus
 
-      const pushEscalation = 1.0 + this._pushCount * 0.3;
-      const flow           = Math.max(1.0, this._styleBase);
-      const captureScore   = Math.round(capturePoints * (1 + additiveMult) * multMult * flow * pushEscalation);
+      if (cards.length === 4) points += 5; // full-month bonus
 
+      // ── Phase 2: Apply engine spirits in slot order ────────────────────────
+      for (const spirit of this._spirits) {
+        const effect = SpiritEffects.get(spirit.id);
+        if (!effect?.applyEngine) continue;
+        const r = effect.applyEngine({ spirit, mult, points, spirits: this._spirits });
+        if (r) {
+          if (r.addPoints)    points += r.addPoints;
+          if (r.addMult)      mult   += r.addMult;
+          if (r.multiplyMult) mult   *= r.multiplyMult;
+        }
+      }
+
+      const flow         = run.flow;
+      const captureScore = Math.round(points * mult * flow);
       this._runningScore += captureScore;
 
       this._scoringEvents.push({
-        type: 'capture', cards, capturePoints, additiveMult, multMult,
-        flow, pushEscalation, captureScore, runningTotal: this._runningScore,
+        type: 'capture', cards, capturePoints: points, mult, flow,
+        captureScore, runningTotal: this._runningScore,
       });
 
       // game_well: draw 1 extra card on any capture.
@@ -957,28 +971,33 @@ export default class GameRoundManager {
             break;
           }
           case 'yellow': {
-            const allCaptured2 = this._capture.getAll();
-            let additiveMult2  = 0;
-            let multMult2      = 1.0;
+            // Retrigger: run the single card through the same two-phase pipeline.
+            let rPts  = card.points;
+            let rMult = 1.0;
             for (const spirit of this._spirits) {
               const effect = SpiritEffects.get(spirit.id);
-              if (effect?.getAdditiveMult)
-                additiveMult2 += effect.getAdditiveMult({ capturedCards: allCaptured2, yakuList: [], spirits: this._spirits });
-              if (effect?.getMultMult)
-                multMult2 *= effect.getMultMult({ capturedCards: allCaptured2, yakuList: [], spirits: this._spirits });
-            }
-            let pts2 = card.points;
-            for (const spirit of this._spirits) {
-              const effect = SpiritEffects.get(spirit.id);
-              if (effect?.getPointBoosts) {
-                const boosts = effect.getPointBoosts({ capturedCards: allCaptured2, spirits: this._spirits });
-                if (boosts?.has(card.id)) pts2 += boosts.get(card.id);
+              if (!effect) continue;
+              if (effect.onCardScored) {
+                const r = effect.onCardScored({ card, spirit, spirits: this._spirits });
+                if (r) {
+                  if (r.addPoints)    rPts  += r.addPoints;
+                  if (r.addMult)      rMult += r.addMult;
+                  if (r.multiplyMult) rMult *= r.multiplyMult;
+                }
               }
             }
-            const pushEscalation2 = 1.0 + this._pushCount * 0.3;
-            const flow2           = Math.max(1.0, this._styleBase);
-            const retriggerScore  = Math.round(pts2 * (1 + additiveMult2) * multMult2 * flow2 * pushEscalation2);
-            this._runningScore   += retriggerScore;
+            for (const spirit of this._spirits) {
+              const effect = SpiritEffects.get(spirit.id);
+              if (!effect?.applyEngine) continue;
+              const r = effect.applyEngine({ spirit, mult: rMult, points: rPts, spirits: this._spirits });
+              if (r) {
+                if (r.addPoints)    rPts  += r.addPoints;
+                if (r.addMult)      rMult += r.addMult;
+                if (r.multiplyMult) rMult *= r.multiplyMult;
+              }
+            }
+            const retriggerScore = Math.round(rPts * rMult * run.flow);
+            this._runningScore  += retriggerScore;
             this._scoringEvents.push({
               type: 'retrigger', cards: [card], card, retriggerScore, runningTotal: this._runningScore,
             });
@@ -1065,7 +1084,7 @@ export default class GameRoundManager {
    */
   _onStyleCombos(combos) {
     for (const combo of combos) {
-      run.addStyleBase(combo.bonus);
+      run.onStyleCombo(combo.id, combo.bonus); // adds to flow only the first time per run
     }
     this._lastStyleCombos = combos;
     logger.logStyleCombos(combos);
@@ -1267,13 +1286,12 @@ export default class GameRoundManager {
       if (roundOver) this._trackSnailsUnplayed();
 
       if (roundOver && penaltyApplied) {
-        const PENALTY_RATES = [0.3, 0.5, 0.7, 0.9];
-        const rate = PENALTY_RATES[Math.min(this._pushCount - 1, 3)];
-        this._runningScore = Math.round(this._runningScore * (1 - rate));
+        // Push failure: reduce flow for future rounds but keep this round's score.
+        run.onPushFailure();
       }
 
-      const pushEscalation = 1.0 + this._pushCount * 0.3;
-      const flow           = Math.max(1.0, this._styleBase);
+      const pushEscalation = 1.0; // removed — no longer used
+      const flow           = run.flow;
 
       if (newYaku.length > 0) {
         this._roundEndingAfterDecision = roundOver;

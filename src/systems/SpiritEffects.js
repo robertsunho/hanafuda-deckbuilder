@@ -1,57 +1,50 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// SpiritEffects — three-channel scoring registry for all spirits
+// SpiritEffects — per-card spirit scoring registry
 //
-// Each entry may implement any combination of:
+// New interface (three optional hooks per spirit):
 //
-//   getPointBoosts({ capturedCards, spirits })
-//     → Map<cardId, flatBonus> | null
-//     Channel 1: flat addition to the base point value of specific captured cards.
-//     In capture mode: pts += boosts.get(card.id)
-//     In additive/multiplicative modes (ScoringEngine): pts *= boosts.get(card.id)
+//   onCardScored({ card, spirit, spirits }) → { addPoints?, addMult?, multiplyMult? } | null
+//     Fires once for EACH card in the current capture group, in spirit slot order.
+//     Per-card spirits (foundations, seasonal, axis, cross-fusions) use this.
 //
-//   getAdditiveMult({ capturedCards, yakuList, spirits })
-//     → number (default 0)
-//     Channel 2: flat addition to the yaku multiplier layer.
-//     Stacks additively: two +5 effects = +10 total.
+//   onCardSeen({ card, spirit }) → void
+//     Fires once per card to update engine internal state WITHOUT applying effects.
+//     Runs alongside onCardScored in Phase 1.
 //
-//   getMultMult({ capturedCards, yakuList, spirits })
-//     → number (default 1.0)
-//     Channel 3: multiplies the entire (Yaku + Additive) layer.
-//     Stacks multiplicatively: two ×2 effects = ×4.
+//   applyEngine({ spirit, mult, points, spirits }) → { addPoints?, addMult?, multiplyMult? } | null
+//     Fires once per capture event in Phase 2 (after all cards processed).
+//     Engine spirits accumulate state via onCardSeen, then apply in Phase 2.
+//     ORDER MATTERS: engines are applied left-to-right by spirit slot index.
 //
-// Axis spirits use card.vertical ('sky' | 'ground') and card.temporal ('day' | 'night').
-// Note: Land cards use 'ground' internally; the display name is 'Land'.
+// Scoring formula per capture event:
+//   Phase 1: for each card — process onCardScored + onCardSeen → accumulate points, mult
+//   Phase 2: for each engine — applyEngine → further adjust mult
+//   Score = round(points × mult × run.flow)
+//
+// Fire-enhanced cards have no month, vertical, or temporal identity.
+// All factory functions skip them so they can't trigger seasonal/axis spirit effects.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Factory helpers ───────────────────────────────────────────────────────────
 
-// Fire-enhanced cards have no month, vertical, or temporal identity.
-// All factory functions skip them so they can't trigger seasonal/axis spirit effects.
-
-function monthPointBoost(months, flatAmt) {
+function monthPointAdd(months, flatAmt) {
   const set = new Set(months);
   return {
-    getPointBoosts({ capturedCards }) {
-      const boosts = new Map();
-      for (const card of capturedCards) {
-        if (card.enhancement?.element === 'fire') continue;
-        if (set.has(card.month)) boosts.set(card.id, flatAmt);
-      }
-      return boosts.size > 0 ? boosts : null;
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
+      if (set.has(card.month)) return { addPoints: flatAmt };
+      return null;
     },
   };
 }
 
-function monthAdditiveMult(months, bonusPerCard) {
+function monthMultAdd(months, bonusPerCard) {
   const set = new Set(months);
   return {
-    getAdditiveMult({ capturedCards }) {
-      let n = 0;
-      for (const card of capturedCards) {
-        if (card.enhancement?.element === 'fire') continue;
-        if (set.has(card.month)) n++;
-      }
-      return n * bonusPerCard;
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
+      if (set.has(card.month)) return { addMult: bonusPerCard };
+      return null;
     },
   };
 }
@@ -59,115 +52,70 @@ function monthAdditiveMult(months, bonusPerCard) {
 function monthFusion(months, flatAmt, bonusPerCard) {
   const set = new Set(months);
   return {
-    getPointBoosts({ capturedCards }) {
-      const boosts = new Map();
-      for (const card of capturedCards) {
-        if (card.enhancement?.element === 'fire') continue;
-        if (set.has(card.month)) boosts.set(card.id, flatAmt);
-      }
-      return boosts.size > 0 ? boosts : null;
-    },
-    getAdditiveMult({ capturedCards }) {
-      let n = 0;
-      for (const card of capturedCards) {
-        if (card.enhancement?.element === 'fire') continue;
-        if (set.has(card.month)) n++;
-      }
-      return n * bonusPerCard;
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
+      if (set.has(card.month)) return { addPoints: flatAmt, addMult: bonusPerCard };
+      return null;
     },
   };
 }
 
-function verticalPointBoost(vertical, flatAmt) {
+function verticalPointAdd(vertical, flatAmt) {
   return {
-    getPointBoosts({ capturedCards }) {
-      const boosts = new Map();
-      for (const card of capturedCards) {
-        if (card.enhancement?.element === 'fire') continue;
-        if (card.vertical === vertical) boosts.set(card.id, flatAmt);
-      }
-      return boosts.size > 0 ? boosts : null;
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
+      if (card.vertical === vertical) return { addPoints: flatAmt };
+      return null;
     },
   };
 }
 
-function verticalAdditiveMult(vertical, bonusPerCard) {
+function verticalMultAdd(vertical, bonusPerCard) {
   return {
-    getAdditiveMult({ capturedCards }) {
-      let n = 0;
-      for (const card of capturedCards) {
-        if (card.enhancement?.element === 'fire') continue;
-        if (card.vertical === vertical) n++;
-      }
-      return n * bonusPerCard;
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
+      if (card.vertical === vertical) return { addMult: bonusPerCard };
+      return null;
     },
   };
 }
 
 function verticalFusion(vertical, flatAmt, bonusPerCard) {
   return {
-    getPointBoosts({ capturedCards }) {
-      const boosts = new Map();
-      for (const card of capturedCards) {
-        if (card.enhancement?.element === 'fire') continue;
-        if (card.vertical === vertical) boosts.set(card.id, flatAmt);
-      }
-      return boosts.size > 0 ? boosts : null;
-    },
-    getAdditiveMult({ capturedCards }) {
-      let n = 0;
-      for (const card of capturedCards) {
-        if (card.enhancement?.element === 'fire') continue;
-        if (card.vertical === vertical) n++;
-      }
-      return n * bonusPerCard;
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
+      if (card.vertical === vertical) return { addPoints: flatAmt, addMult: bonusPerCard };
+      return null;
     },
   };
 }
 
-function temporalPointBoost(temporal, flatAmt) {
+function temporalPointAdd(temporal, flatAmt) {
   return {
-    getPointBoosts({ capturedCards }) {
-      const boosts = new Map();
-      for (const card of capturedCards) {
-        if (card.enhancement?.element === 'fire') continue;
-        if (card.temporal === temporal) boosts.set(card.id, flatAmt);
-      }
-      return boosts.size > 0 ? boosts : null;
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
+      if (card.temporal === temporal) return { addPoints: flatAmt };
+      return null;
     },
   };
 }
 
-function temporalAdditiveMult(temporal, bonusPerCard) {
+function temporalMultAdd(temporal, bonusPerCard) {
   return {
-    getAdditiveMult({ capturedCards }) {
-      let n = 0;
-      for (const card of capturedCards) {
-        if (card.enhancement?.element === 'fire') continue;
-        if (card.temporal === temporal) n++;
-      }
-      return n * bonusPerCard;
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
+      if (card.temporal === temporal) return { addMult: bonusPerCard };
+      return null;
     },
   };
 }
 
 function temporalFusion(temporal, flatAmt, bonusPerCard) {
   return {
-    getPointBoosts({ capturedCards }) {
-      const boosts = new Map();
-      for (const card of capturedCards) {
-        if (card.enhancement?.element === 'fire') continue;
-        if (card.temporal === temporal) boosts.set(card.id, flatAmt);
-      }
-      return boosts.size > 0 ? boosts : null;
-    },
-    getAdditiveMult({ capturedCards }) {
-      let n = 0;
-      for (const card of capturedCards) {
-        if (card.enhancement?.element === 'fire') continue;
-        if (card.temporal === temporal) n++;
-      }
-      return n * bonusPerCard;
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
+      if (card.temporal === temporal) return { addPoints: flatAmt, addMult: bonusPerCard };
+      return null;
     },
   };
 }
@@ -176,33 +124,35 @@ function temporalFusion(temporal, flatAmt, bonusPerCard) {
 
 const _effects = {
 
-  // ── Seasonal Point Boost ──────────────────────────────────────────────────
+  // ── Seasonal Point ────────────────────────────────────────────────────────
+  // +20 pts per card captured from the matching season.
 
-  spring_pollen:  monthPointBoost([3, 4, 5],   20),
-  summer_heat:    monthPointBoost([6, 7, 8],   20),
-  autumn_harvest: monthPointBoost([9, 10, 11], 20),
-  winter_cold:    monthPointBoost([12, 1, 2],  20),
+  spring_pollen:  monthPointAdd([3, 4, 5],   20),
+  summer_heat:    monthPointAdd([6, 7, 8],   20),
+  autumn_harvest: monthPointAdd([9, 10, 11], 20),
+  winter_cold:    monthPointAdd([12, 1, 2],  20),
 
-  // ── Seasonal Additive Mult ────────────────────────────────────────────────
+  // ── Seasonal Mult ─────────────────────────────────────────────────────────
+  // +5 mult per card captured from the matching season.
 
-  spring_bees:     monthAdditiveMult([3, 4, 5],   5),
-  summer_humidity: monthAdditiveMult([6, 7, 8],   5),
-  autumn_leaves:   monthAdditiveMult([9, 10, 11], 5),
-  winter_aridity:  monthAdditiveMult([12, 1, 2],  5),
+  spring_bees:     monthMultAdd([3, 4, 5],   5),
+  summer_humidity: monthMultAdd([6, 7, 8],   5),
+  autumn_leaves:   monthMultAdd([9, 10, 11], 5),
+  winter_aridity:  monthMultAdd([12, 1, 2],  5),
 
-  // ── Axis Point Boost ──────────────────────────────────────────────────────
+  // ── Axis Point ────────────────────────────────────────────────────────────
 
-  sky_clouds: verticalPointBoost('air',  10),
-  land_soil:  verticalPointBoost('land', 10),
-  day_light:  temporalPointBoost('day',  10),
-  night_dark: temporalPointBoost('night',10),
+  sky_clouds: verticalPointAdd('air',   10),
+  land_soil:  verticalPointAdd('land',  10),
+  day_light:  temporalPointAdd('day',   10),
+  night_dark: temporalPointAdd('night', 10),
 
-  // ── Axis Additive Mult ────────────────────────────────────────────────────
+  // ── Axis Mult ─────────────────────────────────────────────────────────────
 
-  sky_wind:        verticalAdditiveMult('air',  5),
-  land_rock:       verticalAdditiveMult('land', 5),
-  day_movement:    temporalAdditiveMult('day',    5),
-  night_stillness: temporalAdditiveMult('night',  5),
+  sky_wind:        verticalMultAdd('air',   5),
+  land_rock:       verticalMultAdd('land',  5),
+  day_movement:    temporalMultAdd('day',   5),
+  night_stillness: temporalMultAdd('night', 5),
 
   // ── Seasonal Fusion Spirits ───────────────────────────────────────────────
 
@@ -215,281 +165,300 @@ const _effects = {
 
   fusion_atmosphere: verticalFusion('air',  8, 3),
   fusion_continent:  verticalFusion('land', 8, 3),
-  fusion_sun:        temporalFusion('day',    8, 3),
-  fusion_moon:       temporalFusion('night',  8, 3),
+  fusion_sun:        temporalFusion('day',  8, 3),
+  fusion_moon:       temporalFusion('night',8, 3),
 
   // ── Rank Foundation Spirits ───────────────────────────────────────────────
-  // Point boost (flat) + additive mult, gated by card type.
+  // Point boost + additive mult per matching card being captured.
 
   rank_shine: {
-    getPointBoosts({ capturedCards }) {
-      const boosts = new Map();
-      for (const card of capturedCards)
-        if (card.type === 'bright') boosts.set(card.id, 80);
-      return boosts.size > 0 ? boosts : null;
-    },
-    getAdditiveMult({ capturedCards }) {
-      return capturedCards.filter(c => c.type === 'bright').length * 8;
+    onCardScored({ card }) {
+      if (card.type === 'bright') return { addPoints: 80, addMult: 8 };
+      return null;
     },
   },
 
   rank_pulse: {
-    getPointBoosts({ capturedCards }) {
-      const boosts = new Map();
-      for (const card of capturedCards)
-        if (card.type === 'animal') boosts.set(card.id, 50);
-      return boosts.size > 0 ? boosts : null;
-    },
-    getAdditiveMult({ capturedCards }) {
-      return capturedCards.filter(c => c.type === 'animal').length * 5;
+    onCardScored({ card }) {
+      if (card.type === 'animal') return { addPoints: 50, addMult: 5 };
+      return null;
     },
   },
 
   rank_poem: {
-    getPointBoosts({ capturedCards }) {
-      const boosts = new Map();
-      for (const card of capturedCards)
-        if (card.type === 'ribbon') boosts.set(card.id, 40);
-      return boosts.size > 0 ? boosts : null;
-    },
-    getAdditiveMult({ capturedCards }) {
-      return capturedCards.filter(c => c.type === 'ribbon').length * 4;
+    onCardScored({ card }) {
+      if (card.type === 'ribbon') return { addPoints: 40, addMult: 4 };
+      return null;
     },
   },
 
   rank_salt: {
-    getPointBoosts({ capturedCards }) {
-      const boosts = new Map();
-      for (const card of capturedCards)
-        if (card.type === 'plain') boosts.set(card.id, 20);
-      return boosts.size > 0 ? boosts : null;
-    },
-    getAdditiveMult({ capturedCards }) {
-      return capturedCards.filter(c => c.type === 'plain').length * 2;
+    onCardScored({ card }) {
+      if (card.type === 'plain') return { addPoints: 20, addMult: 2 };
+      return null;
     },
   },
 
   // ── Rank Engine Spirits ───────────────────────────────────────────────────
-  // Pure mult-mult channel; some are persistent across rounds.
+  // Per-round engines: state is reset each round in GameRoundManager.startRound().
 
   /**
-   * Radiance: ×2.0 per bright captured this round (exponential).
+   * Radiance: ×2.0 per bright card seen in the current round (exponential).
+   * Tracks brights via onCardSeen; applies in Phase 2.
    */
   engine_radiance: {
-    getMultMult({ capturedCards }) {
-      const n = capturedCards.filter(c => c.type === 'bright').length;
-      return n > 0 ? Math.pow(2.0, n) : 1.0;
+    onCardSeen({ card, spirit }) {
+      if (card.type === 'bright') {
+        if (!spirit.state) spirit.state = { count: 0 };
+        spirit.state.count = (spirit.state.count ?? 0) + 1;
+      }
+    },
+    applyEngine({ spirit }) {
+      const n = spirit.state?.count ?? 0;
+      if (n === 0) return null;
+      return { multiplyMult: Math.pow(2.0, n) };
     },
   },
 
   /**
-   * Wildlife: persistent collection tracker.  Each NEW unique animal species
-   * captured (any round) adds +0.5 to the mult-mult permanently.
+   * Wildlife: persistent cross-round tracker.
+   * Each NEW unique animal species captured (any round) adds +0.5 mult.
+   * State updated externally via run.onCardsCaptured().
    */
   engine_wildlife: {
-    getMultMult({ spirits }) {
-      const self = spirits.find(s => s.id === 'engine_wildlife');
-      const n    = self?.state?.seenAnimals?.length ?? 0;
-      return 1.0 + n * 0.5;
+    applyEngine({ spirit }) {
+      const n = spirit.state?.seenAnimals?.length ?? 0;
+      if (n === 0) return null;
+      return { multiplyMult: 1.0 + n * 0.5 };
     },
   },
 
   /**
-   * Banner: +1.0 mult-mult per ribbon captured this round.
+   * Banner: +1.0 mult per ribbon card seen in the current round.
+   * State is reset each round in GameRoundManager.startRound().
    */
   engine_banner: {
-    getMultMult({ capturedCards }) {
-      const n = capturedCards.filter(c => c.type === 'ribbon').length;
-      return 1.0 + n;
+    onCardSeen({ card, spirit }) {
+      if (card.type === 'ribbon') {
+        if (!spirit.state) spirit.state = { count: 0 };
+        spirit.state.count = (spirit.state.count ?? 0) + 1;
+      }
+    },
+    applyEngine({ spirit }) {
+      const n = spirit.state?.count ?? 0;
+      if (n === 0) return null;
+      return { multiplyMult: 1.0 + n };
     },
   },
 
   /**
-   * Plenty: persistent plain tracker.  Each NEW unique plain card captured
-   * (any round) adds +0.1 to the mult-mult permanently.
+   * Plenty: persistent cross-round tracker.
+   * Each NEW unique plain card captured (any round) adds +0.1 mult.
+   * State updated externally via run.onCardsCaptured().
    */
   engine_plenty: {
-    getMultMult({ spirits }) {
-      const self = spirits.find(s => s.id === 'engine_plenty');
-      const n    = self?.state?.seenPlains?.length ?? 0;
-      return 1.0 + n * 0.1;
+    applyEngine({ spirit }) {
+      const n = spirit.state?.seenPlains?.length ?? 0;
+      if (n === 0) return null;
+      return { multiplyMult: 1.0 + n * 0.1 };
     },
   },
 
   // ── Rank Utility Spirits ──────────────────────────────────────────────────
-  // Event-triggered effects — handled in GameRoundManager._addCapture().
-  // No scoring channels here; entries exist so SpiritEffects.get() returns non-null.
+  // Event-triggered effects handled in GameRoundManager._addCapture().
 
   util_glory:      {},  // bright captured → draw 3 cards
-  util_symbiosis:  {},  // placeholder
+  util_symbiosis:  {},  // animal captured → summon symbiont
   util_festival:   {},  // ribbon captured → stamp (TBD)
-  util_irrigation: {},  // plain captured → +10 pts added to running score
+  util_irrigation: {},  // plain captured → +10 pts to running score
 
   // ── Economy Spirits ────────────────────────────────────────────────────────
-  // Most effects are event-driven (interest, push, round-end) — handled in
-  // RunManager / GameRoundManager.  Entries here so SpiritEffects.get() returns non-null.
 
-  econ_bonds:        {},  // +10% interest rate — RunManager.interestRate getter
-  econ_ingot:        {},  // +0.1% interest per ki — RunManager.interestRate getter
+  econ_bonds:        {},  // +10% interest — RunManager.interestRate
+  econ_ingot:        {},  // +0.1% interest per ki — RunManager.interestRate
   econ_grace:        {},  // double style combo ki — RunManager.calculateKiReward
-  econ_recycling:    {},  // +5 ki per overflow discard — GameRoundManager._doDeckPhase / playHandCard
-  econ_lucky_charm:  {},  // +50% ki on push — GameRoundManager.pushOn
-  econ_piggybank:    {},  // 3× hand ki at round end — RunManager.calculateKiReward
-  econ_coupon:       {},  // 20% shop discount — ShrineScene price multiplier
-  econ_replica:      {},  // placeholder
-  econ_print:        {},  // placeholder
-  econ_present:      {},  // placeholder
-  econ_collector:    {},  // placeholder
+  econ_recycling:    {},  // +5 ki per overflow discard
+  econ_lucky_charm:  {},  // +50% ki on push
+  econ_piggybank:    {},  // 3× hand ki at round end
+  econ_coupon:       {},  // 20% shop discount
+  econ_replica:      {},
+  econ_print:        {},
+  econ_present:      {},
+  econ_collector:    {},
 
   // ── Gameplay Spirits ───────────────────────────────────────────────────────
 
-  game_expanse:  {},  // +2 field slots — GameRoundManager.startRound sets field.maxSlots=10
-  game_well:     {},  // draw +1 on capture — GameRoundManager._addCapture
-  game_catcher:  {},  // overflow→hand — GameRoundManager field-full discard path
-  game_surplus:  {},  // +2 starting hand cards — GameRoundManager.startRound
-  game_gankyil:  {},  // 3-stack capture — GameRoundManager capture threshold
-  game_angel:    {},  // +1 card per push — GameRoundManager._getNextPushDealCount
-  game_mirror:   {},  // placeholder
-  game_echo:     {},  // placeholder
+  game_expanse:  {},  // +2 field slots
+  game_well:     {},  // draw +1 on capture
+  game_catcher:  {},  // overflow → hand
+  game_surplus:  {},  // +2 starting hand cards
+  game_gankyil:  {},  // 3-stack capture
+  game_angel:    {},  // +1 card per push
+  game_mirror:   {},
+  game_echo:     {},
 
   // ── Symbiont Spirits ───────────────────────────────────────────────────────
 
-  sym_caterpillar: {},  // event-driven: eats leaf cards in _addCapture
+  sym_caterpillar: {},  // eats leaf cards
 
-  sym_cuckoo_egg:  {},  // event-driven: counts down in startRound, blocks slot
+  sym_cuckoo_egg:  {},  // countdown hatch
 
   sym_algae: {
-    getMultMult({ spirits }) {
-      const self = spirits.find(s => s.id === 'sym_algae');
-      return 1.0 + (self?.state?.summonCount ?? 0) * 0.3;
+    applyEngine({ spirit }) {
+      const m = 1.0 + (spirit.state?.summonCount ?? 0) * 0.3;
+      if (m === 1.0) return null;
+      return { multiplyMult: m };
     },
   },
 
   sym_ants: {
-    getMultMult({ spirits }) {
-      return 1.0 + spirits.length * 1.0;
+    applyEngine({ spirit, spirits }) {
+      const add = spirits?.length ?? 0;
+      if (add === 0) return null;
+      return { addMult: add };
     },
   },
 
-  sym_crow:   {},  // event-driven: first deck flip in _doDeckPhase
+  sym_crow:   {},  // first deck flip is captured directly
 
   sym_ducks: {
-    getMultMult({ spirits }) {
-      const self = spirits.find(s => s.id === 'sym_ducks');
-      return 1.0 + (self?.state?.pairsThisRound ?? 0) * 0.3;
+    applyEngine({ spirit }) {
+      const m = 1.0 + (spirit.state?.pairsThisRound ?? 0) * 0.3;
+      if (m === 1.0) return null;
+      return { multiplyMult: m };
     },
   },
 
   sym_snails: {
-    getMultMult({ spirits }) {
-      const self = spirits.find(s => s.id === 'sym_snails');
-      return 1.0 + (self?.state?.totalUnplayed ?? 0) * 0.2;
+    applyEngine({ spirit }) {
+      const m = 1.0 + (spirit.state?.totalUnplayed ?? 0) * 0.2;
+      if (m === 1.0) return null;
+      return { multiplyMult: m };
     },
   },
 
-  sym_magpie: {},  // event-driven: +3 ki on style combo in _onStyleCombos
-
-  sym_osprey: {},  // event-driven: pre-play field capture (placeholder)
+  sym_magpie: {},  // +3 ki per style combo
+  sym_osprey: {},  // pre-play field capture
 
   // ── Cross-Fusion Spirits (Tier 3) ─────────────────────────────────────────
-  // Each matching card contributes to additive mult.
-  // ×2.0 effective = +1.0 additive per card; ×1.5 = +0.5 additive per card.
+  // Per-card multiplyMult: each qualifying card being captured multiplies mult.
+  // ×2.0 spirits = powerful; ×1.5 = moderate.  Slot ordering matters.
 
   cross_yang: {
-    getAdditiveMult({ capturedCards }) {
-      return capturedCards.filter(c => c.vertical === 'air' || c.temporal === 'day').length * 1.0;
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
+      if (card.vertical === 'air' || card.temporal === 'day') return { multiplyMult: 2.0 };
+      return null;
     },
   },
 
   cross_yin: {
-    getAdditiveMult({ capturedCards }) {
-      return capturedCards.filter(c => c.vertical === 'land' || c.temporal === 'night').length * 1.0;
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
+      if (card.vertical === 'land' || card.temporal === 'night') return { multiplyMult: 2.0 };
+      return null;
     },
   },
 
   cross_space: {
-    getAdditiveMult({ capturedCards }) {
-      return capturedCards.filter(c => c.vertical === 'air' || c.temporal === 'night').length * 0.5;
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
+      if (card.vertical === 'air' || card.temporal === 'night') return { multiplyMult: 1.5 };
+      return null;
     },
   },
 
   cross_energy: {
-    getAdditiveMult({ capturedCards }) {
-      return capturedCards.filter(c => c.vertical === 'land' || c.temporal === 'day').length * 0.5;
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
+      if (card.vertical === 'land' || card.temporal === 'day') return { multiplyMult: 1.5 };
+      return null;
     },
   },
 
   cross_solstice: {
-    getAdditiveMult({ capturedCards }) {
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
       const months = new Set([6, 7, 8, 12, 1, 2]);
-      return capturedCards.filter(c => months.has(c.month)).length * 1.0;
+      if (months.has(card.month)) return { multiplyMult: 2.0 };
+      return null;
     },
   },
 
   cross_equinox: {
-    getAdditiveMult({ capturedCards }) {
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
       const months = new Set([3, 4, 5, 9, 10, 11]);
-      return capturedCards.filter(c => months.has(c.month)).length * 1.0;
+      if (months.has(card.month)) return { multiplyMult: 2.0 };
+      return null;
     },
   },
 
   cross_tropic: {
-    getAdditiveMult({ capturedCards }) {
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
       const months = new Set([3, 4, 5, 6, 7, 8]);
-      return capturedCards.filter(c => months.has(c.month)).length * 0.5;
+      if (months.has(card.month)) return { multiplyMult: 1.5 };
+      return null;
     },
   },
 
   cross_arctic: {
-    getAdditiveMult({ capturedCards }) {
+    onCardScored({ card }) {
+      if (card.enhancement?.element === 'fire') return null;
       const months = new Set([9, 10, 11, 12, 1, 2]);
-      return capturedCards.filter(c => months.has(c.month)).length * 0.5;
+      if (months.has(card.month)) return { multiplyMult: 1.5 };
+      return null;
     },
   },
 
   // ── Unity Spirits (Tier 4) ─────────────────────────────────────────────────
 
-  unity_yinyang: {},  // TBD
-  unity_gravity: {},  // TBD
-  unity_time:    {},  // TBD
-  unity_planet:  {},  // TBD
+  unity_yinyang: {},
+  unity_gravity: {},
+  unity_time:    {},
+  unity_planet:  {},
 
   // ── Wu Xing Engine Spirits ─────────────────────────────────────────────────
-  // State incremented in _applyPostRoundEnhancements; read here for mult-mult channel.
+  // State incremented in _applyPostRoundEnhancements; read here in Phase 2.
 
   engine_glacier: {
-    getMultMult({ spirits }) {
-      const self = spirits.find(s => s.id === 'engine_glacier');
-      return 1.0 + (self?.state?.waterDepCount ?? 0) * 0.3;
+    applyEngine({ spirit }) {
+      const m = 1.0 + (spirit.state?.waterDepCount ?? 0) * 0.3;
+      if (m === 1.0) return null;
+      return { multiplyMult: m };
     },
   },
 
   engine_carbon: {
-    getMultMult({ spirits }) {
-      const self = spirits.find(s => s.id === 'engine_carbon');
-      return 1.0 + (self?.state?.fireCombustCount ?? 0) * 0.5;
+    applyEngine({ spirit }) {
+      const m = 1.0 + (spirit.state?.fireCombustCount ?? 0) * 0.5;
+      if (m === 1.0) return null;
+      return { multiplyMult: m };
     },
   },
 
   engine_velocity: {
-    getMultMult({ spirits }) {
-      const self = spirits.find(s => s.id === 'engine_velocity');
-      return 1.0 + (self?.state?.metalProcCount ?? 0) * 0.3;
+    applyEngine({ spirit }) {
+      const m = 1.0 + (spirit.state?.metalProcCount ?? 0) * 0.3;
+      if (m === 1.0) return null;
+      return { multiplyMult: m };
     },
   },
 
   engine_fossil: {
-    getMultMult({ spirits }) {
-      // Use the cached count updated at round end by _applyPostRoundEnhancements.
-      const self = spirits.find(s => s.id === 'engine_fossil');
-      return 1.0 + (self?.state?.earthCardCount ?? 0) * 0.2;
+    applyEngine({ spirit }) {
+      const m = 1.0 + (spirit.state?.earthCardCount ?? 0) * 0.2;
+      if (m === 1.0) return null;
+      return { multiplyMult: m };
     },
   },
 
   engine_moths: {
-    getMultMult({ spirits }) {
-      const self = spirits.find(s => s.id === 'engine_moths');
-      return 1.0 + (self?.state?.silkTriggerCount ?? 0) * 0.4;
+    applyEngine({ spirit }) {
+      const m = 1.0 + (spirit.state?.silkTriggerCount ?? 0) * 0.4;
+      if (m === 1.0) return null;
+      return { multiplyMult: m };
     },
   },
 };
@@ -499,9 +468,8 @@ const _effects = {
 /**
  * Look up the effect definition for a spirit.
  * @param {string} spiritId
- * @returns {{ getPointBoosts?: Function,
- *             getAdditiveMult?: Function,
- *             getMultMult?: Function }|null}
+ * @returns {{ onCardScored?: Function, onCardSeen?: Function,
+ *             applyEngine?: Function }|null}
  *   null if the id is unrecognised.
  */
 const SpiritEffects = {

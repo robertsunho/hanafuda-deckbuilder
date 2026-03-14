@@ -93,12 +93,26 @@ class RunManager {
     this._totalScore = 0;
 
     /**
-     * Style Base — the player's skill expression multiplier.
-     * Starts at 1.0.  Grows +0.1 per resonance (style) play during a round.
-     * Decays 30% toward 1.0 between rounds: newStyle = 1.0 + (old − 1.0) × 0.7.
-     * Cannot be boosted by spirits — it is the player-skill layer only.
+     * Style Base — legacy; kept for UI display only (no longer used in scoring).
+     * @deprecated Use this._flow for all scoring.
      */
     this._styleBase = 1.0;
+
+    /**
+     * Flow — the single persistent scoring multiplier for the run.
+     * Starts at 1.0.  Modified by push outcomes and one-time style combo milestones.
+     *   Push success (new yaku after push): flow × 1.1
+     *   Push failure (round ends under penalty): flow × 0.9
+     *   Style combo (first time only per run): flow + combo_value
+     */
+    this._flow = 1.0;
+
+    /**
+     * Set of style combo IDs whose flow bonus has already been collected this run.
+     * Prevents the same combo from adding to flow more than once.
+     * @type {Set<string>}
+     */
+    this._triggeredCombos = new Set();
 
     // ── Run state ────────────────────────────────────────────────────────────
     /** True once the run has ended (won or lost). */
@@ -131,6 +145,8 @@ class RunManager {
 
   get ki()        { return this._ki; }
   get styleBase() { return this._styleBase; }
+  /** The current flow multiplier — applied to every capture score. */
+  get flow()      { return this._flow; }
 
   /**
    * Add ki to the balance.
@@ -406,31 +422,44 @@ class RunManager {
   /** True if the run ended in victory. */
   get runWon()  { return this._runWon; }
 
-  // ── Style Base ─────────────────────────────────────────────────────────────
+  // ── Style Base (legacy) ────────────────────────────────────────────────────
+
+  /** @deprecated Kept for backward compat; no longer used in scoring. */
+  accumulateStyle(amount = 0.1) { this._styleBase += amount; }
+  /** @deprecated Kept for backward compat; no longer used in scoring. */
+  addStyleBase(amount) { this._styleBase += amount; }
+  /** @deprecated Kept for backward compat; no longer used in scoring. */
+  decayStyle() { this._styleBase = 1.0 + (this._styleBase - 1.0) * 0.7; }
+
+  // ── Flow system ────────────────────────────────────────────────────────────
 
   /**
-   * Increment Style Base by the given amount (default +0.1 per style hand).
-   * Called by the game scene whenever the player completes a resonance play.
-   * @param {number} [amount=0.1]
+   * Called when the player successfully pushes and then completes a new yaku.
+   * Permanently increases flow by 10%.
    */
-  accumulateStyle(amount = 0.1) {
-    this._styleBase += amount;
+  onPushSuccess() {
+    this._flow *= 1.1;
   }
 
   /**
-   * Add to Style Base.  Called when style combos are triggered.
-   * @param {number} amount  Bonus to add (e.g. 0.2 for a seasonal combo).
+   * Called when the round ends after a push with no new yaku (push failure).
+   * Permanently decreases flow by 10%.  No score penalty is applied.
    */
-  addStyleBase(amount) {
-    this._styleBase += amount;
+  onPushFailure() {
+    this._flow *= 0.9;
   }
 
   /**
-   * Decay Style Base 30% toward 1.0.  Called automatically by advanceRound().
-   * newStyle = 1.0 + (oldStyle − 1.0) × 0.7
+   * Called when a style combo fires.  Only adds to flow the FIRST TIME per run.
+   * @param {string} comboId     e.g. 'akatan'
+   * @param {number} comboValue  The bonus to add (e.g. 0.4 for Akatan).
+   * @returns {boolean}  True if flow was updated; false if combo already collected.
    */
-  decayStyle() {
-    this._styleBase = 1.0 + (this._styleBase - 1.0) * 0.7;
+  onStyleCombo(comboId, comboValue) {
+    if (this._triggeredCombos.has(comboId)) return false;
+    this._triggeredCombos.add(comboId);
+    this._flow += comboValue;
+    return true;
   }
 
   // ── Round advancement ──────────────────────────────────────────────────────
@@ -852,6 +881,7 @@ class RunManager {
       consumables:  [...this._consumables],
       yakuUpgrades: { ...this._yakuUpgrades },
       deck:         JSON.parse(JSON.stringify(this._deck)),
+      flow:         this._flow,
       runOver:      this._runOver,
       runWon:       this._runWon,
     };
