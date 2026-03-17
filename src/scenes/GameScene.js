@@ -1653,7 +1653,7 @@ export class GameScene extends Phaser.Scene {
 
     const drawSize = this._round.deck.drawPileSize;
 
-    this._actRoundText.setText(`Act ${run.act}  R${run.round}/18`);
+    this._actRoundText.setText(`Act ${run.act}  R${run.round}/36`);
     this._kiText.setText(`Ki: ${run.ki}`);
     this._thresholdText.setText(`Target: ${run.threshold}`);
 

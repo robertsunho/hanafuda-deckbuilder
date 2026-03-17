@@ -41,27 +41,33 @@ class RunManager {
   static MAX_SPIRIT_SLOTS     = 6;
   static MAX_CONSUMABLE_SLOTS = 3;
 
-  static TOTAL_ROUNDS   = 18;
-  static ROUNDS_PER_ACT = 3;
+  static TOTAL_ROUNDS   = 36;
+  static ROUNDS_PER_ACT = 6;
   static TOTAL_ACTS     = 6;
 
   /**
-   * Grove appears after completing each of these rounds (end of acts 1–5).
-   * After round 15 the player visits the Grove, then plays the final act.
+   * Grove appears after completing every 3rd round (rounds 3, 6, 9, … 36).
+   * Pattern: Wayside, Wayside, Grove — repeating across all 36 rounds.
    */
-  static GROVE_ROUNDS = [3, 6, 9, 12, 15];
+  static GROVE_ROUNDS = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36];
 
   /**
    * Minimum score required to survive each round (index 0 = Round 1).
    * Failing to meet the threshold ends the run immediately.
    */
   static THRESHOLDS = [
-     50,  70,   90,   // Act 1
-    100, 160,  275,   // Act 2
-    275, 500,  825,   // Act 3
-    775, 1600, 2700,  // Act 4
-   2900, 6250, 9500,  // Act 5
-   9500, 17000, 25000, // Act 6
+    // Act 1 (R1-6): Survivable without spirits
+    50, 70, 90, 120, 160, 200,
+    // Act 2 (R7-12): Spirits essential
+    300, 450, 650, 900, 1200, 1600,
+    // Act 3 (R13-18): Build must be online
+    2000, 2500, 3200, 4000, 5000, 6500,
+    // Act 4 (R19-24): Optimization phase
+    8000, 10000, 13000, 17000, 22000, 28000,
+    // Act 5 (R25-30): Push mastery
+    35000, 45000, 58000, 75000, 95000, 120000,
+    // Act 6 (R31-36): Endgame
+    150000, 190000, 240000, 300000, 380000, 500000,
   ];
 
   constructor() {
@@ -119,7 +125,7 @@ class RunManager {
     // ── Run state ────────────────────────────────────────────────────────────
     /** True once the run has ended (won or lost). */
     this._runOver = false;
-    /** True if the run ended in victory (all 18 rounds cleared). */
+    /** True if the run ended in victory (all 36 rounds cleared). */
     this._runWon  = false;
 
     // ── Yaku upgrades ────────────────────────────────────────────────────────
@@ -469,7 +475,7 @@ class RunManager {
   get isGroveRound() { return RunManager.GROVE_ROUNDS.includes(this._round - 1); }
 
   /**
-   * True when all 18 rounds have been completed.
+   * True when all 36 rounds have been completed.
    * Query this AFTER calling advanceRound().
    */
   get isRunComplete() { return this._round > RunManager.TOTAL_ROUNDS; }
