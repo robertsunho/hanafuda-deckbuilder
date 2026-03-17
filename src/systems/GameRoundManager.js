@@ -181,6 +181,9 @@ export default class GameRoundManager {
      * @type {object[]}
      */
     this._spirits = [];
+
+    /** Scoring step callback — set by GameScene via setScoringStepCallback(). */
+    this._onScoringStep = null;
   }
 
   // ── Read-only accessors ────────────────────────────────────────────────────
@@ -278,6 +281,8 @@ export default class GameRoundManager {
    * @param {number} styleBase
    */
   setStyleBase(styleBase) { this._styleBase = styleBase; }
+
+  setScoringStepCallback(fn) { this._onScoringStep = fn; }
 
   /**
    * Record a resonance (style) hand — increments the round's Style Base by 0.1.
@@ -858,6 +863,8 @@ export default class GameRoundManager {
   }
 
   _addCapture(cards) {
+    if (this._onScoringStep) this._onScoringStep({ type: 'capture_start' });
+
     this._capture.add(cards);
     this._basePoints += cards.reduce((sum, c) => sum + c.points, 0);
     if (cards.length === 4) this._basePoints += 5;   // full-month bonus
@@ -877,6 +884,10 @@ export default class GameRoundManager {
         }
         points += cardPts;
 
+        if (this._onScoringStep) {
+          this._onScoringStep({ type: 'card_points', card, cardPts, points, mult });
+        }
+
         // Per-card spirit effects + engine state updates.
         for (const spirit of this._spirits) {
           const effect = SpiritEffects.get(spirit.id);
@@ -884,9 +895,18 @@ export default class GameRoundManager {
           if (effect.onCardScored) {
             const r = effect.onCardScored({ card, spirit, spirits: this._spirits });
             if (r) {
+              const prevPts  = points;
+              const prevMult = mult;
               if (r.addPoints)    points += r.addPoints;
               if (r.addMult)      mult   += r.addMult;
               if (r.multiplyMult) mult   *= r.multiplyMult;
+              if (this._onScoringStep) {
+                this._onScoringStep({
+                  type: 'spirit_effect', card, spirit,
+                  addPoints: r.addPoints ?? 0, addMult: r.addMult ?? 0, multiplyMult: r.multiplyMult ?? 0,
+                  points, mult, prevPts, prevMult,
+                });
+              }
             }
           }
           if (effect.onCardSeen) {
@@ -903,15 +923,31 @@ export default class GameRoundManager {
         if (!effect?.applyEngine) continue;
         const r = effect.applyEngine({ spirit, mult, points, spirits: this._spirits });
         if (r) {
+          const prevPts  = points;
+          const prevMult = mult;
           if (r.addPoints)    points += r.addPoints;
           if (r.addMult)      mult   += r.addMult;
           if (r.multiplyMult) mult   *= r.multiplyMult;
+          if (this._onScoringStep) {
+            this._onScoringStep({
+              type: 'engine_effect', spirit,
+              addPoints: r.addPoints ?? 0, addMult: r.addMult ?? 0, multiplyMult: r.multiplyMult ?? 0,
+              points, mult, prevPts, prevMult,
+            });
+          }
         }
       }
 
       const flow         = run.flow;
       const captureScore = Math.round(points * mult * flow);
       this._runningScore += captureScore;
+
+      if (this._onScoringStep) {
+        this._onScoringStep({
+          type: 'capture_complete', points, mult, flow, captureScore,
+          runningTotal: this._runningScore,
+        });
+      }
 
       this._scoringEvents.push({
         type: 'capture', cards, capturePoints: points, mult, flow,

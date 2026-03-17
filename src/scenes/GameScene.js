@@ -157,6 +157,7 @@ export class GameScene extends Phaser.Scene {
 
     this._round.setSpirits(run.spirits);
     this._round.setStyleBase(run.styleBase);
+    this._round.setScoringStepCallback(ev => this._onScoringStep(ev));
     this._round.startRound();
     this._afterRoundStart();
     this._renderAll();
@@ -202,12 +203,23 @@ export class GameScene extends Phaser.Scene {
     this._playsText     = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#556677' });
     infoY += 16;
     this._discardsText  = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#556677' });
+    infoY += 22;
+
+    // ── Scoring breakdown panel ───────────────────────────────────────────
+    this._scorePtsText = this.add.text(INFO_X, infoY,      'Points: 0',    { fontSize: '13px', color: '#aaccee' });
+    infoY += 16;
+    this._scoreMltText = this.add.text(INFO_X, infoY,      'Mult: 1.0',    { fontSize: '13px', color: '#ffcc66' });
+    infoY += 16;
+    this._scoreFlwText = this.add.text(INFO_X, infoY,      'Flow: ×1.00',  { fontSize: '13px', color: '#88ddaa' });
+    infoY += 20;
+    this._scoreTotText = this.add.text(INFO_X, infoY,      'Total: 0',     { fontSize: '14px', color: '#ffffff', fontStyle: 'bold' });
+    infoY += 22;
 
     // Ki — top right corner
     this._kiText = this.add.text(1270, 14, '', { fontSize: '13px', color: '#ffee88' }).setOrigin(1, 0);
 
     // ── Status text (below score info in left panel) ──────────────────────
-    this._statusText = this.add.text(INFO_X, 185, '', {
+    this._statusText = this.add.text(INFO_X, infoY, '', {
       fontSize: '13px', color: '#e8e8e8',
       stroke: '#0a0f1e', strokeThickness: 3,
       wordWrap: { width: 140 },
@@ -497,16 +509,11 @@ export class GameScene extends Phaser.Scene {
 
     // ── Per-card spirit (onCardScored) ────────────────────────────────────
     if (fx?.onCardScored) {
-      // Count how many captured cards would trigger this spirit.
-      let matchCount = 0;
-      for (const card of captured) {
-        const r = fx.onCardScored({ card, spirit, spirits });
-        if (r) matchCount++;
-      }
-      if (matchCount > 0) {
-        lines.push(`Per-card effect — ${matchCount} matching card${matchCount !== 1 ? 's' : ''} captured`);
+      const def = getSpiritDef(spirit.id);
+      if (def?.description) {
+        lines.push(def.description);
       } else {
-        lines.push('Per-card — no matching cards captured yet');
+        lines.push('Per-card effect (active during scoring)');
       }
     }
 
@@ -1865,9 +1872,96 @@ export class GameScene extends Phaser.Scene {
     this._showCaptureYakuOverlay(result);
   }
 
+  // ── Scoring breakdown helpers ─────────────────────────────────────────────
+
+  _onScoringStep(event) {
+    switch (event.type) {
+      case 'capture_start': {
+        this._scorePtsText.setText('Points: 0');
+        this._scoreMltText.setText('Mult: 1.0');
+        break;
+      }
+      case 'card_points': {
+        this._scorePtsText.setText(`Points: ${event.points}`);
+        this._flashText(this._scorePtsText, '#ffffff');
+        break;
+      }
+      case 'spirit_effect': {
+        this._scorePtsText.setText(`Points: ${event.points}`);
+        this._scoreMltText.setText(`Mult: ${event.mult.toFixed(1)}`);
+        if (event.addPoints > 0) {
+          this._showSpiritTrigger(event.spirit, `+${event.addPoints} pts`);
+          this._flashText(this._scorePtsText, '#ffffff');
+        }
+        if (event.addMult > 0) {
+          this._showSpiritTrigger(event.spirit, `+${event.addMult} mult`);
+          this._flashText(this._scoreMltText, '#ffcc66');
+        }
+        if (event.multiplyMult && event.multiplyMult !== 1) {
+          this._showSpiritTrigger(event.spirit, `\xD7${event.multiplyMult.toFixed(1)} mult`);
+          this._flashText(this._scoreMltText, '#ff8844');
+        }
+        break;
+      }
+      case 'engine_effect': {
+        this._scorePtsText.setText(`Points: ${event.points}`);
+        this._scoreMltText.setText(`Mult: ${event.mult.toFixed(1)}`);
+        if (event.addMult > 0) {
+          this._showSpiritTrigger(event.spirit, `+${event.addMult.toFixed(1)} mult`);
+          this._flashText(this._scoreMltText, '#ffcc66');
+        }
+        if (event.multiplyMult && event.multiplyMult > 1) {
+          this._showSpiritTrigger(event.spirit, `\xD7${event.multiplyMult.toFixed(2)}`);
+          this._flashText(this._scoreMltText, '#ff8844');
+        }
+        break;
+      }
+      case 'capture_complete': {
+        this._scoreFlwText.setText(`Flow: \xD7${event.flow.toFixed(2)}`);
+        this._scoreTotText.setText(`Total: ${event.runningTotal}`);
+        this._flashText(this._scoreTotText, '#44ff88');
+        break;
+      }
+    }
+  }
+
+  /** Brief colour flash on a text object, then restore original colour. */
+  _flashText(textObj, color) {
+    const original = textObj.style.color;
+    textObj.setStyle({ color });
+    this.time.delayedCall(200, () => {
+      if (textObj.active) textObj.setStyle({ color: original });
+    });
+  }
+
+  /** Floating trigger label that rises from a spirit card and fades out. */
+  _showSpiritTrigger(spirit, label) {
+    const idx = run.spirits.indexOf(spirit);
+    if (idx < 0) return;
+    const spiritX = SPIRIT_START_X + idx * SPIRIT_GAP;
+    const spiritY = SPIRIT_Y - SPIRIT_H / 2;
+    const floatText = this.add.text(spiritX, spiritY, label, {
+      fontSize: '12px', color: '#ffee66',
+      stroke: '#000000', strokeThickness: 2,
+    }).setOrigin(0.5, 1).setDepth(50);
+    this.tweens.add({
+      targets: floatText,
+      y: spiritY - 30,
+      alpha: 0,
+      duration: 800,
+      ease: 'Power2',
+      onComplete: () => floatText.destroy(),
+    });
+  }
+
   // ── Round-start helper ────────────────────────────────────────────────────
 
   _afterRoundStart() {
+    this._scorePtsText.setText('Points: 0');
+    this._scoreMltText.setText('Mult: 1.0');
+    this._scoreFlwText.setText(`Flow: \xD7${run.flow.toFixed(2)}`);
+    this._scoreTotText.setText('Total: 0');
+
     const interest = this._round.lastInterestGain;
     const naturals = this._round.naturalCaptures;
     if (naturals.length > 0) {
