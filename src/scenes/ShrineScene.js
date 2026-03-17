@@ -320,8 +320,6 @@ export class ShrineScene extends Phaser.Scene {
       logger.logShopPurchase('release', spirit.name, 0, 'Spirit released');
       for (const o of this._confirmObjs) o.destroy();
       this._confirmObjs = [];
-      this._offering  = this._generateOffering();
-      this._purchased = new Array(this._offering.length).fill(false);
       this._buildUI();
     });
     push(this.add.text(cx - 60, cy + 20, 'Release', {
