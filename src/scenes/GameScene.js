@@ -487,14 +487,18 @@ export class GameScene extends Phaser.Scene {
       card.on('pointerout', () => tooltip.setVisible(false));
     }
 
-    // Negative spirits row — below regular slots, dimmed.
+    // Negative spirits row — right of regular slots, between spirits and consumables.
     const negSpirits = run.negativeSpirits;
+    const NEG_W   = Math.round(SPIRIT_W * 0.72);  // ~46px
+    const NEG_H   = Math.round(SPIRIT_H * 0.65);  // ~68px
+    const NEG_GAP = NEG_W + 6;
+    const NEG_START_X = SPIRIT_START_X + MAX_SPIRIT_SLOTS * SPIRIT_GAP;  // 676
     for (let i = 0; i < negSpirits.length; i++) {
       const ns  = negSpirits[i];
-      const nx  = SPIRIT_START_X + i * Math.round(SPIRIT_GAP * 0.75);
-      const ny  = SPIRIT_Y + SPIRIT_H + 10;
-      const nw  = Math.round(SPIRIT_W * 0.82);
-      const nh  = Math.round(SPIRIT_H * 0.72);
+      const nx  = NEG_START_X + i * NEG_GAP;
+      const ny  = SPIRIT_Y;
+      const nw  = NEG_W;
+      const nh  = NEG_H;
 
       const negCard = this._addRoundedRect(nx, ny, nw, nh, 4, 0x0a1628, 0.7, 0x2a3a4a);
       this._spiritObjs.push(negCard);
