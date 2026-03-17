@@ -190,52 +190,39 @@ export class GameScene extends Phaser.Scene {
   _buildStaticUI() {
     const labelStyle = { fontSize: '11px', color: '#556677' };
 
-    // ── Top-left info cluster (stacked vertically) ────────────────────────
+    // ── Left info panel (consolidated) ───────────────────────────────────
     let infoY = INFO_TOP_Y;
-    this._actRoundText  = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#445566' });
-    infoY += 18;
-    this._baseText      = this.add.text(INFO_X, infoY, '', { fontSize: '14px', color: '#aaccee' });
-    infoY += 18;
-    this._thresholdText = this.add.text(INFO_X, infoY, '', { fontSize: '13px', color: '#667788' });
+
+    // Act / Round
+    this._actRoundText = this.add.text(INFO_X, infoY, '', { fontSize: '13px', color: '#8899aa' });
     infoY += 20;
-    this._multiText     = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#ffee88' });
-    infoY += 16;
-    this._projText      = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#88ddaa' });
-    infoY += 18;
-    this._turnText      = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#556677' });
-    infoY += 16;
-    this._playsText     = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#556677' });
-    infoY += 16;
-    this._discardsText  = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#556677' });
-    infoY += 22;
 
-    // ── Scoring breakdown panel ───────────────────────────────────────────
-    this._scorePtsText = this.add.text(INFO_X, infoY,      'Points: 0',    { fontSize: '13px', color: '#aaccee' });
-    infoY += 16;
-    this._scoreMltText = this.add.text(INFO_X, infoY,      'Mult: 1.0',    { fontSize: '13px', color: '#ffcc66' });
-    infoY += 16;
-    this._scoreFlwText = this.add.text(INFO_X, infoY,      'Flow: ×1.00',  { fontSize: '13px', color: '#88ddaa' });
-    infoY += 20;
-    this._scoreTotText = this.add.text(INFO_X, infoY,      'Total: 0',     { fontSize: '14px', color: '#ffffff', fontStyle: 'bold' });
-    infoY += 22;
+    // Ki (moved from top-right corner)
+    this._kiText = this.add.text(INFO_X, infoY, '', { fontSize: '13px', color: '#ffee88' });
+    infoY += 28;
 
-    // Ki — top right corner
-    this._kiText = this.add.text(1270, 14, '', { fontSize: '13px', color: '#ffee88' }).setOrigin(1, 0);
-
-    // ── Status text (below score info in left panel) ──────────────────────
+    // Status / instruction text
     this._statusText = this.add.text(INFO_X, infoY, '', {
       fontSize: '13px', color: '#e8e8e8',
       stroke: '#0a0f1e', strokeThickness: 3,
       wordWrap: { width: 140 },
     }).setOrigin(0, 0);
+    infoY += 62;
 
-    // ── Yaku Guide button (top right) ─────────────────────────────────────
-    const guideBtn = this.add.rectangle(1210, 14, 26, 20, 0x1a3550)
-      .setStrokeStyle(1, 0x3a6080).setInteractive({ useHandCursor: true });
-    guideBtn.on('pointerover',  () => guideBtn.setFillStyle(0x2a5a80));
-    guideBtn.on('pointerout',   () => guideBtn.setFillStyle(0x1a3550));
-    guideBtn.on('pointerdown',  () => this._showYakuGuide());
-    this.add.text(1210, 14, '?', { fontSize: '13px', color: '#aaccee' }).setOrigin(0.5);
+    // Scoring breakdown
+    this.add.rectangle(INFO_X + 68, infoY, 136, 1, 0x2a3a50);
+    infoY += 6;
+    this._scorePtsText = this.add.text(INFO_X, infoY, 'Points: 0', { fontSize: '13px', color: '#aaccee' });
+    infoY += 16;
+    this._scoreMltText = this.add.text(INFO_X, infoY, 'Mult: 1.0', { fontSize: '13px', color: '#ffcc66' });
+    infoY += 16;
+    this._scoreFlwText = this.add.text(INFO_X, infoY, 'Flow: \xD71.00', { fontSize: '13px', color: '#88ddaa' });
+    infoY += 16;
+    this.add.rectangle(INFO_X + 68, infoY, 136, 1, 0x2a3a50);
+    infoY += 6;
+    this._scoreTotText  = this.add.text(INFO_X, infoY, 'Total: 0',  { fontSize: '14px', color: '#ffffff', fontStyle: 'bold' });
+    infoY += 18;
+    this._thresholdText = this.add.text(INFO_X, infoY, 'Target: –', { fontSize: '13px', color: '#cc8866' });
 
     // ── Spirits row — vertical label to the left of first card ───────────
     this.add.text(SPIRIT_START_X - SPIRIT_W / 2 - 14, SPIRIT_Y, 'SPIRITS', {
@@ -1530,19 +1517,13 @@ export class GameScene extends Phaser.Scene {
 
     const drawSize = this._round.deck.drawPileSize;
 
-    const runScore = this._round.runningScore;
-    const thr      = run.threshold;
-    this._baseText.setStyle({ color: runScore >= thr ? '#44ff88' : '#aaccee' })
-      .setText(`Running: ${runScore}`);
-    this._multiText.setText(`Flow: \xD7${run.flow.toFixed(2)}`);
-    this._projText.setText('');
-
-    this._thresholdText.setText(`Target: ${run.threshold}`);
-    this._turnText.setText(`Turn: ${this._round.turn}`);
-    this._playsText.setText(`Cards: ${this._round.hand.getAll().length}`);
-    this._discardsText.setText('');
     this._actRoundText.setText(`Act ${run.act}  R${run.round}/18`);
     this._kiText.setText(`Ki: ${run.ki}`);
+    this._thresholdText.setText(`Target: ${run.threshold}`);
+
+    const runScore = this._round.runningScore;
+    const thr      = run.threshold;
+    this._scoreTotText.setStyle({ color: runScore >= thr ? '#44ff88' : '#ffffff', fontStyle: 'bold' });
 
     this._deckSprite.setVisible(drawSize > 0);
     this._deckCountText.setText(String(drawSize));
@@ -2082,6 +2063,7 @@ export class GameScene extends Phaser.Scene {
     this._scoreMltText.setText('Mult: 1.0');
     this._scoreFlwText.setText(`Flow: \xD7${run.flow.toFixed(2)}`);
     this._scoreTotText.setText('Total: 0');
+    this._thresholdText.setText(`Target: ${run.threshold}`);
 
     const interest = this._round.lastInterestGain;
     const naturals = this._round.naturalCaptures;
