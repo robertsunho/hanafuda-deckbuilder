@@ -349,9 +349,30 @@ class RunManager {
     this._spirits.splice(second, 1);
 
     const fusedDef = getSpiritDef(recipe.output);
-    this._spirits.push({ id: fusedDef.id, name: fusedDef.name });
 
-    return { success: true, fusedSpirit: fusedDef };
+    // Check if a copy already exists — if so, stack it (or transcend at ×4).
+    const existing  = this._spirits.find(s => s.id === fusedDef.id && !s.isNegative);
+    const hasNeg    = this._negativeSpirits.some(s => s.id === fusedDef.id);
+    let fusionResult = 'added';
+
+    if (existing) {
+      existing.stackCount = (existing.stackCount ?? 1) + 1;
+      if (existing.stackCount >= 4 && !hasNeg) {
+        const idx = this._spirits.indexOf(existing);
+        this._spirits.splice(idx, 1);
+        this._negativeSpirits.push({
+          id: fusedDef.id, name: fusedDef.name,
+          stackCount: 1, isNegative: true, state: null,
+        });
+        fusionResult = 'transcended';
+      } else {
+        fusionResult = 'stacked';
+      }
+    } else {
+      this._spirits.push({ id: fusedDef.id, name: fusedDef.name, stackCount: 1 });
+    }
+
+    return { success: true, fusedSpirit: fusedDef, fusionResult };
   }
 
   // ── Consumable inventory ───────────────────────────────────────────────────

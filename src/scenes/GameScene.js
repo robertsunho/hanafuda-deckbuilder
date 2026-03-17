@@ -473,10 +473,10 @@ export class GameScene extends Phaser.Scene {
       // Make draggable for reordering.
       card.setInteractive(
         new Phaser.Geom.Rectangle(x - SPIRIT_W / 2, y - SPIRIT_H / 2, SPIRIT_W, SPIRIT_H),
-        Phaser.Geom.Rectangle.Contains,
-        true  // draggable
+        Phaser.Geom.Rectangle.Contains
       );
       card.setData('spiritIndex', i);
+      this.input.setDraggable(card);
 
       card.on('pointerover', () => {
         const captured = this._round.capture.getAll();
