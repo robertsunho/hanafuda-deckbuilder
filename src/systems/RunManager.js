@@ -751,9 +751,17 @@ class RunManager {
     const target = this._deck.find(c => c.id === targetCardId);
     if (!target) throw new Error('Target card not found');
     if (cardIds.length > 4) throw new Error('Path can change up to 4 cards');
+    const typeNames = { bright: 'Bright', animal: 'Animal', ribbon: 'Ribbon', plain: 'Plain' };
     for (const id of cardIds) {
       const card = this._deck.find(c => c.id === id);
-      if (card && card.id !== targetCardId) card.month = target.month;
+      if (!card || card.id === targetCardId) continue;
+      if (!card._originalName) card._originalName = card.name;
+      card.month     = target.month;
+      card.monthName = target.monthName;
+      card.vertical  = target.vertical;
+      card.temporal  = target.temporal;
+      card.name      = `${target.monthName} ${typeNames[card.type] ?? card.type}`;
+      card.pathConverted = true;
     }
   }
 
@@ -796,11 +804,17 @@ class RunManager {
     const savedId          = source.id;
     const savedEnhancement = source.enhancement;
     const savedRibbonStamp = source.ribbonStamp;
-    source.month  = target.month;
-    source.type   = target.type;
-    source.points = target.points;
-    source.name   = target.name + ' (copy)';
-    source.id     = savedId;
+    if (!source._originalName) source._originalName = source.name;
+    source.month     = target.month;
+    source.monthName = target.monthName;
+    source.type      = target.type;
+    source.points    = target.points;
+    source.name      = target.name;
+    source.vertical  = target.vertical;
+    source.temporal  = target.temporal;
+    source.treeConverted  = true;
+    source.treeSourceName = target.name;
+    source.id = savedId;
     if (savedEnhancement !== undefined) source.enhancement = savedEnhancement;
     if (savedRibbonStamp !== undefined) source.ribbonStamp = savedRibbonStamp;
   }

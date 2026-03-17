@@ -335,6 +335,10 @@ export class GameScene extends Phaser.Scene {
       // Ribbon stamp dot — top-left corner of the card.
       const stampDot = this._makeRibbonStampDot(card, x, y);
       if (stampDot) this._handObjs.push(stampDot);
+
+      // Conversion badge — bottom-right corner, for Path/Tree-converted cards.
+      const convBadge = this._makeConversionBadge(card, x, y);
+      if (convBadge) this._handObjs.push(convBadge);
     }
   }
 
@@ -402,6 +406,8 @@ export class GameScene extends Phaser.Scene {
           if (enhBadge) enhBadge.forEach(o => this._fieldObjs.push(o));
           const stampDot = this._makeRibbonStampDot(card, cx, cy);
           if (stampDot) this._fieldObjs.push(stampDot);
+          const convBadge = this._makeConversionBadge(card, cx, cy);
+          if (convBadge) this._fieldObjs.push(convBadge);
         }
       }
     }
@@ -747,6 +753,17 @@ export class GameScene extends Phaser.Scene {
           const dotColor = ELEM_COLORS_CAPTURE[card.enhancement.element] ?? 0xffffff;
           const dot = this.add.circle(imgX + CAPTURE_CARD_W - 4, fanY + 4, 3, dotColor).setDepth(5);
           this._captureObjs.push(dot);
+        }
+
+        // Conversion badge — bottom-right corner.
+        if (card.pathConverted || card.treeConverted) {
+          const badgeLabel = card.treeConverted ? '\u2317' : `M${card.month}`;
+          this._captureObjs.push(
+            this.add.text(imgX + CAPTURE_CARD_W - 1, fanY + CAPTURE_CARD_H - 1, badgeLabel, {
+              fontSize: '8px', color: '#ffcc44', fontStyle: 'bold',
+              stroke: '#000000', strokeThickness: 2,
+            }).setOrigin(1, 1).setDepth(6)
+          );
         }
       }
 
@@ -2427,6 +2444,18 @@ export class GameScene extends Phaser.Scene {
       .setStrokeStyle(1, 0x000000);
   }
 
+  /** Small "M{N}" badge at bottom-right corner for Path/Tree-converted cards. */
+  _makeConversionBadge(card, cx, cy) {
+    if (!card.pathConverted && !card.treeConverted) return null;
+    const hw = Math.round(CARD_W * CARD_SCALE / 2);
+    const hh = Math.round(CARD_H * CARD_SCALE / 2);
+    const label = card.treeConverted ? '\u2317' : `M${card.month}`;
+    return this.add.text(cx + hw - 2, cy + hh - 2, label, {
+      fontSize: '9px', color: '#ffcc44', fontStyle: 'bold',
+      stroke: '#000000', strokeThickness: 2,
+    }).setOrigin(1, 1).setDepth(6);
+  }
+
   // ── Field fan toggle ──────────────────────────────────────────────────────
 
   _toggleFieldFan(i) {
@@ -2461,6 +2490,8 @@ export class GameScene extends Phaser.Scene {
     };
     const lines = [card.name, `${card.monthName} · ${card.type} · ${card.points}pt`];
     if (card.vertical && card.temporal) lines.push(`${card.vertical} / ${card.temporal}`);
+    if (card.pathConverted) lines.push(`Path: was ${card._originalName ?? 'unknown'}`);
+    if (card.treeConverted) lines.push(`Tree: copy of ${card.treeSourceName ?? 'unknown'}`);
     if (card.enhancement) {
       const e = card.enhancement;
       const ename = ENH_NAMES_TT[e.element]?.[e.tier] ?? e.element;

@@ -297,7 +297,7 @@ class GameplayLogger {
   // ── Helpers ─────────────────────────────────────────────────────────────
 
   _cardLabel(card) {
-    let label = card.id;
+    let label = card.name ?? card.id;
     if (card.enhancement) {
       const enh = card.enhancement;
       const names = {
