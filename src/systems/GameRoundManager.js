@@ -910,7 +910,11 @@ export default class GameRoundManager {
             }
           }
           if (effect.onCardSeen) {
+            const prevState = JSON.stringify(spirit.state);
             effect.onCardSeen({ card, spirit });
+            if (this._onScoringStep && JSON.stringify(spirit.state) !== prevState) {
+              this._onScoringStep({ type: 'engine_state_update', spirit, card });
+            }
           }
         }
       }

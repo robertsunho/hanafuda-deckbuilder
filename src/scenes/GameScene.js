@@ -133,6 +133,7 @@ export class GameScene extends Phaser.Scene {
     this._captureObjs        = [];
     this._captureFanObjs     = [];
     this._spiritObjs         = [];
+    this._spiritCardObjs     = [];
     this._consumableObjs     = [];
     this._overlayObjs        = [];
     this._captureOverlayObjs = [];
@@ -418,6 +419,7 @@ export class GameScene extends Phaser.Scene {
 
   _renderSpiritColumn() {
     const spirits = run.spirits;
+    this._spiritCardObjs = [];
 
     for (let i = 0; i < MAX_SPIRIT_SLOTS; i++) {
       const spirit = spirits[i];
@@ -428,6 +430,7 @@ export class GameScene extends Phaser.Scene {
         this._spiritObjs.push(
           this._addRoundedRect(x, y, SPIRIT_W, SPIRIT_H, 6, 0x0a1628, 1, 0x1e2d40)
         );
+        this._spiritCardObjs[i] = null;
         continue;
       }
 
@@ -436,6 +439,7 @@ export class GameScene extends Phaser.Scene {
       // Card background.
       const card = this._addRoundedRect(x, y, SPIRIT_W, SPIRIT_H, 6, 0x0d1b2a, 1, rarityCol);
       this._spiritObjs.push(card);
+      this._spiritCardObjs[i] = card;
 
       // Rarity left-border strip.
       this._spiritObjs.push(
@@ -615,10 +619,26 @@ export class GameScene extends Phaser.Scene {
       );
 
       // Fan cards.
+      const ELEM_COLORS_CAPTURE = {
+        water: 0x4488ff, wood: 0x44cc44, fire: 0xff6644,
+        earth: 0xcc8822, metal: 0xbbbbbb,
+      };
       for (let i = 0; i < cards.length; i++) {
-        const img = this.add.image(CAPTURE_X + i * CAPTURE_OVERLAP, fanY, cards[i].id)
-          .setScale(CAPTURE_SCALE).setOrigin(0, 0);
+        const card  = cards[i];
+        const imgX  = CAPTURE_X + i * CAPTURE_OVERLAP;
+        const img   = this.add.image(imgX, fanY, card.id).setScale(CAPTURE_SCALE).setOrigin(0, 0);
+        const ttX   = imgX + CAPTURE_CARD_W / 2;
+        img.setInteractive({ useHandCursor: false });
+        img.on('pointerover', () => this._showCardTooltip(card, ttX, fanY - 4));
+        img.on('pointerout',  () => this._hideCardTooltip());
         this._captureObjs.push(img);
+
+        // Enhancement dot — top-right corner of card.
+        if (card.enhancement) {
+          const dotColor = ELEM_COLORS_CAPTURE[card.enhancement.element] ?? 0xffffff;
+          const dot = this.add.circle(imgX + CAPTURE_CARD_W - 4, fanY + 4, 3, dotColor).setDepth(5);
+          this._captureObjs.push(dot);
+        }
       }
 
       // Count label at end of fan.
@@ -1227,12 +1247,24 @@ export class GameScene extends Phaser.Scene {
         this._setStatus(`Transcendence: source is ${card.name}. Now click target. ESC to cancel.`);
         this._renderAll();
       } else {
-        // select_target
-        run.transcendCard(this._markMode.sourceCard.id, card.id);
+        // select_target — card = the target whose properties will be copied.
+        const sourceCard = this._markMode.sourceCard;
+        const ENH_NAMES_TR = {
+          water: { base: 'Snow', upgraded: 'Ice' },
+          wood:  { base: 'Leaf', upgraded: 'Silk' },
+          fire:  { base: 'Ember', upgraded: 'Charcoal' },
+          earth: { base: 'Clay', upgraded: 'Pottery' },
+          metal: { base: 'Iron', upgraded: 'Meteorite' },
+        };
+        const te = card.enhancement;
+        const enhMsg = te
+          ? `with ${ENH_NAMES_TR[te.element]?.[te.tier] ?? te.element} enhancement`
+          : 'no enhancement';
+        run.transcendCard(sourceCard.id, card.id);
         run.useConsumable(index);
-        logger.logConsumableUse(consName, `${this._markMode.sourceCard.id} → ${card.id}`);
+        logger.logConsumableUse(consName, `${sourceCard.id} → ${card.id}`);
         this._markMode = null;
-        this._setStatus('Transcendence complete.');
+        this._setStatus(`Transcendence: ${sourceCard.name} → copy of ${card.name} (${enhMsg}).`);
         this._renderAll();
       }
 
@@ -1916,6 +1948,11 @@ export class GameScene extends Phaser.Scene {
         }
         break;
       }
+      case 'engine_state_update': {
+        this._showSpiritTrigger(event.spirit, '\u25B2');
+        this._pulseSpiritIcon(run.spirits.indexOf(event.spirit));
+        break;
+      }
       case 'capture_complete': {
         this._scoreFlwText.setText(`Flow: \xD7${event.flow.toFixed(2)}`);
         this._scoreTotText.setText(`Total: ${event.runningTotal}`);
@@ -1923,6 +1960,20 @@ export class GameScene extends Phaser.Scene {
         break;
       }
     }
+  }
+
+  /** Brief alpha pulse on a spirit card background to indicate state change. */
+  _pulseSpiritIcon(idx) {
+    const obj = this._spiritCardObjs?.[idx];
+    if (!obj || !obj.active) return;
+    this.tweens.add({
+      targets: obj,
+      alpha: 0.25,
+      duration: 150,
+      yoyo: true,
+      ease: 'Power2',
+      onComplete: () => { if (obj.active) obj.setAlpha(1); },
+    });
   }
 
   /** Brief colour flash on a text object, then restore original colour. */
@@ -2223,11 +2274,28 @@ export class GameScene extends Phaser.Scene {
         fontSize: '11px', color: '#ddeeff', lineSpacing: 2,
       }).setOrigin(0.5, 1).setDepth(61).setVisible(false);
     }
+    const ENH_NAMES_TT = {
+      water: { base: 'Snow', upgraded: 'Ice' },
+      wood:  { base: 'Leaf', upgraded: 'Silk' },
+      fire:  { base: 'Ember', upgraded: 'Charcoal' },
+      earth: { base: 'Clay', upgraded: 'Pottery' },
+      metal: { base: 'Iron', upgraded: 'Meteorite' },
+    };
+    const ENH_DESC_TT = {
+      water: { base: 'pts ×mult (scales with deposits)', upgraded: 'pts ×bigger mult (scales with deposits)' },
+      fire:  { base: 'flat 10 pts, counted in all yaku', upgraded: 'flat 20 pts, counted in all yaku' },
+      earth: { base: 'ki interest per round, feeds Fossil', upgraded: 'higher ki interest, feeds Fossil' },
+      metal: { base: '+10 pts proc, feeds Velocity', upgraded: '+15 pts proc + free consumable, feeds Velocity' },
+      wood:  { base: 'bypasses field slot limit, feeds Moths', upgraded: 'anti-strand + slot bypass, feeds Moths' },
+    };
     const lines = [card.name, `${card.monthName} · ${card.type} · ${card.points}pt`];
     if (card.vertical && card.temporal) lines.push(`${card.vertical} / ${card.temporal}`);
     if (card.enhancement) {
       const e = card.enhancement;
-      lines.push(`${e.element}${e.tier === 'upgraded' ? '+' : ''} enhanced`);
+      const ename = ENH_NAMES_TT[e.element]?.[e.tier] ?? e.element;
+      const edesc = ENH_DESC_TT[e.element]?.[e.tier] ?? '';
+      const star  = e.tier === 'upgraded' ? '\u2605' : '\u2022';
+      lines.push(`${star} ${ename}${edesc ? ': ' + edesc : ''}`);
     }
     this._cardTooltipText.setText(lines.join('\n'));
     const tx = Phaser.Math.Clamp(x, 100, 1180);
