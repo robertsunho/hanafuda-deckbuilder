@@ -1957,6 +1957,10 @@ export class GameScene extends Phaser.Scene {
         this._scoreFlwText.setText(`Flow: \xD7${event.flow.toFixed(2)}`);
         this._scoreTotText.setText(`Total: ${event.runningTotal}`);
         this._flashText(this._scoreTotText, '#44ff88');
+        this.time.delayedCall(600, () => {
+          this._scorePtsText.setText('Points: 0');
+          this._scoreMltText.setText('Mult: 1.0');
+        });
         break;
       }
     }
