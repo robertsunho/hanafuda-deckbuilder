@@ -156,9 +156,12 @@ export class GameScene extends Phaser.Scene {
     this._createCardBackTexture();
     this._buildStaticUI();
 
+    this._scoringQueue     = [];
+    this._scoringAnimating = false;
+
     this._round.setSpirits(run.spirits);
     this._round.setStyleBase(run.styleBase);
-    this._round.setScoringStepCallback(ev => this._onScoringStep(ev));
+    this._round.setScoringStepCallback(ev => this._scoringQueue.push(ev));
     this._round.startRound();
     this._afterRoundStart();
     this._renderAll();
@@ -1016,6 +1019,7 @@ export class GameScene extends Phaser.Scene {
   // ── Card selection ─────────────────────────────────────────────────────────
 
   _toggleCardSelection(cardId) {
+    if (this._scoringAnimating) return;
     if (this._selectedCardIds.has(cardId)) {
       this._selectedCardIds.delete(cardId);
     } else {
@@ -1339,7 +1343,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   _onDiscardButton() {
-    if (this._animating) return;
+    if (this._animating || this._scoringAnimating) return;
     const cardIds = [...this._selectedCardIds];
     this._selectedCardIds.clear();
     this._clearObjs(this._actionBtnObjs);
@@ -1370,8 +1374,8 @@ export class GameScene extends Phaser.Scene {
     this._playCards([cardId], targetSlotMonth);
   }
 
-  _playCards(cardIds, targetMonth = null) {
-    if (this._animating) return;
+  async _playCards(cardIds, targetMonth = null) {
+    if (this._animating || this._scoringAnimating) return;
 
     // Log the play action before calling into the round manager.
     const _handMap     = new Map(this._round.hand.getAll().map(c => [c.id, c]));
@@ -1389,30 +1393,35 @@ export class GameScene extends Phaser.Scene {
     this._animating = true;
     this._renderAll();
 
+    // Animate any captures produced by the hand phase.
+    await this._playScoringAnimation();
+
+    // Show field-discard sprites briefly then proceed to deck phase.
     const handDiscardSprs = handResult.discarded.map((card, i) =>
       this.add.image(FLIP_X + 40, FLIP_Y - 60 + i * 20, card.id)
         .setScale(CARD_SCALE).setTint(TINT_DISCARD).setDepth(10)
     );
+    if (handDiscardSprs.length > 0) await this._delay(400);
+    for (const spr of handDiscardSprs) spr.destroy();
 
-    this.time.delayedCall(500, () => {
-      for (const spr of handDiscardSprs) spr.destroy();
+    let deckResult;
+    try {
+      deckResult = this._round.playDeckPhase();
+    } catch (e) {
+      console.error('[GameScene] playDeckPhase error:', e.message);
+      this._animating = false;
+      return;
+    }
 
-      let deckResult;
-      try {
-        deckResult = this._round.playDeckPhase();
-      } catch (e) {
-        console.error('[GameScene] playDeckPhase error:', e.message);
-        this._animating = false;
-        return;
-      }
+    await new Promise(resolve => this._showDeckAnimation(deckResult, resolve));
 
-      this._showDeckAnimation(deckResult, () => {
-        this._animating = false;
-        const styleCombos = this._round.lastStyleCombos;
-        if (styleCombos.length > 0) this._showStyleComboPopup(styleCombos);
-        this._handleResult(deckResult);
-      });
-    });
+    // Animate any captures produced by the deck phase.
+    await this._playScoringAnimation();
+
+    this._animating = false;
+    const styleCombos = this._round.lastStyleCombos;
+    if (styleCombos.length > 0) this._showStyleComboPopup(styleCombos);
+    this._handleResult(deckResult);
   }
 
   // ── Deck-flip animation ────────────────────────────────────────────────────
@@ -1906,16 +1915,36 @@ export class GameScene extends Phaser.Scene {
 
   // ── Scoring breakdown helpers ─────────────────────────────────────────────
 
-  _onScoringStep(event) {
+  /** Drain the scoring event queue, animating each step with pauses. */
+  async _playScoringAnimation() {
+    if (this._scoringQueue.length === 0) return;
+    this._scoringAnimating = true;
+    const queue = this._scoringQueue.splice(0);   // drain in place
+    for (const event of queue) {
+      await this._animateScoringEvent(event);
+    }
+    // Brief hold so player can read the final values, then reset.
+    await this._delay(600);
+    this._scorePtsText.setText('Points: 0');
+    this._scoreMltText.setText('Mult: 1.0');
+    this._scoringAnimating = false;
+  }
+
+  /** Animate a single scoring event and resolve after the appropriate pause. */
+  async _animateScoringEvent(event) {
     switch (event.type) {
       case 'capture_start': {
         this._scorePtsText.setText('Points: 0');
         this._scoreMltText.setText('Mult: 1.0');
+        await this._delay(100);
         break;
       }
       case 'card_points': {
+        this._highlightScoringCard(event.card);
         this._scorePtsText.setText(`Points: ${event.points}`);
         this._flashText(this._scorePtsText, '#ffffff');
+        this._showFloatingScore(`+${event.cardPts}`, this._scorePtsText.x + 70, this._scorePtsText.y, '#aaccee');
+        await this._delay(300);
         break;
       }
       case 'spirit_effect': {
@@ -1924,15 +1953,24 @@ export class GameScene extends Phaser.Scene {
         if (event.addPoints > 0) {
           this._showSpiritTrigger(event.spirit, `+${event.addPoints} pts`);
           this._flashText(this._scorePtsText, '#ffffff');
+          await this._delay(250);
         }
         if (event.addMult > 0) {
           this._showSpiritTrigger(event.spirit, `+${event.addMult} mult`);
           this._flashText(this._scoreMltText, '#ffcc66');
+          await this._delay(250);
         }
         if (event.multiplyMult && event.multiplyMult !== 1) {
           this._showSpiritTrigger(event.spirit, `\xD7${event.multiplyMult.toFixed(1)} mult`);
           this._flashText(this._scoreMltText, '#ff8844');
+          await this._delay(250);
         }
+        break;
+      }
+      case 'engine_state_update': {
+        this._showSpiritTrigger(event.spirit, '\u25B2');
+        this._pulseSpiritIcon(run.spirits.indexOf(event.spirit));
+        await this._delay(150);
         break;
       }
       case 'engine_effect': {
@@ -1941,26 +1979,54 @@ export class GameScene extends Phaser.Scene {
         if (event.addMult > 0) {
           this._showSpiritTrigger(event.spirit, `+${event.addMult.toFixed(1)} mult`);
           this._flashText(this._scoreMltText, '#ffcc66');
+          await this._delay(300);
         }
         if (event.multiplyMult && event.multiplyMult > 1) {
           this._showSpiritTrigger(event.spirit, `\xD7${event.multiplyMult.toFixed(2)}`);
           this._flashText(this._scoreMltText, '#ff8844');
+          await this._delay(300);
         }
-        break;
-      }
-      case 'engine_state_update': {
-        this._showSpiritTrigger(event.spirit, '\u25B2');
-        this._pulseSpiritIcon(run.spirits.indexOf(event.spirit));
         break;
       }
       case 'capture_complete': {
         this._scoreFlwText.setText(`Flow: \xD7${event.flow.toFixed(2)}`);
         this._scoreTotText.setText(`Total: ${event.runningTotal}`);
         this._flashText(this._scoreTotText, '#44ff88');
-        this.time.delayedCall(600, () => {
-          this._scorePtsText.setText('Points: 0');
-          this._scoreMltText.setText('Mult: 1.0');
-        });
+        const summary = `${event.points} \xD7 ${event.mult.toFixed(1)} \xD7 ${event.flow.toFixed(2)} = ${event.captureScore}`;
+        this._showFloatingScore(summary, this._scoreTotText.x, this._scoreTotText.y - 14, '#44ff88');
+        await this._delay(400);
+        break;
+      }
+    }
+  }
+
+  /** Returns a Promise that resolves after ms milliseconds (Phaser timer). */
+  _delay(ms) {
+    return new Promise(resolve => this.time.delayedCall(ms, resolve));
+  }
+
+  /** Floating score text that rises and fades from (x, y). */
+  _showFloatingScore(text, x, y, color = '#ffffff') {
+    const floatText = this.add.text(x, y, text, {
+      fontSize: '11px', color,
+      stroke: '#000000', strokeThickness: 2,
+    }).setOrigin(0, 0.5).setDepth(50);
+    this.tweens.add({
+      targets: floatText,
+      y: y - 20,
+      alpha: 0,
+      duration: 700,
+      ease: 'Power2',
+      onComplete: () => floatText.destroy(),
+    });
+  }
+
+  /** Brief tint highlight on the card image in the capture fan (best-effort). */
+  _highlightScoringCard(card) {
+    for (const obj of this._captureObjs) {
+      if (obj.texture?.key === card.id) {
+        obj.setTint(0xffffaa);
+        this.time.delayedCall(400, () => { if (obj.active) obj.clearTint(); });
         break;
       }
     }
