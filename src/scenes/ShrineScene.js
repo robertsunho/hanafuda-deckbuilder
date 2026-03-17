@@ -69,6 +69,8 @@ export class ShrineScene extends Phaser.Scene {
     this._zodiacOffering = this._generateZodiacOffering();
     this._cardOffers     = generateShopCards(this._isGrove ? 4 : 3, this._isGrove);
     this._confirmObjs   = [];
+    this._rerollCost    = 3;
+    this._rerollCount   = 0;
     this._buildUI();
   }
 
@@ -79,10 +81,14 @@ export class ShrineScene extends Phaser.Scene {
    * exclude spirits already owned, then pick up to 3 at random.
    */
   _generateOffering() {
-    const ownedIds = new Set(run.spirits.map(s => s.id));
-    const pool     = SPIRIT_CATALOG.filter(
-      s => s.tier === 1 && !ownedIds.has(s.id)
-    );
+    // Include owned spirits (duplicates can be bought to stack).
+    // Filter out spirits where the player has already maxed stacking AND has a negative copy.
+    const pool = SPIRIT_CATALOG.filter(s => {
+      if (s.tier !== 1) return false;
+      const existing = run.spirits.find(r => r.id === s.id && !r.isNegative);
+      const hasNeg   = run.negativeSpirits.some(r => r.id === s.id);
+      return !(existing && (existing.stackCount ?? 1) >= 3 && hasNeg);
+    });
     return [...pool].sort(() => Math.random() - 0.5).slice(0, 3);
   }
 
@@ -166,6 +172,30 @@ export class ShrineScene extends Phaser.Scene {
       }
     }
 
+    // Reroll button — below the offer row.
+    const rerollY    = CARD_ROW_Y + CARD_H / 2 + 10;
+    const canReroll  = run.ki >= this._rerollCost;
+    const rerollBg   = canReroll ? 0x1a2a4a : 0x0e1520;
+    const rerollBord = canReroll ? 0x3a5a8a : 0x1e2d40;
+    const rerollBtn  = this.add.rectangle(cx, rerollY, 110, 24, rerollBg)
+      .setStrokeStyle(1, rerollBord);
+    this.add.text(cx, rerollY, `Reroll  ${this._rerollCost} ki`, {
+      fontSize: '11px', color: canReroll ? '#aaccee' : '#445566',
+    }).setOrigin(0.5);
+    if (canReroll) {
+      rerollBtn.setInteractive({ useHandCursor: true });
+      rerollBtn.on('pointerover', () => rerollBtn.setFillStyle(0x2a3a5a));
+      rerollBtn.on('pointerout',  () => rerollBtn.setFillStyle(rerollBg));
+      rerollBtn.on('pointerdown', () => {
+        run.spendKi(this._rerollCost);
+        this._rerollCount++;
+        this._rerollCost = 3 + this._rerollCount * 2;
+        this._offering   = this._generateOffering();
+        this._purchased  = new Array(this._offering.length).fill(false);
+        this._buildUI();
+      });
+    }
+
     // Divider above equipped spirits.
     const divY = CARD_ROW_Y + CARD_H / 2 + 22;
     this.add.rectangle(cx, divY, 580, 1, 0x1e2d40);
@@ -201,12 +231,18 @@ export class ShrineScene extends Phaser.Scene {
   }
 
   _drawSpiritCard(cx, cy, spiritDef, index) {
-    const purchased = this._purchased[index];
+    const purchased    = this._purchased[index];
     const effectiveCost = this._price(spiritDef.cost);
-    const canAfford = run.ki >= effectiveCost;
-    const hasSlot   = run.canAddSpirit;
-    const buyable   = !purchased && canAfford && hasSlot;
-    const alpha     = purchased ? 0.5 : 1.0;
+    const canAfford    = run.ki >= effectiveCost;
+    const existing     = run.spirits.find(s => s.id === spiritDef.id && !s.isNegative);
+    const hasNegative  = run.negativeSpirits.some(s => s.id === spiritDef.id);
+    const stackCount   = existing ? (existing.stackCount ?? 1) : 0;
+    const willTranscend = existing && stackCount >= 3 && !hasNegative;
+    const willStack    = existing && !willTranscend;
+    // Need a slot only if not stacking/transcending.
+    const hasSlot      = existing ? true : run.canAddSpirit;
+    const buyable      = !purchased && canAfford && hasSlot;
+    const alpha        = purchased ? 0.5 : 1.0;
 
     const top = cy - CARD_H / 2;
     const bot = cy + CARD_H / 2;
@@ -232,9 +268,20 @@ export class ShrineScene extends Phaser.Scene {
       wordWrap: { width: CARD_W - 14 }, align: 'center',
     }).setOrigin(0.5, 0).setAlpha(alpha);
 
+    // Show owned stack count if applicable.
+    if (stackCount > 0) {
+      const stackColor = willTranscend ? '#ffcc44' : '#aaccff';
+      const stackLabel = willTranscend
+        ? `Owned: ×${stackCount}  →  TRANSCEND`
+        : `Owned: ×${stackCount}`;
+      this.add.text(cx, top + 4, stackLabel, {
+        fontSize: '9px', color: stackColor, fontStyle: 'bold',
+      }).setOrigin(0.5, 0);
+    }
+
     if (purchased) {
       this.add.rectangle(cx, cy, CARD_W - 4, CARD_H - 4, 0x000000, 0.35);
-      this.add.text(cx, cy, 'Purchased', {
+      this.add.text(cx, cy, willTranscend ? 'Transcended!' : willStack ? 'Stacked!' : 'Purchased', {
         fontSize: '14px', color: '#667788',
         stroke: '#000000', strokeThickness: 2,
       }).setOrigin(0.5);
@@ -251,7 +298,8 @@ export class ShrineScene extends Phaser.Scene {
 
     const btnBg     = buyable ? 0x1a5a2a : 0x141e14;
     const btnBorder = buyable ? 0x44aa66 : 0x2a362a;
-    const btnLabel  = !hasSlot ? 'Slots full' : !canAfford ? "Can't afford" : 'Buy';
+    const btnLabel  = !hasSlot ? 'Slots full' : !canAfford ? "Can't afford"
+                    : willTranscend ? 'Transcend' : willStack ? 'Stack' : 'Buy';
     const btnTextC  = buyable  ? '#aaffcc' : '#445566';
 
     const btn = this.add.rectangle(cx, bot - 24, CARD_W - 18, 26, btnBg)
@@ -1449,7 +1497,11 @@ export class ShrineScene extends Phaser.Scene {
       const discount = spiritDef.cost - this._price(spiritDef.cost);
       if (discount > 0) run.addKi(discount);
       this._purchased[index] = true;
+      const action = result.result ?? 'added';
       logger.logShopPurchase('spirit', spiritDef.name, this._price(spiritDef.cost));
+      if (action === 'transcended') {
+        logger.logShopPurchase('spirit_transcend', spiritDef.name, 0);
+      }
       this._buildUI();
     }
   }

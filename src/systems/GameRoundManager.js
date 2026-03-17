@@ -889,29 +889,38 @@ export default class GameRoundManager {
         }
 
         // Per-card spirit effects + engine state updates.
-        for (const spirit of this._spirits) {
+        const allScoringSpirits = [
+          ...this._spirits,
+          ...run.negativeSpirits,
+        ];
+        for (const spirit of allScoringSpirits) {
           const effect = SpiritEffects.get(spirit.id);
           if (!effect) continue;
+          const count = spirit.isNegative ? 1 : (spirit.stackCount ?? 1);
           if (effect.onCardScored) {
-            const r = effect.onCardScored({ card, spirit, spirits: this._spirits });
-            if (r) {
-              const prevPts  = points;
-              const prevMult = mult;
-              if (r.addPoints)    points += r.addPoints;
-              if (r.addMult)      mult   += r.addMult;
-              if (r.multiplyMult) mult   *= r.multiplyMult;
-              if (this._onScoringStep) {
-                this._onScoringStep({
-                  type: 'spirit_effect', card, spirit,
-                  addPoints: r.addPoints ?? 0, addMult: r.addMult ?? 0, multiplyMult: r.multiplyMult ?? 0,
-                  points, mult, prevPts, prevMult,
-                });
+            for (let copy = 0; copy < count; copy++) {
+              const r = effect.onCardScored({ card, spirit, spirits: this._spirits });
+              if (r) {
+                const prevPts  = points;
+                const prevMult = mult;
+                if (r.addPoints)    points += r.addPoints;
+                if (r.addMult)      mult   += r.addMult;
+                if (r.multiplyMult) mult   *= r.multiplyMult;
+                if (this._onScoringStep) {
+                  this._onScoringStep({
+                    type: 'spirit_effect', card, spirit,
+                    addPoints: r.addPoints ?? 0, addMult: r.addMult ?? 0, multiplyMult: r.multiplyMult ?? 0,
+                    points, mult, prevPts, prevMult,
+                  });
+                }
               }
             }
           }
           if (effect.onCardSeen) {
             const prevState = JSON.stringify(spirit.state);
-            effect.onCardSeen({ card, spirit });
+            for (let copy = 0; copy < count; copy++) {
+              effect.onCardSeen({ card, spirit });
+            }
             if (this._onScoringStep && JSON.stringify(spirit.state) !== prevState) {
               this._onScoringStep({ type: 'engine_state_update', spirit, card });
             }
@@ -922,22 +931,26 @@ export default class GameRoundManager {
       if (cards.length === 4) points += 5; // full-month bonus
 
       // ── Phase 2: Apply engine spirits in slot order ────────────────────────
-      for (const spirit of this._spirits) {
+      const allEngineSpirits = [...this._spirits, ...run.negativeSpirits];
+      for (const spirit of allEngineSpirits) {
         const effect = SpiritEffects.get(spirit.id);
         if (!effect?.applyEngine) continue;
-        const r = effect.applyEngine({ spirit, mult, points, spirits: this._spirits });
-        if (r) {
-          const prevPts  = points;
-          const prevMult = mult;
-          if (r.addPoints)    points += r.addPoints;
-          if (r.addMult)      mult   += r.addMult;
-          if (r.multiplyMult) mult   *= r.multiplyMult;
-          if (this._onScoringStep) {
-            this._onScoringStep({
-              type: 'engine_effect', spirit,
-              addPoints: r.addPoints ?? 0, addMult: r.addMult ?? 0, multiplyMult: r.multiplyMult ?? 0,
-              points, mult, prevPts, prevMult,
-            });
+        const count = spirit.isNegative ? 1 : (spirit.stackCount ?? 1);
+        for (let copy = 0; copy < count; copy++) {
+          const r = effect.applyEngine({ spirit, mult, points, spirits: this._spirits });
+          if (r) {
+            const prevPts  = points;
+            const prevMult = mult;
+            if (r.addPoints)    points += r.addPoints;
+            if (r.addMult)      mult   += r.addMult;
+            if (r.multiplyMult) mult   *= r.multiplyMult;
+            if (this._onScoringStep) {
+              this._onScoringStep({
+                type: 'engine_effect', spirit,
+                addPoints: r.addPoints ?? 0, addMult: r.addMult ?? 0, multiplyMult: r.multiplyMult ?? 0,
+                points, mult, prevPts, prevMult,
+              });
+            }
           }
         }
       }

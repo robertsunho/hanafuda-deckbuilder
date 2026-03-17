@@ -158,6 +158,8 @@ export class GameScene extends Phaser.Scene {
 
     this._scoringQueue     = [];
     this._scoringAnimating = false;
+    this._spiritDragSetup  = false;
+    this._dragSourceIndex  = null;
 
     this._round.setSpirits(run.spirits);
     this._round.setStyleBase(run.styleBase);
@@ -445,6 +447,17 @@ export class GameScene extends Phaser.Scene {
         }).setOrigin(0.5)
       );
 
+      // Stack count badge (top-right corner).
+      const stackCount = spirit.stackCount ?? 1;
+      if (stackCount > 1) {
+        this._spiritObjs.push(
+          this.add.text(x + SPIRIT_W / 2 - 3, y - SPIRIT_H / 2 + 3, `\xD7${stackCount}`, {
+            fontSize: '10px', color: '#ffee66', fontStyle: 'bold',
+            stroke: '#000000', strokeThickness: 2,
+          }).setOrigin(1, 0).setDepth(10)
+        );
+      }
+
       // Hover tooltip — appears BELOW the card.
       const tooltip = this.add.text(
         x, y + SPIRIT_H / 2 + 4, '',
@@ -457,10 +470,14 @@ export class GameScene extends Phaser.Scene {
       ).setOrigin(0.5, 0).setDepth(42).setVisible(false);
       this._spiritObjs.push(tooltip);
 
+      // Make draggable for reordering.
       card.setInteractive(
         new Phaser.Geom.Rectangle(x - SPIRIT_W / 2, y - SPIRIT_H / 2, SPIRIT_W, SPIRIT_H),
-        Phaser.Geom.Rectangle.Contains
+        Phaser.Geom.Rectangle.Contains,
+        true  // draggable
       );
+      card.setData('spiritIndex', i);
+
       card.on('pointerover', () => {
         const captured = this._round.capture.getAll();
         const contrib  = this._getSpiritContrib(spirit, captured);
@@ -469,6 +486,95 @@ export class GameScene extends Phaser.Scene {
       });
       card.on('pointerout', () => tooltip.setVisible(false));
     }
+
+    // Negative spirits row — below regular slots, dimmed.
+    const negSpirits = run.negativeSpirits;
+    for (let i = 0; i < negSpirits.length; i++) {
+      const ns  = negSpirits[i];
+      const nx  = SPIRIT_START_X + i * Math.round(SPIRIT_GAP * 0.75);
+      const ny  = SPIRIT_Y + SPIRIT_H + 10;
+      const nw  = Math.round(SPIRIT_W * 0.82);
+      const nh  = Math.round(SPIRIT_H * 0.72);
+
+      const negCard = this._addRoundedRect(nx, ny, nw, nh, 4, 0x0a1628, 0.7, 0x2a3a4a);
+      this._spiritObjs.push(negCard);
+
+      this._spiritObjs.push(
+        this.add.text(nx, ny - 4, ns.name, {
+          fontSize: '8px', color: '#667788',
+          wordWrap: { width: nw - 6 }, align: 'center',
+        }).setOrigin(0.5, 0.5).setDepth(5)
+      );
+
+      this._spiritObjs.push(
+        this.add.text(nx + nw / 2 - 3, ny - nh / 2 + 2, '\u2205', {
+          fontSize: '9px', color: '#5588aa',
+        }).setOrigin(1, 0).setDepth(10)
+      );
+
+      // Tooltip for negative copy.
+      const negTip = this.add.text(
+        nx, ny + nh / 2 + 4, '',
+        {
+          fontSize: '10px', color: '#e8e8e8',
+          backgroundColor: '#0a0f1e',
+          padding: { x: 6, y: 4 },
+          wordWrap: { width: 180 },
+        }
+      ).setOrigin(0.5, 0).setDepth(42).setVisible(false);
+      this._spiritObjs.push(negTip);
+
+      negCard.setInteractive(
+        new Phaser.Geom.Rectangle(nx - nw / 2, ny - nh / 2, nw, nh),
+        Phaser.Geom.Rectangle.Contains
+      );
+      negCard.on('pointerover', () => {
+        negTip.setText(`${getSpiritDef(ns.id)?.description ?? ns.name}\n\nNegative copy (zero-slot, base effect)`);
+        negTip.setVisible(true);
+      });
+      negCard.on('pointerout', () => negTip.setVisible(false));
+    }
+
+    // Set up drag-and-drop (only once per scene lifetime).
+    if (!this._spiritDragSetup) {
+      this._spiritDragSetup = true;
+
+      this.input.on('dragstart', (pointer, gameObject) => {
+        if (this._scoringAnimating) return;
+        gameObject.setDepth(100);
+        gameObject.setAlpha(0.7);
+        this._dragSourceIndex = gameObject.getData('spiritIndex');
+      });
+
+      this.input.on('drag', (pointer, gameObject, dragX, dragY) => {
+        if (this._scoringAnimating) return;
+        gameObject.x = dragX;
+        gameObject.y = dragY;
+      });
+
+      this.input.on('dragend', (pointer, gameObject) => {
+        if (this._scoringAnimating) return;
+        const sourceIdx = this._dragSourceIndex;
+        this._dragSourceIndex = null;
+        if (sourceIdx == null) return;
+
+        const targetIdx = this._getSpiritSlotFromX(pointer.x);
+        if (targetIdx != null && targetIdx !== sourceIdx &&
+            targetIdx >= 0 && targetIdx < MAX_SPIRIT_SLOTS) {
+          run.swapSpirits(sourceIdx, targetIdx);
+          this._round.setSpirits(run.spirits);
+        }
+        this._renderAll();
+      });
+    }
+  }
+
+  _getSpiritSlotFromX(x) {
+    for (let i = 0; i < MAX_SPIRIT_SLOTS; i++) {
+      const slotX = SPIRIT_START_X + i * SPIRIT_GAP;
+      if (x >= slotX - SPIRIT_W / 2 && x <= slotX + SPIRIT_W / 2) return i;
+    }
+    return null;
   }
 
   /**
@@ -500,6 +606,15 @@ export class GameScene extends Phaser.Scene {
     const fx      = SpiritEffects.get(spirit.id);
     const spirits = run.spirits;
     const lines   = [];
+
+    // Stack / negative copy info.
+    const stackCount = spirit.stackCount ?? 1;
+    if (stackCount > 1) {
+      lines.push(`Stacked \xD7${stackCount} — fires ${stackCount}× per card`);
+    }
+    if (spirit.isNegative) {
+      lines.push('Negative copy (zero-slot, base effect only)');
+    }
 
     // ── Per-card spirit (onCardScored) ────────────────────────────────────
     if (fx?.onCardScored) {

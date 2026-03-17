@@ -80,6 +80,8 @@ class RunManager {
     // ── Spirit loadout ───────────────────────────────────────────────────────
     /** @type {object[]} */
     this._spirits = [];
+    /** @type {object[]} Spirits that have transcended (stack of 4 → zero-slot negative copy). */
+    this._negativeSpirits = [];
 
     // ── Consumable inventory ─────────────────────────────────────────────────
     /** @type {object[]} */
@@ -170,9 +172,10 @@ class RunManager {
 
   // ── Spirit loadout ─────────────────────────────────────────────────────────
 
-  get spirits()      { return [...this._spirits]; }
-  get spiritSlots()  { return RunManager.MAX_SPIRIT_SLOTS; }
-  get canAddSpirit() { return this._spirits.length < RunManager.MAX_SPIRIT_SLOTS; }
+  get spirits()         { return [...this._spirits]; }
+  get negativeSpirits() { return [...this._negativeSpirits]; }
+  get spiritSlots()     { return RunManager.MAX_SPIRIT_SLOTS; }
+  get canAddSpirit()    { return this._spirits.length < RunManager.MAX_SPIRIT_SLOTS; }
 
   /**
    * Purchase a spirit from the shop.
@@ -181,10 +184,40 @@ class RunManager {
    * @returns {{ success: boolean, reason?: string }}
    */
   buySpirit(spiritDef) {
-    if (!this.canAddSpirit)        return { success: false, reason: 'No spirit slots available' };
     if (this._ki < spiritDef.cost) return { success: false, reason: 'Not enough ki' };
+
+    // Check if we already own a regular (non-negative) copy.
+    const existing = this._spirits.find(s => s.id === spiritDef.id && !s.isNegative);
+    const hasNegative = this._negativeSpirits.some(s => s.id === spiritDef.id);
+
+    if (existing) {
+      // Already at max stack AND already have a negative copy — cannot buy.
+      if ((existing.stackCount ?? 1) >= 3 && hasNegative) {
+        return { success: false, reason: 'Maximum spirit copies reached' };
+      }
+
+      this._ki -= spiritDef.cost;
+      existing.stackCount = (existing.stackCount ?? 1) + 1;
+
+      if (existing.stackCount >= 4) {
+        // Transcend: collapse into a zero-slot negative copy.
+        const idx = this._spirits.indexOf(existing);
+        this._spirits.splice(idx, 1);
+        this._negativeSpirits.push({
+          id: spiritDef.id, name: spiritDef.name,
+          stackCount: 1, isNegative: true, state: null,
+        });
+        return { success: true, result: 'transcended' };
+      }
+
+      return { success: true, result: 'stacked' };
+    }
+
+    // New spirit — needs an open slot.
+    if (!this.canAddSpirit) return { success: false, reason: 'No spirit slots available' };
+
     this._ki -= spiritDef.cost;
-    const spirit = { id: spiritDef.id, name: spiritDef.name };
+    const spirit = { id: spiritDef.id, name: spiritDef.name, stackCount: 1 };
     // Initialize persistent state for stateful spirits.
     if (spiritDef.id === 'engine_wildlife')  spirit.state = { seenAnimals: [] };
     if (spiritDef.id === 'engine_plenty')    spirit.state = { seenPlains: [] };
@@ -195,7 +228,18 @@ class RunManager {
     if (spiritDef.id === 'engine_fossil')    spirit.state = { earthCardCount: 0 };
     if (spiritDef.id === 'engine_moths')     spirit.state = { silkTriggerCount: 0 };
     this._spirits.push(spirit);
-    return { success: true };
+    return { success: true, result: 'added' };
+  }
+
+  /**
+   * Swap two spirits by slot index.
+   */
+  swapSpirits(indexA, indexB) {
+    if (indexA < 0 || indexA >= this._spirits.length) return;
+    if (indexB < 0 || indexB >= this._spirits.length) return;
+    const temp = this._spirits[indexA];
+    this._spirits[indexA] = this._spirits[indexB];
+    this._spirits[indexB] = temp;
   }
 
   /**
