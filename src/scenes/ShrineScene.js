@@ -1,18 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // ShrineScene — between-round shop
 //
-// Appears after every round the player passes.  Two variants:
-//   isGrove=false  "Wayside Shrine"  — Spirits + 3 placeholder sections
-//   isGrove=true   "The Sacred Grove" — same + Spirit Fusion section (functional)
-//
 // Layout (1280 × 720):
-//   Header        [y 0–64]      title, act/round, ki balance
-//   Left column   [x 0–640]     Spirits section: offer cards + 6-slot loadout
-//   Right column  [x 640–1280]  Placeholder sections + Grove fusion
-//   Footer        [y ~668–720]  Continue / Enter the Forest button
-//
-// The full scene is rebuilt (children.removeAll) after every purchase or fusion
-// so all state (ki balance, loadout, button affordability) updates automatically.
+//   Top bar         [y 0–120]   spirits (y=62) + consumables (y=62) + info panel
+//   4 Quadrants     TL/TR [y 145–305]  BL/BR [y 385–545]
+//   Center gap      [y 305–385]  purchase button + reroll
+//   Fusion section  [y 555+]     Sacred Grove only
+//   Continue btn    [y 690]
 // ─────────────────────────────────────────────────────────────────────────────
 
 import run, { RunManager }                      from '../systems/RunManager.js';
@@ -25,7 +19,7 @@ import { ZODIAC_CONSUMABLES }                  from '../data/zodiacConsumables.j
 import { generateShopCards }                   from '../data/shopCards.js';
 import logger                                   from '../systems/GameplayLogger.js';
 
-// ── Channel badge display ──────────────────────────────────────────────────────
+// ── Channel badge lookup ───────────────────────────────────────────────────────
 const CHANNEL_BADGE = {
   point:          { label: 'POINT',    bgColor: 0x1a3a88, textColor: '#88aaff' },
   additive:       { label: 'MULT+',    bgColor: 0x7a5500, textColor: '#ffdd44' },
@@ -41,17 +35,55 @@ const CHANNEL_BADGE = {
 };
 
 // ── Layout constants ──────────────────────────────────────────────────────────
-const HEADER_H   = 64;
-const LCX        = 320;
-const RCX        = 960;
-const DIV_X      = 640;
+const BTN_Y = 690;
 
-const CARD_W     = 158;
-const CARD_H     = 204;
-const CARD_GAP   = 14;
-const CARD_ROW_Y = 278;
+// Spirit row — matches GameScene exactly
+const SPIRIT_GAP     = 76;
+const SPIRIT_START_X = 220;
+const SPIRIT_Y       = 62;
+const SPIRIT_W       = 64;
+const SPIRIT_H       = 104;
 
-const BTN_Y      = 690;
+// Consumable slots — matches GameScene exactly
+const CONS_CARD_W = 64;
+const CONS_CARD_H = 104;
+const CONS_BASE_X = 856;
+const CONS_BASE_Y = 62;
+const CONS_FAN_X  = 10;
+
+// Info panel — matches GameScene exactly
+const INFO_X     = 10;
+const INFO_TOP_Y = 14;
+
+// Rarity colors — matches GameScene
+const RARITY_COLOR = {
+  common:    0x667788,
+  uncommon:  0x44aa44,
+  rare:      0x4488ff,
+  legendary: 0xddaa22,
+};
+
+// Shop quadrant grid
+const SHOP_CX    = 640;
+const SHOP_CY    = 345;
+const QUAD_W     = 420;
+const QUAD_H     = 160;
+const CENTER_GAP = 80;
+const VERT_GAP   = 80;
+
+const Q_TL = { x: SHOP_CX - CENTER_GAP / 2 - QUAD_W, y: SHOP_CY - VERT_GAP / 2 - QUAD_H }; // 180, 145
+const Q_TR = { x: SHOP_CX + CENTER_GAP / 2,           y: SHOP_CY - VERT_GAP / 2 - QUAD_H }; // 680, 145
+const Q_BL = { x: SHOP_CX - CENTER_GAP / 2 - QUAD_W, y: SHOP_CY + VERT_GAP / 2         }; // 180, 385
+const Q_BR = { x: SHOP_CX + CENTER_GAP / 2,           y: SHOP_CY + VERT_GAP / 2         }; // 680, 385
+
+// Below bottom quads (385 + 160 = 545), +10 gap
+const FUSION_Y = SHOP_CY + VERT_GAP / 2 + QUAD_H + 10; // 555
+
+// Shop item card size
+const SHOP_CARD_W = 88;
+const SHOP_CARD_H = 115;
+const SHOP_GAP    = 10;
+const QUAD_PAD    = 15;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -63,258 +95,565 @@ export class ShrineScene extends Phaser.Scene {
 
   create() {
     const { isGrove } = this.scene.settings.data || {};
-    this._isGrove       = isGrove ?? false;
-    this._offering      = this._generateOffering();
-    this._purchased     = new Array(this._offering.length).fill(false);
-    this._zodiacOffering = this._generateZodiacOffering();
-    this._cardOffers     = generateShopCards(this._isGrove ? 4 : 3, this._isGrove);
-    this._confirmObjs   = [];
-    this._rerollCost    = 3;
-    this._rerollCount   = 0;
+    this._isGrove    = isGrove ?? false;
+    const itemCount  = this._isGrove ? 4 : 2;
+
+    this._spiritOfferings  = this._generateSpiritOfferings(itemCount);
+    this._deckFixOfferings = this._generateDeckFixOfferings(itemCount);
+    this._cardOfferings    = generateShopCards(itemCount, this._isGrove);
+    this._zodiacOfferings  = this._generateZodiacOfferings(itemCount);
+
+    const pad = arr => { while (arr.length < itemCount) arr.push(null); return arr; };
+    pad(this._spiritOfferings);
+    pad(this._deckFixOfferings);
+    pad(this._cardOfferings);
+    pad(this._zodiacOfferings);
+
+    this._confirmObjs  = [];
+    this._shopTooltip  = null;
+    this._selectedItem = null;
+    this._rerollCost   = 3;
+    this._rerollCount  = 0;
     this._buildUI();
   }
 
-  // ── Offer generation ─────────────────────────────────────────────────────
+  // ── Offering generators ───────────────────────────────────────────────────
 
-  /**
-   * Filter to tier-1 foundation spirits only (fusion spirits are never sold),
-   * exclude spirits already owned, then pick up to 3 at random.
-   */
-  _generateOffering() {
-    // Include owned spirits (duplicates can be bought to stack).
-    // Filter out spirits where the player has already maxed stacking AND has a negative copy.
+  _generateSpiritOfferings(count) {
     const pool = SPIRIT_CATALOG.filter(s => {
       if (s.tier !== 1) return false;
       const existing = run.spirits.find(r => r.id === s.id && !r.isNegative);
       const hasNeg   = run.negativeSpirits.some(r => r.id === s.id);
       return !(existing && (existing.stackCount ?? 1) >= 3 && hasNeg);
     });
-    return [...pool].sort(() => Math.random() - 0.5).slice(0, 3);
+    return [...pool].sort(() => Math.random() - 0.5).slice(0, count);
   }
 
-  /** Pick 3 random zodiac consumables to offer in the shop this visit. */
-  _generateZodiacOffering() {
-    return [...ZODIAC_CONSUMABLES].sort(() => Math.random() - 0.5).slice(0, 3);
+  _generateDeckFixOfferings(count) {
+    const stamps = Object.values(RIBBON_STAMPS);
+    const pool   = [...FOUR_PRACTICES, ...WUXING_CONSUMABLES, ...stamps];
+    return [...pool].sort(() => Math.random() - 0.5).slice(0, count);
   }
 
-  // ── UI construction ──────────────────────────────────────────────────────
+  _generateZodiacOfferings(count) {
+    return [...ZODIAC_CONSUMABLES].sort(() => Math.random() - 0.5).slice(0, count);
+  }
+
+  // ── UI construction ───────────────────────────────────────────────────────
 
   _buildUI() {
     this.children.removeAll(true);
     this._confirmObjs = [];
+    this._shopTooltip = null;
     logger.logShopEnter(run.ki, this._isGrove);
+    const itemCount = this._isGrove ? 4 : 2;
+
     this._drawBg();
-    this._drawHeader();
-    this._drawSpiritsSection();
-    this._drawCardShopSection();
-    this._drawRightColumn();
+    this._drawInfoPanel();
+    this._drawPersistentSpirits();
+    this._drawPersistentConsumables();
+
+    this._drawQuadrant(Q_TL, 'Spirits',       this._spiritOfferings,  'spirit',  itemCount);
+    this._drawQuadrant(Q_TR, 'Deck-Fixing',   this._deckFixOfferings, 'deckfix', itemCount);
+    this._drawQuadrant(Q_BL, 'Playing Cards', this._cardOfferings,    'card',    itemCount);
+    this._drawQuadrant(Q_BR, 'Zodiacs',       this._zodiacOfferings,  'zodiac',  itemCount);
+
+    this._drawCentralButtons();
+
+    if (this._isGrove) {
+      const fusionH = BTN_Y - 38 - FUSION_Y;
+      this._drawFusionSection(SHOP_CX, FUSION_Y, fusionH);
+    }
+
     this._drawContinueButton();
   }
 
   _drawBg() {
     this.add.rectangle(640, 360, 1280, 720, 0x060c18);
-    this.add.rectangle(DIV_X, 360, 1, 720, 0x1e2d40);
+    // Separator below spirit/consumable row
+    this.add.rectangle(640, 122, 1280, 1, 0x1e2d40);
   }
 
-  // ── Header ────────────────────────────────────────────────────────────────
+  // ── Left info panel ────────────────────────────────────────────────────────
 
-  _drawHeader() {
-    this.add.rectangle(640, HEADER_H / 2, 1280, HEADER_H, 0x0a1628);
-    this.add.rectangle(640, HEADER_H,     1280, 1,         0x2a3a50);
-
-    const title      = this._isGrove ? 'The Sacred Grove' : 'Wayside Shrine';
+  _drawInfoPanel() {
+    let y = INFO_TOP_Y;
+    this.add.text(INFO_X, y, `Act ${run.act}  R${run.round}/36`, {
+      fontSize: '13px', color: '#8899aa',
+    });
+    y += 20;
+    this.add.text(INFO_X, y, `Ki: ${run.ki}`, {
+      fontSize: '13px', color: '#ffee88',
+    });
+    y += 28;
+    const shopTitle  = this._isGrove ? 'Sacred Grove' : 'Wayside Shrine';
     const titleColor = this._isGrove ? '#ffcc44' : '#e8c96a';
-    this.add.text(640, HEADER_H / 2, title, {
-      fontSize: '24px', color: titleColor,
-      stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5);
-
-    this.add.text(16, HEADER_H / 2,
-      `Act ${run.act}  —  Round ${run.round}`,
-      { fontSize: '14px', color: '#556677' }
-    ).setOrigin(0, 0.5);
-
-    this.add.text(1264, HEADER_H / 2,
-      `Ki: ${run.ki}`,
-      { fontSize: '17px', color: '#ffee88', stroke: '#000000', strokeThickness: 2 }
-    ).setOrigin(1, 0.5);
+    this.add.text(INFO_X, y, shopTitle, {
+      fontSize: '14px', color: titleColor, fontStyle: 'bold',
+      wordWrap: { width: 155 },
+    });
+    y += 28;
+    this.add.rectangle(INFO_X + 72, y, 144, 1, 0x2a3a50);
+    y += 8;
+    this.add.text(INFO_X, y, `Target: ${run.threshold}`, {
+      fontSize: '13px', color: '#cc8866',
+    });
   }
 
-  // ── Left column: Spirits section ─────────────────────────────────────────
+  // ── Persistent spirit row (matches GameScene position/style) ───────────────
 
-  _drawSpiritsSection() {
-    const cx = LCX;
-
-    this.add.text(cx, HEADER_H + 10, 'Spirits', {
-      fontSize: '18px', color: '#aaccee',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5, 0);
-    this.add.text(cx, HEADER_H + 32, 'Choose companions for your journey', {
-      fontSize: '11px', color: '#445566',
-    }).setOrigin(0.5, 0);
-    if (!run.canAddSpirit) {
-      this.add.text(cx, HEADER_H + 50, 'Spirit slots full', {
-        fontSize: '11px', color: '#cc4444',
-      }).setOrigin(0.5, 0);
-    }
-
-    // Offer cards.
-    if (this._offering.length === 0) {
-      this.add.text(cx, CARD_ROW_Y, 'No spirits available.', {
-        fontSize: '14px', color: '#445566',
-      }).setOrigin(0.5);
-    } else {
-      const n       = this._offering.length;
-      const totalW  = n * CARD_W + (n - 1) * CARD_GAP;
-      const startCX = cx - totalW / 2 + CARD_W / 2;
-      for (let i = 0; i < n; i++) {
-        this._drawSpiritCard(startCX + i * (CARD_W + CARD_GAP), CARD_ROW_Y, this._offering[i], i);
-      }
-    }
-
-    // Reroll button — below the offer row.
-    const rerollY    = CARD_ROW_Y + CARD_H / 2 + 10;
-    const canReroll  = run.ki >= this._rerollCost;
-    const rerollBg   = canReroll ? 0x1a2a4a : 0x0e1520;
-    const rerollBord = canReroll ? 0x3a5a8a : 0x1e2d40;
-    const rerollBtn  = this.add.rectangle(cx, rerollY, 110, 24, rerollBg)
-      .setStrokeStyle(1, rerollBord);
-    this.add.text(cx, rerollY, `Reroll  ${this._rerollCost} ki`, {
-      fontSize: '11px', color: canReroll ? '#aaccee' : '#445566',
-    }).setOrigin(0.5);
-    if (canReroll) {
-      rerollBtn.setInteractive({ useHandCursor: true });
-      rerollBtn.on('pointerover', () => rerollBtn.setFillStyle(0x2a3a5a));
-      rerollBtn.on('pointerout',  () => rerollBtn.setFillStyle(rerollBg));
-      rerollBtn.on('pointerdown', () => {
-        run.spendKi(this._rerollCost);
-        this._rerollCount++;
-        this._rerollCost = 3 + this._rerollCount * 2;
-        this._offering   = this._generateOffering();
-        this._purchased  = new Array(this._offering.length).fill(false);
-        this._buildUI();
-      });
-    }
-
-    // Divider above equipped spirits.
-    const divY = CARD_ROW_Y + CARD_H / 2 + 22;
-    this.add.rectangle(cx, divY, 580, 1, 0x1e2d40);
-    this.add.text(cx, divY + 7,
-      `Equipped Spirits  (${run.spirits.length} / ${RunManager.MAX_SPIRIT_SLOTS})`,
-      { fontSize: '11px', color: '#445566' }
-    ).setOrigin(0.5, 0);
-
-    // 6 loadout slots displayed as two rows of 3.
-    this._drawLoadoutSlots(cx, divY + 44);
-  }
-
-  _drawLoadoutSlots(cx, topCY) {
-    const slotW   = 86;
-    const slotH   = 50;
-    const slotGap = 8;
-    const perRow  = 3;
-    const rowH    = slotH + 8;
-    const rowW    = perRow * slotW + (perRow - 1) * slotGap;
-    const rowX    = cx - rowW / 2 + slotW / 2;
-    const owned   = run.spirits;
+  _drawPersistentSpirits() {
+    const spirits   = run.spirits;
+    const fusionIds = this._isGrove
+      ? getAvailableFusions(spirits.map(s => s.id)).flatMap(r => r.input)
+      : [];
 
     for (let i = 0; i < RunManager.MAX_SPIRIT_SLOTS; i++) {
-      const col = i % perRow;
-      const row = Math.floor(i / perRow);
-      this._drawLoadoutSlot(
-        rowX + col * (slotW + slotGap),
-        topCY + row * rowH,
-        owned[i] ?? null,
-        slotW, slotH, i,
+      const spirit = spirits[i];
+      const x = SPIRIT_START_X + i * SPIRIT_GAP;
+      const y = SPIRIT_Y;
+
+      if (!spirit) {
+        this._addRoundedRect(x, y, SPIRIT_W, SPIRIT_H, 6, 0x0a1628, 1, 0x1e2d40);
+        continue;
+      }
+
+      const rarityCol = RARITY_COLOR[spirit.rarity] ?? RARITY_COLOR.common;
+      this._addRoundedRect(x, y, SPIRIT_W, SPIRIT_H, 6, 0x0d1b2a, 1, rarityCol);
+      this.add.rectangle(x - SPIRIT_W / 2 + 2, y, 4, SPIRIT_H - 4, rarityCol);
+
+      this.add.text(x, y, spirit.name, {
+        fontSize: '9px', color: '#cce0ff',
+        wordWrap: { width: SPIRIT_W - 8 }, align: 'center',
+      }).setOrigin(0.5);
+
+      const stackCount = spirit.stackCount ?? 1;
+      if (stackCount > 1) {
+        this.add.text(x + SPIRIT_W / 2 - 3, y - SPIRIT_H / 2 + 3, `\xD7${stackCount}`, {
+          fontSize: '10px', color: '#ffee66', fontStyle: 'bold',
+          stroke: '#000000', strokeThickness: 2,
+        }).setOrigin(1, 0).setDepth(10);
+      }
+
+      // Fusion glow at Sacred Grove
+      if (fusionIds.includes(spirit.id)) {
+        this.add.rectangle(x, y, SPIRIT_W + 4, SPIRIT_H + 4, 0x000000, 0)
+          .setStrokeStyle(2, 0xffcc44);
+      }
+
+      // Hover tooltip
+      const tip = this.add.text(x, y + SPIRIT_H / 2 + 4,
+        getSpiritDef(spirit.id)?.description ?? spirit.name,
+        {
+          fontSize: '10px', color: '#e8e8e8',
+          backgroundColor: '#0a0f1e',
+          padding: { x: 6, y: 4 },
+          wordWrap: { width: 180 },
+        }
+      ).setOrigin(0.5, 0).setDepth(62).setVisible(false);
+
+      const hit = this.add.rectangle(x, y, SPIRIT_W, SPIRIT_H, 0x000000, 0)
+        .setInteractive({ useHandCursor: false }).setDepth(5);
+      hit.on('pointerover', () => tip.setVisible(true));
+      hit.on('pointerout',  () => tip.setVisible(false));
+
+      // Release ×
+      const rel = this.add.text(x + SPIRIT_W / 2 - 5, y - SPIRIT_H / 2 + 5, '\u00D7', {
+        fontSize: '11px', color: '#774444',
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(12);
+      rel.on('pointerover', () => rel.setColor('#ff6666'));
+      rel.on('pointerout',  () => rel.setColor('#774444'));
+      rel.on('pointerdown', () => this._confirmRelease(i, spirit));
+    }
+
+    // Negative spirits (smaller, to the right)
+    const neg = run.negativeSpirits;
+    const NW  = Math.round(SPIRIT_W * 0.72);
+    const NH  = Math.round(SPIRIT_H * 0.65);
+    const NX0 = SPIRIT_START_X + RunManager.MAX_SPIRIT_SLOTS * SPIRIT_GAP;
+    for (let i = 0; i < neg.length; i++) {
+      const ns = neg[i];
+      const nx = NX0 + i * (NW + 6);
+      this._addRoundedRect(nx, SPIRIT_Y, NW, NH, 4, 0x0a1628, 0.7, 0x2a3a4a);
+      this.add.text(nx, SPIRIT_Y, ns.name, {
+        fontSize: '8px', color: '#667788',
+        wordWrap: { width: NW - 6 }, align: 'center',
+      }).setOrigin(0.5).setDepth(5);
+      this.add.text(nx + NW / 2 - 3, SPIRIT_Y - NH / 2 + 2, '\u2205', {
+        fontSize: '9px', color: '#5588aa',
+      }).setOrigin(1, 0).setDepth(10);
+    }
+  }
+
+  // ── Persistent consumable slots (matches GameScene position/style) ──────────
+
+  _drawPersistentConsumables() {
+    const maxSlots = RunManager.MAX_CONSUMABLE_SLOTS;
+    // Empty slot backgrounds
+    for (let i = 0; i < maxSlots; i++) {
+      this._addRoundedRect(
+        CONS_BASE_X + i * CONS_FAN_X, CONS_BASE_Y,
+        CONS_CARD_W, CONS_CARD_H, 6, 0x080e18, 0.8, 0x1e2d40
+      );
+    }
+    // Filled cards
+    const consumables = run.consumables;
+    for (let i = 0; i < consumables.length; i++) {
+      const cons = consumables[i];
+      const x    = CONS_BASE_X + i * CONS_FAN_X;
+      const y    = CONS_BASE_Y;
+      const rarityCol = RARITY_COLOR[cons.rarity] ?? RARITY_COLOR.common;
+
+      this._addRoundedRect(x, y, CONS_CARD_W, CONS_CARD_H, 6, 0x0d1b2a, 1, 0x2a3a50).setDepth(i + 1);
+      this.add.rectangle(x - CONS_CARD_W / 2 + 2, y, 4, CONS_CARD_H - 4, rarityCol).setDepth(i + 1);
+      this.add.text(x, y, cons.name, {
+        fontSize: '11px', color: '#cce0ff',
+        wordWrap: { width: CONS_CARD_W - 6 }, align: 'center',
+      }).setOrigin(0.5).setDepth(i + 2);
+
+      const tip = this.add.text(x + CONS_CARD_W / 2 + 8, y,
+        cons.description ?? '',
+        {
+          fontSize: '10px', color: '#e8e8e8',
+          backgroundColor: '#0a0f1e',
+          padding: { x: 6, y: 4 },
+          wordWrap: { width: 160 },
+        }
+      ).setOrigin(0, 0.5).setDepth(62).setVisible(false);
+
+      const hit = this.add.rectangle(x, y, CONS_CARD_W, CONS_CARD_H, 0x000000, 0)
+        .setInteractive({ useHandCursor: false }).setDepth(i + 3);
+      hit.on('pointerover', () => tip.setVisible(true));
+      hit.on('pointerout',  () => tip.setVisible(false));
+    }
+  }
+
+  // ── Rounded rect helper (matches GameScene _addRoundedRect style) ───────────
+
+  _addRoundedRect(x, y, w, h, r, fill, alpha, stroke, strokeW = 1) {
+    const g = this.add.graphics();
+    g.fillStyle(fill, alpha ?? 1);
+    g.fillRoundedRect(x - w / 2, y - h / 2, w, h, r);
+    if (stroke !== undefined) {
+      g.lineStyle(strokeW, stroke, 1);
+      g.strokeRoundedRect(x - w / 2, y - h / 2, w, h, r);
+    }
+    return g;
+  }
+
+  // ── Quadrant layout ────────────────────────────────────────────────────────
+
+  _getCategoryColor(category) {
+    switch (category) {
+      case 'spirit':  return 0x4488cc;
+      case 'deckfix': return 0xcc8844;
+      case 'card':    return 0x44aa66;
+      case 'zodiac':  return 0xaa44aa;
+      default:        return 0x3a5a8a;
+    }
+  }
+
+  _getCategoryColorStr(category) {
+    switch (category) {
+      case 'spirit':  return '#4488cc';
+      case 'deckfix': return '#cc8844';
+      case 'card':    return '#44aa66';
+      case 'zodiac':  return '#aa44aa';
+      default:        return '#3a5a8a';
+    }
+  }
+
+  _drawQuadrant(pos, label, offerings, category, maxItems) {
+    const cx = pos.x + QUAD_W / 2;
+    const cy = pos.y + QUAD_H / 2;
+
+    this.add.rectangle(cx, cy, QUAD_W, QUAD_H, 0x0a1520)
+      .setStrokeStyle(1, 0x1e2d40);
+    this.add.rectangle(cx, pos.y + 1.5, QUAD_W - 2, 3, this._getCategoryColor(category), 0.85);
+
+    this.add.text(pos.x + QUAD_PAD, pos.y + 7, label, {
+      fontSize: '11px', color: this._getCategoryColorStr(category), fontStyle: 'bold',
+    });
+
+    const sold = offerings.filter(o => o === null).length;
+    if (sold > 0) {
+      this.add.text(pos.x + QUAD_W - QUAD_PAD, pos.y + 7, `${sold}/${maxItems} sold`, {
+        fontSize: '9px', color: '#334455',
+      }).setOrigin(1, 0);
+    }
+
+    const totalCardsW = maxItems * SHOP_CARD_W + (maxItems - 1) * SHOP_GAP;
+    const innerW      = QUAD_W - 2 * QUAD_PAD;
+    const xPad        = Math.max(0, (innerW - totalCardsW) / 2);
+    const cardStartX  = pos.x + QUAD_PAD + xPad + SHOP_CARD_W / 2;
+    const cardY       = pos.y + 24 + SHOP_CARD_H / 2;
+
+    for (let i = 0; i < maxItems; i++) {
+      this._drawShopCard(
+        cardStartX + i * (SHOP_CARD_W + SHOP_GAP),
+        cardY,
+        i < offerings.length ? offerings[i] : null,
+        category, i, offerings,
       );
     }
   }
 
-  _drawSpiritCard(cx, cy, spiritDef, index) {
-    const purchased    = this._purchased[index];
-    const effectiveCost = this._price(spiritDef.cost);
-    const canAfford    = run.ki >= effectiveCost;
-    const existing     = run.spirits.find(s => s.id === spiritDef.id && !s.isNegative);
-    const hasNegative  = run.negativeSpirits.some(s => s.id === spiritDef.id);
-    const stackCount   = existing ? (existing.stackCount ?? 1) : 0;
-    const willTranscend = existing && stackCount >= 3 && !hasNegative;
-    const willStack    = existing && !willTranscend;
-    // Need a slot only if not stacking/transcending.
-    const hasSlot      = existing ? true : run.canAddSpirit;
-    const buyable      = !purchased && canAfford && hasSlot;
-    const alpha        = purchased ? 0.5 : 1.0;
-
-    const top = cy - CARD_H / 2;
-    const bot = cy + CARD_H / 2;
-
-    this.add.rectangle(cx, cy, CARD_W, CARD_H, 0x0f1e30)
-      .setStrokeStyle(2, 0x2a4a6a)
-      .setAlpha(alpha);
-
-    this.add.text(cx, top + 10, spiritDef.name, {
-      fontSize: '13px', color: '#e8e8e8',
-      wordWrap: { width: CARD_W - 14 }, align: 'center',
-    }).setOrigin(0.5, 0).setAlpha(alpha);
-
-    const badge = CHANNEL_BADGE[spiritDef.channel]
-                  ?? { label: spiritDef.channel.toUpperCase(), bgColor: 0x333333, textColor: '#888888' };
-    this.add.rectangle(cx, top + 40, 66, 17, badge.bgColor, 0.9).setAlpha(alpha);
-    this.add.text(cx, top + 40, badge.label, {
-      fontSize: '9px', color: badge.textColor, fontStyle: 'bold',
-    }).setOrigin(0.5).setAlpha(alpha);
-
-    this.add.text(cx, top + 56, spiritDef.description, {
-      fontSize: '10px', color: '#8aadbb',
-      wordWrap: { width: CARD_W - 14 }, align: 'center',
-    }).setOrigin(0.5, 0).setAlpha(alpha);
-
-    // Show owned stack count if applicable.
-    if (stackCount > 0) {
-      const stackColor = willTranscend ? '#ffcc44' : '#aaccff';
-      const stackLabel = willTranscend
-        ? `Owned: ×${stackCount}  →  TRANSCEND`
-        : `Owned: ×${stackCount}`;
-      this.add.text(cx, top + 4, stackLabel, {
-        fontSize: '9px', color: stackColor, fontStyle: 'bold',
-      }).setOrigin(0.5, 0);
-    }
-
-    if (purchased) {
-      this.add.rectangle(cx, cy, CARD_W - 4, CARD_H - 4, 0x000000, 0.35);
-      this.add.text(cx, cy, willTranscend ? 'Transcended!' : willStack ? 'Stacked!' : 'Purchased', {
-        fontSize: '14px', color: '#667788',
-        stroke: '#000000', strokeThickness: 2,
-      }).setOrigin(0.5);
+  _drawShopCard(cx, cy, offering, category, index, offeringsArray) {
+    if (!offering) {
+      this.add.rectangle(cx, cy, SHOP_CARD_W, SHOP_CARD_H, 0x080e18)
+        .setStrokeStyle(1, 0x151e2a);
+      this.add.text(cx, cy, 'Sold', { fontSize: '10px', color: '#2a3a4a' }).setOrigin(0.5);
       return;
     }
 
-    const costColor = canAfford ? '#ffee88' : '#cc6644';
-    const costLabel = effectiveCost < spiritDef.cost
-      ? `${effectiveCost} ki (was ${spiritDef.cost})`
-      : `${spiritDef.cost} ki`;
-    this.add.text(cx, bot - 50, costLabel, {
-      fontSize: '13px', color: costColor,
-    }).setOrigin(0.5, 0).setAlpha(alpha);
+    const isSelected = (
+      this._selectedItem?.category === category &&
+      this._selectedItem?.index    === index
+    );
+    const cost      = this._getItemCost(offering, category);
+    const canAfford = run.ki >= cost;
+    const canBuy    = canAfford && this._canBuyItem(offering, category);
+    const top       = cy - SHOP_CARD_H / 2;
+    const bot       = cy + SHOP_CARD_H / 2;
 
-    const btnBg     = buyable ? 0x1a5a2a : 0x141e14;
-    const btnBorder = buyable ? 0x44aa66 : 0x2a362a;
-    const btnLabel  = !hasSlot ? 'Slots full' : !canAfford ? "Can't afford"
-                    : willTranscend ? 'Transcend' : willStack ? 'Stack' : 'Buy';
-    const btnTextC  = buyable  ? '#aaffcc' : '#445566';
+    const bdr  = isSelected ? 0x44ff88 : (canBuy ? this._getCategoryColor(category) : 0x1e2d40);
+    const bdrW = isSelected ? 2 : 1;
+    this.add.rectangle(cx, cy, SHOP_CARD_W, SHOP_CARD_H, isSelected ? 0x0a2010 : 0x0d1b2a)
+      .setStrokeStyle(bdrW, bdr);
 
-    const btn = this.add.rectangle(cx, bot - 24, CARD_W - 18, 26, btnBg)
-      .setStrokeStyle(1, btnBorder);
-    this.add.text(cx, bot - 24, btnLabel, {
-      fontSize: '12px', color: btnTextC,
-    }).setOrigin(0.5);
+    // ── Content ───────────────────────────────────────────────────────────
+    if (category === 'card') {
+      const card  = offering.card;
+      const SCALE = 0.52;
+      const CW    = Math.round(64 * SCALE);
+      const CH    = Math.round(104 * SCALE);
+      const imgY  = top + 8 + CH / 2;
+      const spr   = this.add.image(cx, imgY, card.id).setScale(SCALE);
+      if (!canAfford) spr.setAlpha(0.5);
+      if (offering.preEnhancement) {
+        const E_S = { water: 'W', wood: 'L', fire: 'F', earth: 'E', metal: 'M' };
+        const E_C = { water: '#4488ff', wood: '#44cc44', fire: '#ff6644', earth: '#cc8822', metal: '#aaaaaa' };
+        const enh = offering.preEnhancement;
+        this.add.rectangle(cx - CW / 2 + 8, imgY - CH / 2 + 6, 14, 10, 0x000000, 0.7);
+        this.add.text(cx - CW / 2 + 8, imgY - CH / 2 + 6,
+          (enh.tier === 'upgraded' ? '\u2605' : '') + (E_S[enh.element] ?? '?'),
+          { fontSize: '7px', color: E_C[enh.element] ?? '#fff', fontStyle: 'bold' }
+        ).setOrigin(0.5);
+      }
+      if (offering.preRibbon) {
+        const S_C = { red: 0xcc3333, blue: 0x3366cc, green: 0x33aa55, yellow: 0xccaa33 };
+        this.add.circle(cx + CW / 2 - 6, imgY - CH / 2 + 5, 4, S_C[offering.preRibbon] ?? 0xffffff)
+          .setStrokeStyle(1, 0x000000);
+      }
+      this.add.text(cx, imgY + CH / 2 + 3, `[${card.type[0]}] M${card.month}`, {
+        fontSize: '8px', color: canAfford ? '#889aaa' : '#445566',
+      }).setOrigin(0.5, 0);
+    } else {
+      let nameColor = '#ddeeff';
+      if (category === 'deckfix') {
+        const EC = { water: '#4488ff', wood: '#44cc44', fire: '#ff6644', earth: '#cc8822', metal: '#aaaaaa' };
+        const PC = { practice_path: '#88eebb', practice_fasting: '#ddbb88', practice_mind: '#bb88ee', practice_tree: '#88ddbb' };
+        if (offering.element)    nameColor = EC[offering.element] ?? '#ddeeff';
+        else if (offering.color) nameColor = offering.color;
+        else                     nameColor = PC[offering.id] ?? '#ddeeff';
+      } else if (category === 'zodiac') {
+        const CC = { hand: '#88ddcc', field: '#88ccee', yaku: '#ddaaff', ki: '#ffdd88' };
+        nameColor = CC[offering.category] ?? '#ddeeff';
+      }
 
-    if (buyable) {
-      btn.setInteractive({ useHandCursor: true });
-      btn.on('pointerover', () => btn.setFillStyle(0x2a7a3a));
-      btn.on('pointerout',  () => btn.setFillStyle(btnBg));
-      btn.on('pointerdown', () => this._buySpirit(index));
+      this.add.text(cx, top + 8, offering.name ?? '', {
+        fontSize: '11px', color: nameColor, fontStyle: 'bold',
+        wordWrap: { width: SHOP_CARD_W - 8 }, align: 'center',
+      }).setOrigin(0.5, 0);
+
+      if (category === 'spirit') {
+        const badge = CHANNEL_BADGE[offering.channel]
+                      ?? { label: (offering.channel ?? '?').toUpperCase(), bgColor: 0x333333, textColor: '#888888' };
+        this.add.rectangle(cx, top + 30, 60, 15, badge.bgColor, 0.9);
+        this.add.text(cx, top + 30, badge.label, {
+          fontSize: '8px', color: badge.textColor, fontStyle: 'bold',
+        }).setOrigin(0.5);
+        const ex = run.spirits.find(s => s.id === offering.id && !s.isNegative);
+        const sc = ex ? (ex.stackCount ?? 1) : 0;
+        if (sc > 0) {
+          const hn = run.negativeSpirits.some(s => s.id === offering.id);
+          this.add.text(cx, top + 44, (ex && sc >= 3 && !hn) ? `\xD7${sc} \u2192 TRANSCEND` : `Owned \xD7${sc}`, {
+            fontSize: '8px', color: (ex && sc >= 3 && !hn) ? '#ffcc44' : '#aaccff',
+          }).setOrigin(0.5, 0);
+        }
+        this.add.text(cx, top + 58, offering.description ?? '', {
+          fontSize: '9px', color: '#667788',
+          wordWrap: { width: SHOP_CARD_W - 8 }, align: 'center',
+        }).setOrigin(0.5, 0);
+      } else {
+        this.add.text(cx, top + 26, offering.description ?? '', {
+          fontSize: '9px', color: '#667788',
+          wordWrap: { width: SHOP_CARD_W - 8 }, align: 'center',
+        }).setOrigin(0.5, 0);
+      }
+    }
+
+    // Cost hint (no buy button — selection handled by click)
+    this.add.text(cx, bot - 8, `${cost} ki`, {
+      fontSize: '10px', color: canAfford ? '#ffee88' : '#cc6644',
+    }).setOrigin(0.5, 1);
+
+    // Invisible clickable overlay
+    const hit = this.add.rectangle(cx, cy, SHOP_CARD_W, SHOP_CARD_H, 0x000000, 0)
+      .setInteractive({ useHandCursor: true }).setDepth(5);
+
+    hit.on('pointerover', () => {
+      if (!isSelected) {
+        // Subtle hover: brighten border — avoid full rebuild, just show tooltip
+      }
+      this._showShopTooltip(cx, top, this._getTooltipLines(offering, category));
+    });
+    hit.on('pointerout', () => this._hideShopTooltip());
+    hit.on('pointerdown', () => {
+      this._hideShopTooltip();
+      if (isSelected) {
+        this._selectedItem = null;
+      } else {
+        this._selectedItem = { offering, category, index, offeringsArray };
+      }
+      this._buildUI();
+    });
+  }
+
+  // ── Tooltip helpers ────────────────────────────────────────────────────────
+
+  _showShopTooltip(x, cardTop, lines) {
+    this._hideShopTooltip();
+    const tipY = cardTop > 180 ? cardTop - 6 : cardTop + SHOP_CARD_H + 6;
+    const orig = cardTop > 180 ? [0.5, 1] : [0.5, 0];
+    this._shopTooltip = this.add.text(x, tipY, lines.join('\n'), {
+      fontSize: '10px', color: '#ddeeff',
+      backgroundColor: '#0a0f1e',
+      padding: { x: 8, y: 6 },
+      wordWrap: { width: 200 },
+      lineSpacing: 2,
+    }).setOrigin(orig[0], orig[1]).setDepth(65);
+  }
+
+  _hideShopTooltip() {
+    if (this._shopTooltip) { this._shopTooltip.destroy(); this._shopTooltip = null; }
+  }
+
+  _getTooltipLines(offering, category) {
+    const cost = this._getItemCost(offering, category);
+    switch (category) {
+      case 'spirit':
+        return [offering.name, offering.description ?? '', `Cost: ${cost} ki`,
+          offering.channel ? `Channel: ${offering.channel}` : ''].filter(Boolean);
+      case 'deckfix':
+        return [offering.name, offering.description ?? '', `Cost: ${cost} ki`].filter(Boolean);
+      case 'card': {
+        const c = offering.card;
+        return [
+          c.name,
+          `${c.monthName ?? ''} · ${c.type} · ${c.points ?? 0}pt`,
+          (c.vertical || c.temporal) ? `${c.vertical ?? ''}/${c.temporal ?? ''}` : '',
+          offering.preEnhancement ? `Enh: ${offering.preEnhancement.element} (${offering.preEnhancement.tier})` : '',
+          offering.preRibbon ? `Stamp: ${offering.preRibbon}` : '',
+          `Cost: ${cost} ki`,
+        ].filter(Boolean);
+      }
+      case 'zodiac':
+        return [offering.name, offering.description ?? '', `Cost: ${cost} ki`,
+          offering.category ? `Type: ${offering.category}` : ''].filter(Boolean);
+      default:
+        return [(offering.name ?? ''), `${cost} ki`];
     }
   }
+
+  // ── Central buttons (purchase + reroll) ────────────────────────────────────
+
+  _drawCentralButtons() {
+    const sel     = this._selectedItem;
+    const validSel = sel && sel.offeringsArray[sel.index] !== null;
+    let   btnY    = SHOP_CY;
+
+    if (validSel) {
+      const cost       = this._getItemCost(sel.offering, sel.category);
+      const canAfford  = run.ki >= cost;
+      const canAcquire = this._canBuyItem(sel.offering, sel.category);
+      const canBuy     = canAfford && canAcquire;
+
+      const itemName = sel.category === 'card'
+        ? (sel.offering.card?.name ?? 'Card')
+        : (sel.offering.name ?? '');
+
+      this.add.text(SHOP_CX, btnY - 22, itemName, {
+        fontSize: '11px', color: '#ddeeff', fontStyle: 'bold',
+      }).setOrigin(0.5);
+
+      const btnBg  = canBuy ? 0x1a5a2a : 0x141e14;
+      const btnBdr = canBuy ? 0x44aa66 : 0x2a362a;
+      const label  = !canAcquire ? 'Cannot acquire'
+                   : !canAfford  ? `Need ${cost} ki`
+                   : `Purchase — ${cost} ki`;
+
+      const pBtn = this.add.rectangle(SHOP_CX, btnY, 168, 30, btnBg)
+        .setStrokeStyle(1, btnBdr);
+      this.add.text(SHOP_CX, btnY, label, {
+        fontSize: '11px', color: canBuy ? '#aaffcc' : '#556666',
+      }).setOrigin(0.5);
+
+      if (canBuy) {
+        pBtn.setInteractive({ useHandCursor: true });
+        pBtn.on('pointerover', () => pBtn.setFillStyle(0x2a7a3a));
+        pBtn.on('pointerout',  () => pBtn.setFillStyle(btnBg));
+        pBtn.on('pointerdown', () => {
+          const s = this._selectedItem;
+          this._selectedItem = null;
+          this._buyItem(s.offering, s.category, s.index, s.offeringsArray);
+        });
+      }
+      btnY += 36;
+    }
+
+    // Reroll
+    const canReroll = run.ki >= this._rerollCost;
+    const bg  = canReroll ? 0x1a2a4a : 0x0e1520;
+    const bdr = canReroll ? 0x3a5a8a : 0x1e2d40;
+    const rBtn = this.add.rectangle(SHOP_CX, btnY, 150, 26, bg).setStrokeStyle(1, bdr);
+    this.add.text(SHOP_CX, btnY, `Reroll  ${this._rerollCost} ki`, {
+      fontSize: '12px', color: canReroll ? '#aaccee' : '#445566',
+    }).setOrigin(0.5);
+
+    if (canReroll) {
+      rBtn.setInteractive({ useHandCursor: true });
+      rBtn.on('pointerover', () => rBtn.setFillStyle(0x2a3a5a));
+      rBtn.on('pointerout',  () => rBtn.setFillStyle(bg));
+      rBtn.on('pointerdown', () => {
+        run.spendKi(this._rerollCost);
+        this._rerollCount++;
+        this._rerollCost = 3 + this._rerollCount * 2;
+        const ic = this._isGrove ? 4 : 2;
+        this._rerollSection(this._spiritOfferings,  () => this._generateSpiritOfferings(ic));
+        this._rerollSection(this._deckFixOfferings, () => this._generateDeckFixOfferings(ic));
+        this._rerollSection(this._cardOfferings,    () => generateShopCards(ic, this._isGrove));
+        this._rerollSection(this._zodiacOfferings,  () => this._generateZodiacOfferings(ic));
+        this._selectedItem = null;
+        this._buildUI();
+      });
+    }
+  }
+
+  _rerollSection(currentOfferings, generateFn) {
+    const unpurchased = currentOfferings.filter(o => o !== null).length;
+    if (unpurchased === 0) return;
+    const fresh = generateFn();
+    let fi = 0;
+    for (let i = 0; i < currentOfferings.length; i++) {
+      if (currentOfferings[i] !== null) {
+        currentOfferings[i] = fresh[fi] ?? null;
+        fi++;
+      }
+    }
+  }
+
+  // ── Loadout slot (used by release confirm) ─────────────────────────────────
 
   _drawLoadoutSlot(cx, cy, spirit, w, h, spiritIndex = -1) {
     const borderColor = spirit ? 0x3a6080 : 0x1e2d40;
@@ -331,7 +670,6 @@ export class ShrineScene extends Phaser.Scene {
       this.add.text(cx, cy + 14, badge.label, {
         fontSize: '7px', color: badge.textColor, fontStyle: 'bold',
       }).setOrigin(0.5);
-      // Release "×" button in top-right corner of slot
       const rel = this.add.text(cx + w / 2 - 7, cy - h / 2 + 7, '\u00D7', {
         fontSize: '11px', color: '#774444',
       }).setOrigin(0.5).setInteractive({ useHandCursor: true });
@@ -342,6 +680,8 @@ export class ShrineScene extends Phaser.Scene {
       this.add.text(cx, cy, '\u2014', { fontSize: '14px', color: '#1e2d40' }).setOrigin(0.5);
     }
   }
+
+  // ── Release confirmation ───────────────────────────────────────────────────
 
   _confirmRelease(index, spirit) {
     for (const o of this._confirmObjs) o.destroy();
@@ -387,91 +727,88 @@ export class ShrineScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(50));
   }
 
-  // ── Right column ──────────────────────────────────────────────────────────
+  // ── Buy routing ───────────────────────────────────────────────────────────
 
-  _drawRightColumn() {
-    let topY = HEADER_H + 6;
+  _getItemCost(offering, category) {
+    if (!offering) return 0;
+    return category === 'card'
+      ? this._price(offering.price)
+      : this._price(offering.cost ?? 0);
+  }
 
-    // Fixed-height sections
-    this._drawConsumablesSection(RCX, topY, 200);
-    topY += 200;
-    this._drawZodiacSection(RCX, topY, 130);
-    topY += 130;
-    this._drawWuXingForgeSection(RCX, topY, 80);
-    topY += 80;
-    this._drawRibbonStampsSection(RCX, topY, 40);
-    topY += 40;
-
-    if (this._isGrove) {
-      const remaining = BTN_Y - 38 - topY;
-      this._drawFusionSection(RCX, topY, remaining);
+  _canBuyItem(offering, category) {
+    if (!offering) return false;
+    switch (category) {
+      case 'spirit': {
+        const existing = run.spirits.find(s => s.id === offering.id && !s.isNegative);
+        return existing ? true : run.canAddSpirit;
+      }
+      case 'zodiac': return run.canAddConsumable;
+      default:       return true;
     }
   }
 
-  // ── Four Practices section ────────────────────────────────────────────────
+  _buyItem(offering, category, index, offeringsArray) {
+    this._selectedItem = null;
+    switch (category) {
 
-  _drawConsumablesSection(cx, topY, height) {
-    this.add.text(cx, topY + 4, 'Four Practices', {
-      fontSize: '15px', color: '#88ccee',
-    }).setOrigin(0.5, 0);
-    this.add.text(cx, topY + 22, 'Permanent deck modifications — instant use, no inventory', {
-      fontSize: '10px', color: '#334455',
-    }).setOrigin(0.5, 0);
+      case 'spirit': {
+        const result = run.buySpirit(offering);
+        if (result.success) {
+          const discount = offering.cost - this._price(offering.cost);
+          if (discount > 0) run.addKi(discount);
+          logger.logShopPurchase('spirit', offering.name, this._price(offering.cost));
+          if ((result.result ?? '') === 'transcended') {
+            logger.logShopPurchase('spirit_transcend', offering.name, 0);
+          }
+          offeringsArray[index] = null;
+          this._buildUI();
+        }
+        break;
+      }
 
-    const tileW   = 138;
-    const tileH   = height - 40;
-    const tileGap = 6;
-    const totalW  = FOUR_PRACTICES.length * tileW + (FOUR_PRACTICES.length - 1) * tileGap;
-    const startX  = cx - totalW / 2 + tileW / 2;
-    const tileY   = topY + 38 + tileH / 2;
+      case 'deckfix': {
+        const cost = this._price(offering.cost);
+        if (offering.id.startsWith('practice_')) {
+          run.spendKi(cost);
+          logger.logShopPurchase('practice', offering.name, cost);
+          offeringsArray[index] = null;
+          this._showPracticeOverlay(offering);
+        } else if (offering.id.startsWith('element_')) {
+          offeringsArray[index] = null;
+          this._buyConsumable(offering);
+        } else {
+          this._showStampCardSelector(offering, () => { offeringsArray[index] = null; });
+        }
+        break;
+      }
 
-    const PRACTICE_COLORS = {
-      practice_path:    '#88eebb',
-      practice_fasting: '#ddbb88',
-      practice_mind:    '#bb88ee',
-      practice_tree:    '#88ddbb',
-    };
+      case 'card': {
+        const cost   = this._price(offering.price);
+        const result = run.buyCard(offering.card, cost);
+        if (result.success) {
+          logger.logShopPurchase('card', offering.card.name ?? offering.card.id, cost);
+          offeringsArray[index] = null;
+          this._buildUI();
+        }
+        break;
+      }
 
-    for (let i = 0; i < FOUR_PRACTICES.length; i++) {
-      const def    = FOUR_PRACTICES[i];
-      const x      = startX + i * (tileW + tileGap);
-      const pCost  = this._price(def.cost);
-      const afford = run.ki >= pCost;
-      const color  = PRACTICE_COLORS[def.id] ?? '#88ccee';
-
-      this.add.rectangle(x, tileY, tileW, tileH, afford ? 0x0a1a1e : 0x080e12)
-        .setStrokeStyle(1, afford ? 0x224433 : 0x111a22);
-
-      this.add.text(x, tileY - tileH / 2 + 7, def.name, {
-        fontSize: '13px', color, fontStyle: 'bold',
-      }).setOrigin(0.5, 0);
-
-      this.add.text(x, tileY - tileH / 2 + 23, def.description, {
-        fontSize: '9px', color: '#445566',
-        wordWrap: { width: tileW - 12 }, align: 'center',
-      }).setOrigin(0.5, 0);
-
-      const btnY2  = tileY + tileH / 2 - 14;
-      const btnLbl = !afford ? `Need ${pCost} ki` : `Use  ${pCost} ki`;
-      const btnTxt = afford ? color : '#334455';
-      const btn    = this.add.rectangle(x, btnY2, tileW - 12, 22, afford ? 0x112222 : 0x080e0e)
-        .setStrokeStyle(1, afford ? 0x336655 : 0x1a2233);
-      this.add.text(x, btnY2, btnLbl, { fontSize: '11px', color: btnTxt }).setOrigin(0.5);
-
-      if (afford) {
-        btn.setInteractive({ useHandCursor: true });
-        btn.on('pointerover', () => btn.setFillStyle(0x1a3333));
-        btn.on('pointerout',  () => btn.setFillStyle(0x112222));
-        btn.on('pointerdown', () => {
-          run.spendKi(pCost);
-          logger.logShopPurchase('practice', def.name, pCost);
-          this._showPracticeOverlay(def);
-        });
+      case 'zodiac': {
+        const result = run.buyConsumable(offering.id);
+        if (result.success) {
+          const discount = offering.cost - this._price(offering.cost);
+          if (discount > 0) run.addKi(discount);
+          logger.logConsumableUse(offering.name, 'purchased');
+          offeringsArray[index] = null;
+          this._buildUI();
+        }
+        break;
       }
     }
   }
 
-  // ── Four Practices overlays ───────────────────────────────────────────────
+  // ── Four Practices overlays ────────────────────────────────────────────────
 
   _showPracticeOverlay(def) {
     if (def.id === 'practice_path')    { this._showPathOverlay(def);    return; }
@@ -480,10 +817,6 @@ export class ShrineScene extends Phaser.Scene {
     if (def.id === 'practice_tree')    { this._showTreeOverlay(def);    return; }
   }
 
-  /**
-   * Shared card-grid overlay builder for Four Practices.
-   * Renders a modal with all deck cards in a grid, selection state, and action/cancel buttons.
-   */
   _buildPracticeGrid({ title, instruction, cards, selectedIds, disabledFn, onSelect, actionLabel, onAction, onCancel }) {
     for (const o of this._confirmObjs) o.destroy();
     this._confirmObjs = [];
@@ -491,8 +824,8 @@ export class ShrineScene extends Phaser.Scene {
 
     const cx = 640, cy = 356, W = 920, H = 556;
     const SCALE = 0.50;
-    const CW    = Math.round(64 * SCALE);    // 32
-    const CH    = Math.round(104 * SCALE);   // 52
+    const CW    = Math.round(64 * SCALE);
+    const CH    = Math.round(104 * SCALE);
     const COLS  = 8, GAP = 6, ROWH = CH + 22;
 
     push(this.add.rectangle(cx, cy, W, H, 0x040810, 0.97)
@@ -519,8 +852,8 @@ export class ShrineScene extends Phaser.Scene {
       const selected = selectedIds ? selectedIds.has(card.id) : false;
 
       const spr = push(this.add.image(x, y, card.id).setScale(SCALE).setDepth(51));
-      if (disabled)       spr.setAlpha(0.3);
-      else if (selected)  spr.setTint(0xffcc44);
+      if (disabled)      spr.setAlpha(0.3);
+      else if (selected) spr.setTint(0xffcc44);
 
       push(this.add.text(x, y + CH / 2 + 2,
         `${card.name?.split(' ')[0] ?? ''} [${card.type[0]}]`,
@@ -564,12 +897,12 @@ export class ShrineScene extends Phaser.Scene {
       this._buildUI();
     };
     const render = () => {
-      const deck     = run.getDeck();
-      const phase2   = targetCard !== null;
+      const deck   = run.getDeck();
+      const phase2 = targetCard !== null;
       this._buildPracticeGrid({
         title: `Path  (${def.cost} ki paid)`,
         instruction: phase2
-          ? `Target: ${targetCard.name} (month ${targetCard.month}). Select up to 4 cards to change. Selected: ${selectedIds.size}/4`
+          ? `Target: ${targetCard.name} (month ${targetCard.month}). Select up to 4 cards. Selected: ${selectedIds.size}/4`
           : 'Step 1: Click the card whose month you want to copy to others.',
         cards:       phase2 ? deck.filter(c => c.id !== targetCard.id) : deck,
         selectedIds: phase2 ? selectedIds : new Set(),
@@ -640,7 +973,7 @@ export class ShrineScene extends Phaser.Scene {
     const render = () => {
       this._buildPracticeGrid({
         title: `Mind  (${def.cost} ki paid)`,
-        instruction: `Select up to 2 cards to permanently delete from your deck. Selected: ${selectedIds.size}/2`,
+        instruction: `Select up to 2 cards to permanently delete. Selected: ${selectedIds.size}/2`,
         cards:       run.getDeck(),
         selectedIds,
         onSelect: (card) => {
@@ -671,13 +1004,13 @@ export class ShrineScene extends Phaser.Scene {
       this._buildUI();
     };
     const render = () => {
-      const deck  = run.getDeck();
+      const deck   = run.getDeck();
       const phase2 = sourceCard !== null;
       this._buildPracticeGrid({
         title: `Tree  (${def.cost} ki paid)`,
         instruction: phase2
-          ? `Transforming: ${sourceCard.name}. Step 2: Click the card to copy its properties from.`
-          : 'Step 1: Click the card you want to transform (it will be replaced).',
+          ? `Transforming: ${sourceCard.name}. Step 2: Click the card to copy from.`
+          : 'Step 1: Click the card you want to transform.',
         cards:       phase2 ? deck.filter(c => c.id !== sourceCard.id) : deck,
         selectedIds: new Set(sourceCard ? [sourceCard.id] : []),
         onSelect: (card) => {
@@ -696,7 +1029,7 @@ export class ShrineScene extends Phaser.Scene {
     render();
   }
 
-  // ── Buy consumable → booster pack overlay ────────────────────────────────
+  // ── Buy consumable → use-or-carry ─────────────────────────────────────────
 
   _buyConsumable(markDef) {
     const pCost = this._price(markDef.cost);
@@ -723,7 +1056,6 @@ export class ShrineScene extends Phaser.Scene {
       fontSize: '12px', color: '#557799',
     }).setOrigin(0.5).setDepth(55));
 
-    // "Use Now" button
     const useBtn = push(this.add.rectangle(cx, cy - 8, 260, 36, 0x1a3a5a)
       .setStrokeStyle(1, 0x44aacc).setInteractive({ useHandCursor: true }).setDepth(56));
     useBtn.on('pointerover', () => useBtn.setFillStyle(0x2a5a88));
@@ -737,9 +1069,8 @@ export class ShrineScene extends Phaser.Scene {
       fontSize: '12px', color: '#88ddff',
     }).setOrigin(0.5).setDepth(56));
 
-    // "Carry" button
-    const carryBg = canCarry ? 0x1a3a1a : 0x1a1a1a;
-    const carryBr = canCarry ? 0x44aa66 : 0x334433;
+    const carryBg  = canCarry ? 0x1a3a1a : 0x1a1a1a;
+    const carryBr  = canCarry ? 0x44aa66 : 0x334433;
     const carryBtn = push(this.add.rectangle(cx, cy + 38, 260, 36, carryBg)
       .setStrokeStyle(1, carryBr).setDepth(56));
     if (canCarry) {
@@ -762,7 +1093,6 @@ export class ShrineScene extends Phaser.Scene {
       { fontSize: '12px', color: canCarry ? '#aaffcc' : '#554433' }
     ).setOrigin(0.5).setDepth(56));
 
-    // "Cancel / refund" button
     const cancelBtn = push(this.add.rectangle(cx, cy + 84, 160, 30, 0x2a1a1a)
       .setStrokeStyle(1, 0x664444).setInteractive({ useHandCursor: true }).setDepth(56));
     cancelBtn.on('pointerover', () => cancelBtn.setFillStyle(0x4a2a2a));
@@ -779,12 +1109,10 @@ export class ShrineScene extends Phaser.Scene {
   }
 
   _showBoosterPack(markDef) {
-    // Clear any existing booster pack overlay
     for (const o of this._confirmObjs) o.destroy();
     this._confirmObjs = [];
 
-    const deck = run.getDeck();
-    // Pick up to 8 random cards from the current deck
+    const deck     = run.getDeck();
     const shuffled = [...deck].sort(() => Math.random() - 0.5);
     const preview  = shuffled.slice(0, Math.min(8, shuffled.length));
 
@@ -794,44 +1122,33 @@ export class ShrineScene extends Phaser.Scene {
 
     push(this.add.rectangle(cx, cy, W, H, 0x040810, 0.97)
       .setStrokeStyle(2, 0x2a5a88).setDepth(50));
-
     push(this.add.text(cx, cy - H / 2 + 14, `${markDef.name} — Select a Card`, {
       fontSize: '18px', color: '#88ddff', stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(50));
 
-    // Instruction text per consumable type
     const ELEMENT_NAMES = {
       water: 'Snow (2× pts)', wood: 'Leaf (slot bypass)', fire: 'Ember (wildcard)',
       earth: 'Clay (ki interest)', metal: 'Iron (proc chance)',
     };
     let instruction = 'Select a card.';
-    if (markDef.id === 'mark_impermanence') {
-      instruction = 'Click a card to promote it to the next type.';
-    } else if (markDef.id === 'mark_nonbeing') {
-      instruction = 'Click a card to permanently remove it from your deck.';
-    } else if (markDef.id === 'mark_transcendence') {
-      instruction = 'Click the SOURCE card (it will be replaced).';
-    } else if (markDef.id.startsWith('element_')) {
-      const eName = ELEMENT_NAMES[markDef.element] ?? markDef.name;
-      instruction = `Apply ${eName} enhancement. Generative/destructive cycles apply.`;
-    }
+    if (markDef.id === 'mark_impermanence')       instruction = 'Click a card to promote it.';
+    else if (markDef.id === 'mark_nonbeing')       instruction = 'Click a card to permanently remove it.';
+    else if (markDef.id === 'mark_transcendence')  instruction = 'Click the SOURCE card (it will be replaced).';
+    else if (markDef.id.startsWith('element_'))   instruction = `Apply ${ELEMENT_NAMES[markDef.element] ?? markDef.name}.`;
 
     push(this.add.text(cx, cy - H / 2 + 36, instruction, {
       fontSize: '12px', color: '#557799',
     }).setOrigin(0.5).setDepth(50));
 
-    // Card grid — up to 8 cards in two rows of 4
     const SCALE    = 0.68;
     const CW       = Math.round(64 * SCALE);
     const CH       = Math.round(104 * SCALE);
     const GAP      = 12;
     const perRow   = 4;
-    const rowCount = Math.ceil(preview.length / perRow);
     const gridW    = perRow * CW + (perRow - 1) * GAP;
     const gridStartX = cx - gridW / 2 + CW / 2;
     const gridStartY = cy - 60;
 
-    // Transcendence: two-step selection
     let transcendSource = null;
 
     for (let i = 0; i < preview.length; i++) {
@@ -841,11 +1158,8 @@ export class ShrineScene extends Phaser.Scene {
       const x    = gridStartX + col * (CW + GAP);
       const y    = gridStartY + row * (CH + GAP + 22);
 
-      // Card image
       const spr = push(this.add.image(x, y, card.id).setScale(SCALE).setDepth(51));
-
-      // Card label
-      push(this.add.text(x, y + CH / 2 + 2, `${card.name}`, {
+      push(this.add.text(x, y + CH / 2 + 2, card.name, {
         fontSize: '8px', color: '#8899aa',
         wordWrap: { width: CW + GAP - 4 }, align: 'center',
       }).setOrigin(0.5, 0).setDepth(51));
@@ -859,75 +1173,55 @@ export class ShrineScene extends Phaser.Scene {
         if (transcendSource && transcendSource.id === card.id) return;
         spr.clearTint();
       });
-
       spr.on('pointerdown', () => {
-        const closeOverlay = () => {
+        const close = () => {
           for (const o of this._confirmObjs) o.destroy();
           this._confirmObjs = [];
         };
-
         if (markDef.id === 'mark_impermanence') {
           run.promoteCard(card.id);
           logger.logConsumableUse(markDef.name, `promoted ${card.id} at shop`);
-          closeOverlay();
-          this._buildUI();
-
+          close(); this._buildUI();
         } else if (markDef.id === 'mark_nonbeing') {
           run.deleteCard(card.id);
           logger.logConsumableUse(markDef.name, `deleted ${card.id} at shop`);
-          closeOverlay();
-          this._buildUI();
-
+          close(); this._buildUI();
         } else if (markDef.id === 'mark_transcendence') {
           if (!transcendSource) {
             transcendSource = card;
             spr.setTint(0xffcc44);
-            for (const o of this._confirmObjs) {
-              if (o._isTargetInstruction) o.destroy();
-            }
+            for (const o of this._confirmObjs) { if (o._isTargetInstruction) o.destroy(); }
             const instr = push(this.add.text(cx, cy - H / 2 + 36,
-              `Source: ${card.name}. Now click the TARGET card to copy from.`,
+              `Source: ${card.name}. Now click the TARGET card.`,
               { fontSize: '12px', color: '#ffcc44' }
             ).setOrigin(0.5).setDepth(51));
             instr._isTargetInstruction = true;
           } else {
             run.transcendCard(transcendSource.id, card.id);
             logger.logConsumableUse(markDef.name, `${transcendSource.id} → ${card.id} at shop`);
-            closeOverlay();
-            this._buildUI();
+            close(); this._buildUI();
           }
-
         } else if (markDef.id.startsWith('element_')) {
-          // Wu Xing element application
           const element = markDef.element ?? markDef.id.replace('element_', '');
           const result  = run.applyElement(card.id, element);
-          // If the element stripped an existing enhancement, return the base
-          // consumable to inventory (if space is available).
           if (result.action === 'stripped' && result.returnedConsumable) {
-            const returnedDef = getElementDef(result.returnedConsumable);
-            if (returnedDef && run.canAddConsumable) {
-              try {
-                run.addConsumable({
-                  id: returnedDef.id, name: returnedDef.name,
-                  description: returnedDef.description, category: returnedDef.category,
-                });
-              } catch (_) { /* inventory was actually full */ }
+            const rd = getElementDef(result.returnedConsumable);
+            if (rd && run.canAddConsumable) {
+              try { run.addConsumable({ id: rd.id, name: rd.name, description: rd.description, category: rd.category }); }
+              catch (_) {}
             }
           }
           logger.logConsumableUse(markDef.name, `${result.action} on ${card.id} at shop`);
-          closeOverlay();
-          this._buildUI();
+          close(); this._buildUI();
         }
       });
     }
 
-    // Cancel button (refund; no card selected)
     const cancelBtn = push(this.add.rectangle(cx, cy + H / 2 - 30, 140, 36, 0x2a1a1a)
       .setStrokeStyle(1, 0x664444).setInteractive({ useHandCursor: true }).setDepth(51));
     cancelBtn.on('pointerover', () => cancelBtn.setFillStyle(0x4a2a2a));
     cancelBtn.on('pointerout',  () => cancelBtn.setFillStyle(0x2a1a1a));
     cancelBtn.on('pointerdown', () => {
-      // Refund ki since no card was selected
       run.addKi(markDef.cost);
       for (const o of this._confirmObjs) o.destroy();
       this._confirmObjs = [];
@@ -938,232 +1232,12 @@ export class ShrineScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(51));
   }
 
-  // ── Zodiac Items section ──────────────────────────────────────────────────
+  // ── Stamp card selector ────────────────────────────────────────────────────
 
-  _drawZodiacSection(cx, topY, height) {
-    this.add.text(cx, topY + 4, 'Zodiac Items', {
-      fontSize: '15px', color: '#ffdd88',
-    }).setOrigin(0.5, 0);
-    this.add.text(cx, topY + 22, 'Tactical consumables for use in rounds', {
-      fontSize: '10px', color: '#334455',
-    }).setOrigin(0.5, 0);
-
-    // Inventory status
-    const slotCount = run.consumables.length;
-    const invColor  = slotCount >= RunManager.MAX_CONSUMABLE_SLOTS ? '#cc4444' : '#556677';
-    const invNames  = slotCount > 0 ? run.consumables.map(c => c.name).join(', ') : 'empty';
-    this.add.text(cx, topY + 36,
-      `Inventory: ${slotCount}/${RunManager.MAX_CONSUMABLE_SLOTS}  [${invNames}]`,
-      { fontSize: '10px', color: invColor, wordWrap: { width: 560 }, align: 'center' }
-    ).setOrigin(0.5, 0);
-
-    const offers  = this._zodiacOffering;
-    const tileW   = 182;
-    const tileH   = height - 54;  // extra 18px for inventory row
-    const tileGap = 8;
-    const totalW  = offers.length * tileW + (offers.length - 1) * tileGap;
-    const startX  = cx - totalW / 2 + tileW / 2;
-    const tileY   = topY + 52 + tileH / 2;
-
-    const CATEGORY_COLOR = {
-      hand: '#88ddcc', field: '#88ccee', yaku: '#ddaaff', ki: '#ffdd88',
-    };
-
-    for (let i = 0; i < offers.length; i++) {
-      const def    = offers[i];
-      const x      = startX + i * (tileW + tileGap);
-      const zCost  = this._price(def.cost);
-      const canBuy = run.canAddConsumable && run.ki >= zCost;
-      const color  = CATEGORY_COLOR[def.category] ?? '#cccccc';
-
-      this.add.rectangle(x, tileY, tileW, tileH, canBuy ? 0x1a1500 : 0x0e0e0a)
-        .setStrokeStyle(1, canBuy ? 0x554400 : 0x1a1a2a);
-
-      this.add.text(x, tileY - tileH / 2 + 6, def.name, {
-        fontSize: '12px', color, fontStyle: 'bold',
-      }).setOrigin(0.5, 0);
-
-      this.add.text(x, tileY - tileH / 2 + 22, def.description, {
-        fontSize: '9px', color: '#445566',
-        wordWrap: { width: tileW - 10 }, align: 'center',
-      }).setOrigin(0.5, 0);
-
-      const btnY2  = tileY + tileH / 2 - 14;
-      const inv    = !run.canAddConsumable;
-      const btnLbl = inv ? 'Inv Full' : !canBuy ? `${zCost}ki` : `Buy  ${zCost}ki`;
-      const btnClr = canBuy ? color : '#334455';
-      const btn    = this.add.rectangle(x, btnY2, tileW - 10, 20, canBuy ? 0x1a1200 : 0x0a0a0a)
-        .setStrokeStyle(1, canBuy ? 0x554400 : 0x1a1a2a);
-      this.add.text(x, btnY2, btnLbl, { fontSize: '10px', color: btnClr }).setOrigin(0.5);
-
-      if (canBuy) {
-        btn.setInteractive({ useHandCursor: true });
-        btn.on('pointerover', () => btn.setFillStyle(0x2a2000));
-        btn.on('pointerout',  () => btn.setFillStyle(0x1a1200));
-        btn.on('pointerdown', () => {
-          const result = run.buyConsumable(def.id);
-          if (result.success) {
-            // Apply coupon discount (buyConsumable deducts full cost internally).
-            const discount = def.cost - zCost;
-            if (discount > 0) run.addKi(discount);
-            logger.logConsumableUse(def.name, 'purchased');
-            this._zodiacOffering = this._zodiacOffering.filter(d => d.id !== def.id);
-            this._buildUI();
-          }
-        });
-      }
-    }
-  }
-
-  // ── Wu Xing Forge section ─────────────────────────────────────────────────
-
-  _drawWuXingForgeSection(cx, topY, height) {
-    this.add.text(cx, topY + 4, 'Wu Xing Forge', {
-      fontSize: '15px', color: '#aaccee',
-    }).setOrigin(0.5, 0);
-    this.add.text(cx, topY + 22, 'Apply elemental enhancements to your cards  —  5 ki each', {
-      fontSize: '10px', color: '#334455',
-    }).setOrigin(0.5, 0);
-
-    // 5 element tiles in a row
-    const ELEMENT_COLORS = {
-      water: '#4488ff', wood: '#44cc44', fire: '#ff6644', earth: '#cc8822', metal: '#aaaaaa',
-    };
-    const ELEMENT_BORDER = {
-      water: 0x2255aa, wood: 0x228833, fire: 0xaa3322, earth: 0x885511, metal: 0x666666,
-    };
-    const tileW  = 100;
-    const tileH  = height - 36;
-    const tileGap = 8;
-    const totalW = WUXING_CONSUMABLES.length * tileW + (WUXING_CONSUMABLES.length - 1) * tileGap;
-    const startX = cx - totalW / 2 + tileW / 2;
-    const tileY  = topY + 34 + tileH / 2;
-
-    for (let i = 0; i < WUXING_CONSUMABLES.length; i++) {
-      const def     = WUXING_CONSUMABLES[i];
-      const x       = startX + i * (tileW + tileGap);
-      const full    = !run.canAddConsumable;
-      const wCost   = this._price(def.cost);
-      const afford  = run.ki >= wCost;
-      const buyable = afford && !full;
-      const color   = ELEMENT_COLORS[def.element] ?? '#aaaaaa';
-      const bdr     = ELEMENT_BORDER[def.element] ?? 0x555555;
-
-      this.add.rectangle(x, tileY, tileW, tileH, buyable ? 0x0a1a1a : 0x080e10)
-        .setStrokeStyle(1, buyable ? bdr : 0x1a2233);
-
-      this.add.text(x, tileY - tileH / 2 + 7, def.name, {
-        fontSize: '12px', color, fontStyle: 'bold',
-      }).setOrigin(0.5, 0);
-
-      this.add.text(x, tileY - tileH / 2 + 21, def.description, {
-        fontSize: '7px', color: '#445566',
-        wordWrap: { width: tileW - 8 }, align: 'center',
-      }).setOrigin(0.5, 0);
-
-      const btnY2  = tileY + tileH / 2 - 14;
-      const btnLbl = full ? 'Full' : !afford ? 'N/A' : `${wCost} ki`;
-      const btnTxt = buyable ? color : '#334455';
-      const btn    = this.add.rectangle(x, btnY2, tileW - 10, 20, buyable ? 0x111e1e : 0x080e0e)
-        .setStrokeStyle(1, buyable ? bdr : 0x1a2233);
-      this.add.text(x, btnY2, btnLbl, { fontSize: '10px', color: btnTxt }).setOrigin(0.5);
-
-      if (buyable) {
-        btn.setInteractive({ useHandCursor: true });
-        btn.on('pointerover', () => btn.setFillStyle(0x1a2e2e));
-        btn.on('pointerout',  () => btn.setFillStyle(0x111e1e));
-        btn.on('pointerdown', () => this._buyConsumable(def));
-      }
-    }
-  }
-
-  // ── Ribbon Stamps section ─────────────────────────────────────────────────
-
-  _drawRibbonStampsSection(cx, topY, height) {
-    // Compact mode (height ≤ 40px): single row of mini buttons, no tile cards.
-    if (height <= 40) {
-      this.add.text(cx - 280, topY + 10, 'Ribbon Stamps:', {
-        fontSize: '11px', color: '#ddaacc',
-      }).setOrigin(0, 0.5);
-      const stamps = Object.values(RIBBON_STAMPS);
-      stamps.forEach((stamp, i) => {
-        const x = cx - 100 + i * 78;
-        const sCost  = this._price(stamp.cost);
-        const afford = run.ki >= sCost;
-        const btn = this.add.rectangle(x, topY + 10, 72, 22, afford ? 0x1a1020 : 0x0a0a0a)
-          .setStrokeStyle(1, afford ? stamp.hexColor * 0.4 : 0x1a1a2a);
-        this.add.text(x, topY + 10, `${stamp.name.split(' ')[0]}  ${sCost}ki`, {
-          fontSize: '9px', color: afford ? stamp.color : '#334455',
-        }).setOrigin(0.5);
-        if (afford) {
-          btn.setInteractive({ useHandCursor: true });
-          btn.on('pointerover', () => btn.setFillStyle(0x2a1830));
-          btn.on('pointerout',  () => btn.setFillStyle(0x1a1020));
-          btn.on('pointerdown', () => this._showStampCardSelector(stamp));
-        }
-      });
-      return;
-    }
-
-    // Full-size mode (height > 40px)
-    this.add.text(cx, topY + 4, 'Ribbon Stamps', {
-      fontSize: '15px', color: '#ddaacc',
-    }).setOrigin(0.5, 0);
-    this.add.text(cx, topY + 22, 'Apply permanent effects to deck cards', {
-      fontSize: '10px', color: '#334455',
-    }).setOrigin(0.5, 0);
-
-    const stamps   = Object.values(RIBBON_STAMPS);
-    const tileW    = 128;
-    const tileH    = height - 36;
-    const tileGap  = 8;
-    const totalW   = stamps.length * tileW + (stamps.length - 1) * tileGap;
-    const startX   = cx - totalW / 2 + tileW / 2;
-    const tileY    = topY + 34 + tileH / 2;
-
-    for (let i = 0; i < stamps.length; i++) {
-      const stamp   = stamps[i];
-      const x       = startX + i * (tileW + tileGap);
-      const sCost   = this._price(stamp.cost);
-      const afford  = run.ki >= sCost;
-      const buyable = afford;
-
-      this.add.rectangle(x, tileY, tileW, tileH, buyable ? 0x1a0f1a : 0x0e0a0e)
-        .setStrokeStyle(1, buyable ? stamp.hexColor * 0.6 : 0x1a1a2a);
-
-      this.add.text(x, tileY - tileH / 2 + 6, stamp.name, {
-        fontSize: '11px', color: stamp.color, fontStyle: 'bold',
-        wordWrap: { width: tileW - 8 }, align: 'center',
-      }).setOrigin(0.5, 0);
-
-      this.add.text(x, tileY - tileH / 2 + 20, stamp.description, {
-        fontSize: '8px', color: '#445566',
-        wordWrap: { width: tileW - 8 }, align: 'center',
-      }).setOrigin(0.5, 0);
-
-      const btnY2  = tileY + tileH / 2 - 14;
-      const btnLbl = !afford ? `N/A  ${sCost}ki` : `Stamp  ${sCost}ki`;
-      const btnTxt = buyable ? stamp.color : '#334455';
-      const btn    = this.add.rectangle(x, btnY2, tileW - 10, 20, buyable ? 0x1a1020 : 0x0a0a0a)
-        .setStrokeStyle(1, buyable ? stamp.hexColor * 0.4 : 0x1a1a2a);
-      this.add.text(x, btnY2, btnLbl, { fontSize: '10px', color: btnTxt }).setOrigin(0.5);
-
-      if (buyable) {
-        btn.setInteractive({ useHandCursor: true });
-        btn.on('pointerover', () => btn.setFillStyle(0x2a1830));
-        btn.on('pointerout',  () => btn.setFillStyle(0x1a1020));
-        btn.on('pointerdown', () => this._showStampCardSelector(stamp));
-      }
-    }
-  }
-
-  // ── Stamp card selector overlay ───────────────────────────────────────────
-
-  _showStampCardSelector(stampDef) {
+  _showStampCardSelector(stampDef, onSuccess = null) {
     for (const o of this._confirmObjs) o.destroy();
     this._confirmObjs = [];
 
-    // Only show cards that don't already have a ribbon stamp.
     const deck     = run.getDeck().filter(c => !c.ribbonStamp);
     const shuffled = [...deck].sort(() => Math.random() - 0.5);
     const preview  = shuffled.slice(0, Math.min(8, shuffled.length));
@@ -1174,11 +1248,9 @@ export class ShrineScene extends Phaser.Scene {
 
     push(this.add.rectangle(cx, cy, W, H, 0x0a0612, 0.97)
       .setStrokeStyle(2, stampDef.hexColor).setDepth(50));
-
     push(this.add.text(cx, cy - H / 2 + 14, `${stampDef.name} — Select a Card  (${stampDef.cost} ki)`, {
       fontSize: '18px', color: stampDef.color, stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(50));
-
     push(this.add.text(cx, cy - H / 2 + 36, stampDef.description, {
       fontSize: '12px', color: '#667788',
     }).setOrigin(0.5).setDepth(50));
@@ -1219,10 +1291,10 @@ export class ShrineScene extends Phaser.Scene {
         spr.on('pointerdown', () => {
           const result = run.applyRibbonStamp(card.id, stampDef.id);
           if (result.success) {
-            // Apply coupon discount (applyRibbonStamp deducts full cost internally).
             const discount = stampDef.cost - this._price(stampDef.cost);
             if (discount > 0) run.addKi(discount);
             logger.logConsumableUse(stampDef.name, `stamped ${card.id}`);
+            if (onSuccess) onSuccess();
             for (const o of this._confirmObjs) o.destroy();
             this._confirmObjs = [];
             this._buildUI();
@@ -1231,7 +1303,6 @@ export class ShrineScene extends Phaser.Scene {
       }
     }
 
-    // Cancel button (no cost deducted — ki is spent only on success)
     const cancelBtn = push(this.add.rectangle(cx, cy + H / 2 - 30, 140, 36, 0x2a1a1a)
       .setStrokeStyle(1, 0x664444).setInteractive({ useHandCursor: true }).setDepth(51));
     cancelBtn.on('pointerover', () => cancelBtn.setFillStyle(0x4a2a2a));
@@ -1245,7 +1316,7 @@ export class ShrineScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(51));
   }
 
-  // ── Fusion Ritual section (Sacred Grove only) ─────────────────────────────
+  // ── Fusion Ritual (Sacred Grove only) ─────────────────────────────────────
 
   _drawFusionSection(cx, topY, height) {
     this.add.text(cx, topY + 4, 'Fusion Ritual', {
@@ -1291,8 +1362,7 @@ export class ShrineScene extends Phaser.Scene {
       y += 22;
 
       const fuseBtn = this.add.rectangle(cx, y + 11, 90, 22, 0x6a4a1a)
-        .setStrokeStyle(1, 0xccaa44)
-        .setInteractive({ useHandCursor: true });
+        .setStrokeStyle(1, 0xccaa44).setInteractive({ useHandCursor: true });
       fuseBtn.on('pointerover', () => fuseBtn.setFillStyle(0x8a6a2a));
       fuseBtn.on('pointerout',  () => fuseBtn.setFillStyle(0x6a4a1a));
       fuseBtn.on('pointerdown', () => this._showFusionConfirm(recipe));
@@ -1300,8 +1370,6 @@ export class ShrineScene extends Phaser.Scene {
       y += 40;
     }
   }
-
-  // ── Fusion confirmation dialog ────────────────────────────────────────────
 
   _showFusionConfirm(recipe) {
     for (const o of this._confirmObjs) o.destroy();
@@ -1311,16 +1379,13 @@ export class ShrineScene extends Phaser.Scene {
     const nameA     = run.spirits.find(s => s.id === recipe.input[0])?.name ?? recipe.input[0];
     const nameB     = run.spirits.find(s => s.id === recipe.input[1])?.name ?? recipe.input[1];
     const outputDef = getSpiritDef(recipe.output);
-
-    const push = obj => { this._confirmObjs.push(obj); return obj; };
+    const push      = obj => { this._confirmObjs.push(obj); return obj; };
 
     push(this.add.rectangle(cx, cy, 500, 196, 0x0a1628, 0.97)
       .setStrokeStyle(2, 0xaa8833).setDepth(50));
-
     push(this.add.text(cx, cy - 80, 'Fusion Ritual', {
       fontSize: '18px', color: '#ffcc44', stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(50));
-
     push(this.add.text(cx, cy - 46,
       `Fuse ${nameA} + ${nameB}\ninto ${outputDef?.name ?? recipe.output}?\n\nThis cannot be undone.`,
       { fontSize: '13px', color: '#ccbbaa', align: 'center' }
@@ -1354,155 +1419,29 @@ export class ShrineScene extends Phaser.Scene {
     const result = run.fuseSpirits(recipe.input[0], recipe.input[1]);
     if (!result.success) return;
     logger.logShopFusion(nameA, nameB, result.fusedSpirit.name);
-    // New slot opened — regenerate offering and rebuild.
-    this._offering  = this._generateOffering();
-    this._purchased = new Array(this._offering.length).fill(false);
+    const itemCount = this._isGrove ? 4 : 2;
+    this._spiritOfferings = this._generateSpiritOfferings(itemCount);
+    while (this._spiritOfferings.length < itemCount) this._spiritOfferings.push(null);
     this._buildUI();
   }
 
-  // ── Continue button ───────────────────────────────────────────────────────
+  // ── Continue button ────────────────────────────────────────────────────────
 
   _drawContinueButton() {
     const label = this._isGrove ? 'Enter the Forest' : 'Continue';
     const btn   = this.add.rectangle(640, BTN_Y, 260, 44, 0x1a4a2a)
-      .setStrokeStyle(2, 0x44aa66)
-      .setInteractive({ useHandCursor: true });
+      .setStrokeStyle(2, 0x44aa66).setInteractive({ useHandCursor: true });
     btn.on('pointerover', () => btn.setFillStyle(0x2a6a3a));
     btn.on('pointerout',  () => btn.setFillStyle(0x1a4a2a));
-    btn.on('pointerdown', () => {
-      logger.logShopExit(run.ki);
-      this.scene.start('GameScene');
-    });
-
+    btn.on('pointerdown', () => { logger.logShopExit(run.ki); this.scene.start('GameScene'); });
     this.add.text(640, BTN_Y, label, {
-      fontSize: '16px', color: '#ffffff',
-      stroke: '#000000', strokeThickness: 2,
+      fontSize: '16px', color: '#ffffff', stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5);
   }
 
-  // ── Card shop (left column, below loadout) ───────────────────────────────
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
-  _drawCardShopSection() {
-    const cx = LCX;
-
-    // Loadout ends at: CARD_ROW_Y + CARD_H/2 + 22 (divider) + 44 (label) + 2 rows * 58 + 25 (half-slot)
-    // = 278 + 102 + 22 + 44 + 116 + 25 = 587. Add 8 gap → topY = 540.
-    const topY = 540;
-
-    this.add.text(cx, topY, 'Cards for Sale', {
-      fontSize: '13px', color: '#ccddaa',
-    }).setOrigin(0.5, 0);
-
-    const offers = this._cardOffers;
-    if (offers.length === 0) {
-      this.add.text(cx, topY + 20, 'No cards available.', {
-        fontSize: '11px', color: '#334455',
-      }).setOrigin(0.5, 0);
-      return;
-    }
-
-    const SCALE  = 0.50;
-    const CW     = Math.round(64 * SCALE);   // 32
-    const CH     = Math.round(104 * SCALE);  // 52
-    const GAP    = 12;
-    const totalW = offers.length * CW + (offers.length - 1) * GAP;
-    const startX = cx - totalW / 2 + CW / 2;
-    const cardY  = topY + 20 + CH / 2;      // center Y of card image
-
-    // Element name abbreviations for badge
-    const ELEM_SHORT = { water: 'W', wood: 'L', fire: 'F', earth: 'E', metal: 'M' };
-    const ELEM_COLOR = { water: '#4488ff', wood: '#44cc44', fire: '#ff6644', earth: '#cc8822', metal: '#aaaaaa' };
-    const STAMP_COLOR = { red: 0xcc3333, blue: 0x3366cc, green: 0x33aa55, yellow: 0xccaa33 };
-
-    for (let i = 0; i < offers.length; i++) {
-      const offer  = offers[i];
-      const card   = offer.card;
-      const x      = startX + i * (CW + GAP);
-      const oCost  = this._price(offer.price);
-      const afford = run.ki >= oCost;
-
-      // Card image (texture key = original card id without shop suffix)
-      const spr = this.add.image(x, cardY, card.id).setScale(SCALE);
-      if (!afford) spr.setAlpha(0.6);
-
-      // Enhancement badge (top-left corner)
-      if (offer.preEnhancement) {
-        const enh   = offer.preEnhancement;
-        const label = (enh.tier === 'upgraded' ? '\u2605' : '') + ELEM_SHORT[enh.element];
-        const col   = ELEM_COLOR[enh.element] ?? '#ffffff';
-        this.add.rectangle(x - CW / 2 + 8, cardY - CH / 2 + 6, 14, 10, 0x000000, 0.7);
-        this.add.text(x - CW / 2 + 8, cardY - CH / 2 + 6, label, {
-          fontSize: '7px', color: col, fontStyle: 'bold',
-        }).setOrigin(0.5);
-      }
-
-      // Ribbon stamp dot (top-right corner)
-      if (offer.preRibbon) {
-        const dotColor = STAMP_COLOR[offer.preRibbon] ?? 0xffffff;
-        this.add.circle(x + CW / 2 - 5, cardY - CH / 2 + 5, 4, dotColor)
-          .setStrokeStyle(1, 0x000000);
-      }
-
-      // Type + month label
-      const typeLabel = `[${card.type[0]}] M${card.month}`;
-      this.add.text(x, cardY + CH / 2 + 3, typeLabel, {
-        fontSize: '8px', color: afford ? '#889aaa' : '#445566',
-      }).setOrigin(0.5, 0);
-
-      // Price + buy button
-      const btnY   = cardY + CH / 2 + 17;
-      const btnBg  = afford ? 0x1a3a1a : 0x0e180e;
-      const btnBdr = afford ? 0x44aa66 : 0x1a2a1a;
-      const btnLbl = `${oCost}ki`;
-      const btn    = this.add.rectangle(x, btnY, CW + 4, 16, btnBg)
-        .setStrokeStyle(1, btnBdr);
-      this.add.text(x, btnY, btnLbl, {
-        fontSize: '9px', color: afford ? '#aaffcc' : '#334455',
-      }).setOrigin(0.5);
-
-      if (afford) {
-        btn.setInteractive({ useHandCursor: true });
-        spr.setInteractive({ useHandCursor: true });
-        const doBuy = () => {
-          const result = run.buyCard(card, oCost);
-          if (result.success) {
-            logger.logShopPurchase('card', card.name ?? card.id, oCost);
-            this._cardOffers = this._cardOffers.filter(o => o !== offer);
-            this._buildUI();
-          }
-        };
-        btn.on('pointerover', () => btn.setFillStyle(0x2a5a2a));
-        btn.on('pointerout',  () => btn.setFillStyle(btnBg));
-        btn.on('pointerdown', doBuy);
-        spr.on('pointerover', () => spr.setTint(0xccffcc));
-        spr.on('pointerout',  () => spr.clearTint());
-        spr.on('pointerdown', doBuy);
-      }
-    }
-  }
-
-  // ── Purchase ──────────────────────────────────────────────────────────────
-
-  /** Apply econ_coupon discount (20% off, ceil). */
   _price(base) {
     return run.spirits.some(s => s.id === 'econ_coupon') ? Math.ceil(base * 0.8) : base;
-  }
-
-  _buySpirit(index) {
-    const spiritDef = this._offering[index];
-    if (!spiritDef || this._purchased[index]) return;
-    const result = run.buySpirit(spiritDef);
-    if (result.success) {
-      // Apply coupon discount after the fact (buySpirit deducts full cost).
-      const discount = spiritDef.cost - this._price(spiritDef.cost);
-      if (discount > 0) run.addKi(discount);
-      this._purchased[index] = true;
-      const action = result.result ?? 'added';
-      logger.logShopPurchase('spirit', spiritDef.name, this._price(spiritDef.cost));
-      if (action === 'transcended') {
-        logger.logShopPurchase('spirit_transcend', spiritDef.name, 0);
-      }
-      this._buildUI();
-    }
   }
 }
