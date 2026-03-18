@@ -49,7 +49,7 @@ const CONS_CARD_W = 64;
 const CONS_CARD_H = 104;
 const CONS_BASE_X = 856;
 const CONS_BASE_Y = 62;
-const CONS_FAN_X  = 10;
+const CONS_FAN_X  = SPIRIT_GAP; // full spacing, matches spirit row
 
 // Info panel — matches GameScene exactly
 const INFO_X     = 10;
@@ -481,15 +481,6 @@ export class ShrineScene extends Phaser.Scene {
             fontSize: '8px', color: (ex && sc >= 3 && !hn) ? '#ffcc44' : '#aaccff',
           }).setOrigin(0.5, 0);
         }
-        this.add.text(cx, top + 58, offering.description ?? '', {
-          fontSize: '9px', color: '#667788',
-          wordWrap: { width: SHOP_CARD_W - 8 }, align: 'center',
-        }).setOrigin(0.5, 0);
-      } else {
-        this.add.text(cx, top + 26, offering.description ?? '', {
-          fontSize: '9px', color: '#667788',
-          wordWrap: { width: SHOP_CARD_W - 8 }, align: 'center',
-        }).setOrigin(0.5, 0);
       }
     }
 
@@ -569,10 +560,14 @@ export class ShrineScene extends Phaser.Scene {
   // ── Central buttons (purchase + reroll) ────────────────────────────────────
 
   _drawCentralButtons() {
-    const sel     = this._selectedItem;
+    const sel      = this._selectedItem;
     const validSel = sel && sel.offeringsArray[sel.index] !== null;
-    let   btnY    = SHOP_CY;
 
+    // Fixed Y positions — always in the center gap (y 305–385), never jump
+    const purchaseY = SHOP_CY - 16;
+    const rerollY   = purchaseY + 40;
+
+    // ── Purchase button — always visible ──────────────────────────────────────
     if (validSel) {
       const cost       = this._getItemCost(sel.offering, sel.category);
       const canAfford  = run.ki >= cost;
@@ -583,7 +578,7 @@ export class ShrineScene extends Phaser.Scene {
         ? (sel.offering.card?.name ?? 'Card')
         : (sel.offering.name ?? '');
 
-      this.add.text(SHOP_CX, btnY - 22, itemName, {
+      this.add.text(SHOP_CX, purchaseY - 20, itemName, {
         fontSize: '11px', color: '#ddeeff', fontStyle: 'bold',
       }).setOrigin(0.5);
 
@@ -593,9 +588,9 @@ export class ShrineScene extends Phaser.Scene {
                    : !canAfford  ? `Need ${cost} ki`
                    : `Purchase — ${cost} ki`;
 
-      const pBtn = this.add.rectangle(SHOP_CX, btnY, 168, 30, btnBg)
+      const pBtn = this.add.rectangle(SHOP_CX, purchaseY, 168, 30, btnBg)
         .setStrokeStyle(1, btnBdr);
-      this.add.text(SHOP_CX, btnY, label, {
+      this.add.text(SHOP_CX, purchaseY, label, {
         fontSize: '11px', color: canBuy ? '#aaffcc' : '#556666',
       }).setOrigin(0.5);
 
@@ -609,15 +604,21 @@ export class ShrineScene extends Phaser.Scene {
           this._buyItem(s.offering, s.category, s.index, s.offeringsArray);
         });
       }
-      btnY += 36;
+    } else {
+      // Grayed-out placeholder so layout is stable
+      this.add.rectangle(SHOP_CX, purchaseY, 168, 30, 0x0e1520)
+        .setStrokeStyle(1, 0x1e2d40);
+      this.add.text(SHOP_CX, purchaseY, 'Select an item', {
+        fontSize: '11px', color: '#334455',
+      }).setOrigin(0.5);
     }
 
-    // Reroll
+    // ── Reroll button — always visible at fixed Y below purchase ──────────────
     const canReroll = run.ki >= this._rerollCost;
     const bg  = canReroll ? 0x1a2a4a : 0x0e1520;
     const bdr = canReroll ? 0x3a5a8a : 0x1e2d40;
-    const rBtn = this.add.rectangle(SHOP_CX, btnY, 150, 26, bg).setStrokeStyle(1, bdr);
-    this.add.text(SHOP_CX, btnY, `Reroll  ${this._rerollCost} ki`, {
+    const rBtn = this.add.rectangle(SHOP_CX, rerollY, 150, 26, bg).setStrokeStyle(1, bdr);
+    this.add.text(SHOP_CX, rerollY, `Reroll  ${this._rerollCost} ki`, {
       fontSize: '12px', color: canReroll ? '#aaccee' : '#445566',
     }).setOrigin(0.5);
 
