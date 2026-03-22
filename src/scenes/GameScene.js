@@ -1747,12 +1747,22 @@ export class GameScene extends Phaser.Scene {
     y += 6;
     if (result.penaltyApplied) {
       this._overlayObjs.push(
-        this.add.text(cx, y, `\u26A0 Push failed — Flow reduced to \xD7${run.flow.toFixed(2)}`, {
+        this.add.text(cx, y, `\u26A0 Push failed — Flow \xD70.90`, {
           fontSize: '13px', color: '#ff8866',
         }).setOrigin(0.5)
       );
       y += 20;
     }
+    // Flow decay (always shown)
+    const preDecayFlow = run.flow / RunManager.FLOW_DECAY_RATE;
+    const decayDelta   = (run.flow - preDecayFlow).toFixed(2);
+    this._overlayObjs.push(
+      this.add.text(cx, y,
+        `Flow decay \xD70.95 \u2192 \xD7${run.flow.toFixed(2)}  (${decayDelta})`,
+        { fontSize: '12px', color: '#7799aa' }
+      ).setOrigin(0.5)
+    );
+    y += 20;
     this._overlayObjs.push(
       this.add.text(cx, y, `Final Score: ${result.finalScore}`, {
         fontSize: '24px', color: '#ffffff', stroke: '#000000', strokeThickness: 3,
@@ -1977,9 +1987,10 @@ export class GameScene extends Phaser.Scene {
 
     const btnY = cy + 118;
 
+    const bankFlow  = (run.flow * RunManager.FLOW_DECAY_RATE).toFixed(2);
     const bankLabel = surplus >= 0
-      ? `Bank ${result.runningScore}  (+${surplus})`
-      : `Bank ${result.runningScore}  (need ${-surplus})`;
+      ? `Bank  \xD7${bankFlow} flow  (+${surplus})`
+      : `Bank  \xD7${bankFlow} flow  (need ${-surplus})`;
     const bankBtn = this.add.rectangle(cx - 118, btnY, 206, 42, 0x1a6a1a)
       .setStrokeStyle(2, 0x44aa44).setInteractive({ useHandCursor: true }).setDepth(25);
     bankBtn.on('pointerover', () => bankBtn.setFillStyle(0x2a9a2a));
@@ -2002,8 +2013,9 @@ export class GameScene extends Phaser.Scene {
     const pushCount  = this._round.pushCount;
     const PUSH_DEALS = [4, 2, 1];
     const nextDeal   = PUSH_DEALS[Math.min(pushCount, PUSH_DEALS.length - 1)];
-    const failFlow   = (run.flow * 0.9).toFixed(2);
-    const winFlow    = (run.flow * 1.1).toFixed(2);
+    const D          = RunManager.FLOW_DECAY_RATE;
+    const failFlow   = (run.flow * 0.9 * D).toFixed(2);
+    const winFlow    = (run.flow * 1.1 * D).toFixed(2);
     const pushBtn = this.add.rectangle(cx + 118, btnY, 206, 42, 0x6a1a1a)
       .setStrokeStyle(2, 0xaa4444).setInteractive({ useHandCursor: true }).setDepth(25);
     pushBtn.on('pointerover', () => pushBtn.setFillStyle(0x9a2a2a));

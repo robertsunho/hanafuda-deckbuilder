@@ -53,7 +53,7 @@ import ScoringEngine, { SNOW_MULT, ICE_MULT } from "./ScoringEngine.js";
 import ConsumableEffects from "./ConsumableEffects.js";
 import StyleEngine      from "./StyleEngine.js";
 import SpiritEffects    from "./SpiritEffects.js";
-import run              from "./RunManager.js";
+import run, { RunManager } from "./RunManager.js";
 import logger           from "./GameplayLogger.js";
 import { SPIRIT_CATALOG, getSpiritDef, ANIMAL_SYMBIONT_MAP } from "../data/spirits.js";
 
@@ -564,6 +564,10 @@ export default class GameRoundManager {
 
     // Push success: player pushed at least once and is now banking after a yaku.
     if (this._pushCount > 0) run.onPushSuccess();
+
+    // Flow decay — applied every round after push resolution.
+    run.applyFlowDecay();
+    logger.log(`Flow decay: ×${RunManager.FLOW_DECAY_RATE} → Flow is now ×${run.flow.toFixed(2)}`);
 
     const flow = run.flow;
     const sc = this._scoring.calculateFinalScore(
@@ -1350,6 +1354,10 @@ export default class GameRoundManager {
         this._roundEndingAfterDecision = roundOver;
         this._phase = "yaku_decision";
       } else if (roundOver) {
+        // Flow decay — applied every round after push resolution.
+        run.applyFlowDecay();
+        logger.log(`Flow decay: ×${RunManager.FLOW_DECAY_RATE} → Flow is now ×${run.flow.toFixed(2)}`);
+
         const sc = this._scoring.calculateFinalScore(
           this._capture.getAll(), this._spirits, 1.0, run.yakuUpgrades, true
         );
@@ -1357,7 +1365,7 @@ export default class GameRoundManager {
         logger.logRoundEnd(
           { finalScore: this._runningScore, basePoints: this._runningScore,
             boostedBasePoints: this._runningScore, yakuList: [], yakuMult: 1.0,
-            additiveMult: 0, multMult: 1.0, flow,
+            additiveMult: 0, multMult: 1.0, flow: run.flow,
             pointBoost: 1.0, rawBasePoints: this._runningScore },
           run.threshold, this._runningScore >= run.threshold,
           this._capture.getAll(), this._styleBase,

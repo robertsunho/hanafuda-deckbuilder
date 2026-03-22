@@ -50,6 +50,7 @@ class RunManager {
    * Pattern: Wayside, Wayside, Grove — repeating across all 36 rounds.
    */
   static GROVE_ROUNDS = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36];
+  static FLOW_DECAY_RATE = 0.95;
 
   /**
    * Minimum score required to survive each round (index 0 = Round 1).
@@ -518,6 +519,14 @@ class RunManager {
    */
   onPushFailure() {
     this._flow *= 0.9;
+  }
+
+  /**
+   * Apply end-of-round flow decay. Call after push/bank resolution, before shop.
+   * Flow is multiplied by FLOW_DECAY_RATE each round.
+   */
+  applyFlowDecay() {
+    this._flow *= RunManager.FLOW_DECAY_RATE;
   }
 
   /**
