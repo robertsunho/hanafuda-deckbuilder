@@ -567,7 +567,7 @@ export default class GameRoundManager {
 
     // Flow decay — applied every round after push resolution.
     run.applyFlowDecay();
-    logger.log(`Flow decay: ×${RunManager.FLOW_DECAY_RATE} → Flow is now ×${run.flow.toFixed(2)}`);
+    logger._log(`Flow decay: ×${RunManager.FLOW_DECAY_RATE} → Flow is now ×${run.flow.toFixed(2)}`);
 
     const flow = run.flow;
     const sc = this._scoring.calculateFinalScore(
@@ -1356,7 +1356,7 @@ export default class GameRoundManager {
       } else if (roundOver) {
         // Flow decay — applied every round after push resolution.
         run.applyFlowDecay();
-        logger.log(`Flow decay: ×${RunManager.FLOW_DECAY_RATE} → Flow is now ×${run.flow.toFixed(2)}`);
+        logger._log(`Flow decay: ×${RunManager.FLOW_DECAY_RATE} → Flow is now ×${run.flow.toFixed(2)}`);
 
         const sc = this._scoring.calculateFinalScore(
           this._capture.getAll(), this._spirits, 1.0, run.yakuUpgrades, true
