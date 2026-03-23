@@ -902,21 +902,22 @@ export default class GameRoundManager {
           if (!effect) continue;
           const count = spirit.isNegative ? 1 : (spirit.stackCount ?? 1);
           if (effect.onCardScored) {
-            for (let copy = 0; copy < count; copy++) {
-              const r = effect.onCardScored({ card, spirit, spirits: this._spirits });
-              if (r) {
-                const prevPts  = points;
-                const prevMult = mult;
-                if (r.addPoints)    points += r.addPoints;
-                if (r.addMult)      mult   += r.addMult;
-                if (r.multiplyMult) mult   *= r.multiplyMult;
-                if (this._onScoringStep) {
-                  this._onScoringStep({
-                    type: 'spirit_effect', card, spirit,
-                    addPoints: r.addPoints ?? 0, addMult: r.addMult ?? 0, multiplyMult: r.multiplyMult ?? 0,
-                    points, mult, prevPts, prevMult,
-                  });
-                }
+            const r = effect.onCardScored({ card, spirit, spirits: this._spirits });
+            if (r) {
+              const prevPts  = points;
+              const prevMult = mult;
+              // Scale additive/multiplicative values by stack count
+              if (r.addPoints)    points += r.addPoints    * count;
+              if (r.addMult)      mult   += r.addMult      * count;
+              if (r.multiplyMult) mult   *= r.multiplyMult * count;
+              if (this._onScoringStep) {
+                this._onScoringStep({
+                  type: 'spirit_effect', card, spirit,
+                  addPoints:    (r.addPoints    ?? 0) * count,
+                  addMult:      (r.addMult      ?? 0) * count,
+                  multiplyMult: r.multiplyMult ? r.multiplyMult * count : 0,
+                  points, mult, prevPts, prevMult,
+                });
               }
             }
           }
@@ -939,22 +940,20 @@ export default class GameRoundManager {
       for (const spirit of allEngineSpirits) {
         const effect = SpiritEffects.get(spirit.id);
         if (!effect?.applyEngine) continue;
-        const count = spirit.isNegative ? 1 : (spirit.stackCount ?? 1);
-        for (let copy = 0; copy < count; copy++) {
-          const r = effect.applyEngine({ spirit, mult, points, spirits: this._spirits });
-          if (r) {
-            const prevPts  = points;
-            const prevMult = mult;
-            if (r.addPoints)    points += r.addPoints;
-            if (r.addMult)      mult   += r.addMult;
-            if (r.multiplyMult) mult   *= r.multiplyMult;
-            if (this._onScoringStep) {
-              this._onScoringStep({
-                type: 'engine_effect', spirit,
-                addPoints: r.addPoints ?? 0, addMult: r.addMult ?? 0, multiplyMult: r.multiplyMult ?? 0,
-                points, mult, prevPts, prevMult,
-              });
-            }
+        // Engine: call once — stacking is expressed through accelerated onCardSeen accumulation
+        const r = effect.applyEngine({ spirit, mult, points, spirits: this._spirits });
+        if (r) {
+          const prevPts  = points;
+          const prevMult = mult;
+          if (r.addPoints)    points += r.addPoints;
+          if (r.addMult)      mult   += r.addMult;
+          if (r.multiplyMult) mult   *= r.multiplyMult;
+          if (this._onScoringStep) {
+            this._onScoringStep({
+              type: 'engine_effect', spirit,
+              addPoints: r.addPoints ?? 0, addMult: r.addMult ?? 0, multiplyMult: r.multiplyMult ?? 0,
+              points, mult, prevPts, prevMult,
+            });
           }
         }
       }

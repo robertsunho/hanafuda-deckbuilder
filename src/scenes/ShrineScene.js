@@ -642,15 +642,9 @@ export class ShrineScene extends Phaser.Scene {
   }
 
   _rerollSection(currentOfferings, generateFn) {
-    const unpurchased = currentOfferings.filter(o => o !== null).length;
-    if (unpurchased === 0) return;
     const fresh = generateFn();
-    let fi = 0;
     for (let i = 0; i < currentOfferings.length; i++) {
-      if (currentOfferings[i] !== null) {
-        currentOfferings[i] = fresh[fi] ?? null;
-        fi++;
-      }
+      currentOfferings[i] = fresh[i] ?? null;
     }
   }
 
