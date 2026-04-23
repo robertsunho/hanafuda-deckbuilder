@@ -936,6 +936,10 @@ export default class GameRoundManager {
         if (card.edition === 'ghost')   mult    *= 1.5;
 
         // Hexagram onCardScored modifier — applied after editions, before spirits.
+        // prevMult is saved so the animation event can show what the hexagram changed.
+        let _hexCardMod = null;
+        const _hexCardPrevMult = mult;
+        const _hexCardPrevPts  = cardPts;
         {
           const _hexMod = getActiveEffect();
           if (_hexMod?.onCardScored) {
@@ -944,6 +948,7 @@ export default class GameRoundManager {
               if (mod.addPoints    !== undefined) cardPts += mod.addPoints;
               if (mod.addMult      !== undefined) mult    += mod.addMult;
               if (mod.multiplyMult !== undefined) mult    *= mod.multiplyMult;
+              _hexCardMod = mod;
             }
           }
         }
@@ -952,6 +957,23 @@ export default class GameRoundManager {
 
         if (this._onScoringStep) {
           this._onScoringStep({ type: 'card_points', card, cardPts, points, mult });
+        }
+
+        // Emit hexagram animation step AFTER accumulation so `points` is current.
+        if (_hexCardMod && this._onScoringStep) {
+          const _hex = run.getHexagram();
+          this._onScoringStep({
+            type: 'hexagram_card',
+            hexagramId:   _hex?.id          ?? null,
+            hexagramName: _hex?.englishName ?? 'Hexagram',
+            card,
+            addPoints:    cardPts - _hexCardPrevPts,
+            addMult:      mult    - _hexCardPrevMult,
+            multiplyMult: _hexCardMod.multiplyMult ?? 1,
+            points, mult,
+            prevPts:  points - (cardPts - _hexCardPrevPts),
+            prevMult: _hexCardPrevMult,
+          });
         }
 
         // Per-card spirit effects + engine state updates.
