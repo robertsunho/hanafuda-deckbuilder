@@ -128,9 +128,9 @@ export default class ScoringEngine {
       const enh    = card.enhancement;
       const isFire = enh?.element === 'fire';
 
-      // Fire enhancement overrides base points; spirit boosts are skipped.
+      // Fire enhancement adds flat points on top of base; spirit boosts are skipped.
       let pts = isFire
-        ? (enh.tier === 'upgraded' ? 100 : 30)
+        ? card.points + (enh.tier === 'upgraded' ? 100 : 30)
         : card.points;
 
       // Spirit point boosts — Fire cards have no identity so they're excluded.

@@ -336,18 +336,8 @@ export default class GameRoundManager {
     // ── Base interest (10% of ki balance) ────────────────────────────────
     this._lastInterestGain = run.applyInterest();
 
-    // ── Earth enhancement ki generation (before dealing) ─────────────────
-    // Each Clay card contributes 10% ki interest; Pottery contributes 20%.
-    const deckCards = run.getDeck();
-    let earthInterest = 0;
-    for (const card of deckCards) {
-      if (card.enhancement?.element === 'earth') {
-        earthInterest += card.enhancement.tier === 'upgraded' ? 0.20 : 0.10;
-      }
-    }
-    const kiGain = Math.floor(run.ki * earthInterest);
-    if (kiGain > 0) run.addKi(kiGain);
-    this._lastEarthKiGain = kiGain;
+    // Earth ki bonus moves to round end — see _computeEarthKiBonus().
+    this._lastEarthKiGain = 0;
 
     this._deck.resetWithCards(run.getDeck()).shuffle();
     this._hand.clear();
@@ -615,6 +605,7 @@ export default class GameRoundManager {
       deckCard:        this._lastDeckCard,
       cardsInHand:     this._hand.getAll().length,
       styleCombos:     this._style.getTriggeredCombos().length,
+      earthKiBonus:    this._computeEarthKiBonus(),
     };
   }
 
@@ -763,6 +754,23 @@ export default class GameRoundManager {
   }
 
   /**
+   * Compute Earth (Clay/Pottery) ki bonus based on cards held in hand.
+   * Clay: 10% of current ki per Clay card in hand.
+   * Pottery: 20% of current ki per Pottery card in hand.
+   * Called at round end before ki is applied so it scales with accumulated wealth.
+   * @returns {number}
+   */
+  _computeEarthKiBonus() {
+    let rate = 0;
+    for (const card of this._hand.getAll()) {
+      if (card.enhancement?.element === 'earth') {
+        rate += card.enhancement.tier === 'upgraded' ? 0.20 : 0.10;
+      }
+    }
+    return Math.floor(run.ki * rate);
+  }
+
+  /**
    * Returns the number of cards to deal on the next push in capture mode.
    * Push 1: +4, Push 2: +2, Push 3+: +1.
    */
@@ -881,31 +889,38 @@ export default class GameRoundManager {
       let points = 0;
       let mult   = 1.0;
 
+      // Metal enhancement: mult from cards held in HAND during this capture.
+      // Each Iron card in hand contributes ×1.5 mult; each Meteorite ×3.0.
+      // Meteorite: 5% jackpot (+30 ki) per Meteorite in hand.
+      for (const handCard of this._hand.getAll()) {
+        const henh = handCard.enhancement;
+        if (henh?.element !== 'metal') continue;
+        mult *= henh.tier === 'upgraded' ? 3.0 : 1.5;
+        if (henh.tier === 'upgraded' && Math.random() < 0.05) {
+          run.addKi(30);
+          for (const spirit of this._spirits) {
+            if (spirit.id === 'engine_velocity' && spirit.state) spirit.state.metalProcCount++;
+          }
+        }
+      }
+
       for (const card of cards) {
-        const enh    = card.enhancement;
-        const isFire = enh?.element === 'fire';
-        let cardPts = isFire ? (enh.tier === 'upgraded' ? 100 : 30) : card.points;
-        if (!isFire && enh?.element === 'water') {
+        const enh = card.enhancement;
+
+        // Base points + Fire additive (Ember/Charcoal add on top of base points).
+        let cardPts = card.points;
+        if (enh?.element === 'fire') cardPts += enh.tier === 'upgraded' ? 100 : 30;
+
+        // Water mult (Snow/Ice) — applied after Fire additive.
+        if (enh?.element === 'water') {
           const multArr = enh.tier === 'upgraded' ? ICE_MULT : SNOW_MULT;
           cardPts = Math.round(cardPts * multArr[Math.min(enh.depLevel ?? 0, multArr.length - 1)]);
         }
 
         // Edition bonuses — applied before spirit effects.
-        if (card.edition === 'gold')   cardPts += 20;
-        if (card.edition === 'crystal') mult += 5;
-        if (card.edition === 'ghost')   mult *= 1.5;
-
-        // Metal enhancement: mult bonus per capture.
-        if (enh?.element === 'metal') {
-          mult *= enh.tier === 'upgraded' ? 3.0 : 1.5;
-          // Meteorite: 5% jackpot.
-          if (enh.tier === 'upgraded' && Math.random() < 0.05) {
-            run.addKi(30);
-            for (const spirit of this._spirits) {
-              if (spirit.id === 'engine_velocity' && spirit.state) spirit.state.metalProcCount++;
-            }
-          }
-        }
+        if (card.edition === 'gold')    cardPts += 20;
+        if (card.edition === 'crystal') mult    += 5;
+        if (card.edition === 'ghost')   mult    *= 1.5;
 
         points += cardPts;
 
@@ -1036,15 +1051,33 @@ export default class GameRoundManager {
         }
 
         if (stamp === 'stamp_white' || stamp === 'stamp_gray') {
-          // White: retrigger once; Gray: triple retrigger (×3 extra = 4 total).
+          // White: 1 extra retrigger (card scores twice total).
+          // Gray:  3 extra retriggers (card scores four times total).
+          // Each retrigger re-runs the full per-card scoring pipeline.
+          // Depreciation/break/jackpot rolls are NOT re-rolled (use current state only).
+          // TODO: when Applause spirit is added, held-card retriggers will be handled there.
           const retriggerCount = stamp === 'stamp_gray' ? 3 : 1;
+          const rEnh = card.enhancement;
           for (let rt = 0; rt < retriggerCount; rt++) {
-            let rPts  = card.points;
+            // Base + Fire additive
+            let rPts = card.points;
+            if (rEnh?.element === 'fire') rPts += rEnh.tier === 'upgraded' ? 100 : 30;
+            // Water mult — use current depLevel; do NOT increment it
+            if (rEnh?.element === 'water') {
+              const multArr = rEnh.tier === 'upgraded' ? ICE_MULT : SNOW_MULT;
+              rPts = Math.round(rPts * multArr[Math.min(rEnh.depLevel ?? 0, multArr.length - 1)]);
+            }
             let rMult = 1.0;
-            if (card.edition === 'gold')    rPts += 20;
+            // Edition bonuses
+            if (card.edition === 'gold')    rPts  += 20;
             if (card.edition === 'crystal') rMult += 5;
             if (card.edition === 'ghost')   rMult *= 1.5;
-            if (card.enhancement?.element === 'metal') rMult *= card.enhancement.tier === 'upgraded' ? 3.0 : 1.5;
+            // Metal from hand — each Iron/Meteorite in hand contributes mult (no jackpot re-roll)
+            for (const handCard of this._hand.getAll()) {
+              const henh = handCard.enhancement;
+              if (henh?.element === 'metal') rMult *= henh.tier === 'upgraded' ? 3.0 : 1.5;
+            }
+            // Per-card spirit effects
             for (const spirit of this._spirits) {
               const effect = SpiritEffects.get(spirit.id);
               if (!effect) continue;
@@ -1057,6 +1090,7 @@ export default class GameRoundManager {
                 }
               }
             }
+            // Engine spirits
             for (const spirit of this._spirits) {
               const effect = SpiritEffects.get(spirit.id);
               if (!effect?.applyEngine) continue;
@@ -1443,6 +1477,7 @@ export default class GameRoundManager {
         roundDiscardCount: this._discardCount,
         cardsInHand:      this._hand.getAll().length,
         styleCombos:      this._style.getTriggeredCombos().length,
+        earthKiBonus:     this._computeEarthKiBonus(),
       };
     }
   }

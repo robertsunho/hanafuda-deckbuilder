@@ -147,6 +147,9 @@ class RunManager {
      */
     this._deck = JSON.parse(JSON.stringify(ALL_CARDS));
 
+    /** Monotone counter for Throat Chakra duplicates — guarantees unique IDs. */
+    this._throatCounter = 0;
+
     logger.logRunStart();
   }
 
@@ -649,13 +652,14 @@ class RunManager {
    * @returns {number}  Ki earned (integer ≥ 0).
    */
   calculateKiReward(result) {
-    const cardsInHand = result.cardsInHand ?? 0;
-    const styleCombos = result.styleCombos ?? 0;
+    const cardsInHand  = result.cardsInHand  ?? 0;
+    const styleCombos  = result.styleCombos  ?? 0;
+    const earthKiBonus = result.earthKiBonus ?? 0;
     const hasPiggyBank = this._spirits.some(s => s.id === 'econ_piggybank');
     const hasGrace     = this._spirits.some(s => s.id === 'econ_grace');
-    const handKi   = hasPiggyBank ? cardsInHand * 3 : cardsInHand;
-    const comboKi  = hasGrace     ? styleCombos  * 2 : styleCombos;
-    return 5 + handKi + comboKi;
+    const handKi  = hasPiggyBank ? cardsInHand * 3 : cardsInHand;
+    const comboKi = hasGrace     ? styleCombos  * 2 : styleCombos;
+    return 5 + handKi + comboKi + earthKiBonus;
   }
 
   // ── Interest system ────────────────────────────────────────────────────────
@@ -914,7 +918,7 @@ class RunManager {
         card.month     = sameType.month;
         card.monthName = sameType.monthName;
         card.vertical  = sameType.vertical;
-        card.temporal  = sameType.temporal;
+        // temporal (day/night) is preserved — it is a symbolic axis independent of month
         card.name      = sameType.name;
       } else {
         const fallback = _baseCardLookup.get(`${newMonth}_plain`)
@@ -925,7 +929,7 @@ class RunManager {
         if (fallback) {
           card.monthName = fallback.monthName;
           card.vertical  = fallback.vertical;
-          card.temporal  = fallback.temporal;
+          // temporal preserved
         }
       }
       card.sacralConverted = true;
@@ -975,7 +979,8 @@ class RunManager {
   applyChakraThroat(cardId) {
     const card = this._deck.find(c => c.id === cardId);
     if (!card) return { success: false, reason: 'Card not found' };
-    const suffix  = `_throat_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    this._throatCounter++;
+    const suffix  = `_throat_${this._throatCounter}`;
     const newCard = {
       ...JSON.parse(JSON.stringify(card)),
       id:               card.id + suffix,
