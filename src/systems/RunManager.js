@@ -10,6 +10,8 @@ import { WUXING_CONSUMABLES }                   from '../data/consumables.js';
 import { getStampDef }                          from '../data/stamps.js';
 import { ZODIAC_CONSUMABLES, getZodiacDef }     from '../data/zodiacConsumables.js';
 import logger                                   from './GameplayLogger.js';
+import { resolveHexagram }                      from './HexagramGenerator.js';
+import { getActiveEffect, applyHook }          from './HexagramEffects.js';
 //
 //   import run from './systems/RunManager.js';
 //   run.addKi(5);
@@ -150,6 +152,22 @@ class RunManager {
     /** Monotone counter for Throat Chakra duplicates — guarantees unique IDs. */
     this._throatCounter = 0;
 
+    // ── Hexagram ─────────────────────────────────────────────────────────────
+    /**
+     * The id of the hexagram active for this run (e.g. 'hex_01'), or null when
+     * no hexagram has been assigned (first ever run).
+     * @type {string|null}
+     */
+    this._hexagramId = null;
+
+    /**
+     * Arbitrary state bucket for hexagram effects that need run-level
+     * persistence (e.g. one_yaku_disabled round rotation counter).
+     * Populated by each effect's onRunStart hook.
+     * @type {object|null}
+     */
+    this._hexagramState = null;
+
     logger.logRunStart();
   }
 
@@ -178,6 +196,32 @@ class RunManager {
       throw new Error(`Cannot spend ${amount} ki — balance is only ${this._ki}.`);
     }
     this._ki -= amount;
+  }
+
+  // ── Hexagram ───────────────────────────────────────────────────────────────
+
+  /** The hexagram id active this run, or null. */
+  get hexagramId() { return this._hexagramId; }
+
+  /**
+   * Assign a hexagram to this run.  Should be called once at run start before
+   * any round begins.  Pass null to clear (no hexagram / first run behaviour).
+   * @param {string|null} hexagramId  e.g. 'hex_01'
+   */
+  setHexagram(hexagramId) {
+    this._hexagramId    = hexagramId ?? null;
+    this._hexagramState = null;
+    const effect = getActiveEffect();
+    if (effect?.onRunStart) effect.onRunStart(this);
+  }
+
+  /**
+   * Return the full hexagram definition for the current run, or null when none
+   * has been assigned (first run) or the id is unrecognised.
+   * @returns {object|null}
+   */
+  getHexagram() {
+    return resolveHexagram(this._hexagramId);
   }
 
   // ── Spirit loadout ─────────────────────────────────────────────────────────
@@ -558,23 +602,26 @@ class RunManager {
    * Permanently increases flow by 10%.
    */
   onPushSuccess() {
-    this._flow *= 1.1;
+    const mult = applyHook('modifyPushSuccess', 1.1);
+    this._flow *= mult;
   }
 
   /**
    * Called when the round ends after a push with no new yaku (push failure).
-   * Permanently decreases flow by 10%.  No score penalty is applied.
+   * Permanently decreases flow.  Default: ×0.9.  No score penalty is applied.
    */
   onPushFailure() {
-    this._flow *= 0.9;
+    const mult = applyHook('modifyPushFailure', 0.9);
+    this._flow *= mult;
   }
 
   /**
    * Apply end-of-round flow decay. Call after push/bank resolution, before shop.
-   * Flow is multiplied by FLOW_DECAY_RATE each round.
+   * Default: ×0.95 per round.  Hexagram can modify this rate.
    */
   applyFlowDecay() {
-    this._flow *= RunManager.FLOW_DECAY_RATE;
+    const rate = applyHook('modifyFlowDecay', RunManager.FLOW_DECAY_RATE);
+    this._flow *= rate;
   }
 
   /**
@@ -586,8 +633,18 @@ class RunManager {
   onStyleCombo(comboId, comboValue) {
     if (this._triggeredCombos.has(comboId)) return false;
     this._triggeredCombos.add(comboId);
-    this._flow += comboValue;
+    const flowBonus = applyHook('modifyStyleFlow', comboValue, comboValue);
+    this._flow += flowBonus;
     return true;
+  }
+
+  /**
+   * Compute the ki reward for a style combo (hexagram may modify it).
+   * Returns the ki amount the caller should grant.
+   * @param {number} baseKi  Default ki reward for the combo.
+   */
+  styleComboKi(baseKi) {
+    return applyHook('modifyStyleKi', baseKi, baseKi);
   }
 
   // ── Round advancement ──────────────────────────────────────────────────────
@@ -657,8 +714,9 @@ class RunManager {
     const earthKiBonus = result.earthKiBonus ?? 0;
     const hasPiggyBank = this._spirits.some(s => s.id === 'econ_piggybank');
     const hasGrace     = this._spirits.some(s => s.id === 'econ_grace');
-    const handKi  = hasPiggyBank ? cardsInHand * 3 : cardsInHand;
-    const comboKi = hasGrace     ? styleCombos  * 2 : styleCombos;
+    const handKi       = hasPiggyBank ? cardsInHand * 3 : cardsInHand;
+    const baseComboKi  = hasGrace     ? styleCombos  * 2 : styleCombos;
+    const comboKi      = this.styleComboKi(baseComboKi);
     return 5 + handKi + comboKi + earthKiBonus;
   }
 

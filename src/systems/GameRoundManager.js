@@ -54,6 +54,7 @@ import ConsumableEffects from "./ConsumableEffects.js";
 import StyleEngine      from "./StyleEngine.js";
 import SpiritEffects    from "./SpiritEffects.js";
 import run, { RunManager } from "./RunManager.js";
+import { getActiveEffect, applyHook } from "./HexagramEffects.js";
 import logger           from "./GameplayLogger.js";
 import { SPIRIT_CATALOG, getSpiritDef, ANIMAL_SYMBIONT_MAP } from "../data/spirits.js";
 
@@ -230,10 +231,16 @@ export default class GameRoundManager {
    */
   _getCaptureThresholds() {
     const base = { kasu: 6, tanzaku: 3, tane: 3, hikari: 2 };
-    if (!this._snakeThresholdMods) return base;
     const result = { ...base };
-    for (const [key, reduction] of Object.entries(this._snakeThresholdMods)) {
-      if (key in result) result[key] = Math.max(1, result[key] - reduction);
+    // Snake consumable: lower specific thresholds by the consumed amount.
+    if (this._snakeThresholdMods) {
+      for (const [key, reduction] of Object.entries(this._snakeThresholdMods)) {
+        if (key in result) result[key] = Math.max(1, result[key] - reduction);
+      }
+    }
+    // Hexagram modifier — applied per-yaku after snake mods.
+    for (const key of Object.keys(result)) {
+      result[key] = applyHook('modifyYakuThreshold', result[key], key, result[key]);
     }
     return result;
   }
@@ -367,6 +374,10 @@ export default class GameRoundManager {
     this._snakeThresholdMods       = {};
     this._lastStyleCombos          = [];
     this._style.resetRound();
+
+    // Hexagram round-start hook
+    const _hexEffect = getActiveEffect();
+    if (_hexEffect?.onRoundStart) _hexEffect.onRoundStart(this);
 
     // ── Symbiont per-round resets ─────────────────────────────────────────
     for (const spirit of this._spirits) {
@@ -577,6 +588,8 @@ export default class GameRoundManager {
       this._style.getTriggeredCombos(), this._lastEnhancementEvents ?? []
     );
     this._roundEndingAfterDecision = false;
+    const _hexEffectBank = getActiveEffect();
+    if (_hexEffectBank?.onRoundEnd) _hexEffectBank.onRoundEnd(this);
     this._phase = "round_over";
     return {
       status:          "banked",
@@ -922,6 +935,19 @@ export default class GameRoundManager {
         if (card.edition === 'crystal') mult    += 5;
         if (card.edition === 'ghost')   mult    *= 1.5;
 
+        // Hexagram onCardScored modifier — applied after editions, before spirits.
+        {
+          const _hexMod = getActiveEffect();
+          if (_hexMod?.onCardScored) {
+            const mod = _hexMod.onCardScored(card, { currentPoints: cardPts, currentMult: mult });
+            if (mod) {
+              if (mod.addPoints    !== undefined) cardPts += mod.addPoints;
+              if (mod.addMult      !== undefined) mult    += mod.addMult;
+              if (mod.multiplyMult !== undefined) mult    *= mod.multiplyMult;
+            }
+          }
+        }
+
         points += cardPts;
 
         if (this._onScoringStep) {
@@ -994,8 +1020,11 @@ export default class GameRoundManager {
         }
       }
 
-      const flow         = run.flow;
-      const captureScore = Math.round(points * mult * flow);
+      const flow = run.flow;
+      const _hexCompute = getActiveEffect();
+      const captureScore = _hexCompute?.computeFinalScore
+        ? _hexCompute.computeFinalScore(points, mult, flow)
+        : Math.round(points * mult * flow);
       this._runningScore += captureScore;
 
       if (this._onScoringStep) {
@@ -1072,6 +1101,18 @@ export default class GameRoundManager {
             if (card.edition === 'gold')    rPts  += 20;
             if (card.edition === 'crystal') rMult += 5;
             if (card.edition === 'ghost')   rMult *= 1.5;
+            // Hexagram onCardScored modifier — mirrors main capture path
+            {
+              const _hexRt = getActiveEffect();
+              if (_hexRt?.onCardScored) {
+                const mod = _hexRt.onCardScored(card, { currentPoints: rPts, currentMult: rMult });
+                if (mod) {
+                  if (mod.addPoints    !== undefined) rPts  += mod.addPoints;
+                  if (mod.addMult      !== undefined) rMult += mod.addMult;
+                  if (mod.multiplyMult !== undefined) rMult *= mod.multiplyMult;
+                }
+              }
+            }
             // Metal from hand — each Iron/Meteorite in hand contributes mult (no jackpot re-roll)
             for (const handCard of this._hand.getAll()) {
               const henh = handCard.enhancement;
@@ -1101,7 +1142,10 @@ export default class GameRoundManager {
                 if (r.multiplyMult) rMult *= r.multiplyMult;
               }
             }
-            const retriggerScore = Math.round(rPts * rMult * run.flow);
+            const _hexRtCompute = getActiveEffect();
+            const retriggerScore = _hexRtCompute?.computeFinalScore
+              ? _hexRtCompute.computeFinalScore(rPts, rMult, run.flow)
+              : Math.round(rPts * rMult * run.flow);
             this._runningScore  += retriggerScore;
             this._scoringEvents.push({
               type: 'retrigger', cards: [card], card, retriggerScore, runningTotal: this._runningScore,
@@ -1441,6 +1485,8 @@ export default class GameRoundManager {
           this._capture.getAll(), this._styleBase,
           this._style.getTriggeredCombos(), this._lastEnhancementEvents ?? []
         );
+        const _hexEffectFin = getActiveEffect();
+        if (_hexEffectFin?.onRoundEnd) _hexEffectFin.onRoundEnd(this);
         this._phase = "round_over";
       } else {
         this._phase = "idle";
