@@ -12,9 +12,10 @@
 import run, { RunManager }                      from '../systems/RunManager.js';
 import { SPIRIT_CATALOG, getSpiritDef }         from '../data/spirits.js';
 import { getAvailableFusions }                  from '../data/fusionRecipes.js';
-import { FOUR_PRACTICES, THREE_MARKS,
+import { CHAKRA_TOOLS,
          WUXING_CONSUMABLES, getElementDef }    from '../data/consumables.js';
-import { RIBBON_STAMPS, getRibbonStampDef }    from '../data/ribbonStamps.js';
+import { PRIMARY_STAMPS, SECONDARY_STAMPS,
+         getStampDef }                          from '../data/stamps.js';
 import { ZODIAC_CONSUMABLES }                  from '../data/zodiacConsumables.js';
 import { generateShopCards }                   from '../data/shopCards.js';
 import logger                                   from '../systems/GameplayLogger.js';
@@ -130,8 +131,12 @@ export class ShrineScene extends Phaser.Scene {
   }
 
   _generateDeckFixOfferings(count) {
-    const stamps = Object.values(RIBBON_STAMPS);
-    const pool   = [...FOUR_PRACTICES, ...WUXING_CONSUMABLES, ...stamps];
+    const pool = [
+      ...CHAKRA_TOOLS,
+      ...WUXING_CONSUMABLES,
+      ...PRIMARY_STAMPS,
+      ...(this._isGrove ? SECONDARY_STAMPS : []),
+    ];
     return [...pool].sort(() => Math.random() - 0.5).slice(0, count);
   }
 
@@ -441,8 +446,9 @@ export class ShrineScene extends Phaser.Scene {
         ).setOrigin(0.5);
       }
       if (offering.preRibbon) {
-        const S_C = { red: 0xcc3333, blue: 0x3366cc, green: 0x33aa55, yellow: 0xccaa33 };
-        this.add.circle(cx + CW / 2 - 6, imgY - CH / 2 + 5, 4, S_C[offering.preRibbon] ?? 0xffffff)
+        const stampDef = getStampDef(offering.preRibbon);
+        const stampHex = stampDef?.hexColor ?? 0xffffff;
+        this.add.circle(cx + CW / 2 - 6, imgY - CH / 2 + 5, 4, stampHex)
           .setStrokeStyle(1, 0x000000);
       }
       this.add.text(cx, imgY + CH / 2 + 3, `[${card.type[0]}] M${card.month}`, {
@@ -452,10 +458,21 @@ export class ShrineScene extends Phaser.Scene {
       let nameColor = '#ddeeff';
       if (category === 'deckfix') {
         const EC = { water: '#4488ff', wood: '#44cc44', fire: '#ff6644', earth: '#cc8822', metal: '#aaaaaa' };
-        const PC = { practice_path: '#88eebb', practice_fasting: '#ddbb88', practice_mind: '#bb88ee', practice_tree: '#88ddbb' };
+        const CC = {
+          chakra_root:         '#ff4444',
+          chakra_sacral:       '#ff8844',
+          chakra_solar_plexus: '#ffdd44',
+          chakra_heart:        '#44cc44',
+          chakra_throat:       '#4488ff',
+          chakra_third_eye:    '#6644cc',
+          chakra_crown:        '#cc44ff',
+          // Legacy Four Practices colors (kept for any cached state)
+          practice_path: '#88eebb', practice_fasting: '#ddbb88',
+          practice_mind: '#bb88ee', practice_tree:    '#88ddbb',
+        };
         if (offering.element)    nameColor = EC[offering.element] ?? '#ddeeff';
         else if (offering.color) nameColor = offering.color;
-        else                     nameColor = PC[offering.id] ?? '#ddeeff';
+        else                     nameColor = CC[offering.id] ?? '#ddeeff';
       } else if (category === 'zodiac') {
         const CC = { hand: '#88ddcc', field: '#88ccee', yaku: '#ddaaff', ki: '#ffdd88' };
         nameColor = CC[offering.category] ?? '#ddeeff';
@@ -764,7 +781,13 @@ export class ShrineScene extends Phaser.Scene {
 
       case 'deckfix': {
         const cost = this._price(offering.cost);
-        if (offering.id.startsWith('practice_')) {
+        if (offering.id.startsWith('chakra_')) {
+          run.spendKi(cost);
+          logger.logShopPurchase('chakra', offering.name, cost);
+          offeringsArray[index] = null;
+          this._showChakraOverlay(offering);
+        } else if (offering.id.startsWith('practice_')) {
+          // Legacy Four Practices — keep routing for backward compat.
           run.spendKi(cost);
           logger.logShopPurchase('practice', offering.name, cost);
           offeringsArray[index] = null;
@@ -801,6 +824,244 @@ export class ShrineScene extends Phaser.Scene {
         break;
       }
     }
+  }
+
+  // ── Chakra Tool overlays ──────────────────────────────────────────────────
+
+  _showChakraOverlay(def) {
+    switch (def.id) {
+      case 'chakra_root':         this._showRootOverlay(def);         break;
+      case 'chakra_sacral':       this._showSacralOverlay(def);       break;
+      case 'chakra_solar_plexus': this._showSolarPlexusOverlay(def);  break;
+      case 'chakra_heart':        this._showHeartOverlay(def);        break;
+      case 'chakra_throat':       this._showThroatOverlay(def);       break;
+      case 'chakra_third_eye':    this._showThirdEyeOverlay(def);     break;
+      case 'chakra_crown':        this._showCrownOverlay(def);        break;
+    }
+  }
+
+  _showRootOverlay(def) {
+    const selectedIds = new Set();
+    const refund = () => {
+      run.addKi(def.cost);
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    };
+    const render = () => {
+      this._buildPracticeGrid({
+        title:       `Root Chakra  (${def.cost} ki paid)`,
+        instruction: `Select up to 3 cards to toggle day↔night. Selected: ${selectedIds.size}/3`,
+        cards:       run.getDeck(),
+        selectedIds,
+        onSelect: (card) => {
+          if (selectedIds.has(card.id)) selectedIds.delete(card.id);
+          else if (selectedIds.size < 3) selectedIds.add(card.id);
+          render();
+        },
+        actionLabel: selectedIds.size > 0 ? `Toggle (${selectedIds.size})` : null,
+        onAction: () => {
+          run.applyChakraRoot([...selectedIds]);
+          logger.logConsumableUse(def.name, `toggled temporal on ${selectedIds.size} cards`);
+          for (const o of this._confirmObjs) o.destroy();
+          this._confirmObjs = [];
+          this._buildUI();
+        },
+        onCancel: refund,
+      });
+    };
+    render();
+  }
+
+  _showSacralOverlay(def) {
+    const selectedIds = new Set();
+    const refund = () => {
+      run.addKi(def.cost);
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    };
+    const render = () => {
+      this._buildPracticeGrid({
+        title:       `Sacral Chakra  (${def.cost} ki paid)`,
+        instruction: `Select up to 3 cards to advance their month. Selected: ${selectedIds.size}/3`,
+        cards:       run.getDeck(),
+        selectedIds,
+        onSelect: (card) => {
+          if (selectedIds.has(card.id)) selectedIds.delete(card.id);
+          else if (selectedIds.size < 3) selectedIds.add(card.id);
+          render();
+        },
+        actionLabel: selectedIds.size > 0 ? `Advance (${selectedIds.size})` : null,
+        onAction: () => {
+          run.applyChakraSacral([...selectedIds]);
+          logger.logConsumableUse(def.name, `advanced month on ${selectedIds.size} cards`);
+          for (const o of this._confirmObjs) o.destroy();
+          this._confirmObjs = [];
+          this._buildUI();
+        },
+        onCancel: refund,
+      });
+    };
+    render();
+  }
+
+  _showSolarPlexusOverlay(def) {
+    const selectedIds = new Set();
+    const refund = () => {
+      run.addKi(def.cost);
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    };
+    const render = () => {
+      this._buildPracticeGrid({
+        title:       `Solar Plexus Chakra  (${def.cost} ki paid)`,
+        instruction: `Select up to 2 cards to cycle type. Selected: ${selectedIds.size}/2`,
+        cards:       run.getDeck(),
+        selectedIds,
+        onSelect: (card) => {
+          if (selectedIds.has(card.id)) selectedIds.delete(card.id);
+          else if (selectedIds.size < 2) selectedIds.add(card.id);
+          render();
+        },
+        actionLabel: selectedIds.size > 0 ? `Cycle Type (${selectedIds.size})` : null,
+        onAction: () => {
+          run.applyChakraSolarPlexus([...selectedIds]);
+          logger.logConsumableUse(def.name, `cycled type on ${selectedIds.size} cards`);
+          for (const o of this._confirmObjs) o.destroy();
+          this._confirmObjs = [];
+          this._buildUI();
+        },
+        onCancel: refund,
+      });
+    };
+    render();
+  }
+
+  _showHeartOverlay(def) {
+    const refund = () => {
+      run.addKi(def.cost);
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    };
+    const render = () => {
+      this._buildPracticeGrid({
+        title:       `Heart Chakra  (${def.cost} ki paid)`,
+        instruction: 'Select 1 card to receive a random edition (Gold/Crystal/Ghost).',
+        cards:       run.getDeck(),
+        selectedIds: new Set(),
+        onSelect: (card) => {
+          const result = run.applyChakraHeart(card.id);
+          if (result.success) {
+            logger.logConsumableUse(def.name, `applied ${result.edition} edition to ${card.id}`);
+            for (const o of this._confirmObjs) o.destroy();
+            this._confirmObjs = [];
+            this._buildUI();
+          }
+        },
+        onCancel: refund,
+      });
+    };
+    render();
+  }
+
+  _showThroatOverlay(def) {
+    const refund = () => {
+      run.addKi(def.cost);
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    };
+    const render = () => {
+      this._buildPracticeGrid({
+        title:       `Throat Chakra  (${def.cost} ki paid)`,
+        instruction: 'Select 1 card to duplicate into your deck.',
+        cards:       run.getDeck(),
+        selectedIds: new Set(),
+        onSelect: (card) => {
+          const result = run.applyChakraThroat(card.id);
+          if (result.success) {
+            logger.logConsumableUse(def.name, `duplicated ${card.id}`);
+            for (const o of this._confirmObjs) o.destroy();
+            this._confirmObjs = [];
+            this._buildUI();
+          }
+        },
+        onCancel: refund,
+      });
+    };
+    render();
+  }
+
+  _showThirdEyeOverlay(def) {
+    const selectedIds = new Set();
+    const refund = () => {
+      run.addKi(def.cost);
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    };
+    const render = () => {
+      this._buildPracticeGrid({
+        title:       `Third Eye Chakra  (${def.cost} ki paid)`,
+        instruction: `Select up to 2 cards to permanently delete. Selected: ${selectedIds.size}/2`,
+        cards:       run.getDeck(),
+        selectedIds,
+        onSelect: (card) => {
+          if (selectedIds.has(card.id)) selectedIds.delete(card.id);
+          else if (selectedIds.size < 2) selectedIds.add(card.id);
+          render();
+        },
+        actionLabel: selectedIds.size > 0 ? `Delete (${selectedIds.size})` : null,
+        onAction: () => {
+          run.applyChakraThirdEye([...selectedIds]);
+          logger.logConsumableUse(def.name, `deleted ${selectedIds.size} cards`);
+          for (const o of this._confirmObjs) o.destroy();
+          this._confirmObjs = [];
+          this._buildUI();
+        },
+        onCancel: refund,
+      });
+    };
+    render();
+  }
+
+  _showCrownOverlay(def) {
+    let sourceCard = null;
+    const refund = () => {
+      run.addKi(def.cost);
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    };
+    const render = () => {
+      const deck   = run.getDeck();
+      const phase2 = sourceCard !== null;
+      this._buildPracticeGrid({
+        title: `Crown Chakra  (${def.cost} ki paid)`,
+        instruction: phase2
+          ? `Source: ${sourceCard.name}. Step 2: Click the card to receive this identity.`
+          : 'Step 1: Click the card whose identity you want to copy.',
+        cards:       phase2 ? deck.filter(c => c.id !== sourceCard.id) : deck,
+        selectedIds: new Set(sourceCard ? [sourceCard.id] : []),
+        onSelect: (card) => {
+          if (!phase2) { sourceCard = card; render(); }
+          else {
+            const result = run.applyChakraCrown(sourceCard.id, card.id);
+            if (result.success) {
+              logger.logConsumableUse(def.name, `${sourceCard.id} identity → ${card.id}`);
+              for (const o of this._confirmObjs) o.destroy();
+              this._confirmObjs = [];
+              this._buildUI();
+            }
+          }
+        },
+        onCancel: refund,
+      });
+    };
+    render();
   }
 
   // ── Four Practices overlays ────────────────────────────────────────────────
@@ -1233,7 +1494,7 @@ export class ShrineScene extends Phaser.Scene {
     for (const o of this._confirmObjs) o.destroy();
     this._confirmObjs = [];
 
-    const deck     = run.getDeck().filter(c => !c.ribbonStamp);
+    const deck     = run.getDeck();
     const shuffled = [...deck].sort(() => Math.random() - 0.5);
     const preview  = shuffled.slice(0, Math.min(8, shuffled.length));
 
@@ -1251,7 +1512,7 @@ export class ShrineScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(50));
 
     if (preview.length === 0) {
-      push(this.add.text(cx, cy, 'All cards already have ribbon stamps.', {
+      push(this.add.text(cx, cy, 'No cards available.', {
         fontSize: '14px', color: '#667788',
       }).setOrigin(0.5).setDepth(50));
     } else {
@@ -1284,7 +1545,7 @@ export class ShrineScene extends Phaser.Scene {
         spr.on('pointerover', () => spr.setTint(0xffccee));
         spr.on('pointerout',  () => spr.clearTint());
         spr.on('pointerdown', () => {
-          const result = run.applyRibbonStamp(card.id, stampDef.id);
+          const result = run.applyStamp(card.id, stampDef.id);
           if (result.success) {
             const discount = stampDef.cost - this._price(stampDef.cost);
             if (discount > 0) run.addKi(discount);

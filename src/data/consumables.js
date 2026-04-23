@@ -1,11 +1,71 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // consumables.js — Deck modification tools
 //
-// Four Practices: shop-only instant-apply deck tools (replace old Three Marks).
+// Chakra Tools: shop-only instant-apply deck tools (replace Four Practices).
 // Three Marks: kept for backward compatibility with any save state.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Primary deck tool set (replaces Three Marks). Shop-only, instant-apply. */
+/** Primary deck tool set. Shop-only, instant-apply. All cost 4 ki. */
+export const CHAKRA_TOOLS = [
+  {
+    id:          'chakra_root',
+    name:        'Root Chakra',
+    description: 'Toggle the day/night axis of up to 3 cards.',
+    cost:        4,
+    maxTargets:  3,
+    category:    'chakra',
+  },
+  {
+    id:          'chakra_sacral',
+    name:        'Sacral Chakra',
+    description: 'Advance the month of up to 3 cards (December cycles back to January).',
+    cost:        4,
+    maxTargets:  3,
+    category:    'chakra',
+  },
+  {
+    id:          'chakra_solar_plexus',
+    name:        'Solar Plexus Chakra',
+    description: 'Cycle the type of up to 2 cards (plain→ribbon→animal→bright→plain).',
+    cost:        4,
+    maxTargets:  2,
+    category:    'chakra',
+  },
+  {
+    id:          'chakra_heart',
+    name:        'Heart Chakra',
+    description: 'Apply a random edition to 1 card (60% Gold +20pts / 30% Crystal +5×mult / 10% Ghost ×1.5 mult).',
+    cost:        4,
+    maxTargets:  1,
+    category:    'chakra',
+  },
+  {
+    id:          'chakra_throat',
+    name:        'Throat Chakra',
+    description: 'Duplicate 1 card — add an exact copy to your deck.',
+    cost:        4,
+    maxTargets:  1,
+    category:    'chakra',
+  },
+  {
+    id:          'chakra_third_eye',
+    name:        'Third Eye Chakra',
+    description: 'Permanently delete up to 2 cards from your deck.',
+    cost:        4,
+    maxTargets:  2,
+    category:    'chakra',
+  },
+  {
+    id:          'chakra_crown',
+    name:        'Crown Chakra',
+    description: 'Copy the identity (month/type/name) of one card onto another, preserving its enhancements.',
+    cost:        4,
+    maxTargets:  2,
+    category:    'chakra',
+  },
+];
+
+/** @deprecated — kept for backward compatibility; use CHAKRA_TOOLS instead. */
 export const FOUR_PRACTICES = [
   {
     id:          'practice_path',
@@ -41,7 +101,7 @@ export const FOUR_PRACTICES = [
   },
 ];
 
-/** @deprecated — kept for backward compatibility; use FOUR_PRACTICES instead. */
+/** @deprecated — kept for backward compatibility with any save state. */
 export const THREE_MARKS = [
   {
     id:          'mark_impermanence',
@@ -101,7 +161,7 @@ export const WUXING_CONSUMABLES = [
   {
     id:          'element_fire',
     name:        'Fire',
-    description: 'Apply Ember (wildcard 10 pts, all yaku, 1/7 break). Wood upgrades Ember→Charcoal (20 pts, 2/7).',
+    description: 'Apply Ember (wildcard 30 pts, all yaku, 20% break). Wood upgrades Ember→Charcoal (100 pts, 10% break).',
     cost:        5,
     category:    'wuxing',
     element:     'fire',
@@ -109,7 +169,7 @@ export const WUXING_CONSUMABLES = [
   {
     id:          'element_earth',
     name:        'Earth',
-    description: 'Apply Clay (2% ki/round interest). Fire upgrades Clay→Pottery (5% ki/round).',
+    description: 'Apply Clay (10% ki/round interest). Fire upgrades Clay→Pottery (20% ki/round).',
     cost:        5,
     category:    'wuxing',
     element:     'earth',
@@ -117,7 +177,7 @@ export const WUXING_CONSUMABLES = [
   {
     id:          'element_metal',
     name:        'Metal',
-    description: 'Apply Iron (10% chance 5× pts, 5% free consumable). Earth upgrades Iron→Meteorite (20%/10%).',
+    description: 'Apply Iron (×1.5 mult when captured, 5% jackpot +30 ki). Earth upgrades Iron→Meteorite (×3.0 mult).',
     cost:        5,
     category:    'wuxing',
     element:     'metal',

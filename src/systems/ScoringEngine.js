@@ -26,8 +26,10 @@
 // ── Wu Xing Water depreciation multiplier tables ──────────────────────────────
 // depLevel indexes into the array.  Floored at the last entry.
 
-export const SNOW_MULT = [2.0, 1.5, 1.0, 0.75, 0.5, 0.25];
-export const ICE_MULT  = [4.0, 3.0, 2.0, 1.5, 1.0, 0.75, 0.5, 0.25];
+// Snow: −0.25 per use, floor 0.5
+export const SNOW_MULT = [2.0, 1.75, 1.5, 1.25, 1.0, 0.75, 0.5];
+// Ice: −0.5 per use, floor 0.25
+export const ICE_MULT  = [4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5, 0.25];
 
 // ── Public yaku catalogue ─────────────────────────────────────────────────────
 
@@ -121,14 +123,14 @@ export default class ScoringEngine {
     // ── Step 2: Point Boost channel ───────────────────────────────────────
     const rawBasePoints      = capturedCards.reduce((sum, c) => sum + c.points, 0);
     let boostedCardSum       = 0;
-    let metalConsumableCount = 0;
+    const metalConsumableCount = 0; // Metal procs are now handled per-capture in GameRoundManager
     for (const card of capturedCards) {
       const enh    = card.enhancement;
       const isFire = enh?.element === 'fire';
 
       // Fire enhancement overrides base points; spirit boosts are skipped.
       let pts = isFire
-        ? (enh.tier === 'upgraded' ? 20 : 10)
+        ? (enh.tier === 'upgraded' ? 100 : 30)
         : card.points;
 
       // Spirit point boosts — Fire cards have no identity so they're excluded.
@@ -147,21 +149,6 @@ export default class ScoringEngine {
         const multArr = enh.tier === 'upgraded' ? ICE_MULT : SNOW_MULT;
         const level   = Math.min(enh.depLevel ?? 0, multArr.length - 1);
         pts *= multArr[level];
-      }
-
-      // Metal: proc roll — only applied on the final scoring pass.
-      if (applyProcs && enh?.element === 'metal') {
-        const roll       = Math.random();
-        const isUpgraded = enh.tier === 'upgraded';
-        if (roll < (isUpgraded ? 0.20 : 0.10)) {
-          pts *= 5;
-          card._lastMetalProc = 'points_5x';
-        } else if (roll < (isUpgraded ? 0.30 : 0.15)) {
-          metalConsumableCount++;
-          card._lastMetalProc = 'consumable';
-        } else {
-          card._lastMetalProc = null;
-        }
       }
 
       boostedCardSum += pts;

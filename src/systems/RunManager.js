@@ -6,8 +6,8 @@
 import { findFusionRecipe }                     from '../data/fusionRecipes.js';
 import { getSpiritDef }                         from '../data/spirits.js';
 import { cards as ALL_CARDS }                   from '../data/cards.js';
-import { THREE_MARKS, WUXING_CONSUMABLES }      from '../data/consumables.js';
-import { getRibbonStampDef }                    from '../data/ribbonStamps.js';
+import { WUXING_CONSUMABLES }                   from '../data/consumables.js';
+import { getStampDef }                          from '../data/stamps.js';
 import { ZODIAC_CONSUMABLES, getZodiacDef }     from '../data/zodiacConsumables.js';
 import logger                                   from './GameplayLogger.js';
 //
@@ -295,6 +295,51 @@ class RunManager {
     if (spiritDef.id === 'sym_osprey')      spirit.state = { usedThisRound: false };
     this._spirits.push(spirit);
     return { success: true };
+  }
+
+  /**
+   * Summon a spirit by id without spending ki (used by Cat zodiac).
+   * Follows the same stacking/transcendence rules as buySpirit.
+   * @param {string} spiritId
+   * @returns {{ success: boolean, result?: string, reason?: string }}
+   */
+  summonSpirit(spiritId) {
+    const spiritDef = getSpiritDef(spiritId);
+    if (!spiritDef) return { success: false, reason: 'Unknown spirit' };
+
+    const existing    = this._spirits.find(s => s.id === spiritDef.id && !s.isNegative);
+    const hasNegative = this._negativeSpirits.some(s => s.id === spiritDef.id);
+
+    if (existing) {
+      if ((existing.stackCount ?? 1) >= 3 && hasNegative) {
+        return { success: false, reason: 'Maximum spirit copies reached' };
+      }
+      existing.stackCount = (existing.stackCount ?? 1) + 1;
+      if (existing.stackCount >= 4) {
+        const idx = this._spirits.indexOf(existing);
+        this._spirits.splice(idx, 1);
+        this._negativeSpirits.push({
+          id: spiritDef.id, name: spiritDef.name,
+          stackCount: 1, isNegative: true, state: null,
+        });
+        return { success: true, result: 'transcended' };
+      }
+      return { success: true, result: 'stacked' };
+    }
+
+    if (!this.canAddSpirit) return { success: false, reason: 'No spirit slots available' };
+
+    const spirit = { id: spiritDef.id, name: spiritDef.name, stackCount: 1 };
+    if (spiritDef.id === 'engine_wildlife')  spirit.state = { seenAnimals: [] };
+    if (spiritDef.id === 'engine_plenty')    spirit.state = { seenPlains: [] };
+    if (spiritDef.id === 'util_irrigation')  spirit.state = { irrigationBonus: 0 };
+    if (spiritDef.id === 'engine_glacier')   spirit.state = { waterDepCount: 0 };
+    if (spiritDef.id === 'engine_carbon')    spirit.state = { fireCombustCount: 0 };
+    if (spiritDef.id === 'engine_velocity')  spirit.state = { metalProcCount: 0 };
+    if (spiritDef.id === 'engine_fossil')    spirit.state = { earthCardCount: 0 };
+    if (spiritDef.id === 'engine_moths')     spirit.state = { silkTriggerCount: 0 };
+    this._spirits.push(spirit);
+    return { success: true, result: 'added' };
   }
 
   /**
@@ -834,24 +879,180 @@ class RunManager {
     if (savedRibbonStamp !== undefined) source.ribbonStamp = savedRibbonStamp;
   }
 
-  // ── Ribbon stamps ─────────────────────────────────────────────────────────
+  // ── Chakra Tools ──────────────────────────────────────────────────────────
 
   /**
-   * Apply a ribbon stamp to a card in the deck.
-   * @param {string} cardId
-   * @param {string} stampId  'red' | 'blue' | 'green' | 'yellow'
-   * @returns {{ success: boolean, reason?: string }}
+   * Root Chakra: toggle the temporal axis (day↔night) of up to 3 cards.
+   * @param {string[]} cardIds
    */
-  applyRibbonStamp(cardId, stampId) {
+  applyChakraRoot(cardIds) {
+    if (cardIds.length > 3) throw new Error('Root Chakra can toggle up to 3 cards');
+    for (const id of cardIds) {
+      const card = this._deck.find(c => c.id === id);
+      if (!card) continue;
+      card.temporal = card.temporal === 'day' ? 'night' : 'day';
+      card.rootConverted = true;
+    }
+  }
+
+  /**
+   * Sacral Chakra: advance the month of up to 3 cards (Dec → Jan cycle).
+   * Copies month/monthName/vertical/temporal from the base card of the new
+   * month, keeping the card's existing type (falls back to month data only
+   * if no base card exists for that type in the new month).
+   * @param {string[]} cardIds
+   */
+  applyChakraSacral(cardIds) {
+    if (cardIds.length > 3) throw new Error('Sacral Chakra can advance up to 3 cards');
+    for (const id of cardIds) {
+      const card = this._deck.find(c => c.id === id);
+      if (!card) continue;
+      const newMonth     = (card.month % 12) + 1;
+      const sameTypeKey  = `${newMonth}_${card.type}`;
+      const sameType     = _baseCardLookup.get(sameTypeKey);
+      if (sameType) {
+        card.month     = sameType.month;
+        card.monthName = sameType.monthName;
+        card.vertical  = sameType.vertical;
+        card.temporal  = sameType.temporal;
+        card.name      = sameType.name;
+      } else {
+        const fallback = _baseCardLookup.get(`${newMonth}_plain`)
+                      ?? _baseCardLookup.get(`${newMonth}_ribbon`)
+                      ?? _baseCardLookup.get(`${newMonth}_animal`)
+                      ?? _baseCardLookup.get(`${newMonth}_bright`);
+        card.month = newMonth;
+        if (fallback) {
+          card.monthName = fallback.monthName;
+          card.vertical  = fallback.vertical;
+          card.temporal  = fallback.temporal;
+        }
+      }
+      card.sacralConverted = true;
+    }
+  }
+
+  /**
+   * Solar Plexus Chakra: cycle the type of up to 2 cards
+   * (plain→ribbon→animal→bright→plain).
+   * @param {string[]} cardIds
+   */
+  applyChakraSolarPlexus(cardIds) {
+    if (cardIds.length > 2) throw new Error('Solar Plexus Chakra can cycle up to 2 cards');
+    const CYCLE      = { plain: 'ribbon', ribbon: 'animal', animal: 'bright', bright: 'plain' };
+    const POINTS     = { plain: 3, ribbon: 10, animal: 12, bright: 20 };
+    const TYPE_NAMES = { bright: 'Bright', animal: 'Animal', ribbon: 'Ribbon', plain: 'Plain' };
+    for (const id of cardIds) {
+      const card = this._deck.find(c => c.id === id);
+      if (!card) continue;
+      const newType   = CYCLE[card.type] ?? card.type;
+      card.type       = newType;
+      card.points     = POINTS[newType];
+      card.name       = `${card.monthName ?? card.month} ${TYPE_NAMES[newType]}`;
+      card.solarPlexusConverted = true;
+    }
+  }
+
+  /**
+   * Heart Chakra: apply a random edition to 1 card.
+   * 60% gold (+20 base pts), 30% crystal (+5 addMult), 10% ghost (×1.5 multMult).
+   * @param {string} cardId
+   * @returns {{ success: boolean, edition?: string, reason?: string }}
+   */
+  applyChakraHeart(cardId) {
     const card = this._deck.find(c => c.id === cardId);
     if (!card) return { success: false, reason: 'Card not found' };
-    if (card.ribbonStamp) return { success: false, reason: 'Card already has a ribbon stamp' };
-    const stampDef = getRibbonStampDef(stampId);
+    const roll   = Math.random();
+    card.edition = roll < 0.6 ? 'gold' : roll < 0.9 ? 'crystal' : 'ghost';
+    return { success: true, edition: card.edition };
+  }
+
+  /**
+   * Throat Chakra: duplicate 1 card — add an exact copy to the deck.
+   * @param {string} cardId
+   * @returns {{ success: boolean, reason?: string }}
+   */
+  applyChakraThroat(cardId) {
+    const card = this._deck.find(c => c.id === cardId);
+    if (!card) return { success: false, reason: 'Card not found' };
+    const suffix  = `_throat_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const newCard = {
+      ...JSON.parse(JSON.stringify(card)),
+      id:               card.id + suffix,
+      throatDuplicated: true,
+    };
+    this._deck.push(newCard);
+    return { success: true };
+  }
+
+  /**
+   * Third Eye Chakra: permanently delete up to 2 cards.
+   * @param {string[]} cardIds
+   */
+  applyChakraThirdEye(cardIds) {
+    if (cardIds.length > 2) throw new Error('Third Eye Chakra can delete up to 2 cards');
+    this._deck = this._deck.filter(c => !cardIds.includes(c.id));
+  }
+
+  /**
+   * Crown Chakra: copy the identity (month/type/name/points/axes) of the
+   * SOURCE card onto the TARGET card, preserving the target's id, enhancement,
+   * stamp, and edition.
+   * @param {string} sourceId  Card whose identity will be copied.
+   * @param {string} targetId  Card that receives the identity.
+   * @returns {{ success: boolean, reason?: string }}
+   */
+  applyChakraCrown(sourceId, targetId) {
+    const source = this._deck.find(c => c.id === sourceId);
+    const target = this._deck.find(c => c.id === targetId);
+    if (!source || !target) return { success: false, reason: 'Card not found' };
+    const savedId          = target.id;
+    const savedEnhancement = target.enhancement;
+    const savedRibbonStamp = target.ribbonStamp;
+    const savedEdition     = target.edition;
+    target.month     = source.month;
+    target.monthName = source.monthName;
+    target.type      = source.type;
+    target.points    = source.points;
+    target.name      = source.name;
+    target.vertical  = source.vertical;
+    target.temporal  = source.temporal;
+    target.id        = savedId;
+    if (savedEnhancement !== undefined) target.enhancement = savedEnhancement;
+    else                                delete target.enhancement;
+    if (savedRibbonStamp !== undefined) target.ribbonStamp = savedRibbonStamp;
+    else                                delete target.ribbonStamp;
+    if (savedEdition !== undefined)     target.edition     = savedEdition;
+    else                                delete target.edition;
+    target.crownConverted = true;
+    return { success: true };
+  }
+
+  // ── Stamps ────────────────────────────────────────────────────────────────
+
+  /**
+   * Apply a stamp to a card in the deck.
+   * Replaces any existing stamp (no longer blocks re-stamping).
+   * @param {string} cardId
+   * @param {string} stampId  e.g. 'stamp_red', 'stamp_blue', …
+   * @returns {{ success: boolean, reason?: string }}
+   */
+  applyStamp(cardId, stampId) {
+    const card = this._deck.find(c => c.id === cardId);
+    if (!card) return { success: false, reason: 'Card not found' };
+    const stampDef = getStampDef(stampId);
     if (!stampDef) return { success: false, reason: 'Unknown stamp type' };
     if (this._ki < stampDef.cost) return { success: false, reason: 'Not enough ki' };
     this._ki -= stampDef.cost;
     card.ribbonStamp = stampId;
     return { success: true };
+  }
+
+  /**
+   * @deprecated Use applyStamp instead.
+   */
+  applyRibbonStamp(cardId, stampId) {
+    return this.applyStamp(cardId, stampId);
   }
 
   // ── Wu Xing enhancements ───────────────────────────────────────────────────
@@ -952,7 +1153,7 @@ class RunManager {
    */
   generateRandomConsumable() {
     if (!this.canAddConsumable) return null;
-    const pool = [...THREE_MARKS, ...WUXING_CONSUMABLES];
+    const pool = [...WUXING_CONSUMABLES];
     const def  = pool[Math.floor(Math.random() * pool.length)];
     const cons = { id: def.id, name: def.name, description: def.description, category: def.category };
     this._consumables.push(cons);

@@ -20,6 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import run from './RunManager.js';
+import { getSpiritDef } from '../data/spirits.js';
 
 const _effects = {
 
@@ -221,6 +222,27 @@ const _effects = {
     execute() {
       run.addKi(10);
       return { success: true, message: '+10 ki.' };
+    },
+  },
+
+  zodiac_cat: {
+    /** Summon a random Tier 1 Foundation spirit to an open slot. */
+    execute() {
+      const TIER1_FOUNDATION_IDS = [
+        'spring_pollen', 'summer_heat', 'autumn_harvest', 'winter_cold',
+        'spring_bees',   'summer_humidity', 'autumn_leaves', 'winter_aridity',
+        'sky_clouds',    'land_soil',    'day_light',     'night_dark',
+        'sky_wind',      'land_rock',    'day_movement',  'night_stillness',
+        'rank_shine',    'rank_pulse',   'rank_poem',     'rank_salt',
+      ];
+      const id = TIER1_FOUNDATION_IDS[Math.floor(Math.random() * TIER1_FOUNDATION_IDS.length)];
+      const spiritDef = getSpiritDef(id);
+      if (!spiritDef) return { success: false, message: 'Spirit definition not found.' };
+      const result = run.summonSpirit(id);
+      if (result.success) {
+        return { success: true, message: `Cat summoned ${spiritDef.name}.`, spiritId: id };
+      }
+      return { success: false, message: result.reason ?? 'Could not summon spirit.' };
     },
   },
 };

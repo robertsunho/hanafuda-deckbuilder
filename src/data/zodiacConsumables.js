@@ -11,6 +11,7 @@ export const ZODIAC_CONSUMABLES = [
   { id: 'zodiac_rooster', name: 'Rooster', description: 'Open a 9th field slot for this round.',                       category: 'field', cost: 3 },
   { id: 'zodiac_dog',     name: 'Dog',     description: 'Retrieve 2 cards from the discard pile.',                     category: 'hand',  cost: 3 },
   { id: 'zodiac_pig',     name: 'Pig',     description: '+10 ki immediately.',                                         category: 'ki',    cost: 3 },
+  { id: 'zodiac_cat',    name: 'Cat',     description: 'Summon a random Tier 1 Foundation spirit to an open slot.',     category: 'spirit', cost: 3 },
 ];
 
 export const getZodiacDef = (id) => ZODIAC_CONSUMABLES.find(c => c.id === id) ?? null;

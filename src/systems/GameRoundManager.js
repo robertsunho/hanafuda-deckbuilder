@@ -337,12 +337,12 @@ export default class GameRoundManager {
     this._lastInterestGain = run.applyInterest();
 
     // ── Earth enhancement ki generation (before dealing) ─────────────────
-    // Each Clay card contributes 2% ki interest; Pottery contributes 5%.
+    // Each Clay card contributes 10% ki interest; Pottery contributes 20%.
     const deckCards = run.getDeck();
     let earthInterest = 0;
     for (const card of deckCards) {
       if (card.enhancement?.element === 'earth') {
-        earthInterest += card.enhancement.tier === 'upgraded' ? 0.05 : 0.02;
+        earthInterest += card.enhancement.tier === 'upgraded' ? 0.20 : 0.10;
       }
     }
     const kiGain = Math.floor(run.ki * earthInterest);
@@ -506,6 +506,9 @@ export default class GameRoundManager {
         this._discardCount++;
         // econ_recycling: +5 ki per field-full discard.
         if (this._spirits.some(s => s.id === 'econ_recycling')) run.addKi(5);
+        // Stamp discard-trigger effects.
+        if (card.ribbonStamp === 'stamp_blue') run.generateRandomConsumable();
+        if (card.ribbonStamp === 'stamp_green') run.addKi(8);
       }
     }
 
@@ -704,7 +707,7 @@ export default class GameRoundManager {
         }
       }
       if (card.enhancement?.element === 'fire') {
-        const breakChance = card.enhancement.tier === 'upgraded' ? 2 / 7 : 1 / 7;
+        const breakChance = card.enhancement.tier === 'upgraded' ? 0.10 : 0.20;
         if (Math.random() < breakChance) {
           run.deleteCard(card.id);
           card._broken = true;
@@ -881,11 +884,29 @@ export default class GameRoundManager {
       for (const card of cards) {
         const enh    = card.enhancement;
         const isFire = enh?.element === 'fire';
-        let cardPts = isFire ? (enh.tier === 'upgraded' ? 20 : 10) : card.points;
+        let cardPts = isFire ? (enh.tier === 'upgraded' ? 100 : 30) : card.points;
         if (!isFire && enh?.element === 'water') {
           const multArr = enh.tier === 'upgraded' ? ICE_MULT : SNOW_MULT;
           cardPts = Math.round(cardPts * multArr[Math.min(enh.depLevel ?? 0, multArr.length - 1)]);
         }
+
+        // Edition bonuses — applied before spirit effects.
+        if (card.edition === 'gold')   cardPts += 20;
+        if (card.edition === 'crystal') mult += 5;
+        if (card.edition === 'ghost')   mult *= 1.5;
+
+        // Metal enhancement: mult bonus per capture.
+        if (enh?.element === 'metal') {
+          mult *= enh.tier === 'upgraded' ? 3.0 : 1.5;
+          // Meteorite: 5% jackpot.
+          if (enh.tier === 'upgraded' && Math.random() < 0.05) {
+            run.addKi(30);
+            for (const spirit of this._spirits) {
+              if (spirit.id === 'engine_velocity' && spirit.state) spirit.state.metalProcCount++;
+            }
+          }
+        }
+
         points += cardPts;
 
         if (this._onScoringStep) {
@@ -1005,31 +1026,25 @@ export default class GameRoundManager {
         }
       }
 
-      // Ribbon stamp effects.
+      // Stamp captured-trigger effects.
       for (const card of cards) {
         if (!card.ribbonStamp) continue;
-        switch (card.ribbonStamp) {
-          case 'red': {
-            const drawN = Math.min(1, this._deck.drawPileSize);
-            if (drawN > 0) this._hand.add(this._deck.draw(drawN));
-            break;
-          }
-          case 'blue': {
-            if (this._deck.drawPileSize > 0) {
-              const extraFlip = this._deck.draw(1)[0];
-              const flipResult = this._field.addFlippedCard(extraFlip);
-              if (flipResult.captured) this._addCapture(flipResult.captured);
-            }
-            break;
-          }
-          case 'green': {
-            run.onCardsCaptured([card]);
-            break;
-          }
-          case 'yellow': {
-            // Retrigger: run the single card through the same two-phase pipeline.
+        const stamp = card.ribbonStamp;
+
+        if (stamp === 'stamp_yellow') {
+          run.addKi(3);
+        }
+
+        if (stamp === 'stamp_white' || stamp === 'stamp_gray') {
+          // White: retrigger once; Gray: triple retrigger (×3 extra = 4 total).
+          const retriggerCount = stamp === 'stamp_gray' ? 3 : 1;
+          for (let rt = 0; rt < retriggerCount; rt++) {
             let rPts  = card.points;
             let rMult = 1.0;
+            if (card.edition === 'gold')    rPts += 20;
+            if (card.edition === 'crystal') rMult += 5;
+            if (card.edition === 'ghost')   rMult *= 1.5;
+            if (card.enhancement?.element === 'metal') rMult *= card.enhancement.tier === 'upgraded' ? 3.0 : 1.5;
             for (const spirit of this._spirits) {
               const effect = SpiritEffects.get(spirit.id);
               if (!effect) continue;
@@ -1057,8 +1072,20 @@ export default class GameRoundManager {
             this._scoringEvents.push({
               type: 'retrigger', cards: [card], card, retriggerScore, runningTotal: this._runningScore,
             });
-            break;
           }
+        }
+
+        if (stamp === 'stamp_orange') {
+          const drawN = Math.min(1, this._deck.drawPileSize);
+          if (drawN > 0) this._hand.add(this._deck.draw(drawN));
+          run.addKi(3);
+        }
+
+        if (stamp === 'stamp_black') {
+          const drawN = Math.min(1, this._deck.drawPileSize);
+          if (drawN > 0) this._hand.add(this._deck.draw(drawN));
+          run.generateRandomConsumable();
+          run.addKi(3);
         }
       }
     }
@@ -1326,7 +1353,17 @@ export default class GameRoundManager {
         const unspent = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
         for (const yaku of newYaku) {
           const yakuCards = this._selectAdditiveYakuCards(yaku.name, unspent);
-          for (const card of yakuCards) this._spentCardIds.add(card.id);
+          for (const card of yakuCards) {
+            this._spentCardIds.add(card.id);
+            // Stamp yaku-trigger effects.
+            if (card.ribbonStamp === 'stamp_red') {
+              const drawN = Math.min(1, this._deck.drawPileSize);
+              if (drawN > 0) this._hand.add(this._deck.draw(drawN));
+            }
+            if (card.ribbonStamp === 'stamp_purple') {
+              run.generateRandomConsumable();
+            }
+          }
         }
         // Update snapshot to post-spend state so same yaku can't re-trigger next turn.
         const unspentAfterSpend = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
