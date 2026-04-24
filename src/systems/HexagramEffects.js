@@ -46,6 +46,16 @@
 
 import run from './RunManager.js';
 
+// ── Deck composition helpers ──────────────────────────────────────────────────
+
+/** Fisher-Yates in-place shuffle. */
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
 // ── Seasonal helpers ──────────────────────────────────────────────────────────
 
 /**
@@ -350,56 +360,355 @@ export const HEXAGRAM_EFFECTS = {
   },
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Stubbed effects — implemented in later phases
-  // (Empty objects keep applyHook from throwing for any rolled hexagram.)
+  // Phase 3B effects
   // ──────────────────────────────────────────────────────────────────────────
 
-  // TODO: Phase 3B — Wu Xing cycle boosts
-  boost_wood:  {},
-  boost_fire:  {},
-  boost_earth: {},
-  boost_metal: {},
-  boost_water: {},
+  // ── Wu Xing cycle boosts (5) ──────────────────────────────────────────────
+  // Each element boosts its own enhancement and weakens the element it destroys
+  // in the destructive cycle (Wood→Earth, Earth→Water, Water→Fire, Fire→Metal,
+  // Metal→Wood).
 
-  // TODO: Phase 3B — Field/hand modifiers
-  field_plus_hand_minus:              {},
-  field_minus_hand_plus:              {},
-  field_plus_two_double_flip:         {},
-  field_minus_two_threshold_minus:    {},
+  boost_wood: {
+    modifyFirePoints:      (tier) => tier === 'upgraded' ? 50  : 15,
+    modifyFireBreakChance: (tier) => tier === 'upgraded' ? 0.20 : 0.40,
+    modifyWoodScoring:     (tier) => tier === 'upgraded' ? 1.5  : 1.3,
+  },
 
-  // TODO: Phase 3B — Spirit slot modifiers
-  spirit_plus_cards_minus:            {},
-  spirit_minus_cards_plus:            {},
-  four_spirits_fire_twice:            {},
-  eight_spirits_graduated_tax:        {},
+  boost_fire: {
+    modifyFirePoints:      (tier) => tier === 'upgraded' ? 200 : 60,
+    modifyFireBreakChance: (tier) => tier === 'upgraded' ? 0.05 : 0.10,
+    modifyEarthInterest:   (tier) => tier === 'upgraded' ? 0.10 : 0.05,
+  },
 
-  // TODO: Phase 3C — Deck composition modifiers
-  no_brights_plain_threshold_minus:   {},
-  deck_36_field_plus:                 {},
-  deck_60_hand_plus:                  {},
-  no_plains_double_others:            {},
-  animal_deck:                        {},
-  ribbon_deck:                        {},
-  day_deck:                           {},
-  night_deck:                         {},
-  air_deck:                           {},
-  land_deck:                          {},
+  boost_earth: {
+    modifyEarthHeld:        (tier) => tier === 'upgraded' ? 1.5  : 1.2,
+    modifyMetalHeldMult:    (tier) => tier === 'upgraded' ? 2.5  : 1.25,
+    modifyMeteoriteJackpot: ()     => 0.02,
+  },
 
-  // TODO: Phase 3D — Economy modifiers
-  no_hand_ki_double_interest:         {},
-  start_50_ki_no_income:              {},
-  plus_offerings_double_reroll:       {},
-  minus_offerings_discount:           {},
-  no_banking_ki_plus_capture:         {},
-  push_ki_swing:                      {},
-  price_increase_more_consumable_slots: {},
+  boost_metal: {
+    modifyMetalHeldMult:     (tier) => tier === 'upgraded' ? 3.5  : 1.75,
+    modifyMeteoriteJackpot:  ()     => 0.15,
+    modifyWaterDepreciation: (tier) => tier === 'upgraded' ? 0.7  : 0.4,
+  },
+
+  boost_water: {
+    modifyWaterDepreciation: (tier) => tier === 'upgraded' ? 0.3  : 0.15,
+    modifyWoodScoring:       (tier) => tier === 'upgraded' ? 0.5  : 0.7,
+  },
+
+  // ── Field/hand modifier effects (4) ──────────────────────────────────────
+
+  field_plus_hand_minus: {
+    modifyFieldSlots: (base) => base + 1,
+    modifyHandSize:   (base) => base - 1,
+  },
+
+  field_minus_hand_plus: {
+    modifyFieldSlots: (base) => base - 1,
+    modifyHandSize:   (base) => base + 1,
+  },
+
+  field_plus_two_double_flip: {
+    modifyFieldSlots:       (base) => base + 2,
+    modifyDeckFlipsPerTurn: ()     => 2,
+  },
+
+  field_minus_two_threshold_minus: {
+    modifyFieldSlots:    (base)           => base - 2,
+    modifyYakuThreshold: (yakuName, base) => base - 1,
+  },
+
+  // ── Spirit slot modifier effects (4) ─────────────────────────────────────
+
+  spirit_plus_cards_minus: {
+    modifySpiritSlots: (base) => base + 1,
+    modifyCardsDealt:  (base) => Math.max(0, base - 1),
+  },
+
+  spirit_minus_cards_plus: {
+    modifySpiritSlots: (base) => base - 1,
+    modifyCardsDealt:  (base) => base + 1,
+  },
+
+  four_spirits_fire_twice: {
+    modifySpiritSlots:      () => 4,
+    shouldSpiritsFireTwice: () => true,
+  },
+
+  eight_spirits_graduated_tax: {
+    modifySpiritSlots: () => 8,
+    onRoundEnd() {
+      const spiritCount = run.spirits.length;
+      const TAX_BY_COUNT = { 5: 1, 6: 3, 7: 6, 8: 10 };
+      const totalTax = TAX_BY_COUNT[spiritCount] ?? 0;
+      if (totalTax > 0) run.spendKi(Math.min(totalTax, run.ki));
+    },
+  },
+
+  // ── Phase 3C — Deck composition modifiers ────────────────────────────────
+
+  no_brights_plain_threshold_minus: {
+    modifyDeck(cards) {
+      return cards.filter(c => c.type !== 'bright');
+    },
+    modifyYakuThreshold(yakuName, base) {
+      if (yakuName === 'kasu') return base - 1;
+      return base;
+    },
+  },
+
+  deck_36_field_plus: {
+    modifyDeck(cards) {
+      const modified = [...cards];
+      for (let month = 1; month <= 12; month++) {
+        const idx = modified.findIndex(c => c.month === month && c.type === 'plain');
+        if (idx >= 0) modified.splice(idx, 1);
+      }
+      return modified;
+    },
+    modifyFieldSlots: (base) => base + 1,
+  },
+
+  deck_60_hand_plus: {
+    modifyDeck(cards) {
+      const modified = [...cards];
+      for (let month = 1; month <= 12; month++) {
+        const plain = cards.find(c => c.month === month && c.type === 'plain');
+        if (plain) {
+          modified.push({
+            ...JSON.parse(JSON.stringify(plain)),
+            id: plain.id + '_guan_duplicate',
+            hexDuplicate: true,
+          });
+        }
+      }
+      return modified;
+    },
+    modifyHandSize: (base) => base + 1,
+  },
+
+  no_plains_double_others: {
+    modifyDeck(cards) {
+      const nonPlains = cards.filter(c => c.type !== 'plain');
+      const modified = [];
+      for (const card of nonPlains) {
+        modified.push(card);
+        modified.push({
+          ...JSON.parse(JSON.stringify(card)),
+          id: card.id + '_bo_duplicate',
+          hexDuplicate: true,
+        });
+      }
+      return modified;
+    },
+  },
+
+  animal_deck: {
+    modifyDeck(cards) {
+      const rankOrder = { bright: 4, animal: 3, ribbon: 2, plain: 1 };
+      const modified  = [];
+
+      for (let month = 1; month <= 12; month++) {
+        const monthCards = cards.filter(c => c.month === month);
+        let animal = monthCards.find(c => c.type === 'animal');
+
+        if (!animal) {
+          // Nearest month with an animal
+          for (let offset = 1; offset < 12 && !animal; offset++) {
+            const prevMonth = ((month - 1 - offset + 12) % 12) + 1;
+            const nextMonth = ((month - 1 + offset)      % 12) + 1;
+            animal = cards.find(c =>
+              (c.month === prevMonth || c.month === nextMonth) && c.type === 'animal'
+            );
+          }
+        }
+
+        if (!animal) { modified.push(...monthCards); continue; }
+
+        const nonAnimals = monthCards
+          .filter(c => c.type !== 'animal')
+          .sort((a, b) => rankOrder[b.type] - rankOrder[a.type]);
+
+        if (nonAnimals.length === 0) { modified.push(...monthCards); continue; }
+
+        const toReplace = nonAnimals[0].id;
+        for (const card of monthCards) {
+          if (card.id === toReplace) {
+            modified.push({
+              ...JSON.parse(JSON.stringify(animal)),
+              id: `${animal.id}_sui_${month}`,
+              month,
+              hexReplaced: true,
+            });
+          } else {
+            modified.push(card);
+          }
+        }
+      }
+      return modified;
+    },
+  },
+
+  ribbon_deck: {
+    modifyDeck(cards) {
+      const rankOrder = { bright: 4, animal: 3, ribbon: 2, plain: 1 };
+      const modified  = [];
+
+      for (let month = 1; month <= 12; month++) {
+        const monthCards = cards.filter(c => c.month === month);
+        let ribbon = monthCards.find(c => c.type === 'ribbon');
+
+        if (!ribbon) {
+          for (let offset = 1; offset < 12 && !ribbon; offset++) {
+            const prevMonth = ((month - 1 - offset + 12) % 12) + 1;
+            const nextMonth = ((month - 1 + offset)      % 12) + 1;
+            ribbon = cards.find(c =>
+              (c.month === prevMonth || c.month === nextMonth) && c.type === 'ribbon'
+            );
+          }
+        }
+
+        if (!ribbon) { modified.push(...monthCards); continue; }
+
+        const nonRibbons = monthCards
+          .filter(c => c.type !== 'ribbon')
+          .sort((a, b) => rankOrder[b.type] - rankOrder[a.type]);
+
+        if (nonRibbons.length === 0) { modified.push(...monthCards); continue; }
+
+        const toReplace = nonRibbons[0].id;
+        for (const card of monthCards) {
+          if (card.id === toReplace) {
+            modified.push({
+              ...JSON.parse(JSON.stringify(ribbon)),
+              id: `${ribbon.id}_xian_${month}`,
+              month,
+              hexReplaced: true,
+            });
+          } else {
+            modified.push(card);
+          }
+        }
+      }
+      return modified;
+    },
+  },
+
+  day_deck: {
+    modifyDeck(cards) {
+      const dayCards = cards.filter(c => c.temporal === 'day');
+      return [
+        ...dayCards,
+        ...dayCards.map(c => ({
+          ...JSON.parse(JSON.stringify(c)),
+          id: c.id + '_wuwang_duplicate',
+          hexDuplicate: true,
+        })),
+      ];
+    },
+  },
+
+  night_deck: {
+    modifyDeck(cards) {
+      const nightCards = cards.filter(c => c.temporal === 'night');
+      return [
+        ...nightCards,
+        ...nightCards.map(c => ({
+          ...JSON.parse(JSON.stringify(c)),
+          id: c.id + '_jian_duplicate',
+          hexDuplicate: true,
+        })),
+      ];
+    },
+  },
+
+  air_deck: {
+    modifyDeck(cards) {
+      const airCards = cards.filter(c => c.vertical === 'air');
+      return [
+        ...airCards,
+        ...airCards.map(c => ({
+          ...JSON.parse(JSON.stringify(c)),
+          id: c.id + '_gou_duplicate',
+          hexDuplicate: true,
+        })),
+      ];
+    },
+  },
+
+  land_deck: {
+    modifyDeck(cards) {
+      const landCards = cards.filter(c => c.vertical === 'land');
+      return [
+        ...landCards,
+        ...landCards.map(c => ({
+          ...JSON.parse(JSON.stringify(c)),
+          id: c.id + '_jiaren_duplicate',
+          hexDuplicate: true,
+        })),
+      ];
+    },
+  },
+
+  // ── Phase 3D — Economy modifiers ──────────────────────────────────────────
+
+  no_hand_ki_double_interest: {
+    modifyHandKi:       () => 0,
+    modifyInterestRate: (baseRate) => baseRate * 2,
+  },
+
+  start_50_ki_no_income: {
+    onRunStart(runManager) {
+      runManager._ki = 50;
+    },
+    modifyHandKi:       () => 0,
+    modifyInterestRate: () => 0,
+    modifyKiReward:     () => 0,
+  },
+
+  plus_offerings_double_reroll: {
+    modifyShopCount:  (baseCount) => baseCount + 1,
+    modifyRerollCost: (baseCost)  => baseCost * 2,
+  },
+
+  minus_offerings_discount: {
+    modifyShopCount: (baseCount) => Math.max(1, baseCount - 1),
+    modifyShopPrice: (basePrice) => Math.ceil(basePrice * 0.75),
+  },
+
+  no_banking_ki_plus_capture: {
+    modifyKiReward:     () => 0,
+    modifyInterestRate: () => 0,
+    onCaptureComplete({ run: r }) {
+      r.addKi(1);
+    },
+  },
+
+  push_ki_swing: {
+    onPushSuccess(r) {
+      r.addKi(10);
+    },
+    onPushFailure(r) {
+      r.spendKi(Math.min(10, r.ki));
+    },
+  },
+
+  price_increase_more_consumable_slots: {
+    modifyShopPrice: (basePrice) => Math.ceil(basePrice * 1.25),
+    onRunStart(runManager) {
+      runManager._maxConsumableSlots = 5;
+    },
+  },
 
   // TODO: Phase 3E — Radical mode changes
   deck_flip_revealed:                 {},
   yaku_ends_round:                    {},
   play_two_cards:                     {},
   match_by_rank:                      {},
-  match_by_adjacent_month:            {},
+  match_by_adjacent_month: {
+    overridesCaptureRule: () => 'adjacent_month',
+  },
   score_field_at_round_end:           {},
   randomized_deck:                    {},
 };
@@ -439,4 +748,48 @@ export function applyHook(hookName, fallback, ...args) {
   const effect = getActiveEffect();
   if (!effect || typeof effect[hookName] !== 'function') return fallback;
   return effect[hookName](...args);
+}
+
+// ── Wu Xing value helpers ─────────────────────────────────────────────────────
+// These replace every hardcoded enhancement constant in the codebase.
+// Each reads the base default and delegates to any active hexagram override.
+
+export function getFireFlatPoints(tier) {
+  return applyHook('modifyFirePoints', tier === 'upgraded' ? 100 : 30, tier);
+}
+
+export function getFireBreakChance(tier) {
+  return applyHook('modifyFireBreakChance', tier === 'upgraded' ? 0.10 : 0.20, tier);
+}
+
+/**
+ * Compute the current Water mult for a card.
+ * Mirrors SNOW_MULT/ICE_MULT arrays at default rates; hexagram can alter the
+ * depreciation rate via modifyWaterDepreciation.
+ */
+export function getWaterMult(tier, depLevel) {
+  const base  = tier === 'upgraded' ? 4.0 : 2.0;
+  const floor = tier === 'upgraded' ? 0.25 : 0.5;
+  const rate  = applyHook('modifyWaterDepreciation', tier === 'upgraded' ? 0.5 : 0.25, tier);
+  return Math.max(floor, base - (depLevel ?? 0) * rate);
+}
+
+export function getMetalHeldMult(tier) {
+  return applyHook('modifyMetalHeldMult', tier === 'upgraded' ? 3.0 : 1.5, tier);
+}
+
+export function getMeteoriteJackpotChance() {
+  return applyHook('modifyMeteoriteJackpot', 0.05, 0.05);
+}
+
+export function getEarthInterestRate(tier) {
+  return applyHook('modifyEarthInterest', tier === 'upgraded' ? 0.20 : 0.10, tier);
+}
+
+export function getWoodScoringMult(tier) {
+  return applyHook('modifyWoodScoring', 1.0, tier);
+}
+
+export function getEarthHeldMult(tier) {
+  return applyHook('modifyEarthHeld', 1.0, tier);
 }

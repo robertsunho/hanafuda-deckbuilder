@@ -49,12 +49,16 @@ import DeckManager      from "./DeckManager.js";
 import HandManager      from "./HandManager.js";
 import FieldManager     from "./FieldManager.js";
 import CaptureManager   from "./CaptureManager.js";
-import ScoringEngine, { SNOW_MULT, ICE_MULT } from "./ScoringEngine.js";
+import ScoringEngine from "./ScoringEngine.js";
 import ConsumableEffects from "./ConsumableEffects.js";
 import StyleEngine      from "./StyleEngine.js";
 import SpiritEffects    from "./SpiritEffects.js";
 import run, { RunManager } from "./RunManager.js";
-import { getActiveEffect, applyHook } from "./HexagramEffects.js";
+import { getActiveEffect, applyHook,
+  getFireFlatPoints, getFireBreakChance, getWaterMult,
+  getMetalHeldMult, getMeteoriteJackpotChance,
+  getEarthInterestRate, getWoodScoringMult, getEarthHeldMult,
+} from "./HexagramEffects.js";
 import logger           from "./GameplayLogger.js";
 import { SPIRIT_CATALOG, getSpiritDef, ANIMAL_SYMBIONT_MAP } from "../data/spirits.js";
 
@@ -414,13 +418,15 @@ export default class GameRoundManager {
     // ── Empty-slot play tracking (for Fix D/E capture rules) ─────────────
     this._lastHandPlayToEmptySlot = null;
 
-    // game_expanse: +2 field slots (10 total).
-    if (this._spirits.some(s => s.id === 'game_expanse')) {
-      this._field.setMaxSlots(10);
-    }
+    // Field slot count: game_expanse gives +2 base; hexagram may further adjust.
+    const _baseFieldSlots = this._spirits.some(s => s.id === 'game_expanse') ? 10 : FieldManager.MAX_SLOTS;
+    this._field.setMaxSlots(applyHook('modifyFieldSlots', _baseFieldSlots, _baseFieldSlots));
+    this._field.setCaptureRule(applyHook('overridesCaptureRule', 'month'));
 
-    const surplusExtra = this._spirits.some(s => s.id === 'game_surplus') ? 2 : 0;
-    this._hand.add(this._deck.draw(GameRoundManager.HAND_SIZE + surplusExtra));
+    const surplusExtra    = this._spirits.some(s => s.id === 'game_surplus') ? 2 : 0;
+    const _baseHandSize   = applyHook('modifyHandSize', GameRoundManager.HAND_SIZE, GameRoundManager.HAND_SIZE) + surplusExtra;
+    const _initialDeal    = applyHook('modifyCardsDealt', _baseHandSize, _baseHandSize, 'initial');
+    this._hand.add(this._deck.draw(_initialDeal));
 
     // Deal field cards one at a time so stacking rules are applied per card.
     for (const card of this._deck.draw(GameRoundManager.FIELD_DEAL)) {
@@ -701,9 +707,7 @@ export default class GameRoundManager {
     const events = [];
     for (const card of capturedCards) {
       if (card.enhancement?.element === 'water') {
-        const multArr = card.enhancement.tier === 'upgraded' ? ICE_MULT : SNOW_MULT;
-        const maxLevel = multArr.length - 1;
-        card.enhancement.depLevel = Math.min((card.enhancement.depLevel ?? 0) + 1, maxLevel);
+        card.enhancement.depLevel = (card.enhancement.depLevel ?? 0) + 1;
         events.push(`${card.id} Water dep → level ${card.enhancement.depLevel}`);
         // engine_glacier: +0.3 mult per water depreciation.
         for (const spirit of this._spirits) {
@@ -711,7 +715,7 @@ export default class GameRoundManager {
         }
       }
       if (card.enhancement?.element === 'fire') {
-        const breakChance = card.enhancement.tier === 'upgraded' ? 0.10 : 0.20;
+        const breakChance = getFireBreakChance(card.enhancement.tier);
         if (Math.random() < breakChance) {
           run.deleteCard(card.id);
           card._broken = true;
@@ -777,7 +781,7 @@ export default class GameRoundManager {
     let rate = 0;
     for (const card of this._hand.getAll()) {
       if (card.enhancement?.element === 'earth') {
-        rate += card.enhancement.tier === 'upgraded' ? 0.20 : 0.10;
+        rate += getEarthInterestRate(card.enhancement.tier);
       }
     }
     return Math.floor(run.ki * rate);
@@ -789,9 +793,12 @@ export default class GameRoundManager {
    */
   _getNextPushDealCount() {
     const angel = this._spirits.some(s => s.id === 'game_angel') ? 1 : 0;
-    if (this._pushCount === 1) return 4 + angel;
-    if (this._pushCount === 2) return 2 + angel;
-    return 1 + angel;
+    let base;
+    if      (this._pushCount === 1) base = 4 + angel;
+    else if (this._pushCount === 2) base = 2 + angel;
+    else                            base = 1 + angel;
+    const phase = this._pushCount === 1 ? 'push1' : this._pushCount === 2 ? 'push2' : 'push3plus';
+    return applyHook('modifyCardsDealt', base, base, phase);
   }
 
   // ── Three Marks helpers ────────────────────────────────────────────────────
@@ -903,17 +910,19 @@ export default class GameRoundManager {
       let mult   = 1.0;
 
       // Metal enhancement: mult from cards held in HAND during this capture.
-      // Each Iron card in hand contributes ×1.5 mult; each Meteorite ×3.0.
-      // Meteorite: 5% jackpot (+30 ki) per Meteorite in hand.
+      // Earth enhancement: mult from earth cards held in HAND during this capture.
       for (const handCard of this._hand.getAll()) {
         const henh = handCard.enhancement;
-        if (henh?.element !== 'metal') continue;
-        mult *= henh.tier === 'upgraded' ? 3.0 : 1.5;
-        if (henh.tier === 'upgraded' && Math.random() < 0.05) {
-          run.addKi(30);
-          for (const spirit of this._spirits) {
-            if (spirit.id === 'engine_velocity' && spirit.state) spirit.state.metalProcCount++;
+        if (henh?.element === 'metal') {
+          mult *= getMetalHeldMult(henh.tier);
+          if (henh.tier === 'upgraded' && Math.random() < getMeteoriteJackpotChance()) {
+            run.addKi(30);
+            for (const spirit of this._spirits) {
+              if (spirit.id === 'engine_velocity' && spirit.state) spirit.state.metalProcCount++;
+            }
           }
+        } else if (henh?.element === 'earth') {
+          mult *= getEarthHeldMult(henh.tier);
         }
       }
 
@@ -922,13 +931,15 @@ export default class GameRoundManager {
 
         // Base points + Fire additive (Ember/Charcoal add on top of base points).
         let cardPts = card.points;
-        if (enh?.element === 'fire') cardPts += enh.tier === 'upgraded' ? 100 : 30;
+        if (enh?.element === 'fire')  cardPts += getFireFlatPoints(enh.tier);
 
         // Water mult (Snow/Ice) — applied after Fire additive.
         if (enh?.element === 'water') {
-          const multArr = enh.tier === 'upgraded' ? ICE_MULT : SNOW_MULT;
-          cardPts = Math.round(cardPts * multArr[Math.min(enh.depLevel ?? 0, multArr.length - 1)]);
+          cardPts = Math.round(cardPts * getWaterMult(enh.tier, enh.depLevel ?? 0));
         }
+
+        // Wood scoring mult — applied to the per-capture multiplier.
+        if (enh?.element === 'wood') mult *= getWoodScoringMult(enh.tier);
 
         // Edition bonuses — applied before spirit effects.
         if (card.edition === 'gold')    cardPts += 20;
@@ -981,16 +992,17 @@ export default class GameRoundManager {
           ...this._spirits,
           ...run.negativeSpirits,
         ];
-        for (const spirit of allScoringSpirits) {
-          const effect = SpiritEffects.get(spirit.id);
-          if (!effect) continue;
-          const count = spirit.isNegative ? 1 : (spirit.stackCount ?? 1);
-          if (effect.onCardScored) {
+        // four_spirits_fire_twice: onCardScored fires twice per card.
+        const _spiritFireCount = applyHook('shouldSpiritsFireTwice', false, false) ? 2 : 1;
+        for (let _sf = 0; _sf < _spiritFireCount; _sf++) {
+          for (const spirit of allScoringSpirits) {
+            const effect = SpiritEffects.get(spirit.id);
+            if (!effect?.onCardScored) continue;
+            const count = spirit.isNegative ? 1 : (spirit.stackCount ?? 1);
             const r = effect.onCardScored({ card, spirit, spirits: this._spirits });
             if (r) {
               const prevPts  = points;
               const prevMult = mult;
-              // Scale additive/multiplicative values by stack count
               if (r.addPoints)    points += r.addPoints    * count;
               if (r.addMult)      mult   += r.addMult      * count;
               if (r.multiplyMult) mult   *= r.multiplyMult * count;
@@ -1005,14 +1017,18 @@ export default class GameRoundManager {
               }
             }
           }
-          if (effect.onCardSeen) {
-            const prevState = JSON.stringify(spirit.state);
-            for (let copy = 0; copy < count; copy++) {
-              effect.onCardSeen({ card, spirit });
-            }
-            if (this._onScoringStep && JSON.stringify(spirit.state) !== prevState) {
-              this._onScoringStep({ type: 'engine_state_update', spirit, card });
-            }
+        }
+        // Engine state (onCardSeen) fires once regardless of fire count.
+        for (const spirit of allScoringSpirits) {
+          const effect = SpiritEffects.get(spirit.id);
+          if (!effect?.onCardSeen) continue;
+          const count = spirit.isNegative ? 1 : (spirit.stackCount ?? 1);
+          const prevState = JSON.stringify(spirit.state);
+          for (let copy = 0; copy < count; copy++) {
+            effect.onCardSeen({ card, spirit });
+          }
+          if (this._onScoringStep && JSON.stringify(spirit.state) !== prevState) {
+            this._onScoringStep({ type: 'engine_state_update', spirit, card });
           }
         }
       }
@@ -1112,11 +1128,10 @@ export default class GameRoundManager {
           for (let rt = 0; rt < retriggerCount; rt++) {
             // Base + Fire additive
             let rPts = card.points;
-            if (rEnh?.element === 'fire') rPts += rEnh.tier === 'upgraded' ? 100 : 30;
+            if (rEnh?.element === 'fire')  rPts += getFireFlatPoints(rEnh.tier);
             // Water mult — use current depLevel; do NOT increment it
             if (rEnh?.element === 'water') {
-              const multArr = rEnh.tier === 'upgraded' ? ICE_MULT : SNOW_MULT;
-              rPts = Math.round(rPts * multArr[Math.min(rEnh.depLevel ?? 0, multArr.length - 1)]);
+              rPts = Math.round(rPts * getWaterMult(rEnh.tier, rEnh.depLevel ?? 0));
             }
             let rMult = 1.0;
             // Edition bonuses
@@ -1138,7 +1153,7 @@ export default class GameRoundManager {
             // Metal from hand — each Iron/Meteorite in hand contributes mult (no jackpot re-roll)
             for (const handCard of this._hand.getAll()) {
               const henh = handCard.enhancement;
-              if (henh?.element === 'metal') rMult *= henh.tier === 'upgraded' ? 3.0 : 1.5;
+              if (henh?.element === 'metal') rMult *= getMetalHeldMult(henh.tier);
             }
             // Per-card spirit effects
             for (const spirit of this._spirits) {
@@ -1256,6 +1271,12 @@ export default class GameRoundManager {
     if (newCombos.length > 0) {
       this._onStyleCombos(newCombos);
     }
+
+    // Hexagram onCaptureComplete hook (e.g. no_banking_ki_plus_capture: +1 ki per capture).
+    const _hexCapture = getActiveEffect();
+    if (_hexCapture?.onCaptureComplete) {
+      _hexCapture.onCaptureComplete({ run, capturedCards: cards });
+    }
   }
 
   /**
@@ -1315,7 +1336,7 @@ export default class GameRoundManager {
     const pending = this._field.getPendingSlot();
 
     if (pending) {
-      if (deckCard.month === pending.month) {
+      if (this._field.matchesSlot(deckCard, pending)) {
         // Deck card is the same month as the pending match.
         // Silk (Wood upgraded) cards in the pending slot are immune to stranding:
         // they force a capture even when adding the deck card would normally strand.
@@ -1377,7 +1398,7 @@ export default class GameRoundManager {
       // No pending match — deck card goes to the field.
       // Fix D: 1 hand card played to empty slot + flip is same month → capture pair.
       if (this._lastHandPlayToEmptySlot?.cards.length === 1 &&
-          deckCard.month === this._lastHandPlayToEmptySlot.month) {
+          this._field.cardsMatch(deckCard, this._lastHandPlayToEmptySlot.cards[0])) {
         const handCard = this._lastHandPlayToEmptySlot.cards[0];
         this._field.removeCardById(handCard.id);
         this._addCapture([handCard, deckCard]);
@@ -1385,7 +1406,7 @@ export default class GameRoundManager {
         _flipCaptures = [handCard, deckCard];
       // Fix E: 2 hand cards played to empty slot + flip is different month → capture the pair.
       } else if (this._lastHandPlayToEmptySlot?.cards.length === 2 &&
-                 deckCard.month !== this._lastHandPlayToEmptySlot.month) {
+                 !this._field.cardsMatch(deckCard, this._lastHandPlayToEmptySlot.cards[0])) {
         const handCards = this._lastHandPlayToEmptySlot.cards;
         for (const hc of handCards) this._field.removeCardById(hc.id);
         this._addCapture(handCards);
@@ -1415,6 +1436,23 @@ export default class GameRoundManager {
     }
 
     logger.logDeckFlip(deckCard, _flipResult, _flipCaptures);
+
+    // field_plus_two_double_flip: flip a second deck card this turn.
+    if (!this._deck.isEmpty() && applyHook('modifyDeckFlipsPerTurn', 1, 1) >= 2) {
+      const deckCard2     = this._deck.draw(1)[0];
+      const flipResult2   = this._field.addFlippedCard(deckCard2);
+      let _flip2Result    = 'field_place';
+      let _flip2Captures  = [];
+      if (flipResult2.captured) {
+        this._addCapture(flipResult2.captured);
+        _flip2Result   = 'capture';
+        _flip2Captures = flipResult2.captured;
+      } else if (flipResult2.discarded) {
+        _flip2Result = this._handleFieldDiscard(deckCard2);
+      }
+      logger.logDeckFlip(deckCard2, _flip2Result, _flip2Captures);
+    }
+
     return this._finalizeTurn();
   }
 

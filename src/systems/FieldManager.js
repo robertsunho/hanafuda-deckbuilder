@@ -40,6 +40,7 @@ export default class FieldManager {
      * @type {Array<{month:number, cards:object[], state:'normal'|'pending'}|null>}
      */
     this._slots = [];
+    this._captureRule = 'month';
   }
 
   // ── Read-only accessors ────────────────────────────────────────────────────
@@ -52,6 +53,29 @@ export default class FieldManager {
 
   /** True when every position is empty (or the array is empty). */
   isEmpty()       { return this._slots.every(s => s === null); }
+
+  // ── Capture rule ─────────────────────────────────────────────────────────────
+
+  /** Set the capture matching rule for this round ('month', 'rank', 'adjacent_month'). */
+  setCaptureRule(rule) { this._captureRule = rule; }
+
+  /** Check if a card matches a slot using the active capture rule. */
+  matchesSlot(card, slot) { return this._matchesSlot(card, slot); }
+
+  /** Check if two cards match each other using the active capture rule. */
+  cardsMatch(card1, card2) {
+    switch (this._captureRule) {
+      case 'adjacent_month': {
+        const m1 = card1.month, m2 = card2.month;
+        const diff = Math.min(Math.abs(m1 - m2), 12 - Math.abs(m1 - m2));
+        return diff === 1;
+      }
+      case 'rank':
+        return card1.type === card2.type;
+      default:
+        return card1.month === card2.month;
+    }
+  }
 
   // ── Slot access ────────────────────────────────────────────────────────────
 
@@ -148,7 +172,7 @@ export default class FieldManager {
    *   captured  — always null; 4-card stacks stay pending until the deck phase
    */
   playHandCard(card) {
-    const matchingSlots = this.getSlotsForMonth(card.month);
+    const matchingSlots = this._getMatchingSlots(card);
 
     if (matchingSlots.length === 0) {
       const idx = this._firstEmptyIndex();
@@ -164,7 +188,7 @@ export default class FieldManager {
       return { matched: false, discarded: false, captured: null };
     }
 
-    // Merge all same-month slots + hand card into the FIRST matching slot,
+    // Merge all matching slots + hand card into the FIRST matching slot,
     // mutating it in-place so its grid index never changes.
     const target        = matchingSlots[0];
     const allFieldCards = matchingSlots.flatMap(s => s.cards);
@@ -208,7 +232,7 @@ export default class FieldManager {
    */
   playHandCards(cards, targetMonth = null) {
     const month         = targetMonth ?? cards[0].month;
-    const matchingSlots = this.getSlotsForMonth(month);
+    const matchingSlots = this._getMatchingSlots(cards[0]);
 
     if (matchingSlots.length === 0) {
       const idx = this._firstEmptyIndex();
@@ -270,7 +294,7 @@ export default class FieldManager {
    * @returns {{ discarded: boolean, captured: object[]|null }}
    */
   addFlippedCard(card) {
-    const matches = this._slots.filter(s => s && s.month === card.month && s.state === 'normal');
+    const matches = this._getMatchingSlots(card, 'pending');
     const slot    = matches.reduce((best, s) => (!best || s.cards.length < best.cards.length) ? s : best, null);
     if (slot) {
       slot.cards.push(card);
@@ -383,6 +407,7 @@ export default class FieldManager {
   clear() {
     this._slots = [];
     this._maxSlots = undefined;
+    this._captureRule = 'month';
     return this;
   }
 
@@ -431,6 +456,28 @@ export default class FieldManager {
    *   - -1 if the field is truly full.
    * @returns {number}
    */
+  _matchesSlot(card, slot) {
+    switch (this._captureRule) {
+      case 'adjacent_month': {
+        const m1 = card.month, m2 = slot.month;
+        const diff = Math.min(Math.abs(m1 - m2), 12 - Math.abs(m1 - m2));
+        return diff === 1;
+      }
+      case 'rank':
+        return slot.cards.some(c => c.type === card.type);
+      default:
+        return card.month === slot.month;
+    }
+  }
+
+  _getMatchingSlots(card, excludeState = null) {
+    return this._slots.filter(s => {
+      if (!s) return false;
+      if (excludeState && s.state === excludeState) return false;
+      return this._matchesSlot(card, s);
+    });
+  }
+
   _firstEmptyIndex() {
     const maxSlots = this._maxSlots ?? FieldManager.MAX_SLOTS;
     const i = this._slots.indexOf(null);
