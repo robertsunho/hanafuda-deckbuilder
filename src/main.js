@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import { BootScene }   from './scenes/BootScene.js';
-import { GameScene }   from './scenes/GameScene.js';
-import { ShrineScene } from './scenes/ShrineScene.js';
+import { BootScene }       from './scenes/BootScene.js';
+import { DivinationScene } from './scenes/DivinationScene.js';
+import { GameScene }       from './scenes/GameScene.js';
+import { ShrineScene }     from './scenes/ShrineScene.js';
 import logger          from './systems/GameplayLogger.js';
 
 const config = {
@@ -10,7 +11,7 @@ const config = {
   width: 1280,
   height: 720,
   backgroundColor: '#16213e',
-  scene: [BootScene, GameScene, ShrineScene],
+  scene: [BootScene, DivinationScene, GameScene, ShrineScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
