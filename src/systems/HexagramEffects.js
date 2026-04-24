@@ -709,7 +709,9 @@ export const HEXAGRAM_EFFECTS = {
   yaku_ends_round: {
     forceAutoBankOnYaku: () => true,
   },
-  play_two_cards:                     {},
+  play_two_cards: {
+    modifyPlaysPerTurn: () => 2,
+  },
   match_by_rank: {
     overridesCaptureRule: () => 'rank',
     disablesYaku: () => true,

@@ -273,6 +273,10 @@ export default class GameRoundManager {
 
   /** Revealed next deck flip card (when deck_flip_revealed hexagram is active). */
   get nextDeckFlip() { return this._nextDeckFlip; }
+  /** Number of plays required per turn (1 normally, 2 with play_two_cards hex). */
+  get requiredPlaysPerTurn() { return this._requiredPlaysPerTurn; }
+  /** Number of plays made so far in the current turn. */
+  get playsThisTurn() { return this._playsThisTurn; }
 
   /** Running total of score accumulated this round (capture events). */
   get runningScore() { return this._runningScore; }
@@ -381,6 +385,8 @@ export default class GameRoundManager {
     this._snakeThresholdMods       = {};
     this._lastStyleCombos          = [];
     this._nextDeckFlip             = null;
+    this._playsThisTurn            = 0;
+    this._requiredPlaysPerTurn     = applyHook('modifyPlaysPerTurn', 1, 1);
     this._style.resetRound();
 
     // Hexagram round-start hook
@@ -508,14 +514,24 @@ export default class GameRoundManager {
     // Remove all played cards from hand.
     this._hand.removeMany(cardIds);
 
-    // Snapshot active yaku (name → bonus) so _finalizeTurn() can diff.
-    const _snapThresholds = this._getCaptureThresholds();
-    const _snapCards = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
-    this._yakuBeforeTurn = new Map(
-      this._scoring.evaluate(_snapCards, run.yakuUpgrades, _snapThresholds).map(y => [y.name, y.bonus])
-    );
+    // Multi-play turn: resolve any pending match from a previous play this turn.
+    if (this._playsThisTurn > 0) {
+      const pending = this._field.getPendingSlot();
+      if (pending) {
+        const captured = this._field.capturePendingMatch();
+        if (captured.length > 0) this._addCapture(captured);
+      }
+    }
 
-    this._discardedThisTurn = [];   // reset each turn
+    // Snapshot yaku and reset discards only on the first play of a turn.
+    if (this._playsThisTurn === 0) {
+      const _snapThresholds = this._getCaptureThresholds();
+      const _snapCards = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
+      this._yakuBeforeTurn = new Map(
+        this._scoring.evaluate(_snapCards, run.yakuUpgrades, _snapThresholds).map(y => [y.name, y.bonus])
+      );
+      this._discardedThisTurn = [];
+    }
 
     const handResult = this._field.playHandCards(cards, targetMonth);
     if (handResult.captured) {
@@ -543,15 +559,19 @@ export default class GameRoundManager {
       this._lastHandPlayToEmptySlot = null;
     }
 
-    this._phase = "awaiting_deck";
+    this._playsThisTurn++;
+    const morePlays = this._playsThisTurn < this._requiredPlaysPerTurn && !this._hand.isEmpty();
+
+    this._phase = morePlays ? "idle" : "awaiting_deck";
 
     return {
-      status:       "awaiting_deck",
+      status:       morePlays ? "awaiting_play" : "awaiting_deck",
       handCards:    cards,
       matched:      handResult.matched,
       autoCaptured: handResult.captured != null,
       discarded:    handResult.discarded ? [...cards] : [],
       basePoints:   this._basePoints,
+      playsRemaining: this._requiredPlaysPerTurn - this._playsThisTurn,
     };
   }
 
@@ -1513,6 +1533,7 @@ export default class GameRoundManager {
    */
   _finalizeTurn() {
     this._turn++;
+    this._playsThisTurn = 0;
     this._capture.recordTurn();
 
     const _yakuThresholds = this._getCaptureThresholds();

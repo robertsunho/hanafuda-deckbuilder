@@ -1522,6 +1522,15 @@ export class GameScene extends Phaser.Scene {
     // Animate any captures produced by the hand phase.
     await this._playScoringAnimation();
 
+    // Multi-play turn: wait for more plays before proceeding to deck phase.
+    if (handResult.status === 'awaiting_play') {
+      this._animating = false;
+      const rem = handResult.playsRemaining;
+      this._setStatus(`Play ${rem} more card${rem > 1 ? 's' : ''} this turn.`);
+      this._renderAll();
+      return;
+    }
+
     // Show field-discard sprites briefly then proceed to deck phase.
     const handDiscardSprs = handResult.discarded.map((card, i) =>
       this.add.image(FLIP_X + 40, FLIP_Y - 60 + i * 20, card.id)
