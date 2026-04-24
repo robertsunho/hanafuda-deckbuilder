@@ -38,20 +38,50 @@ const FIELD_CY    = 340;
 const FIELD_COL_W = Math.round(CARD_W * CARD_SCALE * 2.2);  // ~141
 const FIELD_ROW_H = Math.round(CARD_H * CARD_SCALE) + 50;   // 154
 
-// Hexagonal arrangement: 3-top / 2-middle (flanking deck) / 3-bottom + overflow
-const SLOT_POSITIONS = [
-  { x: FIELD_CX - FIELD_COL_W,        y: FIELD_CY - FIELD_ROW_H },  // F1
-  { x: FIELD_CX,                      y: FIELD_CY - FIELD_ROW_H },  // F2
-  { x: FIELD_CX + FIELD_COL_W,        y: FIELD_CY - FIELD_ROW_H },  // F3
-  { x: FIELD_CX - FIELD_COL_W * 1.75,  y: FIELD_CY               },  // F4 (left)
-  { x: FIELD_CX + FIELD_COL_W * 1.75,  y: FIELD_CY               },  // F5 (right)
-  { x: FIELD_CX - FIELD_COL_W,        y: FIELD_CY + FIELD_ROW_H },  // F6
-  { x: FIELD_CX,                      y: FIELD_CY + FIELD_ROW_H },  // F7
-  { x: FIELD_CX + FIELD_COL_W,        y: FIELD_CY + FIELD_ROW_H },  // F8
-  // Overflow positions for hexagram-modified field (9th, 10th)
-  { x: FIELD_CX - FIELD_COL_W * 1.75,  y: FIELD_CY - FIELD_ROW_H },  // F9  (far-left top)
-  { x: FIELD_CX + FIELD_COL_W * 1.75,  y: FIELD_CY - FIELD_ROW_H },  // F10 (far-right top)
-];
+// Hexagonal field layout — middle row is fixed; top/bottom rows are dynamic.
+const MIDDLE_MUL     = 1.75;
+const MIDDLE_LEFT_X  = FIELD_CX - FIELD_COL_W * MIDDLE_MUL;
+const MIDDLE_RIGHT_X = FIELD_CX + FIELD_COL_W * MIDDLE_MUL;
+const INNER_MARGIN   = 30;  // px inset from middle row edges for 4-slot rows
+
+function _distributeRow(count, y) {
+  if (count === 0) return [];
+  if (count === 1) return [{ x: FIELD_CX, y }];
+  // 3-slot row: exact default positions (preserves current 8-slot layout)
+  if (count === 3) return [
+    { x: FIELD_CX - FIELD_COL_W, y },
+    { x: FIELD_CX,               y },
+    { x: FIELD_CX + FIELD_COL_W, y },
+  ];
+  // 2-slot row: symmetric around centre
+  if (count === 2) {
+    const halfGap = FIELD_COL_W * 0.55;
+    return [
+      { x: FIELD_CX - halfGap, y },
+      { x: FIELD_CX + halfGap, y },
+    ];
+  }
+  // 4+ slots: equidistant within inner span
+  const left  = MIDDLE_LEFT_X  + INNER_MARGIN;
+  const right = MIDDLE_RIGHT_X - INNER_MARGIN;
+  const step  = (right - left) / (count - 1);
+  return Array.from({ length: count }, (_, i) => ({
+    x: Math.round(left + i * step), y,
+  }));
+}
+
+function computeFieldSlotPositions(totalSlots) {
+  const outerCount  = totalSlots - 2;            // minus middle row's 2
+  const topCount    = Math.floor(outerCount / 2);
+  const bottomCount = Math.ceil(outerCount / 2);  // bottom-heavy for odd
+
+  return [
+    ..._distributeRow(topCount,    FIELD_CY - FIELD_ROW_H),
+    { x: MIDDLE_LEFT_X,  y: FIELD_CY },
+    { x: MIDDLE_RIGHT_X, y: FIELD_CY },
+    ..._distributeRow(bottomCount, FIELD_CY + FIELD_ROW_H),
+  ];
+}
 
 const SLOT_FAN_X = 10;
 const SLOT_FAN_Y = 14;
@@ -355,8 +385,9 @@ export class GameScene extends Phaser.Scene {
     const fireWild   = this._fireWildCard !== null;
 
     const fieldSlotCount = this._round.field.maxSlots;
+    const slotPositions  = computeFieldSlotPositions(fieldSlotCount);
     for (let i = 0; i < fieldSlotCount; i++) {
-      const { x: sx, y: sy } = SLOT_POSITIONS[i] ?? SLOT_POSITIONS[SLOT_POSITIONS.length - 1];
+      const { x: sx, y: sy } = slotPositions[i];
       const slot     = slots[i];
       const isFanned = this._fannedSlot === i;
 
