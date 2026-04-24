@@ -1909,7 +1909,7 @@ export class GameScene extends Phaser.Scene {
         .setStrokeStyle(2, 0xaa3333).setInteractive({ useHandCursor: true });
       btn.on('pointerover', () => btn.setFillStyle(0x8a2a2a));
       btn.on('pointerout',  () => btn.setFillStyle(0x5a1a1a));
-      btn.on('pointerdown', () => { run.reset(); this.scene.start('BootScene'); });
+      btn.on('pointerdown', () => { this.scene.start('MenuScene'); });
       this._overlayObjs.push(btn);
       this._overlayObjs.push(
         this.add.text(cx, btnY, 'Return to Menu', { fontSize: '18px', color: '#ffaaaa' })
@@ -1963,7 +1963,7 @@ export class GameScene extends Phaser.Scene {
           .setStrokeStyle(2, 0x88cc44).setInteractive({ useHandCursor: true });
         btn.on('pointerover', () => btn.setFillStyle(0x5a9a2a));
         btn.on('pointerout',  () => btn.setFillStyle(0x3a6a1a));
-        btn.on('pointerdown', () => { run.reset(); this.scene.start('BootScene'); });
+        btn.on('pointerdown', () => { this.scene.start('MenuScene'); });
         this._overlayObjs.push(btn);
         this._overlayObjs.push(
           this.add.text(cx, btnY, 'Victory!  Return to Menu', {
