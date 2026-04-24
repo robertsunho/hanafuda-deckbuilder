@@ -724,7 +724,22 @@ export const HEXAGRAM_EFFECTS = {
     disableCaptureScoring: () => true,
     scoreFieldAtRoundEnd: () => true,
   },
-  randomized_deck:                    {},
+  randomized_deck: {
+    modifyDeck(cards) {
+      const months = cards.map(c => c.month);
+      const types  = cards.map(c => c.type);
+
+      shuffleArray(months);
+      shuffleArray(types);
+
+      return cards.map((card, i) => ({
+        ...JSON.parse(JSON.stringify(card)),
+        month: months[i],
+        type: types[i],
+        hexRandomized: true,
+      }));
+    },
+  },
 };
 
 // ── Public helpers ────────────────────────────────────────────────────────────
