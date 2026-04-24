@@ -117,18 +117,24 @@ export class DivinationScene extends Phaser.Scene {
     }
 
     if (this._rolledLines.length >= 6) return;
-    this._throwNext();
+    this._startCoinSequence();
   }
 
-  // ── Single throw ────────────────────────────────────────────────────────
-  _throwNext() {
+  // ── Auto-chain all 6 throws on a single click ──────────────────────────
+  _startCoinSequence() {
     this._busy = true;
+    this._btnBg.setFillStyle(0x141e30);
+    this._btnLabel.setAlpha(0.4);
+    this._throwNextInSequence();
+  }
+
+  _throwNextInSequence() {
     const { coins, line } = throwCoinsOnce();
     const throwIndex = this._rolledLines.length;  // 0-based
 
     this._counterText.setText(`Throw ${throwIndex + 1} of 6`);
 
-    // Animate coins
+    // Animate coins, then resolve and chain next
     this._animateCoins(coins, () => {
       this._rolledLines.push(line);
       this._drawLine(throwIndex, line);
@@ -143,8 +149,8 @@ export class DivinationScene extends Phaser.Scene {
         this._counterText.setText('Throw 6 of 6');
         this.time.delayedCall(400, () => this._revealHexagram());
       } else {
-        this._counterText.setText(`Throw ${this._rolledLines.length + 1} of 6`);
-        this._busy = false;
+        // Brief pause, then throw next
+        this.time.delayedCall(300, () => this._throwNextInSequence());
       }
     });
   }
