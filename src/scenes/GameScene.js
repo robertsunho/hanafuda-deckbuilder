@@ -6,6 +6,9 @@ import { getSpiritDef }      from '../data/spirits.js';
 import logger                from '../systems/GameplayLogger.js';
 import SpiritEffects         from '../systems/SpiritEffects.js';
 
+/** Resolve card → Phaser texture key (handles hex-duplicate suffix). */
+function _tex(card) { return card.baseImageId ?? card.id; }
+
 // ── Layout constants ───────────────────────────────────────────────────────────
 // Canvas is 1280 × 720.
 // Top        (y 0–114):  Spirit row (horizontal) + info cluster (top-left)
@@ -335,7 +338,7 @@ export class GameScene extends Phaser.Scene {
       const selected = this._selectedCardIds.has(card.id);
       const x        = startX + i * HAND_STEP;
       const y        = HAND_Y - (selected || (fireWild && card.id === this._fireWildCard.id) ? 20 : 0);
-      const spr      = this.add.image(x, y, card.id).setScale(CARD_SCALE);
+      const spr      = this.add.image(x, y, _tex(card)).setScale(CARD_SCALE);
 
       const ttY = y - Math.round(CARD_H * CARD_SCALE / 2) - 5;
       if (markActive) {
@@ -403,7 +406,7 @@ export class GameScene extends Phaser.Scene {
         const offY = isFanned ? j * 28 : j * SLOT_FAN_Y;
         const cx   = sx + offX;
         const cy   = sy + offY;
-        const spr  = this.add.image(cx, cy, card.id).setScale(CARD_SCALE);
+        const spr  = this.add.image(cx, cy, _tex(card)).setScale(CARD_SCALE);
         const ttY  = cy - Math.round(CARD_H * CARD_SCALE / 2) - 5;
 
         if (markActive) {
@@ -779,7 +782,7 @@ export class GameScene extends Phaser.Scene {
       for (let i = 0; i < cards.length; i++) {
         const card  = cards[i];
         const imgX  = CAPTURE_X + i * CAPTURE_OVERLAP;
-        const img   = this.add.image(imgX, fanY, card.id).setScale(CAPTURE_SCALE).setOrigin(0, 0);
+        const img   = this.add.image(imgX, fanY, _tex(card)).setScale(CAPTURE_SCALE).setOrigin(0, 0);
         const ttX   = imgX + CAPTURE_CARD_W / 2;
         img.setInteractive({ useHandCursor: false });
         img.on('pointerover', () => this._showCardTooltip(card, ttX, fanY - 4));
@@ -832,7 +835,7 @@ export class GameScene extends Phaser.Scene {
     );
     if (bankedCount > 0) {
       const capTop = bankedCards[bankedCount - 1];
-      const capSpr = this.add.image(BANKED_X, BANKED_Y, capTop.id)
+      const capSpr = this.add.image(BANKED_X, BANKED_Y, _tex(capTop))
         .setScale(CARD_SCALE).setInteractive({ useHandCursor: true });
       capSpr.on('pointerover', () => capSpr.setTint(0x88aacc));
       capSpr.on('pointerout',  () => capSpr.clearTint());
@@ -859,7 +862,7 @@ export class GameScene extends Phaser.Scene {
     );
     if (discardCount > 0) {
       const dTop = discards[discardCount - 1];
-      const dSpr = this.add.image(DISCARD_X, DISCARD_Y, dTop.id)
+      const dSpr = this.add.image(DISCARD_X, DISCARD_Y, _tex(dTop))
         .setScale(CARD_SCALE).setTint(0x886655).setInteractive({ useHandCursor: true });
       dSpr.on('pointerover', () => dSpr.setTint(TINT_HOVER));
       dSpr.on('pointerout',  () => dSpr.setTint(0x886655));
@@ -1007,7 +1010,7 @@ export class GameScene extends Phaser.Scene {
           const startX   = Math.round(cx - rowW / 2 + OV_W / 2);
           const spentIds = this._round.spentCardIds;
           for (let j = 0; j < rowCards.length; j++) {
-            const img = this.add.image(startX + j * (OV_W + OV_GAP), Math.round(y + OV_H / 2), rowCards[j].id)
+            const img = this.add.image(startX + j * (OV_W + OV_GAP), Math.round(y + OV_H / 2), _tex(rowCards[j]))
               .setScale(OV_SCALE).setDepth(20);
             if (spentIds?.has(rowCards[j].id)) img.setTint(0x334455).setAlpha(0.5);
             objs.push(img);
@@ -1568,7 +1571,7 @@ export class GameScene extends Phaser.Scene {
 
     // Show field-discard sprites briefly then proceed to deck phase.
     const handDiscardSprs = handResult.discarded.map((card, i) =>
-      this.add.image(FLIP_X + 40, FLIP_Y - 60 + i * 20, card.id)
+      this.add.image(FLIP_X + 40, FLIP_Y - 60 + i * 20, _tex(card))
         .setScale(CARD_SCALE).setTint(TINT_DISCARD).setDepth(10)
     );
     if (handDiscardSprs.length > 0) await this._delay(400);
@@ -1600,7 +1603,7 @@ export class GameScene extends Phaser.Scene {
     const temp = [];
 
     if (result.deckCard) {
-      const spr = this.add.image(FLIP_X, FLIP_Y, result.deckCard.id)
+      const spr = this.add.image(FLIP_X, FLIP_Y, _tex(result.deckCard))
         .setScale(CARD_SCALE * 0.5).setDepth(10);
       temp.push(spr);
       this.tweens.add({
@@ -1616,7 +1619,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     for (let i = 0; i < result.discarded.length; i++) {
-      const spr = this.add.image(FLIP_X + 40, FLIP_Y - 60 + i * 20, result.discarded[i].id)
+      const spr = this.add.image(FLIP_X + 40, FLIP_Y - 60 + i * 20, _tex(result.discarded[i]))
         .setScale(CARD_SCALE).setTint(TINT_DISCARD).setDepth(10);
       temp.push(spr);
       this.tweens.add({ targets: spr, alpha: 0, duration: FLIP_HOLD - 100, ease: 'Linear' });
@@ -1725,7 +1728,7 @@ export class GameScene extends Phaser.Scene {
     const label = this.add.text(px, py - CARD_H / 2 - 16, 'Next:', {
       fontSize: '10px', color: '#66ccee',
     }).setOrigin(0.5).setDepth(5);
-    const card = this.add.image(px, py, preview.id)
+    const card = this.add.image(px, py, _tex(preview))
       .setDisplaySize(CARD_W * 0.9, CARD_H * 0.9).setDepth(5);
     this._deckPreviewObjs.push(bg, label, card);
   }
@@ -2269,7 +2272,7 @@ export class GameScene extends Phaser.Scene {
   /** Brief tint highlight on the card image in the capture fan (best-effort). */
   _highlightScoringCard(card) {
     for (const obj of this._captureObjs) {
-      if (obj.texture?.key === card.id) {
+      if (obj.texture?.key === _tex(card)) {
         obj.setTint(0xffffaa);
         this.time.delayedCall(400, () => { if (obj.active) obj.clearTint(); });
         break;
@@ -2453,7 +2456,7 @@ export class GameScene extends Phaser.Scene {
         for (let j = 0; j < row.length; j++) {
           const card = row[j];
           objs.push(
-            this.add.image(startX + j * (OV_W + OV_GAP), Math.round(y + OV_H / 2), card.id)
+            this.add.image(startX + j * (OV_W + OV_GAP), Math.round(y + OV_H / 2), _tex(card))
               .setScale(OV_SCALE).setDepth(20).setTint(0x886655)
           );
         }

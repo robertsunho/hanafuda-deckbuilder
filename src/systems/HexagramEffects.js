@@ -479,6 +479,7 @@ export const HEXAGRAM_EFFECTS = {
           modified.push({
             ...JSON.parse(JSON.stringify(plain)),
             id: plain.id + '_guan_duplicate',
+            baseImageId: plain.id,
             hexDuplicate: true,
           });
         }
@@ -497,6 +498,7 @@ export const HEXAGRAM_EFFECTS = {
         modified.push({
           ...JSON.parse(JSON.stringify(card)),
           id: card.id + '_bo_duplicate',
+          baseImageId: card.id,
           hexDuplicate: true,
         });
       }
@@ -511,20 +513,13 @@ export const HEXAGRAM_EFFECTS = {
 
       for (let month = 1; month <= 12; month++) {
         const monthCards = cards.filter(c => c.month === month);
-        let animal = monthCards.find(c => c.type === 'animal');
+        const animal = monthCards.find(c => c.type === 'animal');
 
         if (!animal) {
-          // Nearest month with an animal
-          for (let offset = 1; offset < 12 && !animal; offset++) {
-            const prevMonth = ((month - 1 - offset + 12) % 12) + 1;
-            const nextMonth = ((month - 1 + offset)      % 12) + 1;
-            animal = cards.find(c =>
-              (c.month === prevMonth || c.month === nextMonth) && c.type === 'animal'
-            );
-          }
+          // No base animal this month — leave untouched
+          modified.push(...monthCards);
+          continue;
         }
-
-        if (!animal) { modified.push(...monthCards); continue; }
 
         const nonAnimals = monthCards
           .filter(c => c.type !== 'animal')
@@ -537,9 +532,9 @@ export const HEXAGRAM_EFFECTS = {
           if (card.id === toReplace) {
             modified.push({
               ...JSON.parse(JSON.stringify(animal)),
-              id: `${animal.id}_sui_${month}`,
-              month,
-              hexReplaced: true,
+              id: `${animal.id}_sui_dup`,
+              baseImageId: animal.id,
+              hexDuplicate: true,
             });
           } else {
             modified.push(card);
@@ -557,19 +552,13 @@ export const HEXAGRAM_EFFECTS = {
 
       for (let month = 1; month <= 12; month++) {
         const monthCards = cards.filter(c => c.month === month);
-        let ribbon = monthCards.find(c => c.type === 'ribbon');
+        const ribbon = monthCards.find(c => c.type === 'ribbon');
 
         if (!ribbon) {
-          for (let offset = 1; offset < 12 && !ribbon; offset++) {
-            const prevMonth = ((month - 1 - offset + 12) % 12) + 1;
-            const nextMonth = ((month - 1 + offset)      % 12) + 1;
-            ribbon = cards.find(c =>
-              (c.month === prevMonth || c.month === nextMonth) && c.type === 'ribbon'
-            );
-          }
+          // No base ribbon this month — leave untouched
+          modified.push(...monthCards);
+          continue;
         }
-
-        if (!ribbon) { modified.push(...monthCards); continue; }
 
         const nonRibbons = monthCards
           .filter(c => c.type !== 'ribbon')
@@ -582,9 +571,9 @@ export const HEXAGRAM_EFFECTS = {
           if (card.id === toReplace) {
             modified.push({
               ...JSON.parse(JSON.stringify(ribbon)),
-              id: `${ribbon.id}_xian_${month}`,
-              month,
-              hexReplaced: true,
+              id: `${ribbon.id}_xian_dup`,
+              baseImageId: ribbon.id,
+              hexDuplicate: true,
             });
           } else {
             modified.push(card);
@@ -603,6 +592,7 @@ export const HEXAGRAM_EFFECTS = {
         ...dayCards.map(c => ({
           ...JSON.parse(JSON.stringify(c)),
           id: c.id + '_wuwang_duplicate',
+          baseImageId: c.id,
           hexDuplicate: true,
         })),
       ];
@@ -617,6 +607,7 @@ export const HEXAGRAM_EFFECTS = {
         ...nightCards.map(c => ({
           ...JSON.parse(JSON.stringify(c)),
           id: c.id + '_jian_duplicate',
+          baseImageId: c.id,
           hexDuplicate: true,
         })),
       ];
@@ -631,6 +622,7 @@ export const HEXAGRAM_EFFECTS = {
         ...airCards.map(c => ({
           ...JSON.parse(JSON.stringify(c)),
           id: c.id + '_gou_duplicate',
+          baseImageId: c.id,
           hexDuplicate: true,
         })),
       ];
@@ -645,6 +637,7 @@ export const HEXAGRAM_EFFECTS = {
         ...landCards.map(c => ({
           ...JSON.parse(JSON.stringify(c)),
           id: c.id + '_jiaren_duplicate',
+          baseImageId: c.id,
           hexDuplicate: true,
         })),
       ];

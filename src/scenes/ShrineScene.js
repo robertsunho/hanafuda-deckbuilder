@@ -21,6 +21,9 @@ import { generateShopCards }                   from '../data/shopCards.js';
 import logger                                   from '../systems/GameplayLogger.js';
 import { applyHook }                            from '../systems/HexagramEffects.js';
 
+/** Resolve card → Phaser texture key (handles hex-duplicate suffix). */
+function _tex(card) { return card.baseImageId ?? card.id; }
+
 // ── Channel badge lookup ───────────────────────────────────────────────────────
 const CHANNEL_BADGE = {
   point:          { label: 'POINT',    bgColor: 0x1a3a88, textColor: '#88aaff' },
@@ -437,7 +440,7 @@ export class ShrineScene extends Phaser.Scene {
       const CW    = Math.round(64 * SCALE);
       const CH    = Math.round(104 * SCALE);
       const imgY  = top + 8 + CH / 2;
-      const spr   = this.add.image(cx, imgY, card.id).setScale(SCALE);
+      const spr   = this.add.image(cx, imgY, _tex(card)).setScale(SCALE);
       if (!canAfford) spr.setAlpha(0.5);
       if (offering.preEnhancement) {
         const E_S = { water: 'W', wood: 'L', fire: 'F', earth: 'E', metal: 'M' };
@@ -1113,7 +1116,7 @@ export class ShrineScene extends Phaser.Scene {
       const disabled = noDisabled(card);
       const selected = selectedIds ? selectedIds.has(card.id) : false;
 
-      const spr = push(this.add.image(x, y, card.id).setScale(SCALE).setDepth(51));
+      const spr = push(this.add.image(x, y, _tex(card)).setScale(SCALE).setDepth(51));
       if (disabled)      spr.setAlpha(0.3);
       else if (selected) spr.setTint(0xffcc44);
 
@@ -1420,7 +1423,7 @@ export class ShrineScene extends Phaser.Scene {
       const x    = gridStartX + col * (CW + GAP);
       const y    = gridStartY + row * (CH + GAP + 22);
 
-      const spr = push(this.add.image(x, y, card.id).setScale(SCALE).setDepth(51));
+      const spr = push(this.add.image(x, y, _tex(card)).setScale(SCALE).setDepth(51));
       push(this.add.text(x, y + CH / 2 + 2, card.name, {
         fontSize: '8px', color: '#8899aa',
         wordWrap: { width: CW + GAP - 4 }, align: 'center',
@@ -1538,7 +1541,7 @@ export class ShrineScene extends Phaser.Scene {
         const x    = gridStartX + col * (CW + GAP);
         const y    = gridStartY + row * (CH + GAP + 22);
 
-        const spr = push(this.add.image(x, y, card.id).setScale(SCALE).setDepth(51));
+        const spr = push(this.add.image(x, y, _tex(card)).setScale(SCALE).setDepth(51));
         push(this.add.text(x, y + CH / 2 + 2, card.name, {
           fontSize: '8px', color: '#8899aa',
           wordWrap: { width: CW + GAP - 4 }, align: 'center',
