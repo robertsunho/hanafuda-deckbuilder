@@ -1,4 +1,4 @@
-import { cards as ALL_CARDS } from "../data/cards.js";
+import { baseCards as ALL_CARDS } from "../data/cards.js";
 
 /**
  * DeckManager

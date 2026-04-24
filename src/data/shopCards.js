@@ -10,7 +10,7 @@
 // Wu Xing + stamp can coexist on the same card.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { cards as ALL_CARDS } from './cards.js';
+import { baseCards as ALL_CARDS } from './cards.js';
 
 const PRIMARY_STAMP_IDS   = ['stamp_red', 'stamp_blue', 'stamp_yellow', 'stamp_white'];
 const SECONDARY_STAMP_IDS = ['stamp_orange', 'stamp_green', 'stamp_purple'];

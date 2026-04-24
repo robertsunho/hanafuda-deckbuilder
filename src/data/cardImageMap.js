@@ -16,6 +16,10 @@ import { cards } from "./cards.js";
  * Flat mapping of card id → image path (relative to the project root /
  * web-server public root).
  *
+ * Includes all cards (base + speculative).  Speculative cards map to their
+ * id-based path even though the image file may not exist yet — the _tex()
+ * helper in scene code resolves baseImageId before hitting this map.
+ *
  * @type {Record<string, string>}
  */
 export const cardImageMap = Object.fromEntries(

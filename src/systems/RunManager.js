@@ -5,7 +5,7 @@
 // and run progression for the entire run.  Import the exported instance:
 import { findFusionRecipe }                     from '../data/fusionRecipes.js';
 import { getSpiritDef }                         from '../data/spirits.js';
-import { cards as ALL_CARDS }                   from '../data/cards.js';
+import { cards as ALL_CARDS, baseCards }          from '../data/cards.js';
 import { WUXING_CONSUMABLES }                   from '../data/consumables.js';
 import { getStampDef }                          from '../data/stamps.js';
 import { ZODIAC_CONSUMABLES, getZodiacDef }     from '../data/zodiacConsumables.js';
@@ -143,13 +143,13 @@ class RunManager {
 
     // ── Persistent deck ──────────────────────────────────────────────────────
     /**
-     * The canonical deck array — deep-copied from ALL_CARDS at run start.
+     * The canonical deck array — deep-copied from baseCards at run start.
      * Survives across rounds.  Three Marks mutations are applied in-place.
      * DeckManager.resetWithCards() receives a shallow copy each round so
      * card object references are shared (mutations propagate automatically).
      * @type {object[]}
      */
-    this._deck = JSON.parse(JSON.stringify(ALL_CARDS));
+    this._deck = JSON.parse(JSON.stringify(baseCards));
 
     /** Monotone counter for Throat Chakra duplicates — guarantees unique IDs. */
     this._throatCounter = 0;

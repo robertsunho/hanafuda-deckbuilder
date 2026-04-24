@@ -1,16 +1,21 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Hanafuda card data — all 48 cards across 12 months
+// Hanafuda card data — 48 base cards + 13 speculative cards across 12 months
 //
-// Type distribution (canonical):
+// Base deck type distribution (canonical, 48 cards):
 //   bright  ×5  — 20 pts  (Jan, Mar, Aug, Nov, Dec)
 //   animal  ×9  — 12 pts  (Feb, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov)
 //   ribbon  ×10 — 10 pts  (Jan, Feb, Mar, Apr, May, Jun, Jul, Sep, Oct, Nov)
 //   plain   ×24 —  3 pts  (all months)
 //
+// Speculative cards (13) fill missing month/rank slots so every month has
+// at least one bright, animal, ribbon, and two plains.  They never appear in
+// the base deck — only via rank promotion or hexagram deck modifications.
+// Marked with `speculative: true`.
+//
 // Tags are thematic descriptors used to compute spirit / hexagram affinity.
 //
-// vertical: 'air' | 'land' — cosmic axis of the card's imagery (24/24)
-// temporal: 'day' | 'night' — time-of-day quality of the card (24/24)
+// vertical: 'air' | 'land' — cosmic axis of the card's imagery (24/24 base)
+// temporal: 'day' | 'night' — time-of-day quality of the card (24/24 base)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const cards = [
@@ -603,6 +608,219 @@ export const cards = [
     temporal: "day",
   },
   {
+    id: "december_plain_1_dup",
+    month: 12,
+    monthName: "December",
+    flower: "Paulownia",
+    type: "plain",
+    points: 3,
+    name: "Paulownia Plain",
+    tags: ["winter", "noble", "evergreen"],
+    vertical: "land",
+    temporal: "night",
+    baseImageId: "december_plain_1",
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Speculative cards — missing month/rank slots
+  //
+  // These cards never enter the base deck.  They exist as definitions for
+  // rank promotion mechanics and hexagram deck modifications.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ── January speculative ──────────────────────────────────────────────────
+  {
+    id: "january_bear",
+    month: 1,
+    monthName: "January",
+    flower: "Pine",
+    type: "animal",
+    points: 12,
+    name: "Bear",
+    tags: [],
+    vertical: "land",
+    temporal: "day",
+    speculative: true,
+  },
+
+  // ── February speculative ─────────────────────────────────────────────────
+  {
+    id: "february_scholar",
+    month: 2,
+    monthName: "February",
+    flower: "Plum Blossom",
+    type: "bright",
+    points: 20,
+    name: "Scholar",
+    tags: [],
+    vertical: "air",
+    temporal: "night",
+    speculative: true,
+  },
+
+  // ── March speculative ────────────────────────────────────────────────────
+  {
+    id: "march_ladybugs",
+    month: 3,
+    monthName: "March",
+    flower: "Cherry Blossom",
+    type: "animal",
+    points: 12,
+    name: "Ladybugs",
+    tags: [],
+    vertical: "air",
+    temporal: "day",
+    speculative: true,
+  },
+
+  // ── April speculative ────────────────────────────────────────────────────
+  {
+    id: "april_pond",
+    month: 4,
+    monthName: "April",
+    flower: "Wisteria",
+    type: "bright",
+    points: 20,
+    name: "Pond",
+    tags: [],
+    vertical: "air",
+    temporal: "night",
+    speculative: true,
+  },
+
+  // ── May speculative ──────────────────────────────────────────────────────
+  {
+    id: "may_kite",
+    month: 5,
+    monthName: "May",
+    flower: "Iris",
+    type: "bright",
+    points: 20,
+    name: "Kite",
+    tags: [],
+    vertical: "air",
+    temporal: "day",
+    speculative: true,
+  },
+
+  // ── June speculative ─────────────────────────────────────────────────────
+  {
+    id: "june_kirin",
+    month: 6,
+    monthName: "June",
+    flower: "Peony",
+    type: "bright",
+    points: 20,
+    name: "Kirin",
+    tags: [],
+    vertical: "land",
+    temporal: "night",
+    speculative: true,
+  },
+
+  // ── July speculative ─────────────────────────────────────────────────────
+  {
+    id: "july_farmer",
+    month: 7,
+    monthName: "July",
+    flower: "Bush Clover",
+    type: "bright",
+    points: 20,
+    name: "Farmer",
+    tags: [],
+    vertical: "land",
+    temporal: "day",
+    speculative: true,
+  },
+
+  // ── August speculative ───────────────────────────────────────────────────
+  {
+    id: "august_ribbon",
+    month: 8,
+    monthName: "August",
+    flower: "Pampas Grass",
+    type: "ribbon",
+    points: 10,
+    name: "Pampas Ribbon",
+    tags: [],
+    vertical: "air",
+    temporal: "day",
+    speculative: true,
+  },
+
+  // ── September speculative ────────────────────────────────────────────────
+  {
+    id: "september_bell",
+    month: 9,
+    monthName: "September",
+    flower: "Chrysanthemum",
+    type: "bright",
+    points: 20,
+    name: "Bell",
+    tags: [],
+    vertical: "air",
+    temporal: "day",
+    speculative: true,
+  },
+
+  // ── October speculative ──────────────────────────────────────────────────
+  {
+    id: "october_lantern",
+    month: 10,
+    monthName: "October",
+    flower: "Maple",
+    type: "bright",
+    points: 20,
+    name: "Lantern",
+    tags: [],
+    vertical: "land",
+    temporal: "night",
+    speculative: true,
+  },
+
+  // ── November speculative ─────────────────────────────────────────────────
+  {
+    id: "november_plain_2",
+    month: 11,
+    monthName: "November",
+    flower: "Willow",
+    type: "plain",
+    points: 3,
+    name: "Willow Plain",
+    tags: [],
+    vertical: "land",
+    temporal: "night",
+    speculative: true,
+  },
+
+  // ── December speculative ─────────────────────────────────────────────────
+  {
+    id: "december_fox",
+    month: 12,
+    monthName: "December",
+    flower: "Paulownia",
+    type: "animal",
+    points: 12,
+    name: "Fox",
+    tags: [],
+    vertical: "land",
+    temporal: "night",
+    speculative: true,
+  },
+  {
+    id: "december_ribbon",
+    month: 12,
+    monthName: "December",
+    flower: "Paulownia",
+    type: "ribbon",
+    points: 10,
+    name: "Paulownia Ribbon",
+    tags: [],
+    vertical: "land",
+    temporal: "night",
+    speculative: true,
+  },
+  {
     id: "december_plain_3",
     month: 12,
     monthName: "December",
@@ -613,8 +831,19 @@ export const cards = [
     tags: ["winter", "noble", "sky"],
     vertical: "land",
     temporal: "night",
+    speculative: true,
   },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Filtered subsets
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The 48-card base deck (no speculative cards). */
+export const baseCards = cards.filter(c => !c.speculative);
+
+/** The 13+1 speculative cards (not part of the base deck). */
+export const speculativeCards = cards.filter(c => c.speculative);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper lookup objects
