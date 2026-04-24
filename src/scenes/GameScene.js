@@ -2213,6 +2213,26 @@ export class GameScene extends Phaser.Scene {
         }
         break;
       }
+      case 'hexagram_card': {
+        this._scorePtsText.setText(`Points: ${event.points}`);
+        this._scoreMltText.setText(`Mult: ${event.mult.toFixed(1)}`);
+        if (event.addPoints > 0) {
+          this._showFloatingScore(`+${event.addPoints} pts`, this._scorePtsText.x + 70, this._scorePtsText.y, '#ffcc66');
+          this._flashText(this._scorePtsText, '#ffcc66');
+          await this._delay(250);
+        }
+        if (event.addMult > 0) {
+          this._showFloatingScore(`+${event.addMult.toFixed(1)} mult`, this._scoreMltText.x + 70, this._scoreMltText.y, '#ffcc66');
+          this._flashText(this._scoreMltText, '#ffcc66');
+          await this._delay(250);
+        }
+        if (event.multiplyMult && event.multiplyMult !== 1) {
+          this._showFloatingScore(`\xD7${event.multiplyMult.toFixed(1)} mult`, this._scoreMltText.x + 70, this._scoreMltText.y, '#ff8844');
+          this._flashText(this._scoreMltText, '#ff8844');
+          await this._delay(250);
+        }
+        break;
+      }
       case 'capture_complete': {
         this._scoreFlwText.setText(`Flow: \xD7${event.flow.toFixed(2)}`);
         this._scoreTotText.setText(`Total: ${event.runningTotal}`);
