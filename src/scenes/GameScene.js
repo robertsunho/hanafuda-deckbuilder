@@ -1840,8 +1840,13 @@ export class GameScene extends Phaser.Scene {
 
     const cardsInHand = result.cardsInHand ?? 0;
     const styleCombos = result.styleCombos ?? 0;
+    const pushFailed = result.penaltyApplied ?? false;
     let kiLabel = `Ki earned: +${kiEarned}  (base 5`;
-    if (cardsInHand > 0) kiLabel += ` +${cardsInHand} cards`;
+    if (pushFailed && cardsInHand > 0) {
+      kiLabel += `, hand ki forfeited`;
+    } else if (cardsInHand > 0) {
+      kiLabel += ` +${cardsInHand} cards`;
+    }
     if (styleCombos > 0) kiLabel += ` +${styleCombos} style`;
     kiLabel += ')';
     this._overlayObjs.push(

@@ -95,6 +95,8 @@ class RunManager {
     // ── Consumable inventory ─────────────────────────────────────────────────
     /** @type {object[]} */
     this._consumables = [];
+    /** @type {number} Mutable max consumable slots (hexagram can override). */
+    this._maxConsumableSlots = RunManager.MAX_CONSUMABLE_SLOTS;
 
     // ── Run progression ──────────────────────────────────────────────────────
     /** Current round number (1-based). */
@@ -213,6 +215,14 @@ class RunManager {
     this._hexagramState = null;
     const effect = getActiveEffect();
     if (effect?.onRunStart) effect.onRunStart(this);
+    this._applyHexagramDeckModification();
+  }
+
+  _applyHexagramDeckModification() {
+    const effect = getActiveEffect();
+    if (effect?.modifyDeck) {
+      this._deck = effect.modifyDeck(this._deck);
+    }
   }
 
   /**
@@ -228,8 +238,8 @@ class RunManager {
 
   get spirits()         { return [...this._spirits]; }
   get negativeSpirits() { return [...this._negativeSpirits]; }
-  get spiritSlots()     { return RunManager.MAX_SPIRIT_SLOTS; }
-  get canAddSpirit()    { return this._spirits.length < RunManager.MAX_SPIRIT_SLOTS; }
+  get spiritSlots()     { return applyHook('modifySpiritSlots', RunManager.MAX_SPIRIT_SLOTS, RunManager.MAX_SPIRIT_SLOTS); }
+  get canAddSpirit()    { return this._spirits.length < this.spiritSlots; }
 
   /**
    * Purchase a spirit from the shop.
@@ -254,12 +264,14 @@ class RunManager {
       existing.stackCount = (existing.stackCount ?? 1) + 1;
 
       if (existing.stackCount >= 4) {
-        // Transcend: collapse into a zero-slot negative copy.
+        // Transcend: collapse into a zero-slot negative copy preserving
+        // the pre-transcendence stack power (3 for natural 4th-copy path).
+        const snapshotStacks = existing.stackCount - 1;
         const idx = this._spirits.indexOf(existing);
         this._spirits.splice(idx, 1);
         this._negativeSpirits.push({
           id: spiritDef.id, name: spiritDef.name,
-          stackCount: 1, isNegative: true, state: null,
+          stackCount: snapshotStacks, isNegative: true, state: existing.state ?? null,
         });
         return { success: true, result: 'transcended' };
       }
@@ -395,8 +407,8 @@ class RunManager {
    * @throws {Error} if all slots are occupied.
    */
   addSpirit(spirit) {
-    if (this._spirits.length >= RunManager.MAX_SPIRIT_SLOTS) {
-      throw new Error(`Spirit loadout is full (max ${RunManager.MAX_SPIRIT_SLOTS} slots).`);
+    if (this._spirits.length >= this.spiritSlots) {
+      throw new Error(`Spirit loadout is full (max ${this.spiritSlots} slots).`);
     }
     this._spirits.push(spirit);
   }
@@ -457,11 +469,12 @@ class RunManager {
     if (existing) {
       existing.stackCount = (existing.stackCount ?? 1) + 1;
       if (existing.stackCount >= 4 && !hasNeg) {
+        const snapshotStacks = existing.stackCount - 1;
         const idx = this._spirits.indexOf(existing);
         this._spirits.splice(idx, 1);
         this._negativeSpirits.push({
           id: fusedDef.id, name: fusedDef.name,
-          stackCount: 1, isNegative: true, state: null,
+          stackCount: snapshotStacks, isNegative: true, state: existing.state ?? null,
         });
         fusionResult = 'transcended';
       } else {
@@ -477,7 +490,8 @@ class RunManager {
   // ── Consumable inventory ───────────────────────────────────────────────────
 
   get consumables()      { return [...this._consumables]; }
-  get canAddConsumable() { return this._consumables.length < RunManager.MAX_CONSUMABLE_SLOTS; }
+  get maxConsumableSlots() { return this._maxConsumableSlots; }
+  get canAddConsumable() { return this._consumables.length < this._maxConsumableSlots; }
 
   /**
    * Add a consumable to the inventory.
@@ -485,8 +499,8 @@ class RunManager {
    * @throws {Error} if all slots are occupied.
    */
   addConsumable(consumable) {
-    if (this._consumables.length >= RunManager.MAX_CONSUMABLE_SLOTS) {
-      throw new Error(`Consumable inventory is full (max ${RunManager.MAX_CONSUMABLE_SLOTS} slots).`);
+    if (this._consumables.length >= this._maxConsumableSlots) {
+      throw new Error(`Consumable inventory is full (max ${this._maxConsumableSlots} slots).`);
     }
     this._consumables.push(consumable);
   }
@@ -602,8 +616,10 @@ class RunManager {
    * Permanently increases flow by 10%.
    */
   onPushSuccess() {
-    const mult = applyHook('modifyPushSuccess', 1.1);
+    const mult = applyHook('modifyPushSuccess', 1.1, 1.1);
     this._flow *= mult;
+    const effect = getActiveEffect();
+    if (effect?.onPushSuccess) effect.onPushSuccess(this);
   }
 
   /**
@@ -611,8 +627,10 @@ class RunManager {
    * Permanently decreases flow.  Default: ×0.9.  No score penalty is applied.
    */
   onPushFailure() {
-    const mult = applyHook('modifyPushFailure', 0.9);
+    const mult = applyHook('modifyPushFailure', 0.9, 0.9);
     this._flow *= mult;
+    const effect = getActiveEffect();
+    if (effect?.onPushFailure) effect.onPushFailure(this);
   }
 
   /**
@@ -620,7 +638,7 @@ class RunManager {
    * Default: ×0.95 per round.  Hexagram can modify this rate.
    */
   applyFlowDecay() {
-    const rate = applyHook('modifyFlowDecay', RunManager.FLOW_DECAY_RATE);
+    const rate = applyHook('modifyFlowDecay', RunManager.FLOW_DECAY_RATE, RunManager.FLOW_DECAY_RATE);
     this._flow *= rate;
   }
 
@@ -712,12 +730,16 @@ class RunManager {
     const cardsInHand  = result.cardsInHand  ?? 0;
     const styleCombos  = result.styleCombos  ?? 0;
     const earthKiBonus = result.earthKiBonus ?? 0;
+    const pushFailed   = result.penaltyApplied ?? false;
     const hasPiggyBank = this._spirits.some(s => s.id === 'econ_piggybank');
     const hasGrace     = this._spirits.some(s => s.id === 'econ_grace');
-    const handKi       = hasPiggyBank ? cardsInHand * 3 : cardsInHand;
+    // Push failure forfeits all hand-derived ki.
+    let handKi         = pushFailed ? 0 : (hasPiggyBank ? cardsInHand * 3 : cardsInHand);
+    handKi             = applyHook('modifyHandKi', handKi, handKi);
     const baseComboKi  = hasGrace     ? styleCombos  * 2 : styleCombos;
     const comboKi      = this.styleComboKi(baseComboKi);
-    return 5 + handKi + comboKi + earthKiBonus;
+    const total        = 5 + handKi + comboKi + earthKiBonus;
+    return applyHook('modifyKiReward', total, total, { cardsInHand, styleCombos });
   }
 
   // ── Interest system ────────────────────────────────────────────────────────
@@ -727,7 +749,7 @@ class RunManager {
     let rate = 0.10;
     if (this._spirits.some(s => s.id === 'econ_bonds')) rate += 0.10;
     if (this._spirits.some(s => s.id === 'econ_ingot'))  rate += this._ki * 0.001;
-    return rate;
+    return applyHook('modifyInterestRate', rate, rate);
   }
 
   /**
@@ -1253,3 +1275,9 @@ class RunManager {
 const run = new RunManager();
 export { RunManager };
 export default run;
+
+
+// Dev-only: expose for browser console testing
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
+  window.run = run;
+}
