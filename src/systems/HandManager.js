@@ -137,7 +137,7 @@ export default class HandManager {
 
   /**
    * Add one card or an array of cards to the hand.
-   * Throws RangeError if adding would exceed maxSize.
+   * Cards beyond maxSize are silently skipped (no draw, no discard).
    * Silently ignores cards whose id is already in the hand.
    *
    * @param {object|object[]} cards
@@ -147,14 +147,10 @@ export default class HandManager {
     const list = Array.isArray(cards) ? cards : [cards];
     const incoming = list.filter((c) => !this._cards.has(c.id));
 
-    if (this._cards.size + incoming.length > this.maxSize) {
-      throw new RangeError(
-        `Cannot add ${incoming.length} card(s): hand limit of ${this.maxSize} would be exceeded ` +
-        `(currently holding ${this._cards.size})`
-      );
-    }
+    const slots = this.maxSize === Infinity ? incoming.length : this.maxSize - this._cards.size;
+    const toAdd = incoming.slice(0, Math.max(0, slots));
 
-    for (const card of incoming) {
+    for (const card of toAdd) {
       this._cards.set(card.id, card);
     }
     return this;

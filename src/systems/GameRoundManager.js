@@ -435,6 +435,7 @@ export default class GameRoundManager {
 
     const surplusExtra    = this._spirits.some(s => s.id === 'game_surplus') ? 2 : 0;
     const _baseHandSize   = applyHook('modifyHandSize', GameRoundManager.HAND_SIZE, GameRoundManager.HAND_SIZE) + surplusExtra;
+    this._hand.maxSize    = _baseHandSize;  // enforce hand cap (silently skips draws beyond this)
     const _initialDeal    = applyHook('modifyCardsDealt', _baseHandSize, _baseHandSize, 'initial');
     this._hand.add(this._deck.draw(_initialDeal));
 
@@ -1140,7 +1141,7 @@ export default class GameRoundManager {
           for (const spirit of allScoringSpirits) {
             const effect = SpiritEffects.get(spirit.id);
             if (!effect?.onCardScored) continue;
-            const count = spirit.isNegative ? 1 : (spirit.stackCount ?? 1);
+            const count = spirit.stackCount ?? 1;
             const r = effect.onCardScored({ card, spirit, spirits: this._spirits });
             if (r) {
               const prevPts  = points;
@@ -1164,7 +1165,7 @@ export default class GameRoundManager {
         for (const spirit of allScoringSpirits) {
           const effect = SpiritEffects.get(spirit.id);
           if (!effect?.onCardSeen) continue;
-          const count = spirit.isNegative ? 1 : (spirit.stackCount ?? 1);
+          const count = spirit.stackCount ?? 1;
           const prevState = JSON.stringify(spirit.state);
           for (let copy = 0; copy < count; copy++) {
             effect.onCardSeen({ card, spirit });
