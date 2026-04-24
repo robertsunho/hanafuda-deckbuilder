@@ -86,6 +86,8 @@ export default class FieldManager {
    */
   getSlots() { return [...this._slots]; }
 
+  get maxSlots() { return this._maxSlots ?? FieldManager.MAX_SLOTS; }
+
   /**
    * The first occupied slot for a given month, or null.
    * @param {number} month

@@ -19,6 +19,7 @@ import { PRIMARY_STAMPS, SECONDARY_STAMPS,
 import { ZODIAC_CONSUMABLES }                  from '../data/zodiacConsumables.js';
 import { generateShopCards }                   from '../data/shopCards.js';
 import logger                                   from '../systems/GameplayLogger.js';
+import { applyHook }                            from '../systems/HexagramEffects.js';
 
 // ── Channel badge lookup ───────────────────────────────────────────────────────
 const CHANNEL_BADGE = {
@@ -97,7 +98,8 @@ export class ShrineScene extends Phaser.Scene {
   create() {
     const { isGrove } = this.scene.settings.data || {};
     this._isGrove    = isGrove ?? false;
-    const itemCount  = this._isGrove ? 4 : 2;
+    const baseCount  = this._isGrove ? 4 : 2;
+    const itemCount  = applyHook('modifyShopCount', baseCount, baseCount, 'all');
 
     this._spiritOfferings  = this._generateSpiritOfferings(itemCount);
     this._deckFixOfferings = this._generateDeckFixOfferings(itemCount);
@@ -113,8 +115,8 @@ export class ShrineScene extends Phaser.Scene {
     this._confirmObjs  = [];
     this._shopTooltip  = null;
     this._selectedItem = null;
-    this._rerollCost   = 3;
     this._rerollCount  = 0;
+    this._rerollCost   = applyHook('modifyRerollCost', 3, 3, this._rerollCount);
     this._buildUI();
   }
 
@@ -151,7 +153,8 @@ export class ShrineScene extends Phaser.Scene {
     this._confirmObjs = [];
     this._shopTooltip = null;
     logger.logShopEnter(run.ki, this._isGrove);
-    const itemCount = this._isGrove ? 4 : 2;
+    const baseCount = this._isGrove ? 4 : 2;
+    const itemCount = applyHook('modifyShopCount', baseCount, baseCount, 'all');
 
     this._drawBg();
     this._drawInfoPanel();
@@ -213,7 +216,8 @@ export class ShrineScene extends Phaser.Scene {
       ? getAvailableFusions(spirits.map(s => s.id)).flatMap(r => r.input)
       : [];
 
-    for (let i = 0; i < RunManager.MAX_SPIRIT_SLOTS; i++) {
+    const spiritSlotCount = run.spiritSlots;
+    for (let i = 0; i < spiritSlotCount; i++) {
       const spirit = spirits[i];
       const x = SPIRIT_START_X + i * SPIRIT_GAP;
       const y = SPIRIT_Y;
@@ -275,7 +279,7 @@ export class ShrineScene extends Phaser.Scene {
     const neg = run.negativeSpirits;
     const NW  = Math.round(SPIRIT_W * 0.72);
     const NH  = Math.round(SPIRIT_H * 0.65);
-    const NX0 = SPIRIT_START_X + RunManager.MAX_SPIRIT_SLOTS * SPIRIT_GAP;
+    const NX0 = SPIRIT_START_X + spiritSlotCount * SPIRIT_GAP;
     for (let i = 0; i < neg.length; i++) {
       const ns = neg[i];
       const nx = NX0 + i * (NW + 6);
@@ -293,7 +297,7 @@ export class ShrineScene extends Phaser.Scene {
   // ── Persistent consumable slots (matches GameScene position/style) ──────────
 
   _drawPersistentConsumables() {
-    const maxSlots = RunManager.MAX_CONSUMABLE_SLOTS;
+    const maxSlots = run.maxConsumableSlots;
     // Empty slot backgrounds
     for (let i = 0; i < maxSlots; i++) {
       this._addRoundedRect(
@@ -646,8 +650,10 @@ export class ShrineScene extends Phaser.Scene {
       rBtn.on('pointerdown', () => {
         run.spendKi(this._rerollCost);
         this._rerollCount++;
-        this._rerollCost = 3 + this._rerollCount * 2;
-        const ic = this._isGrove ? 4 : 2;
+        const baseCost = 3 + this._rerollCount * 2;
+        this._rerollCost = applyHook('modifyRerollCost', baseCost, baseCost, this._rerollCount);
+        const baseIc = this._isGrove ? 4 : 2;
+        const ic = applyHook('modifyShopCount', baseIc, baseIc, 'all');
         this._rerollSection(this._spiritOfferings,  () => this._generateSpiritOfferings(ic));
         this._rerollSection(this._deckFixOfferings, () => this._generateDeckFixOfferings(ic));
         this._rerollSection(this._cardOfferings,    () => generateShopCards(ic, this._isGrove));
@@ -1698,6 +1704,7 @@ export class ShrineScene extends Phaser.Scene {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   _price(base) {
-    return run.spirits.some(s => s.id === 'econ_coupon') ? Math.ceil(base * 0.8) : base;
+    let price = run.spirits.some(s => s.id === 'econ_coupon') ? Math.ceil(base * 0.8) : base;
+    return applyHook('modifyShopPrice', price, price);
   }
 }

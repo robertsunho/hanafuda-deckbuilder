@@ -26,7 +26,7 @@ const SPIRIT_START_X   = 220;                          // flush left — 6 spiri
 const SPIRIT_Y         = 62;                          // spirit card centre y
 const SPIRIT_W         = CARD_W * CARD_SCALE;  // 64
 const SPIRIT_H         = CARD_H * CARD_SCALE;  // 104
-const MAX_SPIRIT_SLOTS = RunManager.MAX_SPIRIT_SLOTS;  // 6
+// Spirit slot count is dynamic (hexagram can modify). Read run.spiritSlots at render time.
 
 // ── Info box (top-left corner, clustered vertically) ──────────────────────
 const INFO_X     = 10;
@@ -38,7 +38,7 @@ const FIELD_CY    = 340;
 const FIELD_COL_W = Math.round(CARD_W * CARD_SCALE * 2.2);  // ~141
 const FIELD_ROW_H = Math.round(CARD_H * CARD_SCALE) + 50;   // 154
 
-// Hexagonal arrangement: 3-top / 2-middle (flanking deck) / 3-bottom
+// Hexagonal arrangement: 3-top / 2-middle (flanking deck) / 3-bottom + overflow
 const SLOT_POSITIONS = [
   { x: FIELD_CX - FIELD_COL_W,        y: FIELD_CY - FIELD_ROW_H },  // F1
   { x: FIELD_CX,                      y: FIELD_CY - FIELD_ROW_H },  // F2
@@ -48,6 +48,9 @@ const SLOT_POSITIONS = [
   { x: FIELD_CX - FIELD_COL_W,        y: FIELD_CY + FIELD_ROW_H },  // F6
   { x: FIELD_CX,                      y: FIELD_CY + FIELD_ROW_H },  // F7
   { x: FIELD_CX + FIELD_COL_W,        y: FIELD_CY + FIELD_ROW_H },  // F8
+  // Overflow positions for hexagram-modified field (9th, 10th)
+  { x: FIELD_CX - FIELD_COL_W * 1.75,  y: FIELD_CY - FIELD_ROW_H },  // F9  (far-left top)
+  { x: FIELD_CX + FIELD_COL_W * 1.75,  y: FIELD_CY - FIELD_ROW_H },  // F10 (far-right top)
 ];
 
 const SLOT_FAN_X = 10;
@@ -96,8 +99,7 @@ const CONS_SLOT_X  = 1024 - CONS_SLOT_W / 2;                   // 920 — right 
 const CONS_SLOT_Y  = SPIRIT_Y;                                 // 62 — aligned with spirit row
 const CONS_BASE_X  = Math.round(CONS_SLOT_X - CONS_SLOT_W / 2 + CONS_CARD_W / 2 + 8);  // 856
 const CONS_BASE_Y  = CONS_SLOT_Y;
-// Use run.maxConsumableSlots for the live value (hexagram can modify it).
-const MAX_CONSUMABLE_SLOTS = 3; // layout fallback only
+// Consumable slot count is dynamic (hexagram can modify). Read run.maxConsumableSlots at render time.
 
 // ── Rarity colours ────────────────────────────────────────────────────────
 const RARITY_COLOR = {
@@ -352,8 +354,9 @@ export class GameScene extends Phaser.Scene {
     const markActive = this._markMode !== null;
     const fireWild   = this._fireWildCard !== null;
 
-    for (let i = 0; i < 8; i++) {
-      const { x: sx, y: sy } = SLOT_POSITIONS[i];
+    const fieldSlotCount = this._round.field.maxSlots;
+    for (let i = 0; i < fieldSlotCount; i++) {
+      const { x: sx, y: sy } = SLOT_POSITIONS[i] ?? SLOT_POSITIONS[SLOT_POSITIONS.length - 1];
       const slot     = slots[i];
       const isFanned = this._fannedSlot === i;
 
@@ -422,7 +425,8 @@ export class GameScene extends Phaser.Scene {
     const spirits = run.spirits;
     this._spiritCardObjs = [];
 
-    for (let i = 0; i < MAX_SPIRIT_SLOTS; i++) {
+    const spiritSlotCount = run.spiritSlots;
+    for (let i = 0; i < spiritSlotCount; i++) {
       const spirit = spirits[i];
       const x      = SPIRIT_START_X + i * SPIRIT_GAP;
       const y      = SPIRIT_Y;
@@ -501,7 +505,7 @@ export class GameScene extends Phaser.Scene {
     const NEG_W   = Math.round(SPIRIT_W * 0.72);  // ~46px
     const NEG_H   = Math.round(SPIRIT_H * 0.65);  // ~68px
     const NEG_GAP = NEG_W + 6;
-    const NEG_START_X = SPIRIT_START_X + MAX_SPIRIT_SLOTS * SPIRIT_GAP;  // 676
+    const NEG_START_X = SPIRIT_START_X + spiritSlotCount * SPIRIT_GAP;
     for (let i = 0; i < negSpirits.length; i++) {
       const ns  = negSpirits[i];
       const nx  = NEG_START_X + i * NEG_GAP;
@@ -573,7 +577,7 @@ export class GameScene extends Phaser.Scene {
 
         const targetIdx = this._getSpiritSlotFromX(pointer.x);
         if (targetIdx != null && targetIdx !== sourceIdx &&
-            targetIdx >= 0 && targetIdx < MAX_SPIRIT_SLOTS) {
+            targetIdx >= 0 && targetIdx < run.spiritSlots) {
           run.swapSpirits(sourceIdx, targetIdx);
           this._round.setSpirits(run.spirits);
         }
@@ -583,7 +587,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   _getSpiritSlotFromX(x) {
-    for (let i = 0; i < MAX_SPIRIT_SLOTS; i++) {
+    for (let i = 0; i < run.spiritSlots; i++) {
       const slotX = SPIRIT_START_X + i * SPIRIT_GAP;
       if (x >= slotX - SPIRIT_W / 2 && x <= slotX + SPIRIT_W / 2) return i;
     }
