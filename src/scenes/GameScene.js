@@ -96,7 +96,8 @@ const CONS_SLOT_X  = 1024 - CONS_SLOT_W / 2;                   // 920 — right 
 const CONS_SLOT_Y  = SPIRIT_Y;                                 // 62 — aligned with spirit row
 const CONS_BASE_X  = Math.round(CONS_SLOT_X - CONS_SLOT_W / 2 + CONS_CARD_W / 2 + 8);  // 856
 const CONS_BASE_Y  = CONS_SLOT_Y;
-const MAX_CONSUMABLE_SLOTS = 3;
+// Use run.maxConsumableSlots for the live value (hexagram can modify it).
+const MAX_CONSUMABLE_SLOTS = 3; // layout fallback only
 
 // ── Rarity colours ────────────────────────────────────────────────────────
 const RARITY_COLOR = {
@@ -1953,8 +1954,9 @@ export class GameScene extends Phaser.Scene {
       this.add.rectangle(cx, cy, 490, 280, 0x080d1a, 0.96)
         .setStrokeStyle(2, 0x6a9a3a).setDepth(25)
     );
+    const _overlayTitle = result.yakuDisabled ? 'Bank Score?' : 'Yaku Reached!';
     this._overlayObjs.push(
-      this.add.text(cx, cy - 122, 'Yaku Reached!', {
+      this.add.text(cx, cy - 122, _overlayTitle, {
         fontSize: '20px', color: '#e8c96a', stroke: '#000000', strokeThickness: 3,
       }).setOrigin(0.5).setDepth(25)
     );
@@ -2010,30 +2012,51 @@ export class GameScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(25)
     );
 
-    const pushCount  = this._round.pushCount;
-    const PUSH_DEALS = [4, 2, 1];
-    const nextDeal   = PUSH_DEALS[Math.min(pushCount, PUSH_DEALS.length - 1)];
-    const D          = RunManager.FLOW_DECAY_RATE;
-    const failFlow   = (run.flow * 0.9 * D).toFixed(2);
-    const winFlow    = (run.flow * 1.1 * D).toFixed(2);
-    const pushBtn = this.add.rectangle(cx + 118, btnY, 206, 42, 0x6a1a1a)
-      .setStrokeStyle(2, 0xaa4444).setInteractive({ useHandCursor: true }).setDepth(25);
-    pushBtn.on('pointerover', () => pushBtn.setFillStyle(0x9a2a2a));
-    pushBtn.on('pointerout',  () => pushBtn.setFillStyle(0x6a1a1a));
-    pushBtn.on('pointerdown', () => {
-      this._bankPushOpen = false;
-      logger.logBankPushDecision('push', this._round.pushCount);
-      this._round.pushOn();
-      this._clearObjs(this._overlayObjs);
-      this._setStatus(`Pushed! +${nextDeal} cards. Win: Flow ×${winFlow}  Fail: Flow ×${failFlow}`);
-      this._renderAll();
-    });
-    this._overlayObjs.push(pushBtn);
-    this._overlayObjs.push(
-      this.add.text(cx + 118, btnY, `Push +${nextDeal}  W:\xD7${winFlow} / F:\xD7${failFlow}`, {
-        fontSize: '13px', color: '#ffffff',
-      }).setOrigin(0.5).setDepth(25)
-    );
+    if (result.yakuDisabled) {
+      // Yaku disabled (e.g. match_by_rank) — Continue button instead of Push
+      const contBtn = this.add.rectangle(cx + 118, btnY, 206, 42, 0x1a4a6a)
+        .setStrokeStyle(2, 0x4488aa).setInteractive({ useHandCursor: true }).setDepth(25);
+      contBtn.on('pointerover', () => contBtn.setFillStyle(0x2a6a8a));
+      contBtn.on('pointerout',  () => contBtn.setFillStyle(0x1a4a6a));
+      contBtn.on('pointerdown', () => {
+        this._bankPushOpen = false;
+        this._round.continuePlay();
+        this._clearObjs(this._overlayObjs);
+        this._setStatus('Play your next card.');
+        this._renderAll();
+      });
+      this._overlayObjs.push(contBtn);
+      this._overlayObjs.push(
+        this.add.text(cx + 118, btnY, 'Continue Playing', {
+          fontSize: '13px', color: '#ffffff',
+        }).setOrigin(0.5).setDepth(25)
+      );
+    } else {
+      const pushCount  = this._round.pushCount;
+      const PUSH_DEALS = [4, 2, 1];
+      const nextDeal   = PUSH_DEALS[Math.min(pushCount, PUSH_DEALS.length - 1)];
+      const D          = RunManager.FLOW_DECAY_RATE;
+      const failFlow   = (run.flow * 0.9 * D).toFixed(2);
+      const winFlow    = (run.flow * 1.1 * D).toFixed(2);
+      const pushBtn = this.add.rectangle(cx + 118, btnY, 206, 42, 0x6a1a1a)
+        .setStrokeStyle(2, 0xaa4444).setInteractive({ useHandCursor: true }).setDepth(25);
+      pushBtn.on('pointerover', () => pushBtn.setFillStyle(0x9a2a2a));
+      pushBtn.on('pointerout',  () => pushBtn.setFillStyle(0x6a1a1a));
+      pushBtn.on('pointerdown', () => {
+        this._bankPushOpen = false;
+        logger.logBankPushDecision('push', this._round.pushCount);
+        this._round.pushOn();
+        this._clearObjs(this._overlayObjs);
+        this._setStatus(`Pushed! +${nextDeal} cards. Win: Flow ×${winFlow}  Fail: Flow ×${failFlow}`);
+        this._renderAll();
+      });
+      this._overlayObjs.push(pushBtn);
+      this._overlayObjs.push(
+        this.add.text(cx + 118, btnY, `Push +${nextDeal}  W:\xD7${winFlow} / F:\xD7${failFlow}`, {
+          fontSize: '13px', color: '#ffffff',
+        }).setOrigin(0.5).setDepth(25)
+      );
+    }
   }
 
   // ── Yaku decision overlay ─────────────────────────────────────────────────

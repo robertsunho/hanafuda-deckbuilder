@@ -705,7 +705,10 @@ export const HEXAGRAM_EFFECTS = {
   deck_flip_revealed:                 {},
   yaku_ends_round:                    {},
   play_two_cards:                     {},
-  match_by_rank:                      {},
+  match_by_rank: {
+    overridesCaptureRule: () => 'rank',
+    disablesYaku: () => true,
+  },
   match_by_adjacent_month: {
     overridesCaptureRule: () => 'adjacent_month',
   },

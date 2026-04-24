@@ -676,6 +676,18 @@ export default class GameRoundManager {
   }
 
   /**
+   * Continue playing without push mechanics (used when yaku is disabled).
+   * Simply returns to the idle phase so the player can play their next card.
+   */
+  continuePlay() {
+    if (this._phase !== "yaku_decision") {
+      throw new Error(`continuePlay() called while phase is "${this._phase}".`);
+    }
+    this._roundEndingAfterDecision = false;
+    this._phase = "idle";
+  }
+
+  /**
    * Execute a consumable's effect and return the result.
    * The caller is responsible for removing the consumable from RunManager
    * inventory after this call succeeds.
@@ -1480,6 +1492,8 @@ export default class GameRoundManager {
         const prev = this._yakuBeforeTurn.get(y.name);
         return prev === undefined || y.bonus - prev > 0.3;
       });
+      const _disablesYaku = applyHook('disablesYaku', false);
+      if (_disablesYaku) newYaku.length = 0;
       this._yakuBeforeTurn = new Map(yakuFromUnspent.map(y => [y.name, y.bonus]));
       logger.logYakuState(yakuFromUnspent, newYaku);
 
@@ -1548,14 +1562,20 @@ export default class GameRoundManager {
         const _hexEffectFin = getActiveEffect();
         if (_hexEffectFin?.onRoundEnd) _hexEffectFin.onRoundEnd(this);
         this._phase = "round_over";
+      } else if (_disablesYaku) {
+        // Yaku disabled — offer free bank/continue each turn
+        this._phase = "yaku_decision";
       } else {
         this._phase = "idle";
       }
 
-      const status = newYaku.length > 0 ? "yaku_decision" : roundOver ? "round_over" : "ok";
+      const status = newYaku.length > 0 ? "yaku_decision"
+                   : roundOver ? "round_over"
+                   : _disablesYaku ? "yaku_decision" : "ok";
       return {
         status,
         newYaku,
+        yakuDisabled:     !!_disablesYaku,
         captureEvents:    [...this._scoringEvents],
         runningScore:     this._runningScore,
         allYaku:          yakuForDiff,
