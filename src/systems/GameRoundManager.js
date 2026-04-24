@@ -456,6 +456,64 @@ export default class GameRoundManager {
     return this;
   }
 
+  /**
+   * Score all remaining field cards (score_field_at_round_end hexagram).
+   * Runs through the same per-card scoring pipeline as _addCapture.
+   */
+  _scoreFieldCards() {
+    if (!applyHook('scoreFieldAtRoundEnd', false)) return;
+    const fieldCards = this._field.getAll();
+    if (fieldCards.length === 0) return;
+
+    if (this._onScoringStep) this._onScoringStep({ type: 'capture_start' });
+
+    let points = 0;
+    let mult   = 1.0;
+
+    for (const card of fieldCards) {
+      let cardPts = card.points;
+      const enh = card.enhancement;
+      if (enh?.element === 'fire')  cardPts += getFireFlatPoints(enh.tier);
+      if (enh?.element === 'water') {
+        cardPts = Math.round(cardPts * getWaterMult(enh.tier, enh.depLevel ?? 0));
+      }
+      if (enh?.element === 'wood') mult *= getWoodScoringMult(enh.tier);
+      if (card.edition === 'gold')    cardPts += 20;
+      if (card.edition === 'crystal') mult    += 5;
+      if (card.edition === 'ghost')   mult    *= 1.5;
+
+      const _hexMod = getActiveEffect();
+      if (_hexMod?.onCardScored) {
+        const mod = _hexMod.onCardScored(card, { currentPoints: cardPts, currentMult: mult });
+        if (mod) {
+          if (mod.addPoints    !== undefined) cardPts += mod.addPoints;
+          if (mod.addMult      !== undefined) mult    += mod.addMult;
+          if (mod.multiplyMult !== undefined) mult    *= mod.multiplyMult;
+        }
+      }
+
+      points += cardPts;
+      if (this._onScoringStep) {
+        this._onScoringStep({ type: 'card_points', card, cardPts, points, mult });
+      }
+    }
+
+    const flow = run.flow;
+    const fieldScore = Math.round(points * mult * flow);
+    this._runningScore += fieldScore;
+
+    if (this._onScoringStep) {
+      this._onScoringStep({
+        type: 'capture_complete', points, mult, flow, captureScore: fieldScore,
+        runningTotal: this._runningScore,
+      });
+    }
+    this._scoringEvents.push({
+      type: 'field_score', cards: fieldCards, capturePoints: points, mult, flow,
+      captureScore: fieldScore, runningTotal: this._runningScore,
+    });
+  }
+
   /** Peek at the top card of the deck for the reveal hexagram. */
   _peekNextDeckFlip() {
     if (applyHook('revealsDeckFlip', false) && !this._deck.isEmpty()) {
@@ -610,6 +668,9 @@ export default class GameRoundManager {
 
     // Push success: player pushed at least once and is now banking after a yaku.
     if (this._pushCount > 0) run.onPushSuccess();
+
+    // Score field cards if score_field_at_round_end is active.
+    this._scoreFieldCards();
 
     // Flow decay — applied every round after push resolution.
     run.applyFlowDecay();
@@ -961,7 +1022,7 @@ export default class GameRoundManager {
         return { captured: null, discarded: false };
       }
     }
-    return this._addFlippedCardToField(card);
+    return this._field.addFlippedCard(card);
   }
 
   _addCapture(cards) {
@@ -970,6 +1031,20 @@ export default class GameRoundManager {
     this._capture.add(cards);
     this._basePoints += cards.reduce((sum, c) => sum + c.points, 0);
     if (cards.length === 4) this._basePoints += 5;   // full-month bonus
+
+    // score_field_at_round_end: captures add to pile but don't score.
+    if (applyHook('disableCaptureScoring', false)) {
+      run.onCardsCaptured(cards);
+      if (this._goatActive) run.addKi(cards.length);
+      logger.logCapture(cards, 'capture');
+      const newCombos = this._style.checkCombos(this._capture.getAll());
+      if (newCombos.length > 0) this._onStyleCombos(newCombos);
+      const _hexCapture = getActiveEffect();
+      if (_hexCapture?.onCaptureComplete) {
+        _hexCapture.onCaptureComplete({ run, capturedCards: cards });
+      }
+      return;
+    }
 
     {
       // ── Phase 1: Process each card through spirits left-to-right ──────────
@@ -1600,6 +1675,8 @@ export default class GameRoundManager {
         this._roundEndingAfterDecision = roundOver;
         this._phase = "yaku_decision";
       } else if (roundOver || _forceAutoBank) {
+        // Score field cards if score_field_at_round_end is active.
+        this._scoreFieldCards();
         // Flow decay — applied every round after push resolution.
         run.applyFlowDecay();
         logger._log(`Flow decay: ×${RunManager.FLOW_DECAY_RATE} → Flow is now ×${run.flow.toFixed(2)}`);

@@ -719,7 +719,10 @@ export const HEXAGRAM_EFFECTS = {
   match_by_adjacent_month: {
     overridesCaptureRule: () => 'adjacent_month',
   },
-  score_field_at_round_end:           {},
+  score_field_at_round_end: {
+    disableCaptureScoring: () => true,
+    scoreFieldAtRoundEnd: () => true,
+  },
   randomized_deck:                    {},
 };
 
