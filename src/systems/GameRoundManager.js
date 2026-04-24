@@ -271,6 +271,9 @@ export default class GameRoundManager {
   /** All style combos triggered this round (for end-of-round display). */
   get triggeredStyleCombos() { return this._style.getTriggeredCombos(); }
 
+  /** Revealed next deck flip card (when deck_flip_revealed hexagram is active). */
+  get nextDeckFlip() { return this._nextDeckFlip; }
+
   /** Running total of score accumulated this round (capture events). */
   get runningScore() { return this._runningScore; }
   /** Set of card IDs already spent by yaku scoring. */
@@ -377,6 +380,7 @@ export default class GameRoundManager {
     this._tigerPushActive          = false;
     this._snakeThresholdMods       = {};
     this._lastStyleCombos          = [];
+    this._nextDeckFlip             = null;
     this._style.resetRound();
 
     // Hexagram round-start hook
@@ -440,7 +444,19 @@ export default class GameRoundManager {
     );
     logger.logSpiritLoadout(this._spirits);
 
+    // Peek at next deck card if reveal hexagram is active.
+    this._peekNextDeckFlip();
+
     return this;
+  }
+
+  /** Peek at the top card of the deck for the reveal hexagram. */
+  _peekNextDeckFlip() {
+    if (applyHook('revealsDeckFlip', false) && !this._deck.isEmpty()) {
+      this._nextDeckFlip = this._deck.peek(1)[0] ?? null;
+    } else {
+      this._nextDeckFlip = null;
+    }
   }
 
   /**
@@ -907,6 +923,25 @@ export default class GameRoundManager {
     this._discardCount++;
     if (this._spirits.some(s => s.id === 'econ_recycling')) run.addKi(5);
     return 'field_discard';
+  }
+
+  /**
+   * Wrapper around field.addFlippedCard that discards unmatched deck cards
+   * when the deck_flip_revealed hexagram is active.
+   */
+  _addFlippedCardToField(card) {
+    if (applyHook('discardUnmatchedDeckFlip', false)) {
+      const hasMatch = this._field.getSlots().some(s =>
+        s && s.state !== 'pending' && this._field.matchesSlot(card, s)
+      );
+      if (!hasMatch) {
+        this._discardedThisTurn.push(card);
+        this._allDiscards.push(card);
+        this._discardCount++;
+        return { captured: null, discarded: false };
+      }
+    }
+    return this._addFlippedCardToField(card);
   }
 
   _addCapture(cards) {
@@ -1397,7 +1432,7 @@ export default class GameRoundManager {
         }
 
         // Deck card goes to the field normally (stack or new slot).
-        const flipResult = this._field.addFlippedCard(deckCard);
+        const flipResult = this._addFlippedCardToField(deckCard);
         if (flipResult.captured) {
           this._addCapture(flipResult.captured);
           _flipResult   = 'capture';
@@ -1424,7 +1459,7 @@ export default class GameRoundManager {
         this._addCapture(handCards);
         _flipCaptures = [...handCards];
         // Still place the flip card on the field normally.
-        const flipResult = this._field.addFlippedCard(deckCard);
+        const flipResult = this._addFlippedCardToField(deckCard);
         if (flipResult.captured) {
           this._addCapture(flipResult.captured);
           _flipResult   = 'capture';
@@ -1436,7 +1471,7 @@ export default class GameRoundManager {
         }
       } else {
         // Standard: deck card simply goes to the field.
-        const flipResult = this._field.addFlippedCard(deckCard);
+        const flipResult = this._addFlippedCardToField(deckCard);
         if (flipResult.captured) {
           this._addCapture(flipResult.captured);
           _flipResult   = 'capture';
@@ -1452,7 +1487,7 @@ export default class GameRoundManager {
     // field_plus_two_double_flip: flip a second deck card this turn.
     if (!this._deck.isEmpty() && applyHook('modifyDeckFlipsPerTurn', 1, 1) >= 2) {
       const deckCard2     = this._deck.draw(1)[0];
-      const flipResult2   = this._field.addFlippedCard(deckCard2);
+      const flipResult2   = this._addFlippedCardToField(deckCard2);
       let _flip2Result    = 'field_place';
       let _flip2Captures  = [];
       if (flipResult2.captured) {
@@ -1575,10 +1610,15 @@ export default class GameRoundManager {
                    : newYaku.length > 0 ? "yaku_decision"
                    : roundOver ? "round_over"
                    : _disablesYaku ? "yaku_decision" : "ok";
+
+      // Refresh deck flip preview for next turn.
+      if (status === 'ok' || status === 'yaku_decision') this._peekNextDeckFlip();
+
       return {
         status,
         newYaku,
         yakuDisabled:     !!_disablesYaku,
+        nextDeckFlip:     this._nextDeckFlip,
         captureEvents:    [...this._scoringEvents],
         runningScore:     this._runningScore,
         allYaku:          yakuForDiff,

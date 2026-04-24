@@ -141,6 +141,7 @@ export class GameScene extends Phaser.Scene {
     this._yakuGuideObjs      = [];
     this._discardOverlayObjs = [];
     this._actionBtnObjs      = [];
+    this._deckPreviewObjs    = [];
 
     this._selectedCardIds         = new Set();
     this._selectedConsumableIndex = null;
@@ -282,6 +283,7 @@ export class GameScene extends Phaser.Scene {
     this._renderConsumables();
     this._renderActionButtons();
     this._updateInfoTexts();
+    this._renderDeckFlipPreview();
   }
 
   // ── Hand ──────────────────────────────────────────────────────────────────
@@ -1664,6 +1666,24 @@ export class GameScene extends Phaser.Scene {
 
     this._deckSprite.setVisible(drawSize > 0);
     this._deckCountText.setText(String(drawSize));
+  }
+
+  // ── Deck flip preview (deck_flip_revealed hexagram) ─────────────────────
+
+  _renderDeckFlipPreview() {
+    this._clearObjs(this._deckPreviewObjs);
+    const preview = this._round.nextDeckFlip;
+    if (!preview) return;
+    const px = DECK_X + CARD_W + 14;
+    const py = DECK_Y - 20;
+    const bg = this.add.rectangle(px, py - 18, CARD_W + 10, CARD_H + 30, 0x0a1520, 0.92)
+      .setStrokeStyle(1, 0x44aacc).setDepth(5);
+    const label = this.add.text(px, py - CARD_H / 2 - 16, 'Next:', {
+      fontSize: '10px', color: '#66ccee',
+    }).setOrigin(0.5).setDepth(5);
+    const card = this.add.image(px, py, preview.id)
+      .setDisplaySize(CARD_W * 0.9, CARD_H * 0.9).setDepth(5);
+    this._deckPreviewObjs.push(bg, label, card);
   }
 
   // ── End screen ────────────────────────────────────────────────────────────

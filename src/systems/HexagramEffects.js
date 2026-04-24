@@ -702,7 +702,10 @@ export const HEXAGRAM_EFFECTS = {
   },
 
   // TODO: Phase 3E — Radical mode changes
-  deck_flip_revealed:                 {},
+  deck_flip_revealed: {
+    revealsDeckFlip: () => true,
+    discardUnmatchedDeckFlip: () => true,
+  },
   yaku_ends_round: {
     forceAutoBankOnYaku: () => true,
   },
