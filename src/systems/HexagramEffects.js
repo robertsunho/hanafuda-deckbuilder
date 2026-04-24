@@ -701,7 +701,8 @@ export const HEXAGRAM_EFFECTS = {
     },
   },
 
-  // TODO: Phase 3E — Radical mode changes
+  // ── Phase 3E — Radical mode changes ──────────────────────────────────────
+
   deck_flip_revealed: {
     revealsDeckFlip: () => true,
     discardUnmatchedDeckFlip: () => true,
