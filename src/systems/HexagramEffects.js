@@ -703,7 +703,9 @@ export const HEXAGRAM_EFFECTS = {
 
   // TODO: Phase 3E — Radical mode changes
   deck_flip_revealed:                 {},
-  yaku_ends_round:                    {},
+  yaku_ends_round: {
+    forceAutoBankOnYaku: () => true,
+  },
   play_two_cards:                     {},
   match_by_rank: {
     overridesCaptureRule: () => 'rank',

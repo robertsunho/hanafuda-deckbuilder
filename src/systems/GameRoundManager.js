@@ -1538,10 +1538,12 @@ export default class GameRoundManager {
       const pushEscalation = 1.0; // removed — no longer used
       const flow           = run.flow;
 
-      if (newYaku.length > 0) {
+      const _forceAutoBank = !_disablesYaku && newYaku.length > 0 && applyHook('forceAutoBankOnYaku', false);
+
+      if (newYaku.length > 0 && !_forceAutoBank) {
         this._roundEndingAfterDecision = roundOver;
         this._phase = "yaku_decision";
-      } else if (roundOver) {
+      } else if (roundOver || _forceAutoBank) {
         // Flow decay — applied every round after push resolution.
         run.applyFlowDecay();
         logger._log(`Flow decay: ×${RunManager.FLOW_DECAY_RATE} → Flow is now ×${run.flow.toFixed(2)}`);
@@ -1569,7 +1571,8 @@ export default class GameRoundManager {
         this._phase = "idle";
       }
 
-      const status = newYaku.length > 0 ? "yaku_decision"
+      const status = _forceAutoBank ? "round_over"
+                   : newYaku.length > 0 ? "yaku_decision"
                    : roundOver ? "round_over"
                    : _disablesYaku ? "yaku_decision" : "ok";
       return {
