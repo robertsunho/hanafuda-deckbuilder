@@ -1889,6 +1889,15 @@ export class GameScene extends Phaser.Scene {
       if (run.isRunComplete) {
         // ── Victory ─────────────────────────────────────────────────
         run.endRun(true);
+        // Track beaten hexagram for unlock progression
+        const hexId = run.getHexagram()?.id;
+        if (hexId) {
+          const beaten = JSON.parse(localStorage.getItem('hanatu_beaten_hexagrams') || '[]');
+          if (!beaten.includes(hexId)) {
+            beaten.push(hexId);
+            localStorage.setItem('hanatu_beaten_hexagrams', JSON.stringify(beaten));
+          }
+        }
         logger.logRunEnd('victory', run.round);
         logger.logRunSummary({
           round: run.round, ki: run.ki,
