@@ -428,7 +428,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'util_symbiosis',
     name:        'Symbiosis',
-    description: 'Capturing an animal card summons a symbiont spirit into an open slot.',
+    description: 'Capturing an animal summons a symbiont. 3 stacks summon 3 different symbionts per capture.',
     channel:     'utility',
     cost:        7,
     tier:        1,
@@ -543,7 +543,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'econ_grace',
     name:        'Grace',
-    description: 'Style combos earn double ki at round end.',
+    description: 'Multiplies style combo ki: ×2 / ×3 / ×4 (additive stacking).',
     channel:     'economy',
     cost:        3,
     tier:        1,
@@ -573,7 +573,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'econ_piggybank',
     name:        'Piggy Bank',
-    description: 'Leftover hand cards earn 3× ki at round end instead of 1×.',
+    description: 'Multiplies hand-card ki: ×2 / ×3 / ×4 (additive stacking).',
     channel:     'economy',
     cost:        3,
     tier:        1,

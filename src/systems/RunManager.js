@@ -731,12 +731,14 @@ class RunManager {
     const styleCombos  = result.styleCombos  ?? 0;
     const earthKiBonus = result.earthKiBonus ?? 0;
     const pushFailed   = result.penaltyApplied ?? false;
-    const hasPiggyBank = this._spirits.some(s => s.id === 'econ_piggybank');
-    const hasGrace     = this._spirits.some(s => s.id === 'econ_grace');
+    const piggyCount   = this._spirits.filter(s => s.id === 'econ_piggybank').length;
+    const graceCount   = this._spirits.filter(s => s.id === 'econ_grace').length;
     // Push failure forfeits all hand-derived ki.
-    let handKi         = pushFailed ? 0 : (hasPiggyBank ? cardsInHand * 3 : cardsInHand);
+    const piggyMult    = piggyCount > 0 ? Math.min(1 + piggyCount, 4) : 1;
+    let handKi         = pushFailed ? 0 : cardsInHand * piggyMult;
     handKi             = applyHook('modifyHandKi', handKi, handKi);
-    const baseComboKi  = hasGrace     ? styleCombos  * 2 : styleCombos;
+    const graceMult    = graceCount > 0 ? Math.min(1 + graceCount, 4) : 1;
+    const baseComboKi  = styleCombos * graceMult;
     const comboKi      = this.styleComboKi(baseComboKi);
     const total        = 5 + handKi + comboKi + earthKiBonus;
     return applyHook('modifyKiReward', total, total, { cardsInHand, styleCombos });

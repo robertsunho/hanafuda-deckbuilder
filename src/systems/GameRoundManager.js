@@ -1383,15 +1383,37 @@ export default class GameRoundManager {
       }
     }
 
-    // util_symbiosis: generate symbiont spirit on animal capture.
-    if (this._spirits.some(s => s.id === 'util_symbiosis')) {
+    // util_symbiosis: generate symbiont spirit(s) on animal capture.
+    // N stacks generate up to N different symbionts per animal capture.
+    const symbiosisCount = this._spirits.filter(s => s.id === 'util_symbiosis').length;
+    if (symbiosisCount > 0) {
       for (const card of cards) {
         if (card.type === 'animal') {
-          const symbiontId = ANIMAL_SYMBIONT_MAP[card.id];
-          if (symbiontId && run.canAddSpirit && !run.spirits.some(s => s.id === symbiontId)) {
-            const symDef = getSpiritDef(symbiontId);
+          // Build pool of valid symbiont IDs for this animal (not already equipped).
+          const primaryId = ANIMAL_SYMBIONT_MAP[card.id];
+          if (!primaryId) continue;
+          // Collect all possible symbiont IDs, starting with the primary one.
+          const allSymbiontIds = Object.values(ANIMAL_SYMBIONT_MAP);
+          const candidates = allSymbiontIds.filter(
+            sid => !run.spirits.some(s => s.id === sid)
+          );
+          // Primary goes first if available; then fill with random others.
+          const ordered = [];
+          if (candidates.includes(primaryId)) {
+            ordered.push(primaryId);
+          }
+          const others = candidates.filter(sid => sid !== primaryId)
+            .sort(() => Math.random() - 0.5);
+          ordered.push(...others);
+          // Summon up to symbiosisCount different symbionts.
+          let summoned = 0;
+          for (const sid of ordered) {
+            if (summoned >= symbiosisCount) break;
+            if (!run.canAddSpirit) break;
+            const symDef = getSpiritDef(sid);
             if (symDef) {
               run.addSymbiontSpirit(symDef);
+              summoned++;
               // sym_algae: increment on summon.
               for (const spirit of run.spirits) {
                 if (spirit.id === 'sym_algae' && spirit.state) {

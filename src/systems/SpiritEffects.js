@@ -276,10 +276,10 @@ const _effects = {
 
   econ_bonds:        {},  // +5% interest (stacks to +25%) — RunManager.interestRate
   econ_ingot:        {},  // +0.01% interest per ki — RunManager.interestRate
-  econ_grace:        {},  // double style combo ki — RunManager.calculateKiReward
+  econ_grace:        {},  // ×2/×3/×4 style combo ki (additive stacking)
   econ_recycling:    {},  // +5 ki per overflow discard
   econ_lucky_charm:  {},  // +50% ki on push
-  econ_piggybank:    {},  // 3× hand ki at round end
+  econ_piggybank:    {},  // ×2/×3/×4 hand ki (additive stacking)
   econ_coupon:       {},  // 15% shop discount (stacks to 45%)
   econ_replica:      {},
   econ_print:        {},
