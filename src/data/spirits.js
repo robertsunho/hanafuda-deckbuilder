@@ -16,6 +16,11 @@
 //
 // fusionGroup: spirits that share a fusionGroup can be fused together at the
 // Sacred Grove.  Two spirits in the same fusionGroup → one fusion spirit.
+//
+// rarity: 'common' | 'uncommon' | 'rare' | 'legendary' | null
+//   null = not in the rarity-based RNG pool (symbionts, fusions)
+//
+// category: taxonomy classification for filtering and grouping
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const SPIRIT_CATALOG = [
@@ -30,6 +35,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'spring',
+    rarity:      'common',
+    category:    'foundation_seasonal',
   },
   {
     id:          'summer_heat',
@@ -39,6 +46,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'summer',
+    rarity:      'common',
+    category:    'foundation_seasonal',
   },
   {
     id:          'autumn_harvest',
@@ -48,6 +57,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'autumn',
+    rarity:      'common',
+    category:    'foundation_seasonal',
   },
   {
     id:          'winter_cold',
@@ -57,6 +68,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'winter',
+    rarity:      'common',
+    category:    'foundation_seasonal',
   },
 
   // ── Seasonal Additive Mult (Tier 1) ───────────────────────────────────────
@@ -69,6 +82,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'spring',
+    rarity:      'common',
+    category:    'foundation_seasonal',
   },
   {
     id:          'summer_humidity',
@@ -78,6 +93,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'summer',
+    rarity:      'common',
+    category:    'foundation_seasonal',
   },
   {
     id:          'autumn_leaves',
@@ -87,6 +104,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'autumn',
+    rarity:      'common',
+    category:    'foundation_seasonal',
   },
   {
     id:          'winter_aridity',
@@ -96,6 +115,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'winter',
+    rarity:      'common',
+    category:    'foundation_seasonal',
   },
 
   // ── Axis Point Boost (Tier 1) ─────────────────────────────────────────────
@@ -108,6 +129,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'sky',
+    rarity:      'common',
+    category:    'foundation_axis',
   },
   {
     id:          'land_soil',
@@ -117,6 +140,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'land',
+    rarity:      'common',
+    category:    'foundation_axis',
   },
   {
     id:          'day_light',
@@ -126,6 +151,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'day',
+    rarity:      'common',
+    category:    'foundation_axis',
   },
   {
     id:          'night_dark',
@@ -135,6 +162,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'night',
+    rarity:      'common',
+    category:    'foundation_axis',
   },
 
   // ── Axis Additive Mult (Tier 1) ───────────────────────────────────────────
@@ -147,6 +176,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'sky',
+    rarity:      'common',
+    category:    'foundation_axis',
   },
   {
     id:          'land_rock',
@@ -156,6 +187,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'land',
+    rarity:      'common',
+    category:    'foundation_axis',
   },
   {
     id:          'day_movement',
@@ -165,6 +198,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'day',
+    rarity:      'common',
+    category:    'foundation_axis',
   },
   {
     id:          'night_stillness',
@@ -174,6 +209,8 @@ export const SPIRIT_CATALOG = [
     cost:        3,
     tier:        1,
     fusionGroup: 'night',
+    rarity:      'common',
+    category:    'foundation_axis',
   },
 
   // ── Seasonal Fusion Spirits (Tier 2 — Sacred Grove only, never sold) ──────
@@ -186,6 +223,8 @@ export const SPIRIT_CATALOG = [
     cost:        0,
     tier:        2,
     fusionGroup: 'spring',
+    rarity:      null,
+    category:    'fusion_t2',
   },
   {
     id:          'fusion_thunderstorm',
@@ -195,6 +234,8 @@ export const SPIRIT_CATALOG = [
     cost:        0,
     tier:        2,
     fusionGroup: 'summer',
+    rarity:      null,
+    category:    'fusion_t2',
   },
   {
     id:          'fusion_decay',
@@ -204,6 +245,8 @@ export const SPIRIT_CATALOG = [
     cost:        0,
     tier:        2,
     fusionGroup: 'autumn',
+    rarity:      null,
+    category:    'fusion_t2',
   },
   {
     id:          'fusion_blizzard',
@@ -213,6 +256,8 @@ export const SPIRIT_CATALOG = [
     cost:        0,
     tier:        2,
     fusionGroup: 'winter',
+    rarity:      null,
+    category:    'fusion_t2',
   },
 
   // ── Axis Fusion Spirits (Tier 2 — Sacred Grove only, never sold) ──────────
@@ -225,6 +270,8 @@ export const SPIRIT_CATALOG = [
     cost:        0,
     tier:        2,
     fusionGroup: 'sky',
+    rarity:      null,
+    category:    'fusion_t2',
   },
   {
     id:          'fusion_continent',
@@ -234,6 +281,8 @@ export const SPIRIT_CATALOG = [
     cost:        0,
     tier:        2,
     fusionGroup: 'land',
+    rarity:      null,
+    category:    'fusion_t2',
   },
   {
     id:          'fusion_sun',
@@ -243,6 +292,8 @@ export const SPIRIT_CATALOG = [
     cost:        0,
     tier:        2,
     fusionGroup: 'day',
+    rarity:      null,
+    category:    'fusion_t2',
   },
   {
     id:          'fusion_moon',
@@ -252,6 +303,8 @@ export const SPIRIT_CATALOG = [
     cost:        0,
     tier:        2,
     fusionGroup: 'night',
+    rarity:      null,
+    category:    'fusion_t2',
   },
 
   // ── Rank Foundation Spirits (Tier 1) ──────────────────────────────────────
@@ -263,6 +316,8 @@ export const SPIRIT_CATALOG = [
     channel:     'rank',
     cost:        3,
     tier:        1,
+    rarity:      'common',
+    category:    'foundation_rank',
   },
   {
     id:          'rank_pulse',
@@ -271,6 +326,8 @@ export const SPIRIT_CATALOG = [
     channel:     'rank',
     cost:        3,
     tier:        1,
+    rarity:      'common',
+    category:    'foundation_rank',
   },
   {
     id:          'rank_poem',
@@ -279,6 +336,8 @@ export const SPIRIT_CATALOG = [
     channel:     'rank',
     cost:        3,
     tier:        1,
+    rarity:      'common',
+    category:    'foundation_rank',
   },
   {
     id:          'rank_salt',
@@ -287,6 +346,8 @@ export const SPIRIT_CATALOG = [
     channel:     'rank',
     cost:        3,
     tier:        1,
+    rarity:      'common',
+    category:    'foundation_rank',
   },
 
   // ── Rank Engine Spirits (Tier 1) ──────────────────────────────────────────
@@ -298,6 +359,8 @@ export const SPIRIT_CATALOG = [
     channel:     'multiplicative',
     cost:        3,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_rank_mult',
   },
   {
     id:          'engine_wildlife',
@@ -306,6 +369,8 @@ export const SPIRIT_CATALOG = [
     channel:     'multiplicative',
     cost:        3,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_rank_mult',
   },
   {
     id:          'engine_banner',
@@ -314,6 +379,8 @@ export const SPIRIT_CATALOG = [
     channel:     'multiplicative',
     cost:        3,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_rank_mult',
   },
   {
     id:          'engine_plenty',
@@ -322,6 +389,8 @@ export const SPIRIT_CATALOG = [
     channel:     'multiplicative',
     cost:        3,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_rank_mult',
   },
 
   // ── Rank Utility Spirits (Tier 1) ─────────────────────────────────────────
@@ -333,6 +402,8 @@ export const SPIRIT_CATALOG = [
     channel:     'utility',
     cost:        3,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'utility',
   },
   {
     id:          'util_festival',
@@ -341,6 +412,8 @@ export const SPIRIT_CATALOG = [
     channel:     'utility',
     cost:        3,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'utility',
   },
   {
     id:          'util_irrigation',
@@ -349,6 +422,8 @@ export const SPIRIT_CATALOG = [
     channel:     'utility',
     cost:        3,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'utility',
   },
   {
     id:          'util_symbiosis',
@@ -357,6 +432,8 @@ export const SPIRIT_CATALOG = [
     channel:     'utility',
     cost:        7,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'utility',
   },
 
   // ── Symbiont Spirits (generated by Symbiosis, not purchasable) ─────────────
@@ -365,72 +442,81 @@ export const SPIRIT_CATALOG = [
     id: 'sym_caterpillar', name: 'Caterpillar',
     description: 'Eats leaf-enhanced cards on capture (removed from deck, no yaku credit). After 3, metamorphoses into a copy of a random equipped spirit.',
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'warbler',
+    rarity: null, category: 'symbiont',
   },
   {
     id: 'sym_cuckoo_egg', name: 'Cuckoo Egg',
     description: 'Blocks this slot for 3 rounds. Hatches into a random Tier 2 fusion spirit.',
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'cuckoo',
+    rarity: null, category: 'symbiont',
   },
   {
     id: 'sym_algae', name: 'Algae',
     description: '+0.3 mult-mult each time a symbiont is summoned.',
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'dragonfly',
+    rarity: null, category: 'symbiont',
   },
   {
     id: 'sym_ants', name: 'Ants',
     description: '×1.0 mult per spirit equipped.',
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'butterflies',
+    rarity: null, category: 'symbiont',
   },
   {
     id: 'sym_crow', name: 'Crow',
     description: 'First deck flip each round is captured instead of placed.',
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'boar',
+    rarity: null, category: 'symbiont',
   },
   {
     id: 'sym_ducks', name: 'Ducks',
     description: '+0.3 mult-mult per pair captured (2-card captures). Resets each round.',
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'geese',
+    rarity: null, category: 'symbiont',
   },
   {
     id: 'sym_snails', name: 'Snails',
     description: '+0.2 mult-mult per card NOT played when round ends. Permanent across run.',
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'fireflies',
+    rarity: null, category: 'symbiont',
   },
   {
     id: 'sym_magpie', name: 'Magpie',
     description: '+3 ki each time a style combo triggers.',
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'deer',
+    rarity: null, category: 'symbiont',
   },
   {
     id: 'sym_osprey', name: 'Osprey',
     description: 'Once per round, capture 1 card directly from the field before playing.',
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'swallow',
+    rarity: null, category: 'symbiont',
   },
 
   // ── Cross-Fusion Spirits (Tier 3 — Sacred Grove only) ─────────────────────
 
   // Polarity Path
-  { id: 'cross_yang',    name: 'Yang',     description: 'Sky and Day cards score at ×2.0 mult.',       channel: 'cross', cost: 0, tier: 3, fusionGroup: 'polarity' },
-  { id: 'cross_yin',     name: 'Yin',      description: 'Land and Night cards score at ×2.0 mult.',    channel: 'cross', cost: 0, tier: 3, fusionGroup: 'polarity' },
+  { id: 'cross_yang',    name: 'Yang',     description: 'Sky and Day cards score at ×2.0 mult.',       channel: 'cross', cost: 0, tier: 3, fusionGroup: 'polarity',         rarity: null, category: 'fusion_t3' },
+  { id: 'cross_yin',     name: 'Yin',      description: 'Land and Night cards score at ×2.0 mult.',    channel: 'cross', cost: 0, tier: 3, fusionGroup: 'polarity',         rarity: null, category: 'fusion_t3' },
 
   // Quadrant Path
-  { id: 'cross_space',   name: 'Space',    description: 'Sky and Night cards score at ×1.5 mult.',     channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant' },
-  { id: 'cross_energy',  name: 'Energy',   description: 'Land and Day cards score at ×1.5 mult.',      channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant' },
+  { id: 'cross_space',   name: 'Space',    description: 'Sky and Night cards score at ×1.5 mult.',     channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant',         rarity: null, category: 'fusion_t3' },
+  { id: 'cross_energy',  name: 'Energy',   description: 'Land and Day cards score at ×1.5 mult.',      channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant',         rarity: null, category: 'fusion_t3' },
 
   // Seasonal Extremes
-  { id: 'cross_solstice', name: 'Solstice', description: 'Summer and Winter cards score at ×2.0 mult.', channel: 'cross', cost: 0, tier: 3, fusionGroup: 'seasonal_extreme' },
-  { id: 'cross_equinox',  name: 'Equinox',  description: 'Spring and Autumn cards score at ×2.0 mult.', channel: 'cross', cost: 0, tier: 3, fusionGroup: 'seasonal_extreme' },
+  { id: 'cross_solstice', name: 'Solstice', description: 'Summer and Winter cards score at ×2.0 mult.', channel: 'cross', cost: 0, tier: 3, fusionGroup: 'seasonal_extreme', rarity: null, category: 'fusion_t3' },
+  { id: 'cross_equinox',  name: 'Equinox',  description: 'Spring and Autumn cards score at ×2.0 mult.', channel: 'cross', cost: 0, tier: 3, fusionGroup: 'seasonal_extreme', rarity: null, category: 'fusion_t3' },
 
   // Half-Year
-  { id: 'cross_tropic',  name: 'Tropic',   description: 'Spring and Summer cards score at ×1.5 mult.',  channel: 'cross', cost: 0, tier: 3, fusionGroup: 'halfyear' },
-  { id: 'cross_arctic',  name: 'Arctic',   description: 'Autumn and Winter cards score at ×1.5 mult.',  channel: 'cross', cost: 0, tier: 3, fusionGroup: 'halfyear' },
+  { id: 'cross_tropic',  name: 'Tropic',   description: 'Spring and Summer cards score at ×1.5 mult.',  channel: 'cross', cost: 0, tier: 3, fusionGroup: 'halfyear',         rarity: null, category: 'fusion_t3' },
+  { id: 'cross_arctic',  name: 'Arctic',   description: 'Autumn and Winter cards score at ×1.5 mult.',  channel: 'cross', cost: 0, tier: 3, fusionGroup: 'halfyear',         rarity: null, category: 'fusion_t3' },
 
   // ── Unity Spirits (Tier 4 — Sacred Grove only) ─────────────────────────────
 
-  { id: 'unity_yinyang', name: 'Yin-Yang', description: 'Ultimate axis spirit. Effect TBD.',      channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_axis' },
-  { id: 'unity_gravity', name: 'Gravity',  description: 'Ultimate quadrant spirit. Effect TBD.',  channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_axis' },
-  { id: 'unity_time',    name: 'Time',     description: 'Ultimate seasonal spirit. Effect TBD.',  channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_seasonal' },
-  { id: 'unity_planet',  name: 'Planet',   description: 'Ultimate half-year spirit. Effect TBD.', channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_seasonal' },
+  { id: 'unity_yinyang', name: 'Yin-Yang', description: 'Ultimate axis spirit. Effect TBD.',      channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_axis',     rarity: null, category: 'fusion_t4' },
+  { id: 'unity_gravity', name: 'Gravity',  description: 'Ultimate quadrant spirit. Effect TBD.',  channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_axis',     rarity: null, category: 'fusion_t4' },
+  { id: 'unity_time',    name: 'Time',     description: 'Ultimate seasonal spirit. Effect TBD.',  channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_seasonal', rarity: null, category: 'fusion_t4' },
+  { id: 'unity_planet',  name: 'Planet',   description: 'Ultimate half-year spirit. Effect TBD.', channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_seasonal', rarity: null, category: 'fusion_t4' },
 
   // ── Economy Spirits ────────────────────────────────────────────────────────
 
@@ -441,6 +527,8 @@ export const SPIRIT_CATALOG = [
     channel:     'economy',
     cost:        4,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'economy_ki',
   },
   {
     id:          'econ_ingot',
@@ -449,6 +537,8 @@ export const SPIRIT_CATALOG = [
     channel:     'economy',
     cost:        4,
     tier:        1,
+    rarity:      'common',
+    category:    'economy_ki',
   },
   {
     id:          'econ_grace',
@@ -457,6 +547,8 @@ export const SPIRIT_CATALOG = [
     channel:     'economy',
     cost:        3,
     tier:        1,
+    rarity:      'common',
+    category:    'economy_ki',
   },
   {
     id:          'econ_recycling',
@@ -465,6 +557,8 @@ export const SPIRIT_CATALOG = [
     channel:     'economy',
     cost:        3,
     tier:        1,
+    rarity:      'common',
+    category:    'economy_ki',
   },
   {
     id:          'econ_lucky_charm',
@@ -473,6 +567,8 @@ export const SPIRIT_CATALOG = [
     channel:     'economy',
     cost:        4,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'economy_ki',
   },
   {
     id:          'econ_piggybank',
@@ -481,6 +577,8 @@ export const SPIRIT_CATALOG = [
     channel:     'economy',
     cost:        3,
     tier:        1,
+    rarity:      'common',
+    category:    'economy_ki',
   },
   {
     id:          'econ_coupon',
@@ -489,6 +587,8 @@ export const SPIRIT_CATALOG = [
     channel:     'economy',
     cost:        5,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'economy_ki',
   },
   {
     id:          'econ_replica',
@@ -497,6 +597,8 @@ export const SPIRIT_CATALOG = [
     channel:     'economy',
     cost:        5,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'economy_consumable',
   },
   {
     id:          'econ_print',
@@ -505,6 +607,8 @@ export const SPIRIT_CATALOG = [
     channel:     'economy',
     cost:        4,
     tier:        1,
+    rarity:      'rare',
+    category:    'economy_consumable',
   },
   {
     id:          'econ_present',
@@ -513,6 +617,8 @@ export const SPIRIT_CATALOG = [
     channel:     'economy',
     cost:        4,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'economy_consumable',
   },
   {
     id:          'econ_collector',
@@ -521,6 +627,8 @@ export const SPIRIT_CATALOG = [
     channel:     'economy',
     cost:        3,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'economy_consumable',
   },
 
   // ── Gameplay Spirits ───────────────────────────────────────────────────────
@@ -532,6 +640,8 @@ export const SPIRIT_CATALOG = [
     channel:     'gameplay',
     cost:        4,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'gameplay',
   },
   {
     id:          'game_well',
@@ -540,6 +650,8 @@ export const SPIRIT_CATALOG = [
     channel:     'gameplay',
     cost:        3,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'gameplay',
   },
   {
     id:          'game_catcher',
@@ -548,6 +660,8 @@ export const SPIRIT_CATALOG = [
     channel:     'gameplay',
     cost:        4,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'gameplay',
   },
   {
     id:          'game_surplus',
@@ -556,6 +670,8 @@ export const SPIRIT_CATALOG = [
     channel:     'gameplay',
     cost:        4,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'gameplay',
   },
   {
     id:          'game_gankyil',
@@ -564,6 +680,8 @@ export const SPIRIT_CATALOG = [
     channel:     'gameplay',
     cost:        5,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'gameplay',
   },
   {
     id:          'game_angel',
@@ -572,6 +690,8 @@ export const SPIRIT_CATALOG = [
     channel:     'gameplay',
     cost:        3,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'gameplay',
   },
   {
     id:          'game_mirror',
@@ -580,6 +700,8 @@ export const SPIRIT_CATALOG = [
     channel:     'gameplay',
     cost:        6,
     tier:        1,
+    rarity:      'rare',
+    category:    'meta',
   },
   {
     id:          'game_echo',
@@ -588,6 +710,8 @@ export const SPIRIT_CATALOG = [
     channel:     'gameplay',
     cost:        4,
     tier:        1,
+    rarity:      'common',
+    category:    'retrigger',
   },
 
   // ── Wu Xing Engine Spirits ─────────────────────────────────────────────────
@@ -599,6 +723,8 @@ export const SPIRIT_CATALOG = [
     channel:     'multiplicative',
     cost:        4,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_wuxing',
   },
   {
     id:          'engine_carbon',
@@ -607,6 +733,8 @@ export const SPIRIT_CATALOG = [
     channel:     'multiplicative',
     cost:        4,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_wuxing',
   },
   {
     id:          'engine_velocity',
@@ -615,6 +743,8 @@ export const SPIRIT_CATALOG = [
     channel:     'multiplicative',
     cost:        4,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_wuxing',
   },
   {
     id:          'engine_fossil',
@@ -623,6 +753,8 @@ export const SPIRIT_CATALOG = [
     channel:     'multiplicative',
     cost:        3,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_wuxing',
   },
   {
     id:          'engine_moths',
@@ -631,8 +763,14 @@ export const SPIRIT_CATALOG = [
     channel:     'multiplicative',
     cost:        4,
     tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_wuxing',
   },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lookup helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Look up a spirit definition by id.
@@ -656,3 +794,25 @@ export const ANIMAL_SYMBIONT_MAP = {
   october_deer:        'sym_magpie',
   november_swallow:    'sym_osprey',
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rarity & category helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Spirits filtered by rarity (excludes null rarity). */
+export const spiritsByRarity = {
+  common:    SPIRIT_CATALOG.filter(s => s.rarity === 'common'),
+  uncommon:  SPIRIT_CATALOG.filter(s => s.rarity === 'uncommon'),
+  rare:      SPIRIT_CATALOG.filter(s => s.rarity === 'rare'),
+  legendary: SPIRIT_CATALOG.filter(s => s.rarity === 'legendary'),
+};
+
+/** All spirits with non-null rarity (eligible for Cat Zodiac, Lead, etc.). */
+export const rarityPoolSpirits = SPIRIT_CATALOG.filter(s => s.rarity !== null);
+
+/** Spirits filtered by category. Returns array per category. */
+export const spiritsByCategory = SPIRIT_CATALOG.reduce((acc, s) => {
+  if (!acc[s.category]) acc[s.category] = [];
+  acc[s.category].push(s);
+  return acc;
+}, {});
