@@ -395,9 +395,7 @@ export default class GameRoundManager {
 
     // ── Symbiont per-round resets ─────────────────────────────────────────
     for (const spirit of this._spirits) {
-      if (spirit.id === 'sym_ducks'   && spirit.state) spirit.state.pairsThisRound = 0;
-      if (spirit.id === 'sym_crow'    && spirit.state) spirit.state.usedThisRound  = false;
-      if (spirit.id === 'sym_osprey'  && spirit.state) spirit.state.usedThisRound  = false;
+      if (spirit.id === 'sym_osprey'  && spirit.state) spirit.state.flipsUsedThisRound = 0;
       // sym_cuckoo_egg: countdown — hatch when it reaches 0.
       if (spirit.id === 'sym_cuckoo_egg' && spirit.state) {
         spirit.state.roundsRemaining--;
@@ -573,6 +571,13 @@ export default class GameRoundManager {
     // Remove all played cards from hand.
     this._hand.removeMany(cardIds);
 
+    // sym_ants: +0.5 additive mult per card played (permanent).
+    for (const spirit of this._spirits) {
+      if (spirit.id === 'sym_ants' && spirit.state) {
+        spirit.state.totalPlayed = (spirit.state.totalPlayed ?? 0) + cardIds.length;
+      }
+    }
+
     // Multi-play turn: resolve any pending match from a previous play this turn.
     if (this._playsThisTurn > 0) {
       const pending = this._field.getPendingSlot();
@@ -692,6 +697,11 @@ export default class GameRoundManager {
       this._style.getTriggeredCombos(), this._lastEnhancementEvents ?? []
     );
     this._roundEndingAfterDecision = false;
+    // sym_crow: generate a random consumable at round end per crow copy.
+    const crowCountBank = this._spirits.filter(s => s.id === 'sym_crow').length;
+    for (let i = 0; i < crowCountBank; i++) {
+      if (run.canAddConsumable) run.generateRandomConsumable();
+    }
     const _hexEffectBank = getActiveEffect();
     if (_hexEffectBank?.onRoundEnd) _hexEffectBank.onRoundEnd(this);
     this._phase = "round_over";
@@ -1350,10 +1360,12 @@ export default class GameRoundManager {
 
     run.onCardsCaptured(cards);
 
-    // sym_ducks: track 2-card pair captures.
-    for (const spirit of this._spirits) {
-      if (spirit.id === 'sym_ducks' && spirit.state && cards.length === 2) {
-        spirit.state.pairsThisRound++;
+    // sym_ducks: double multValue on deck-flip pair capture.
+    if (this._inDeckPhase && cards.length === 2) {
+      for (const spirit of this._spirits) {
+        if (spirit.id === 'sym_ducks' && spirit.state) {
+          spirit.state.multValue = (spirit.state.multValue ?? 1) * 2;
+        }
       }
     }
 
@@ -1471,6 +1483,7 @@ export default class GameRoundManager {
    * @returns {{ status: string, … }}
    */
   _doDeckPhase() {
+    this._inDeckPhase = true;
     if (this._deck.isEmpty()) {
       this._lastDeckCard = null;
       // No deck card to flip — resolve any pending match as a capture.
@@ -1485,13 +1498,25 @@ export default class GameRoundManager {
     const deckCard = this._deck.draw(1)[0];
     this._lastDeckCard = deckCard;
 
-    // sym_crow: first deck flip each round is captured directly.
-    const crowSpirit = this._spirits.find(s => s.id === 'sym_crow');
-    if (crowSpirit?.state && !crowSpirit.state.usedThisRound) {
-      crowSpirit.state.usedThisRound = true;
-      this._addCapture([deckCard]);
-      logger.logDeckFlip(deckCard, 'crow_capture', [deckCard]);
-      return this._finalizeTurn();
+    // sym_osprey: first N deck flips go to hand instead of field.
+    const ospreySpirits = this._spirits.filter(s => s.id === 'sym_osprey');
+    const ospreyMax = ospreySpirits.length;
+    if (ospreyMax > 0) {
+      const used = ospreySpirits[0]?.state?.flipsUsedThisRound ?? 0;
+      if (used < ospreyMax && this._hand.getAll().length < (this._handSizeCap ?? 99)) {
+        for (const os of ospreySpirits) {
+          if (os.state) os.state.flipsUsedThisRound = used + 1;
+        }
+        this._hand.add([deckCard]);
+        logger.logDeckFlip(deckCard, 'osprey_to_hand', [deckCard]);
+        // Resolve any pending match without the deck card.
+        const pending0 = this._field.getPendingSlot();
+        if (pending0) {
+          const captured = this._field.capturePendingMatch();
+          if (captured.length > 0) this._addCapture(captured);
+        }
+        return this._finalizeTurn();
+      }
     }
 
     // Track the deck flip outcome for logging.
@@ -1530,6 +1555,12 @@ export default class GameRoundManager {
             _flipCaptures = captured;
           } else {
             _flipResult = 'strand';
+            // sym_ducks: halve multValue on strand (floor at 1).
+            for (const spirit of this._spirits) {
+              if (spirit.id === 'sym_ducks' && spirit.state) {
+                spirit.state.multValue = Math.max(1, (spirit.state.multValue ?? 1) / 2);
+              }
+            }
           }
         }
         // Whether captured or stranded, the pending state is resolved for
@@ -1630,6 +1661,7 @@ export default class GameRoundManager {
    *             yakuPoints: number, turn: number, deckCard: object|null }}
    */
   _finalizeTurn() {
+    this._inDeckPhase = false;
     this._turn++;
     this._playsThisTurn = 0;
     this._capture.recordTurn();
@@ -1683,6 +1715,13 @@ export default class GameRoundManager {
       const roundOver = this._hand.isEmpty();
       const penaltyApplied = roundOver && this._pushPenaltyActive && !this._dogProtection;
       if (roundOver) this._trackSnailsUnplayed();
+      // sym_crow: generate a random consumable at round end per crow copy.
+      if (roundOver) {
+        const crowCount = this._spirits.filter(s => s.id === 'sym_crow').length;
+        for (let i = 0; i < crowCount; i++) {
+          if (run.canAddConsumable) run.generateRandomConsumable();
+        }
+      }
 
       if (roundOver && penaltyApplied) {
         // Push failure: reduce flow for future rounds but keep this round's score.

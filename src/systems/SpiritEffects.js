@@ -312,33 +312,32 @@ const _effects = {
   },
 
   sym_ants: {
-    applyEngine({ spirit, spirits }) {
-      const add = spirits?.length ?? 0;
+    applyEngine({ spirit }) {
+      const add = spirit.state?.totalPlayed ?? 0;
       if (add === 0) return null;
-      return { addMult: add };
+      return { addMult: add * 0.5 };
     },
   },
 
-  sym_crow:   {},  // first deck flip is captured directly
+  sym_crow:   {},  // consumable generation at round end
 
   sym_ducks: {
     applyEngine({ spirit }) {
-      const m = 1.0 + (spirit.state?.pairsThisRound ?? 0) * 0.3;
-      if (m === 1.0) return null;
-      return { multiplyMult: m };
+      const add = spirit.state?.multValue ?? 1;
+      return { addMult: add };
     },
   },
 
   sym_snails: {
     applyEngine({ spirit }) {
-      const m = 1.0 + (spirit.state?.totalUnplayed ?? 0) * 0.2;
-      if (m === 1.0) return null;
-      return { multiplyMult: m };
+      const add = spirit.state?.totalUnplayed ?? 0;
+      if (add === 0) return null;
+      return { addMult: add };
     },
   },
 
   sym_magpie: {},  // +3 ki per style combo
-  sym_osprey: {},  // pre-play field capture
+  sym_osprey: {},  // first N deck flips go to hand
 
   // ── Cross-Fusion Spirits (Tier 3) ─────────────────────────────────────────
   // Per-card multiplyMult: each qualifying card being captured multiplies mult.

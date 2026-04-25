@@ -458,25 +458,25 @@ export const SPIRIT_CATALOG = [
   },
   {
     id: 'sym_ants', name: 'Ants',
-    description: '×1.0 mult per spirit equipped.',
+    description: '+0.5 additive mult per card played (permanent across run).',
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'butterflies',
     rarity: null, category: 'symbiont',
   },
   {
     id: 'sym_crow', name: 'Crow',
-    description: 'First deck flip each round is captured instead of placed.',
+    description: 'Generate a random consumable at end of round (if slot available).',
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'boar',
     rarity: null, category: 'symbiont',
   },
   {
     id: 'sym_ducks', name: 'Ducks',
-    description: '+0.3 mult-mult per pair captured (2-card captures). Resets each round.',
+    description: 'Starts at +1 additive mult. Doubles per deck-flip pair, halves per stranded pair. Permanent.',
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'geese',
     rarity: null, category: 'symbiont',
   },
   {
     id: 'sym_snails', name: 'Snails',
-    description: '+0.2 mult-mult per card NOT played when round ends. Permanent across run.',
+    description: '+1 additive mult per card NOT played at round end. Permanent across run.',
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'fireflies',
     rarity: null, category: 'symbiont',
   },
@@ -488,7 +488,7 @@ export const SPIRIT_CATALOG = [
   },
   {
     id: 'sym_osprey', name: 'Osprey',
-    description: 'Once per round, capture 1 card directly from the field before playing.',
+    description: 'Draw the first deck flip into your hand instead of field. Stacks: first N flips.',
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'swallow',
     rarity: null, category: 'symbiont',
   },

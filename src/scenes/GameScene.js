@@ -696,13 +696,14 @@ export class GameScene extends Phaser.Scene {
         const n = spirit.state?.summonCount ?? 0;
         lines.push(`Symbionts summoned: ${n}  →  \u00D7${(1 + n * 0.1).toFixed(2)} mult`);
       } else if (spirit.id === 'sym_ants') {
-        lines.push(`Spirits equipped: ${spirits.length}  →  +${spirits.length} mult`);
+        const n = spirit.state?.totalPlayed ?? 0;
+        lines.push(`Cards played: ${n}  →  +${(n * 0.5).toFixed(1)} mult`);
       } else if (spirit.id === 'sym_ducks') {
-        const n = spirit.state?.pairsThisRound ?? 0;
-        lines.push(`Pairs this round: ${n}  →  \u00D7${(1 + n * 0.3).toFixed(2)} mult`);
+        const v = spirit.state?.multValue ?? 1;
+        lines.push(`Mult value: +${v.toFixed(1)} (doubles on pair, halves on strand)`);
       } else if (spirit.id === 'sym_snails') {
         const n = spirit.state?.totalUnplayed ?? 0;
-        lines.push(`Total unplayed: ${n}  →  \u00D7${(1 + n * 0.2).toFixed(2)} mult`);
+        lines.push(`Total unplayed: ${n}  →  +${n} mult`);
       } else if (spirit.id === 'engine_glacier') {
         const n = spirit.state?.waterDepCount ?? 0;
         lines.push(`Water dep count: ${n}  →  \u00D7${(1 + n * 0.3).toFixed(2)} mult`);
@@ -734,9 +735,11 @@ export class GameScene extends Phaser.Scene {
     } else if (spirit.id === 'sym_cuckoo_egg') {
       lines.push(`Rounds until hatch: ${spirit.state?.roundsRemaining ?? '?'}`);
     } else if (spirit.id === 'sym_crow') {
-      lines.push(spirit.state?.usedThisRound ? 'Used this round' : 'Ready — first flip captures');
+      lines.push('Generates consumable at round end');
     } else if (spirit.id === 'sym_osprey') {
-      lines.push(spirit.state?.usedThisRound ? 'Used this round' : 'Ready — capture a field card');
+      const used = spirit.state?.flipsUsedThisRound ?? 0;
+      const max  = this._spirits?.filter(s => s.id === 'sym_osprey').length ?? 1;
+      lines.push(`Deck flips to hand: ${used}/${max} used this round`);
     }
 
     return lines.length > 0 ? lines.join('\n') : null;
