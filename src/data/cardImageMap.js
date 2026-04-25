@@ -16,14 +16,16 @@ import { cards } from "./cards.js";
  * Flat mapping of card id → image path (relative to the project root /
  * web-server public root).
  *
- * Includes all cards (base + speculative).  Speculative cards map to their
- * id-based path even though the image file may not exist yet — the _tex()
- * helper in scene code resolves baseImageId before hitting this map.
+ * Only includes cards that have their own image asset:
+ * - Duplicates (baseImageId) resolve via _tex() at render time.
+ * - Speculative cards have no art yet.
  *
  * @type {Record<string, string>}
  */
 export const cardImageMap = Object.fromEntries(
-  cards.map(card => [card.id, `assets/cards/${card.id}.png`])
+  cards
+    .filter(c => !c.baseImageId && !c.speculative)
+    .map(card => [card.id, `assets/cards/${card.id}.png`])
 );
 
 /**
