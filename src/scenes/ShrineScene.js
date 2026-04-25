@@ -1707,7 +1707,9 @@ export class ShrineScene extends Phaser.Scene {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   _price(base) {
-    let price = run.spirits.some(s => s.id === 'econ_coupon') ? Math.ceil(base * 0.8) : base;
+    const couponCount = run.spirits.filter(s => s.id === 'econ_coupon').length;
+    const discount = Math.min(couponCount * 0.15, 0.45);
+    let price = couponCount > 0 ? Math.ceil(base * (1 - discount)) : base;
     return applyHook('modifyShopPrice', price, price);
   }
 }

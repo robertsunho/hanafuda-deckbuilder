@@ -747,8 +747,9 @@ class RunManager {
   /** Base interest rate applied at the start of each round. */
   get interestRate() {
     let rate = 0.10;
-    if (this._spirits.some(s => s.id === 'econ_bonds')) rate += 0.10;
-    if (this._spirits.some(s => s.id === 'econ_ingot'))  rate += this._ki * 0.001;
+    const bondsCount = this._spirits.filter(s => s.id === 'econ_bonds').length;
+    rate += Math.min(bondsCount * 0.05, 0.25);
+    if (this._spirits.some(s => s.id === 'econ_ingot'))  rate += this._ki * 0.0001;
     return applyHook('modifyInterestRate', rate, rate);
   }
 

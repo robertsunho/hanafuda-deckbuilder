@@ -133,12 +133,12 @@ const _effects = {
   winter_cold:    monthPointAdd([12, 1, 2],  20),
 
   // ── Seasonal Mult ─────────────────────────────────────────────────────────
-  // +5 mult per card captured from the matching season.
+  // +10 mult per card captured from the matching season.
 
-  spring_bees:     monthMultAdd([3, 4, 5],   5),
-  summer_humidity: monthMultAdd([6, 7, 8],   5),
-  autumn_leaves:   monthMultAdd([9, 10, 11], 5),
-  winter_aridity:  monthMultAdd([12, 1, 2],  5),
+  spring_bees:     monthMultAdd([3, 4, 5],   10),
+  summer_humidity: monthMultAdd([6, 7, 8],   10),
+  autumn_leaves:   monthMultAdd([9, 10, 11], 10),
+  winter_aridity:  monthMultAdd([12, 1, 2],  10),
 
   // ── Axis Point ────────────────────────────────────────────────────────────
 
@@ -156,10 +156,10 @@ const _effects = {
 
   // ── Seasonal Fusion Spirits ───────────────────────────────────────────────
 
-  fusion_bloom:        monthFusion([3, 4, 5],   15, 3),
-  fusion_thunderstorm: monthFusion([6, 7, 8],   15, 3),
-  fusion_decay:        monthFusion([9, 10, 11], 15, 3),
-  fusion_blizzard:     monthFusion([12, 1, 2],  15, 3),
+  fusion_bloom:        monthFusion([3, 4, 5],   15, 7),
+  fusion_thunderstorm: monthFusion([6, 7, 8],   15, 7),
+  fusion_decay:        monthFusion([9, 10, 11], 15, 7),
+  fusion_blizzard:     monthFusion([12, 1, 2],  15, 7),
 
   // ── Axis Fusion Spirits ───────────────────────────────────────────────────
 
@@ -267,20 +267,20 @@ const _effects = {
   // ── Rank Utility Spirits ──────────────────────────────────────────────────
   // Event-triggered effects handled in GameRoundManager._addCapture().
 
-  util_glory:      {},  // bright captured → draw 3 cards
+  util_glory:      {},  // bright captured → draw 2 cards
   util_symbiosis:  {},  // animal captured → summon symbiont
   util_festival:   {},  // ribbon captured → stamp (TBD)
   util_irrigation: {},  // plain captured → +10 pts to running score
 
   // ── Economy Spirits ────────────────────────────────────────────────────────
 
-  econ_bonds:        {},  // +10% interest — RunManager.interestRate
-  econ_ingot:        {},  // +0.1% interest per ki — RunManager.interestRate
+  econ_bonds:        {},  // +5% interest (stacks to +25%) — RunManager.interestRate
+  econ_ingot:        {},  // +0.01% interest per ki — RunManager.interestRate
   econ_grace:        {},  // double style combo ki — RunManager.calculateKiReward
   econ_recycling:    {},  // +5 ki per overflow discard
   econ_lucky_charm:  {},  // +50% ki on push
   econ_piggybank:    {},  // 3× hand ki at round end
-  econ_coupon:       {},  // 20% shop discount
+  econ_coupon:       {},  // 15% shop discount (stacks to 45%)
   econ_replica:      {},
   econ_print:        {},
   econ_present:      {},
@@ -305,7 +305,7 @@ const _effects = {
 
   sym_algae: {
     applyEngine({ spirit }) {
-      const m = 1.0 + (spirit.state?.summonCount ?? 0) * 0.3;
+      const m = 1.0 + (spirit.state?.summonCount ?? 0) * 0.1;
       if (m === 1.0) return null;
       return { multiplyMult: m };
     },
@@ -363,7 +363,7 @@ const _effects = {
   cross_space: {
     onCardScored({ card }) {
       if (card.enhancement?.element === 'fire') return null;
-      if (card.vertical === 'air' || card.temporal === 'night') return { multiplyMult: 1.5 };
+      if (card.vertical === 'air' || card.temporal === 'night') return { multiplyMult: 2.0 };
       return null;
     },
   },
@@ -371,7 +371,7 @@ const _effects = {
   cross_energy: {
     onCardScored({ card }) {
       if (card.enhancement?.element === 'fire') return null;
-      if (card.vertical === 'land' || card.temporal === 'day') return { multiplyMult: 1.5 };
+      if (card.vertical === 'land' || card.temporal === 'day') return { multiplyMult: 2.0 };
       return null;
     },
   },
@@ -398,7 +398,7 @@ const _effects = {
     onCardScored({ card }) {
       if (card.enhancement?.element === 'fire') return null;
       const months = new Set([3, 4, 5, 6, 7, 8]);
-      if (months.has(card.month)) return { multiplyMult: 1.5 };
+      if (months.has(card.month)) return { multiplyMult: 2.0 };
       return null;
     },
   },
@@ -407,7 +407,7 @@ const _effects = {
     onCardScored({ card }) {
       if (card.enhancement?.element === 'fire') return null;
       const months = new Set([9, 10, 11, 12, 1, 2]);
-      if (months.has(card.month)) return { multiplyMult: 1.5 };
+      if (months.has(card.month)) return { multiplyMult: 2.0 };
       return null;
     },
   },

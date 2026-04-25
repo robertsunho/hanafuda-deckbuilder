@@ -694,7 +694,7 @@ export class GameScene extends Phaser.Scene {
         lines.push(`Unique plains: ${n}  →  \u00D7${(1 + n * 0.1).toFixed(2)} mult`);
       } else if (spirit.id === 'sym_algae') {
         const n = spirit.state?.summonCount ?? 0;
-        lines.push(`Symbionts summoned: ${n}  →  \u00D7${(1 + n * 0.3).toFixed(2)} mult`);
+        lines.push(`Symbionts summoned: ${n}  →  \u00D7${(1 + n * 0.1).toFixed(2)} mult`);
       } else if (spirit.id === 'sym_ants') {
         lines.push(`Spirits equipped: ${spirits.length}  →  +${spirits.length} mult`);
       } else if (spirit.id === 'sym_ducks') {

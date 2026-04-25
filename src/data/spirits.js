@@ -77,7 +77,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'spring_bees',
     name:        'Bees',
-    description: '+5 additive mult per spring card (months 3–5) captured.',
+    description: '+10 additive mult per spring card (months 3–5) captured.',
     channel:     'additive',
     cost:        3,
     tier:        1,
@@ -88,7 +88,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'summer_humidity',
     name:        'Wet',
-    description: '+5 additive mult per summer card (months 6–8) captured.',
+    description: '+10 additive mult per summer card (months 6–8) captured.',
     channel:     'additive',
     cost:        3,
     tier:        1,
@@ -99,7 +99,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'autumn_leaves',
     name:        'Changing Leaves',
-    description: '+5 additive mult per autumn card (months 9–11) captured.',
+    description: '+10 additive mult per autumn card (months 9–11) captured.',
     channel:     'additive',
     cost:        3,
     tier:        1,
@@ -110,7 +110,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'winter_aridity',
     name:        'Dry',
-    description: '+5 additive mult per winter card (months 12, 1, 2) captured.',
+    description: '+10 additive mult per winter card (months 12, 1, 2) captured.',
     channel:     'additive',
     cost:        3,
     tier:        1,
@@ -218,7 +218,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'fusion_bloom',
     name:        'Bloom',
-    description: 'Spring cards +15 base points, +3 additive mult per spring card.',
+    description: 'Spring cards +15 base points, +7 additive mult per spring card.',
     channel:     'both',
     cost:        0,
     tier:        2,
@@ -229,7 +229,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'fusion_thunderstorm',
     name:        'Thunderstorm',
-    description: 'Summer cards +15 base points, +3 additive mult per summer card.',
+    description: 'Summer cards +15 base points, +7 additive mult per summer card.',
     channel:     'both',
     cost:        0,
     tier:        2,
@@ -240,7 +240,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'fusion_decay',
     name:        'Decay',
-    description: 'Autumn cards +15 base points, +3 additive mult per autumn card.',
+    description: 'Autumn cards +15 base points, +7 additive mult per autumn card.',
     channel:     'both',
     cost:        0,
     tier:        2,
@@ -251,7 +251,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'fusion_blizzard',
     name:        'Blizzard',
-    description: 'Winter cards +15 base points, +3 additive mult per winter card.',
+    description: 'Winter cards +15 base points, +7 additive mult per winter card.',
     channel:     'both',
     cost:        0,
     tier:        2,
@@ -398,7 +398,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'util_glory',
     name:        'Glory',
-    description: 'Whenever you capture a bright card, draw 3 cards.',
+    description: 'Whenever you capture a bright card, draw 2 cards.',
     channel:     'utility',
     cost:        3,
     tier:        1,
@@ -452,7 +452,7 @@ export const SPIRIT_CATALOG = [
   },
   {
     id: 'sym_algae', name: 'Algae',
-    description: '+0.3 mult-mult each time a symbiont is summoned.',
+    description: '+0.1 mult-mult each time a symbiont is summoned.',
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'dragonfly',
     rarity: null, category: 'symbiont',
   },
@@ -500,16 +500,16 @@ export const SPIRIT_CATALOG = [
   { id: 'cross_yin',     name: 'Yin',      description: 'Land and Night cards score at ×2.0 mult.',    channel: 'cross', cost: 0, tier: 3, fusionGroup: 'polarity',         rarity: null, category: 'fusion_t3' },
 
   // Quadrant Path
-  { id: 'cross_space',   name: 'Space',    description: 'Air and Night cards score at ×1.5 mult.',     channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant',         rarity: null, category: 'fusion_t3' },
-  { id: 'cross_energy',  name: 'Energy',   description: 'Land and Day cards score at ×1.5 mult.',      channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant',         rarity: null, category: 'fusion_t3' },
+  { id: 'cross_space',   name: 'Space',    description: 'Air and Night cards score at ×2.0 mult.',     channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant',         rarity: null, category: 'fusion_t3' },
+  { id: 'cross_energy',  name: 'Energy',   description: 'Land and Day cards score at ×2.0 mult.',      channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant',         rarity: null, category: 'fusion_t3' },
 
   // Seasonal Extremes
   { id: 'cross_solstice', name: 'Solstice', description: 'Summer and Winter cards score at ×2.0 mult.', channel: 'cross', cost: 0, tier: 3, fusionGroup: 'seasonal_extreme', rarity: null, category: 'fusion_t3' },
   { id: 'cross_equinox',  name: 'Equinox',  description: 'Spring and Autumn cards score at ×2.0 mult.', channel: 'cross', cost: 0, tier: 3, fusionGroup: 'seasonal_extreme', rarity: null, category: 'fusion_t3' },
 
   // Half-Year
-  { id: 'cross_tropic',  name: 'Tropic',   description: 'Spring and Summer cards score at ×1.5 mult.',  channel: 'cross', cost: 0, tier: 3, fusionGroup: 'halfyear',         rarity: null, category: 'fusion_t3' },
-  { id: 'cross_arctic',  name: 'Arctic',   description: 'Autumn and Winter cards score at ×1.5 mult.',  channel: 'cross', cost: 0, tier: 3, fusionGroup: 'halfyear',         rarity: null, category: 'fusion_t3' },
+  { id: 'cross_tropic',  name: 'Tropic',   description: 'Spring and Summer cards score at ×2.0 mult.',  channel: 'cross', cost: 0, tier: 3, fusionGroup: 'halfyear',         rarity: null, category: 'fusion_t3' },
+  { id: 'cross_arctic',  name: 'Arctic',   description: 'Autumn and Winter cards score at ×2.0 mult.',  channel: 'cross', cost: 0, tier: 3, fusionGroup: 'halfyear',         rarity: null, category: 'fusion_t3' },
 
   // ── Unity Spirits (Tier 4 — Sacred Grove only) ─────────────────────────────
 
@@ -523,7 +523,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'econ_bonds',
     name:        'Bonds',
-    description: '+10% interest rate on ki at the start of each round.',
+    description: '+5% addition to interest rate (stacks up to +25% additional).',
     channel:     'economy',
     cost:        4,
     tier:        1,
@@ -533,7 +533,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'econ_ingot',
     name:        'Ingot',
-    description: '+0.1% interest per 1 ki held (scales with wealth).',
+    description: '+0.01% interest per 1 ki held (scales with wealth).',
     channel:     'economy',
     cost:        4,
     tier:        1,
@@ -583,7 +583,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'econ_coupon',
     name:        'Coupon',
-    description: 'All shrine shop prices are 20% cheaper.',
+    description: '15% discount on all shop prices (stacks up to 45%).',
     channel:     'economy',
     cost:        5,
     tier:        1,

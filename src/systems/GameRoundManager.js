@@ -1225,12 +1225,12 @@ export default class GameRoundManager {
         this._hand.add(this._deck.draw(1));
       }
 
-      // util_glory: draw 3 cards on any bright capture.
+      // util_glory: draw 2 cards on any bright capture.
       for (const spirit of this._spirits) {
         if (spirit.id === 'util_glory') {
           const brightCount = cards.filter(c => c.type === 'bright').length;
           if (brightCount > 0) {
-            const drawN = Math.min(3, this._deck.drawPileSize);
+            const drawN = Math.min(2, this._deck.drawPileSize);
             const drawn = drawN > 0 ? this._deck.draw(drawN) : [];
             if (drawn.length > 0) this._hand.add(drawn);
             if (drawn.length > 0)
