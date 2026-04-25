@@ -142,14 +142,14 @@ const _effects = {
 
   // ── Axis Point ────────────────────────────────────────────────────────────
 
-  sky_clouds: verticalPointAdd('air',   10),
+  air_clouds: verticalPointAdd('air',   10),
   land_soil:  verticalPointAdd('land',  10),
   day_light:  temporalPointAdd('day',   10),
   night_dark: temporalPointAdd('night', 10),
 
   // ── Axis Mult ─────────────────────────────────────────────────────────────
 
-  sky_wind:        verticalMultAdd('air',   5),
+  air_wind:        verticalMultAdd('air',   5),
   land_rock:       verticalMultAdd('land',  5),
   day_movement:    temporalMultAdd('day',   5),
   night_stillness: temporalMultAdd('night', 5),
@@ -178,7 +178,7 @@ const _effects = {
     },
   },
 
-  rank_pulse: {
+  rank_oxygen: {
     onCardScored({ card }) {
       if (card.type === 'animal') return { addPoints: 50, addMult: 5 };
       return null;
@@ -414,10 +414,10 @@ const _effects = {
 
   // ── Unity Spirits (Tier 4) ─────────────────────────────────────────────────
 
-  unity_yinyang: {},
-  unity_gravity: {},
-  unity_time:    {},
-  unity_planet:  {},
+  capstone_yinyang:  {},
+  capstone_universe: {},
+  capstone_time:     {},
+  capstone_nature:   {},
 
   // ── Wu Xing Engine Spirits ─────────────────────────────────────────────────
   // State incremented in _applyPostRoundEnhancements; read here in Phase 2.

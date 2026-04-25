@@ -122,13 +122,13 @@ export const SPIRIT_CATALOG = [
   // ── Axis Point Boost (Tier 1) ─────────────────────────────────────────────
 
   {
-    id:          'sky_clouds',
+    id:          'air_clouds',
     name:        'Clouds',
-    description: 'Sky cards worth +10 base points.',
+    description: 'Air cards worth +10 base points.',
     channel:     'point',
     cost:        3,
     tier:        1,
-    fusionGroup: 'sky',
+    fusionGroup: 'air',
     rarity:      'common',
     category:    'foundation_axis',
   },
@@ -169,13 +169,13 @@ export const SPIRIT_CATALOG = [
   // ── Axis Additive Mult (Tier 1) ───────────────────────────────────────────
 
   {
-    id:          'sky_wind',
+    id:          'air_wind',
     name:        'Wind',
-    description: '+5 additive mult per sky card captured.',
+    description: '+5 additive mult per air card captured.',
     channel:     'additive',
     cost:        3,
     tier:        1,
-    fusionGroup: 'sky',
+    fusionGroup: 'air',
     rarity:      'common',
     category:    'foundation_axis',
   },
@@ -265,11 +265,11 @@ export const SPIRIT_CATALOG = [
   {
     id:          'fusion_atmosphere',
     name:        'Atmosphere',
-    description: 'Sky cards +8 base points, +3 additive mult per sky card.',
+    description: 'Air cards +8 base points, +3 additive mult per air card.',
     channel:     'both',
     cost:        0,
     tier:        2,
-    fusionGroup: 'sky',
+    fusionGroup: 'air',
     rarity:      null,
     category:    'fusion_t2',
   },
@@ -320,8 +320,8 @@ export const SPIRIT_CATALOG = [
     category:    'foundation_rank',
   },
   {
-    id:          'rank_pulse',
-    name:        'Pulse',
+    id:          'rank_oxygen',
+    name:        'Oxygen',
     description: 'Animal cards worth +50 base points, +5 additive mult per animal.',
     channel:     'rank',
     cost:        3,
@@ -496,11 +496,11 @@ export const SPIRIT_CATALOG = [
   // ── Cross-Fusion Spirits (Tier 3 — Sacred Grove only) ─────────────────────
 
   // Polarity Path
-  { id: 'cross_yang',    name: 'Yang',     description: 'Sky and Day cards score at ×2.0 mult.',       channel: 'cross', cost: 0, tier: 3, fusionGroup: 'polarity',         rarity: null, category: 'fusion_t3' },
+  { id: 'cross_yang',    name: 'Yang',     description: 'Air and Day cards score at ×2.0 mult.',       channel: 'cross', cost: 0, tier: 3, fusionGroup: 'polarity',         rarity: null, category: 'fusion_t3' },
   { id: 'cross_yin',     name: 'Yin',      description: 'Land and Night cards score at ×2.0 mult.',    channel: 'cross', cost: 0, tier: 3, fusionGroup: 'polarity',         rarity: null, category: 'fusion_t3' },
 
   // Quadrant Path
-  { id: 'cross_space',   name: 'Space',    description: 'Sky and Night cards score at ×1.5 mult.',     channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant',         rarity: null, category: 'fusion_t3' },
+  { id: 'cross_space',   name: 'Space',    description: 'Air and Night cards score at ×1.5 mult.',     channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant',         rarity: null, category: 'fusion_t3' },
   { id: 'cross_energy',  name: 'Energy',   description: 'Land and Day cards score at ×1.5 mult.',      channel: 'cross', cost: 0, tier: 3, fusionGroup: 'quadrant',         rarity: null, category: 'fusion_t3' },
 
   // Seasonal Extremes
@@ -513,10 +513,10 @@ export const SPIRIT_CATALOG = [
 
   // ── Unity Spirits (Tier 4 — Sacred Grove only) ─────────────────────────────
 
-  { id: 'unity_yinyang', name: 'Yin-Yang', description: 'Ultimate axis spirit. Effect TBD.',      channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_axis',     rarity: null, category: 'fusion_t4' },
-  { id: 'unity_gravity', name: 'Gravity',  description: 'Ultimate quadrant spirit. Effect TBD.',  channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_axis',     rarity: null, category: 'fusion_t4' },
-  { id: 'unity_time',    name: 'Time',     description: 'Ultimate seasonal spirit. Effect TBD.',  channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_seasonal', rarity: null, category: 'fusion_t4' },
-  { id: 'unity_planet',  name: 'Planet',   description: 'Ultimate half-year spirit. Effect TBD.', channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_seasonal', rarity: null, category: 'fusion_t4' },
+  { id: 'capstone_yinyang',  name: 'Yin-Yang',  description: 'Ultimate axis spirit. Effect TBD.',      channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_axis',     rarity: null, category: 'fusion_t4' },
+  { id: 'capstone_universe', name: 'Universe', description: 'Ultimate quadrant spirit. Effect TBD.',  channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_axis',     rarity: null, category: 'fusion_t4' },
+  { id: 'capstone_time',    name: 'Time',     description: 'Ultimate seasonal spirit. Effect TBD.',  channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_seasonal', rarity: null, category: 'fusion_t4' },
+  { id: 'capstone_nature',  name: 'Nature',   description: 'Ultimate half-year spirit. Effect TBD.', channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_seasonal', rarity: null, category: 'fusion_t4' },
 
   // ── Economy Spirits ────────────────────────────────────────────────────────
 

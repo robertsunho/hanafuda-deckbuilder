@@ -231,9 +231,9 @@ const _effects = {
       const TIER1_FOUNDATION_IDS = [
         'spring_pollen', 'summer_heat', 'autumn_harvest', 'winter_cold',
         'spring_bees',   'summer_humidity', 'autumn_leaves', 'winter_aridity',
-        'sky_clouds',    'land_soil',    'day_light',     'night_dark',
-        'sky_wind',      'land_rock',    'day_movement',  'night_stillness',
-        'rank_shine',    'rank_pulse',   'rank_poem',     'rank_salt',
+        'air_clouds',    'land_soil',    'day_light',     'night_dark',
+        'air_wind',      'land_rock',    'day_movement',  'night_stillness',
+        'rank_shine',    'rank_oxygen',  'rank_poem',     'rank_salt',
       ];
       const id = TIER1_FOUNDATION_IDS[Math.floor(Math.random() * TIER1_FOUNDATION_IDS.length)];
       const spiritDef = getSpiritDef(id);

@@ -16,7 +16,7 @@ export const FUSION_RECIPES = [
   { input: ['autumn_harvest',  'autumn_leaves'],    output: 'fusion_decay'        },
   { input: ['winter_cold',     'winter_aridity'],   output: 'fusion_blizzard'     },
   // ── Tier 2: Axis fusions ──────────────────────────────────────────────────
-  { input: ['sky_clouds',      'sky_wind'],         output: 'fusion_atmosphere'   },
+  { input: ['air_clouds',      'air_wind'],          output: 'fusion_atmosphere'   },
   { input: ['land_soil',       'land_rock'],        output: 'fusion_continent'    },
   { input: ['day_light',       'day_movement'],     output: 'fusion_sun'          },
   { input: ['night_dark',      'night_stillness'],  output: 'fusion_moon'         },
@@ -35,11 +35,11 @@ export const FUSION_RECIPES = [
   { input: ['fusion_bloom',        'fusion_thunderstorm'], output: 'cross_tropic'    },
   { input: ['fusion_decay',        'fusion_blizzard'],     output: 'cross_arctic'    },
 
-  // ── Tier 4: Unity Spirits (two Tier 3 → one Tier 4) ──────────────────────
-  { input: ['cross_yang',      'cross_yin'],         output: 'unity_yinyang' },
-  { input: ['cross_space',     'cross_energy'],        output: 'unity_gravity' },
-  { input: ['cross_solstice',  'cross_equinox'],     output: 'unity_time'    },
-  { input: ['cross_tropic',    'cross_arctic'],      output: 'unity_planet'  },
+  // ── Tier 4: Capstone Spirits (two Tier 3 → one Tier 4) ────────────────────
+  { input: ['cross_yang',      'cross_yin'],         output: 'capstone_yinyang'  },
+  { input: ['cross_space',     'cross_energy'],        output: 'capstone_universe' },
+  { input: ['cross_solstice',  'cross_equinox'],     output: 'capstone_time'     },
+  { input: ['cross_tropic',    'cross_arctic'],      output: 'capstone_nature'   },
 ];
 
 /**
