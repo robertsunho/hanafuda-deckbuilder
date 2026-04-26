@@ -91,6 +91,10 @@ class RunManager {
     this._spirits = [];
     /** @type {object[]} Spirits that have transcended (stack of 4 → zero-slot negative copy). */
     this._negativeSpirits = [];
+    /** @type {object[]} Legendary spirits (separate slot category). */
+    this._legendarySpirits = [];
+    /** Permanent field slot modifier (Amber alchemical reduces by 1). */
+    this._permanentFieldSlotMod = 0;
 
     // ── Consumable inventory ─────────────────────────────────────────────────
     /** @type {object[]} */
@@ -236,10 +240,22 @@ class RunManager {
 
   // ── Spirit loadout ─────────────────────────────────────────────────────────
 
-  get spirits()         { return [...this._spirits]; }
-  get negativeSpirits() { return [...this._negativeSpirits]; }
-  get spiritSlots()     { return applyHook('modifySpiritSlots', RunManager.MAX_SPIRIT_SLOTS, RunManager.MAX_SPIRIT_SLOTS); }
-  get canAddSpirit()    { return this._spirits.length < this.spiritSlots; }
+  get spirits()           { return [...this._spirits]; }
+  get negativeSpirits()   { return [...this._negativeSpirits]; }
+  get legendarySpirits()  { return [...this._legendarySpirits]; }
+  get spiritSlots() {
+    let base = applyHook('modifySpiritSlots', RunManager.MAX_SPIRIT_SLOTS, RunManager.MAX_SPIRIT_SLOTS);
+    if (this._legendarySpirits.some(s => s.id === 'legend_bishamonten')) base += 1;
+    return base;
+  }
+  get canAddSpirit()      { return this._spirits.length < this.spiritSlots; }
+  get maxLegendarySlots() { return 2; }
+  get canAddLegendary()   { return this._legendarySpirits.length < this.maxLegendarySlots; }
+  get maxConsumableSlots() {
+    let base = this._maxConsumableSlots;
+    if (this._legendarySpirits.some(s => s.id === 'legend_benzaiten')) base += 1;
+    return base;
+  }
 
   /**
    * Purchase a spirit from the shop.
@@ -288,11 +304,23 @@ class RunManager {
     if (spiritDef.id === 'engine_wildlife')  spirit.state = { seenAnimals: [] };
     if (spiritDef.id === 'engine_plenty')    spirit.state = { seenPlains: [] };
     if (spiritDef.id === 'util_irrigation')  spirit.state = { irrigationBonus: 0 };
-    if (spiritDef.id === 'engine_glacier')   spirit.state = { waterDepCount: 0 };
-    if (spiritDef.id === 'engine_carbon')    spirit.state = { fireCombustCount: 0 };
-    if (spiritDef.id === 'engine_velocity')  spirit.state = { metalProcCount: 0 };
-    if (spiritDef.id === 'engine_fossil')    spirit.state = { earthCardCount: 0 };
-    if (spiritDef.id === 'engine_moths')     spirit.state = { silkTriggerCount: 0 };
+    if (spiritDef.id === 'engine_glacier')   spirit.state = { t1Procs: 0, t2Procs: 0 };
+    if (spiritDef.id === 'engine_carbon')    spirit.state = { t1Procs: 0, t2Procs: 0 };
+    if (spiritDef.id === 'engine_velocity')  spirit.state = { t2Procs: 0 };  // t1 is live deck count
+    if (spiritDef.id === 'engine_fossil')    spirit.state = { t1Procs: 0, t2Procs: 0 };
+    if (spiritDef.id === 'engine_moths')     spirit.state = { t1Procs: 0, t2Procs: 0 };  // t2 deferred
+    if (spiritDef.id === 'engine_devotion')     spirit.state = { totalScored: 0 };
+    if (spiritDef.id === 'engine_habitat')      spirit.state = { totalScored: 0 };
+    if (spiritDef.id === 'engine_ceremony')     spirit.state = { totalScored: 0 };
+    if (spiritDef.id === 'engine_agriculture')  spirit.state = { totalScored: 0 };
+    if (spiritDef.id === 'engine_lincoln')        spirit.state = { banks: 0 };
+    if (spiritDef.id === 'engine_napoleon')       spirit.state = { pushFails: 0 };
+    if (spiritDef.id === 'engine_missing_number') spirit.state = { totalStacks: 0 };
+    if (spiritDef.id === 'engine_palace')         spirit.state = { cardsAdded: 0 };
+    if (spiritDef.id === 'engine_ship')           spirit.state = { cardsDiscarded: 0 };
+    if (spiritDef.id === 'engine_northern_lion')  spirit.state = { freeRerolls: 0 };
+    if (spiritDef.id === 'decay_persimmon')       spirit.state = { remaining: 30 };
+    if (spiritDef.id === 'decay_pear')            spirit.state = { remaining: 150 };
     this._spirits.push(spirit);
     return { success: true, result: 'added' };
   }
@@ -353,6 +381,7 @@ class RunManager {
     if (spiritDef.id === 'sym_snails')      spirit.state = { totalUnplayed: 0 };
     if (spiritDef.id === 'sym_magpie')      spirit.state = {};
     if (spiritDef.id === 'sym_osprey')      spirit.state = { flipsUsedThisRound: 0 };
+    if (spiritDef.id === 'sym_badger')      spirit.state = { consumablesUsed: 0 };
     this._spirits.push(spirit);
     return { success: true };
   }
@@ -393,11 +422,23 @@ class RunManager {
     if (spiritDef.id === 'engine_wildlife')  spirit.state = { seenAnimals: [] };
     if (spiritDef.id === 'engine_plenty')    spirit.state = { seenPlains: [] };
     if (spiritDef.id === 'util_irrigation')  spirit.state = { irrigationBonus: 0 };
-    if (spiritDef.id === 'engine_glacier')   spirit.state = { waterDepCount: 0 };
-    if (spiritDef.id === 'engine_carbon')    spirit.state = { fireCombustCount: 0 };
-    if (spiritDef.id === 'engine_velocity')  spirit.state = { metalProcCount: 0 };
-    if (spiritDef.id === 'engine_fossil')    spirit.state = { earthCardCount: 0 };
-    if (spiritDef.id === 'engine_moths')     spirit.state = { silkTriggerCount: 0 };
+    if (spiritDef.id === 'engine_glacier')   spirit.state = { t1Procs: 0, t2Procs: 0 };
+    if (spiritDef.id === 'engine_carbon')    spirit.state = { t1Procs: 0, t2Procs: 0 };
+    if (spiritDef.id === 'engine_velocity')  spirit.state = { t2Procs: 0 };  // t1 is live deck count
+    if (spiritDef.id === 'engine_fossil')    spirit.state = { t1Procs: 0, t2Procs: 0 };
+    if (spiritDef.id === 'engine_moths')     spirit.state = { t1Procs: 0, t2Procs: 0 };  // t2 deferred
+    if (spiritDef.id === 'engine_devotion')     spirit.state = { totalScored: 0 };
+    if (spiritDef.id === 'engine_habitat')      spirit.state = { totalScored: 0 };
+    if (spiritDef.id === 'engine_ceremony')     spirit.state = { totalScored: 0 };
+    if (spiritDef.id === 'engine_agriculture')  spirit.state = { totalScored: 0 };
+    if (spiritDef.id === 'engine_lincoln')        spirit.state = { banks: 0 };
+    if (spiritDef.id === 'engine_napoleon')       spirit.state = { pushFails: 0 };
+    if (spiritDef.id === 'engine_missing_number') spirit.state = { totalStacks: 0 };
+    if (spiritDef.id === 'engine_palace')         spirit.state = { cardsAdded: 0 };
+    if (spiritDef.id === 'engine_ship')           spirit.state = { cardsDiscarded: 0 };
+    if (spiritDef.id === 'engine_northern_lion')  spirit.state = { freeRerolls: 0 };
+    if (spiritDef.id === 'decay_persimmon')       spirit.state = { remaining: 30 };
+    if (spiritDef.id === 'decay_pear')            spirit.state = { remaining: 150 };
     this._spirits.push(spirit);
     return { success: true, result: 'added' };
   }
@@ -435,7 +476,83 @@ class RunManager {
    */
   releaseSpirit(index) {
     const released = this.removeSpirit(index);
+
+    // Past Life: on release, create copies of a random remaining spirit.
+    if (released.id === 'util_past_life' && this._spirits.length > 0) {
+      const count = released.stackCount ?? 1;
+      const targetIdx = Math.floor(Math.random() * this._spirits.length);
+      const target = this._spirits[targetIdx];
+      for (let i = 0; i < count; i++) {
+        this._addPastLifeCopy(target);
+      }
+    }
+
     return { released };
+  }
+
+  /**
+   * Internal helper for Past Life duplication.
+   * Adds one copy of the target spirit, respecting stacking and transcendence.
+   */
+  _addPastLifeCopy(target) {
+    const existing = this._spirits.find(s => s.id === target.id && !s.isNegative);
+    const hasNegative = this._negativeSpirits.some(s => s.id === target.id);
+
+    if (existing) {
+      if ((existing.stackCount ?? 1) >= 3 && hasNegative) return; // max reached
+      existing.stackCount = (existing.stackCount ?? 1) + 1;
+      if (existing.stackCount >= 4) {
+        const idx = this._spirits.indexOf(existing);
+        this._spirits.splice(idx, 1);
+        this._negativeSpirits.push({
+          id: target.id, name: target.name,
+          stackCount: 1, isNegative: true, state: null,
+        });
+      }
+      return;
+    }
+
+    if (!this.canAddSpirit) return; // no empty slots
+
+    const copy = {
+      id: target.id,
+      name: target.name,
+      stackCount: 1,
+    };
+    if (target.state) copy.state = JSON.parse(JSON.stringify(target.state));
+    if (target.symbiont) copy.symbiont = true;
+    this._spirits.push(copy);
+  }
+
+  // ── Legendary spirit slots ─────────────────────────────────────────────────
+
+  static LEGENDARY_PURCHASE_COST = 25;
+  static LEGENDARY_SELL_VALUE    = 10;
+
+  addLegendarySpirit(spiritDef) {
+    if (this._legendarySpirits.some(s => s.id === spiritDef.id)) {
+      return { success: false, reason: 'Legendary already owned' };
+    }
+    if (!this.canAddLegendary) {
+      return { success: false, reason: 'No Legendary slot available' };
+    }
+    this._legendarySpirits.push({
+      id: spiritDef.id, name: spiritDef.name, legendary: true,
+    });
+    return { success: true };
+  }
+
+  removeLegendarySpirit(index) {
+    if (index < 0 || index >= this._legendarySpirits.length) return null;
+    return this._legendarySpirits.splice(index, 1)[0];
+  }
+
+  sellLegendarySpirit(index) {
+    const spirit = this._legendarySpirits[index];
+    if (!spirit) return { success: false };
+    this._legendarySpirits.splice(index, 1);
+    this._ki += RunManager.LEGENDARY_SELL_VALUE;
+    return { success: true, refund: RunManager.LEGENDARY_SELL_VALUE };
   }
 
   /**
@@ -491,8 +608,7 @@ class RunManager {
   // ── Consumable inventory ───────────────────────────────────────────────────
 
   get consumables()      { return [...this._consumables]; }
-  get maxConsumableSlots() { return this._maxConsumableSlots; }
-  get canAddConsumable() { return this._consumables.length < this._maxConsumableSlots; }
+  get canAddConsumable() { return this._consumables.length < this.maxConsumableSlots; }
 
   /**
    * Add a consumable to the inventory.
@@ -500,8 +616,8 @@ class RunManager {
    * @throws {Error} if all slots are occupied.
    */
   addConsumable(consumable) {
-    if (this._consumables.length >= this._maxConsumableSlots) {
-      throw new Error(`Consumable inventory is full (max ${this._maxConsumableSlots} slots).`);
+    if (this._consumables.length >= this.maxConsumableSlots) {
+      throw new Error(`Consumable inventory is full (max ${this.maxConsumableSlots} slots).`);
     }
     this._consumables.push(consumable);
   }
@@ -617,7 +733,9 @@ class RunManager {
    * Permanently increases flow by 10%.
    */
   onPushSuccess() {
-    const mult = applyHook('modifyPushSuccess', 1.1, 1.1);
+    const time = this._legendarySpirits.some(s => s.id === 'capstone_time');
+    const base = time ? 1.3 : 1.1;
+    const mult = applyHook('modifyPushSuccess', base, base);
     this._flow *= mult;
     const effect = getActiveEffect();
     if (effect?.onPushSuccess) effect.onPushSuccess(this);
@@ -628,7 +746,9 @@ class RunManager {
    * Permanently decreases flow.  Default: ×0.9.  No score penalty is applied.
    */
   onPushFailure() {
-    const mult = applyHook('modifyPushFailure', 0.9, 0.9);
+    const time = this._legendarySpirits.some(s => s.id === 'capstone_time');
+    const base = time ? 0.95 : 0.9;
+    const mult = applyHook('modifyPushFailure', base, base);
     this._flow *= mult;
     const effect = getActiveEffect();
     if (effect?.onPushFailure) effect.onPushFailure(this);
@@ -639,7 +759,9 @@ class RunManager {
    * Default: ×0.95 per round.  Hexagram can modify this rate.
    */
   applyFlowDecay() {
-    const rate = applyHook('modifyFlowDecay', RunManager.FLOW_DECAY_RATE, RunManager.FLOW_DECAY_RATE);
+    const time = this._legendarySpirits.some(s => s.id === 'capstone_time');
+    const base = time ? 0.98 : RunManager.FLOW_DECAY_RATE;
+    const rate = applyHook('modifyFlowDecay', base, base);
     this._flow *= rate;
   }
 
@@ -834,6 +956,7 @@ class RunManager {
     } else {
       card.promotionProgress = (card.promotionProgress || 0) + 1;
     }
+    this._notifyBadger();
   }
 
   /**
@@ -842,7 +965,10 @@ class RunManager {
    */
   deleteCard(cardId) {
     const idx = this._deck.findIndex(c => c.id === cardId);
-    if (idx !== -1) this._deck.splice(idx, 1);
+    if (idx !== -1) {
+      this._deck.splice(idx, 1);
+      this._notifyBadger();
+    }
   }
 
   /**
@@ -864,6 +990,16 @@ class RunManager {
     }
     // Copy all target properties (deep enough for plain objects / arrays).
     Object.assign(source, JSON.parse(JSON.stringify(target)));
+    this._notifyBadger();
+  }
+
+  /** sym_badger: notify that a consumable was used. */
+  _notifyBadger() {
+    for (const spirit of this._spirits) {
+      if (spirit.id === 'sym_badger' && spirit.state) {
+        spirit.state.consumablesUsed += (spirit.stackCount ?? 1);
+      }
+    }
   }
 
   // ── Card shop ─────────────────────────────────────────────────────────────
@@ -885,6 +1021,10 @@ class RunManager {
       shopPurchased: true,
     };
     this._deck.push(newCard);
+    // engine_palace: increment counter when a card is added to the deck.
+    for (const spirit of this._spirits) {
+      if (spirit.id === 'engine_palace' && spirit.state) spirit.state.cardsAdded++;
+    }
     return { success: true, card: newCard };
   }
 
@@ -981,6 +1121,7 @@ class RunManager {
       card.temporal = card.temporal === 'day' ? 'night' : 'day';
       card.rootConverted = true;
     }
+    this._notifyBadger();
   }
 
   /**
@@ -1018,6 +1159,7 @@ class RunManager {
       }
       card.sacralConverted = true;
     }
+    this._notifyBadger();
   }
 
   /**
@@ -1039,6 +1181,7 @@ class RunManager {
       card.name       = `${card.monthName ?? card.month} ${TYPE_NAMES[newType]}`;
       card.solarPlexusConverted = true;
     }
+    this._notifyBadger();
   }
 
   /**
@@ -1052,6 +1195,7 @@ class RunManager {
     if (!card) return { success: false, reason: 'Card not found' };
     const roll   = Math.random();
     card.edition = roll < 0.6 ? 'gold' : roll < 0.9 ? 'crystal' : 'ghost';
+    this._notifyBadger();
     return { success: true, edition: card.edition };
   }
 
@@ -1071,6 +1215,11 @@ class RunManager {
       throatDuplicated: true,
     };
     this._deck.push(newCard);
+    // engine_palace: increment counter when a card is added to the deck.
+    for (const spirit of this._spirits) {
+      if (spirit.id === 'engine_palace' && spirit.state) spirit.state.cardsAdded++;
+    }
+    this._notifyBadger();
     return { success: true };
   }
 
@@ -1081,6 +1230,7 @@ class RunManager {
   applyChakraThirdEye(cardIds) {
     if (cardIds.length > 2) throw new Error('Third Eye Chakra can delete up to 2 cards');
     this._deck = this._deck.filter(c => !cardIds.includes(c.id));
+    this._notifyBadger();
   }
 
   /**
@@ -1114,6 +1264,7 @@ class RunManager {
     if (savedEdition !== undefined)     target.edition     = savedEdition;
     else                                delete target.edition;
     target.crownConverted = true;
+    this._notifyBadger();
     return { success: true };
   }
 
@@ -1134,6 +1285,7 @@ class RunManager {
     if (this._ki < stampDef.cost) return { success: false, reason: 'Not enough ki' };
     this._ki -= stampDef.cost;
     card.ribbonStamp = stampId;
+    this._notifyBadger();
     return { success: true };
   }
 
@@ -1168,6 +1320,7 @@ class RunManager {
     // No existing enhancement — apply base.
     if (!current) {
       card.enhancement = this._createBaseEnhancement(element);
+      this._notifyBadger();
       return { action: 'applied_base' };
     }
 
@@ -1185,6 +1338,7 @@ class RunManager {
       }
       current.tier = 'upgraded';
       if (current.depLevel !== undefined) current.depLevel = 0;   // reset Water dep
+      this._notifyBadger();
       return { action: 'upgraded' };
     }
 
@@ -1192,11 +1346,13 @@ class RunManager {
     if (this._isDestructiveElement(currentElement, element)) {
       const returnedElement = currentElement;
       card.enhancement = null;
+      this._notifyBadger();
       return { action: 'stripped', returnedConsumable: `element_${returnedElement}` };
     }
 
     // Any other element — overwrite with new base.
     card.enhancement = this._createBaseEnhancement(element);
+    this._notifyBadger();
     return { action: 'overwritten' };
   }
 

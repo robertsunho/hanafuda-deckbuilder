@@ -41,6 +41,8 @@ export default class FieldManager {
      */
     this._slots = [];
     this._captureRule = 'month';
+    /** Auto-capture threshold (default 4; Gankyil legendary sets to 3). */
+    this.autoCaptureThreshold = 4;
   }
 
   // ── Read-only accessors ────────────────────────────────────────────────────
@@ -182,7 +184,7 @@ export default class FieldManager {
         // Leaf/Silk Wood-enhanced cards bypass the field slot limit.
         if (card.enhancement?.element === 'wood') {
           this._slots.push({ month: card.month, cards: [card], state: 'normal' });
-          return { matched: false, discarded: false, captured: null };
+          return { matched: false, discarded: false, captured: null, leafSlotCreated: card.enhancement.tier === 'base' };
         }
         return { matched: false, discarded: true, captured: null };
       }
@@ -242,7 +244,7 @@ export default class FieldManager {
         // Leaf/Silk bypass: Wood-enhanced cards ignore the slot limit.
         if (cards[0].enhancement?.element === 'wood') {
           this._slots.push({ month, cards: [...cards], state: 'normal' });
-          return { matched: false, discarded: false, captured: null };
+          return { matched: false, discarded: false, captured: null, leafSlotCreated: cards[0].enhancement.tier === 'base' };
         }
         return { matched: false, discarded: true, captured: null };
       }
@@ -263,7 +265,7 @@ export default class FieldManager {
     target.cards = [...allFieldCards, ...cards];
     const total  = target.cards.length;
 
-    if (total >= 4) {
+    if (total >= this.autoCaptureThreshold) {
       // Full month set assembled — mark pending so the cards remain visible
       // on the field through the hand-phase pause and deck-flip animation.
       // Capture is deferred to the deck phase (capturePendingMatch).
@@ -301,9 +303,8 @@ export default class FieldManager {
     if (slot) {
       slot.cards.push(card);
       const len = slot.cards.length;
-      // Only capture when the full 4-card set is assembled.
-      // Pairs and 3-stacks accumulate on the field until the 4th card arrives.
-      if (len >= 4) {
+      // Only capture when the full set is assembled (4 normally, 3 with Gankyil).
+      if (len >= this.autoCaptureThreshold) {
         const captured = [...slot.cards];
         this._nullify(slot);
         return { discarded: false, captured };
@@ -316,7 +317,7 @@ export default class FieldManager {
       // Leaf/Silk bypass: Wood-enhanced deck flip cards ignore the slot limit.
       if (card.enhancement?.element === 'wood') {
         this._slots.push({ month: card.month, cards: [card], state: 'normal' });
-        return { discarded: false, captured: null };
+        return { discarded: false, captured: null, leafSlotCreated: card.enhancement.tier === 'base' };
       }
       return { discarded: true, captured: null };
     }
@@ -341,7 +342,7 @@ export default class FieldManager {
     const slot = this.getPendingSlot();
     if (!slot) throw new Error('addToPendingMatch: no pending match on the field');
     slot.cards.push(card);
-    if (slot.cards.length >= 4) {
+    if (slot.cards.length >= this.autoCaptureThreshold) {
       const captured = [...slot.cards];
       this._nullify(slot);
       return { captured };

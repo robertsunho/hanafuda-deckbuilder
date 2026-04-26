@@ -25,6 +25,8 @@
 // All factory functions skip them so they can't trigger seasonal/axis spirit effects.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import run from './RunManager.js';
+
 // ── Factory helpers ───────────────────────────────────────────────────────────
 
 function monthPointAdd(months, flatAmt) {
@@ -118,6 +120,55 @@ function temporalFusion(temporal, flatAmt, bonusPerCard) {
       return null;
     },
   };
+}
+
+// ── Meta spirit helpers ─────────────────────────────────────────────────────
+
+/** Recursion guard for Memory↔Mirror cross-references. */
+const _metaInProgress = new Set();
+
+function _evaluateWithGuard(spirit, fn) {
+  if (_metaInProgress.has(spirit)) return null;
+  _metaInProgress.add(spirit);
+  try {
+    return fn();
+  } finally {
+    _metaInProgress.delete(spirit);
+  }
+}
+
+/**
+ * Memory target resolver: returns the rightmost spirit, excluding self.
+ * If the rightmost non-self slot is another Memory, returns null (inert).
+ */
+function _getMemoryTarget(memorySpirit, allSpirits) {
+  for (let i = allSpirits.length - 1; i >= 0; i--) {
+    const s = allSpirits[i];
+    if (s === memorySpirit) continue;        // skip own slot
+    if (s.id === 'engine_memory') return null; // STOP — inert
+    return s;
+  }
+  return null;
+}
+
+/**
+ * Mirror target resolver: returns the closest occupied slot to the left
+ * of mirrorSpirit. Does NOT exclude other Mirrors (chains are allowed).
+ */
+function _getMirrorTarget(mirrorSpirit, allSpirits) {
+  const idx = allSpirits.indexOf(mirrorSpirit);
+  if (idx <= 0) return null;
+  for (let i = idx - 1; i >= 0; i--) {
+    if (allSpirits[i] && allSpirits[i] !== mirrorSpirit) return allSpirits[i];
+  }
+  return null;
+}
+
+/** Count cards with no modifications (no enhancement, stamp, edition, promotion). */
+function _countUnalteredCards(deck) {
+  return deck.filter(c =>
+    !c.enhancement && !c.ribbonStamp && !c.edition && !c.promotionProgress
+  ).length;
 }
 
 // ── Spirit effect registry ────────────────────────────────────────────────────
@@ -283,19 +334,94 @@ const _effects = {
   econ_coupon:       {},  // 15% shop discount (stacks to 45%)
   econ_replica:      {},
   econ_print:        {},
-  econ_present:      {},
+
   econ_collector:    {},
 
   // ── Gameplay Spirits ───────────────────────────────────────────────────────
 
-  game_expanse:  {},  // +2 field slots
-  game_well:     {},  // draw +1 on capture
   game_catcher:  {},  // overflow → hand
-  game_surplus:  {},  // +2 starting hand cards
-  game_gankyil:  {},  // 3-stack capture
-  game_angel:    {},  // +1 card per push
-  game_mirror:   {},
+  game_mirror: {
+    onCardScored({ card, spirit, spirits }) {
+      return _evaluateWithGuard(spirit, () => {
+        const target = _getMirrorTarget(spirit, spirits);
+        if (!target) return null;
+        const fx = _effects[target.id];
+        if (!fx?.onCardScored) return null;
+        return fx.onCardScored({ card, spirit: target, spirits });
+      });
+    },
+    onCardSeen({ card, spirit, spirits }) {
+      _evaluateWithGuard(spirit, () => {
+        const target = _getMirrorTarget(spirit, spirits);
+        if (!target) return;
+        const fx = _effects[target.id];
+        if (!fx?.onCardSeen) return;
+        fx.onCardSeen({ card, spirit: target, spirits });
+      });
+    },
+    applyEngine({ spirit, spirits, mult, points, cards }) {
+      return _evaluateWithGuard(spirit, () => {
+        const target = _getMirrorTarget(spirit, spirits);
+        if (!target) return null;
+        const fx = _effects[target.id];
+        if (!fx?.applyEngine) return null;
+        return fx.applyEngine({ spirit: target, spirits, mult, points, cards });
+      });
+    },
+    getRetriggerCount({ card, spirit, spirits }) {
+      return _evaluateWithGuard(spirit, () => {
+        const target = _getMirrorTarget(spirit, spirits ?? []);
+        if (!target) return 0;
+        const fx = _effects[target.id];
+        if (!fx?.getRetriggerCount) return 0;
+        return fx.getRetriggerCount({ card, spirit: target, spirits });
+      }) ?? 0;
+    },
+  },
   game_echo:     {},
+
+  // ── Meta Spirits ─────────────────────────────────────────────────────────
+
+  util_past_life: {},  // sell-time duplication — handled in RunManager.releaseSpirit
+
+  engine_memory: {
+    onCardScored({ card, spirit, spirits }) {
+      return _evaluateWithGuard(spirit, () => {
+        const target = _getMemoryTarget(spirit, spirits);
+        if (!target) return null;
+        const fx = _effects[target.id];
+        if (!fx?.onCardScored) return null;
+        return fx.onCardScored({ card, spirit: target, spirits });
+      });
+    },
+    onCardSeen({ card, spirit, spirits }) {
+      _evaluateWithGuard(spirit, () => {
+        const target = _getMemoryTarget(spirit, spirits);
+        if (!target) return;
+        const fx = _effects[target.id];
+        if (!fx?.onCardSeen) return;
+        fx.onCardSeen({ card, spirit: target, spirits });
+      });
+    },
+    applyEngine({ spirit, spirits, mult, points, cards }) {
+      return _evaluateWithGuard(spirit, () => {
+        const target = _getMemoryTarget(spirit, spirits);
+        if (!target) return null;
+        const fx = _effects[target.id];
+        if (!fx?.applyEngine) return null;
+        return fx.applyEngine({ spirit: target, spirits, mult, points, cards });
+      });
+    },
+    getRetriggerCount({ card, spirit, spirits }) {
+      return _evaluateWithGuard(spirit, () => {
+        const target = _getMemoryTarget(spirit, spirits ?? []);
+        if (!target) return 0;
+        const fx = _effects[target.id];
+        if (!fx?.getRetriggerCount) return 0;
+        return fx.getRetriggerCount({ card, spirit: target, spirits });
+      }) ?? 0;
+    },
+  },
 
   // ── Symbiont Spirits ───────────────────────────────────────────────────────
 
@@ -338,6 +464,38 @@ const _effects = {
 
   sym_magpie: {},  // +3 ki per style combo
   sym_osprey: {},  // first N deck flips go to hand
+
+  sym_wolf: {
+    onCardScored({ card }) {
+      if (card.type !== 'bright') return null;
+      return { multiplyMult: 2 };
+    },
+  },
+
+  sym_garden: {
+    applyEngine() {
+      const deck = run.getDeck();
+      const sigs = new Set();
+      for (const card of deck) {
+        sigs.add([
+          card.month, card.type, card.temporal,
+          card.enhancement?.element ?? '', card.enhancement?.tier ?? '',
+          card.ribbonStamp ?? '', card.edition ?? '',
+        ].join('|'));
+      }
+      const n = sigs.size;
+      if (n === 0) return null;
+      return { addMult: n * 0.2 };
+    },
+  },
+
+  sym_badger: {
+    applyEngine({ spirit }) {
+      const n = spirit.state?.consumablesUsed ?? 0;
+      if (n === 0) return null;
+      return { addMult: n };
+    },
+  },
 
   // ── Cross-Fusion Spirits (Tier 3) ─────────────────────────────────────────
   // Per-card multiplyMult: each qualifying card being captured multiplies mult.
@@ -413,53 +571,309 @@ const _effects = {
 
   // ── Unity Spirits (Tier 4) ─────────────────────────────────────────────────
 
-  capstone_yinyang:  {},
-  capstone_universe: {},
-  capstone_time:     {},
-  capstone_nature:   {},
+  capstone_yinyang:  {},  // doubling handled in scoring loop
+  capstone_universe: {},  // point-mirroring handled in scoring loop
+  capstone_time:     {},  // flow modifiers handled in RunManager
+  capstone_nature:   {},  // cumulative points handled in scoring loop
 
   // ── Wu Xing Engine Spirits ─────────────────────────────────────────────────
   // State incremented in _applyPostRoundEnhancements; read here in Phase 2.
 
   engine_glacier: {
     applyEngine({ spirit }) {
-      const m = 1.0 + (spirit.state?.waterDepCount ?? 0) * 0.3;
-      if (m === 1.0) return null;
-      return { multiplyMult: m };
+      const t1 = spirit.state?.t1Procs ?? 0;
+      const t2 = spirit.state?.t2Procs ?? 0;
+      const total = t1 * 0.2 + t2 * 0.4;
+      if (total === 0) return null;
+      return { multiplyMult: 1 + total };
     },
   },
 
   engine_carbon: {
     applyEngine({ spirit }) {
-      const m = 1.0 + (spirit.state?.fireCombustCount ?? 0) * 0.5;
-      if (m === 1.0) return null;
-      return { multiplyMult: m };
+      const t1 = spirit.state?.t1Procs ?? 0;
+      const t2 = spirit.state?.t2Procs ?? 0;
+      const total = t1 * 0.5 + t2 * 1.0;
+      if (total === 0) return null;
+      return { multiplyMult: 1 + total };
     },
   },
 
   engine_velocity: {
     applyEngine({ spirit }) {
-      const m = 1.0 + (spirit.state?.metalProcCount ?? 0) * 0.3;
-      if (m === 1.0) return null;
-      return { multiplyMult: m };
+      // Tier 1: live count of base Iron cards in deck.
+      const ironCount = run.getDeck().filter(c =>
+        c.enhancement?.element === 'metal' && c.enhancement?.tier === 'base'
+      ).length;
+      // Tier 2: multiplicative compounding per Meteorite jackpot.
+      const t2 = spirit.state?.t2Procs ?? 0;
+      const t1Mult = ironCount * 0.1;
+      const t2Mult = Math.pow(1.5, t2);
+      if (t1Mult === 0 && t2 === 0) return null;
+      return { multiplyMult: (1 + t1Mult) * t2Mult };
     },
   },
 
   engine_fossil: {
     applyEngine({ spirit }) {
-      const m = 1.0 + (spirit.state?.earthCardCount ?? 0) * 0.2;
-      if (m === 1.0) return null;
-      return { multiplyMult: m };
+      const t1 = spirit.state?.t1Procs ?? 0;
+      const t2 = spirit.state?.t2Procs ?? 0;
+      const total = t1 * 0.1 + t2 * 0.3;
+      if (total === 0) return null;
+      return { multiplyMult: 1 + total };
     },
   },
 
   engine_moths: {
     applyEngine({ spirit }) {
-      const m = 1.0 + (spirit.state?.silkTriggerCount ?? 0) * 0.4;
-      if (m === 1.0) return null;
-      return { multiplyMult: m };
+      const t1 = spirit.state?.t1Procs ?? 0;
+      const t2 = spirit.state?.t2Procs ?? 0;  // 0 until Silk wired (PostD-2)
+      const total = t1 * 0.3 + t2 * 0.6;
+      if (total === 0) return null;
+      return { multiplyMult: 1 + total };
     },
   },
+
+  // ── Rank Additive Engine Spirits ─────────────────────────────────────────
+  // Permanent counters: onCardSeen increments per matching rank scored;
+  // applyEngine returns addMult based on total count.
+  // Stacking: stackCount copies means onCardSeen fires N times per card,
+  // so the counter accumulates N× faster.
+
+  engine_devotion: {
+    onCardSeen({ card, spirit }) {
+      if (card.type === 'bright') {
+        if (!spirit.state) spirit.state = { totalScored: 0 };
+        spirit.state.totalScored++;
+      }
+    },
+    applyEngine({ spirit }) {
+      const n = spirit.state?.totalScored ?? 0;
+      if (n === 0) return null;
+      return { addMult: n * 4 };
+    },
+  },
+
+  engine_habitat: {
+    onCardSeen({ card, spirit }) {
+      if (card.type === 'animal') {
+        if (!spirit.state) spirit.state = { totalScored: 0 };
+        spirit.state.totalScored++;
+      }
+    },
+    applyEngine({ spirit }) {
+      const n = spirit.state?.totalScored ?? 0;
+      if (n === 0) return null;
+      return { addMult: n * 2.5 };
+    },
+  },
+
+  engine_ceremony: {
+    onCardSeen({ card, spirit }) {
+      if (card.type === 'ribbon') {
+        if (!spirit.state) spirit.state = { totalScored: 0 };
+        spirit.state.totalScored++;
+      }
+    },
+    applyEngine({ spirit }) {
+      const n = spirit.state?.totalScored ?? 0;
+      if (n === 0) return null;
+      return { addMult: n * 2 };
+    },
+  },
+
+  engine_agriculture: {
+    onCardSeen({ card, spirit }) {
+      if (card.type === 'plain') {
+        if (!spirit.state) spirit.state = { totalScored: 0 };
+        spirit.state.totalScored++;
+      }
+    },
+    applyEngine({ spirit }) {
+      const n = spirit.state?.totalScored ?? 0;
+      if (n === 0) return null;
+      return { addMult: n * 1 };
+    },
+  },
+
+  // ── Conditional Spirits ──────────────────────────────────────────────────
+  // Per-capture conditionals: check the captured cards array (passed as `cards`
+  // to applyEngine).  Each copy compounds multiplicatively via stackCount.
+
+  cond_horizon: {
+    applyEngine({ spirit, cards }) {
+      if (!cards) return null;
+      const hasAir  = cards.some(c => c.enhancement?.element !== 'fire' && c.vertical === 'air');
+      const hasLand = cards.some(c => c.enhancement?.element !== 'fire' && c.vertical === 'land');
+      if (!hasAir || !hasLand) return null;
+      return { multiplyMult: Math.pow(2.0, spirit.stackCount ?? 1) };
+    },
+  },
+
+  cond_dream: {
+    applyEngine({ spirit, cards }) {
+      if (!cards) return null;
+      const hasDay   = cards.some(c => c.enhancement?.element !== 'fire' && c.temporal === 'day');
+      const hasNight = cards.some(c => c.enhancement?.element !== 'fire' && c.temporal === 'night');
+      if (!hasDay || !hasNight) return null;
+      return { multiplyMult: Math.pow(2.0, spirit.stackCount ?? 1) };
+    },
+  },
+
+  cond_hierarchy: {
+    applyEngine({ spirit, cards }) {
+      if (!cards) return null;
+      const ranks = new Set(cards.map(c => c.type));
+      const n = ranks.size;
+      if (n === 0) return null;
+      const stacks = spirit.stackCount ?? 1;
+      return { multiplyMult: Math.pow(1.5, n * stacks) };
+    },
+  },
+
+  // ── Counter Engine Spirits ───────────────────────────────────────────────
+  // State incremented by event hooks in GameRoundManager; read here in Phase 2.
+
+  engine_lincoln: {
+    applyEngine({ spirit }) {
+      const n = spirit.state?.banks ?? 0;
+      if (n === 0) return null;
+      return { addMult: n * 0.1 };
+    },
+  },
+
+  engine_napoleon: {
+    applyEngine({ spirit }) {
+      const n = spirit.state?.pushFails ?? 0;
+      if (n === 0) return null;
+      return { addMult: n * 0.2 };
+    },
+  },
+
+  // ── Decay Spirits ────────────────────────────────────────────────────────
+  // Strong initial bonus that decreases each round. State decremented at round end.
+
+  decay_persimmon: {
+    applyEngine({ spirit }) {
+      const n = spirit.state?.remaining ?? 0;
+      if (n === 0) return null;
+      return { addMult: n };
+    },
+  },
+
+  decay_pear: {
+    applyEngine({ spirit }) {
+      const n = spirit.state?.remaining ?? 0;
+      if (n === 0) return null;
+      return { addPoints: n };
+    },
+  },
+
+  // ── Rank Retrigger Spirits ───────────────────────────────────────────────
+  // getRetriggerCount: returns extra triggers for a matching card.
+  // Called by Phase 1.5 in _addCapture; the card fully re-scores.
+
+  retrigger_rainbow: {
+    getRetriggerCount({ card, spirit }) {
+      return card.type === 'bright' ? (spirit.stackCount ?? 1) : 0;
+    },
+  },
+
+  retrigger_family: {
+    getRetriggerCount({ card, spirit }) {
+      return card.type === 'animal' ? (spirit.stackCount ?? 1) : 0;
+    },
+  },
+
+  retrigger_wish: {
+    getRetriggerCount({ card, spirit }) {
+      return card.type === 'ribbon' ? (spirit.stackCount ?? 1) : 0;
+    },
+  },
+
+  retrigger_dew: {
+    getRetriggerCount({ card, spirit }) {
+      return card.type === 'plain' ? (spirit.stackCount ?? 1) : 0;
+    },
+  },
+
+  // ── Event-Hook Engine Spirits (E2b) ──────────────────────────────────────
+
+  engine_missing_number: {
+    applyEngine({ spirit }) {
+      const n = spirit.state?.totalStacks ?? 0;
+      if (n === 0) return null;
+      return { addMult: n * 5 };
+    },
+  },
+
+  engine_palace: {
+    applyEngine({ spirit }) {
+      const n = spirit.state?.cardsAdded ?? 0;
+      if (n === 0) return null;
+      return { multiplyMult: 1 + n * 0.5 };
+    },
+  },
+
+  engine_ship: {
+    applyEngine({ spirit }) {
+      const n = spirit.state?.cardsDiscarded ?? 0;
+      if (n === 0) return null;
+      return { multiplyMult: 1 + n * 0.3 };
+    },
+  },
+
+  engine_surplus: {
+    applyEngine({ spirit }) {
+      const ki = run.ki;
+      const stacks = spirit.stackCount ?? 1;
+      const bonus = Math.floor(ki / 3) * stacks;
+      if (bonus === 0) return null;
+      return { addMult: bonus };
+    },
+  },
+
+  engine_northern_lion: {},  // utility — handled in shop reroll logic
+
+  engine_applause: {},  // retrigger handled inline at held-in-hand proc sites
+
+  // ── Patron Legendaries ───────────────────────────────────────────────────
+  // Patrons modify game-state values — most have no scoring handler.
+
+  legend_ebisu:        {},  // +1 to all deals — handled in GameRoundManager
+  legend_daikokuten:   {},  // +1 shop item — handled in ShrineScene
+  legend_bishamonten:  {},  // +1 spirit slot — handled in RunManager.spiritSlots getter
+  legend_benzaiten:    {},  // +1 consumable slot — handled in RunManager.maxConsumableSlots getter
+  legend_fukurokuju:   {},  // +1 hand size — handled in GameRoundManager
+  legend_jurojin:      {},  // +1 field slot — handled in GameRoundManager
+
+  // ── Unique Legendaries ───────────────────────────────────────────────────
+
+  legend_wuji: {
+    applyEngine() {
+      const emptySlots = run.spiritSlots - run.spirits.length;
+      if (emptySlots <= 0) return null;
+      return { multiplyMult: Math.pow(2, emptySlots) };
+    },
+  },
+
+  legend_dao: {
+    applyEngine() {
+      const n = _countUnalteredCards(run.getDeck());
+      if (n === 0) return null;
+      return { addMult: n };
+    },
+  },
+
+  legend_chi: {
+    applyEngine() {
+      const flow = run.flow;
+      if (flow <= 0) return null;
+      return { multiplyMult: flow };
+    },
+  },
+
+  legend_gankyil: {},  // auto-capture at 3-stack — handled in FieldManager
 };
 
 // ── Public interface ──────────────────────────────────────────────────────────

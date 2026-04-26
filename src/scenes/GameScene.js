@@ -198,7 +198,7 @@ export class GameScene extends Phaser.Scene {
     this._spiritDragSetup  = false;
     this._dragSourceIndex  = null;
 
-    this._round.setSpirits(run.spirits);
+    this._round.setSpirits([...run.spirits, ...run.legendarySpirits]);
     this._round.setStyleBase(run.styleBase);
     this._round.setScoringStepCallback(ev => this._scoringQueue.push(ev));
     this._round.startRound();
@@ -586,6 +586,69 @@ export class GameScene extends Phaser.Scene {
       negCard.on('pointerout', () => negTip.setVisible(false));
     }
 
+    // ── Legendary spirit slots — right of negative spirits, before consumables.
+    const legSpirits = run.legendarySpirits;
+    const LEG_W   = SPIRIT_W;
+    const LEG_H   = SPIRIT_H;
+    const LEG_GAP = LEG_W + 12;
+    const LEG_START_X = NEG_START_X + negSpirits.length * NEG_GAP + (negSpirits.length > 0 ? 12 : 0);
+    const legSlotCount = run.maxLegendarySlots;
+    for (let i = 0; i < legSlotCount; i++) {
+      const ls = legSpirits[i];
+      const lx = LEG_START_X + i * LEG_GAP;
+      const ly = SPIRIT_Y;
+
+      if (!ls) {
+        this._spiritObjs.push(
+          this._addRoundedRect(lx, ly, LEG_W, LEG_H, 6, 0x1a1a0a, 1, 0x4a4a1a)
+        );
+        this._spiritObjs.push(
+          this.add.text(lx, ly + LEG_H / 2 - 6, 'L', {
+            fontSize: '8px', color: '#6a6a3a',
+          }).setOrigin(0.5)
+        );
+        continue;
+      }
+
+      const legCol = RARITY_COLOR.legendary;
+      const legCard = this._addRoundedRect(lx, ly, LEG_W, LEG_H, 6, 0x1a1a0a, 1, legCol);
+      this._spiritObjs.push(legCard);
+
+      this._spiritObjs.push(
+        this.add.rectangle(lx - LEG_W / 2 + 2, ly, 4, LEG_H - 4, legCol)
+      );
+
+      this._spiritObjs.push(
+        this.add.text(lx, ly, ls.name, {
+          fontSize: '9px', color: '#ffee88',
+          wordWrap: { width: LEG_W - 8 }, align: 'center',
+        }).setOrigin(0.5)
+      );
+
+      const legTip = this.add.text(
+        lx, ly + LEG_H / 2 + 4, '',
+        {
+          fontSize: '11px', color: '#e8e8e8',
+          backgroundColor: '#0a0f1e',
+          padding: { x: 6, y: 4 },
+          wordWrap: { width: 200 },
+        }
+      ).setOrigin(0.5, 0).setDepth(42).setVisible(false);
+      this._spiritObjs.push(legTip);
+
+      legCard.setInteractive(
+        new Phaser.Geom.Rectangle(lx - LEG_W / 2, ly - LEG_H / 2, LEG_W, LEG_H),
+        Phaser.Geom.Rectangle.Contains
+      );
+      legCard.on('pointerover', () => {
+        const captured = this._round.capture.getAll();
+        const contrib  = this._getSpiritContrib(ls, captured);
+        legTip.setText((getSpiritDef(ls.id)?.description ?? ls.name) + (contrib ? '\n\n' + contrib : ''));
+        legTip.setVisible(true);
+      });
+      legCard.on('pointerout', () => legTip.setVisible(false));
+    }
+
     // Set up drag-and-drop (only once per scene lifetime).
     if (!this._spiritDragSetup) {
       this._spiritDragSetup = true;
@@ -613,7 +676,7 @@ export class GameScene extends Phaser.Scene {
         if (targetIdx != null && targetIdx !== sourceIdx &&
             targetIdx >= 0 && targetIdx < run.spiritSlots) {
           run.swapSpirits(sourceIdx, targetIdx);
-          this._round.setSpirits(run.spirits);
+          this._round.setSpirits([...run.spirits, ...run.legendarySpirits]);
         }
         this._renderAll();
       });
@@ -705,20 +768,71 @@ export class GameScene extends Phaser.Scene {
         const n = spirit.state?.totalUnplayed ?? 0;
         lines.push(`Total unplayed: ${n}  →  +${n} mult`);
       } else if (spirit.id === 'engine_glacier') {
-        const n = spirit.state?.waterDepCount ?? 0;
-        lines.push(`Water dep count: ${n}  →  \u00D7${(1 + n * 0.3).toFixed(2)} mult`);
+        const t1 = spirit.state?.t1Procs ?? 0;
+        const t2 = spirit.state?.t2Procs ?? 0;
+        const mult = 1 + t1 * 0.2 + t2 * 0.4;
+        lines.push(`Snow: ${t1}, Ice: ${t2}  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
       } else if (spirit.id === 'engine_carbon') {
-        const n = spirit.state?.fireCombustCount ?? 0;
-        lines.push(`Fire combustions: ${n}  →  \u00D7${(1 + n * 0.5).toFixed(2)} mult`);
+        const t1 = spirit.state?.t1Procs ?? 0;
+        const t2 = spirit.state?.t2Procs ?? 0;
+        const mult = 1 + t1 * 0.5 + t2 * 1.0;
+        lines.push(`Ember: ${t1}, Charcoal: ${t2}  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
       } else if (spirit.id === 'engine_velocity') {
-        const n = spirit.state?.metalProcCount ?? 0;
-        lines.push(`Metal procs: ${n}  →  \u00D7${(1 + n * 0.3).toFixed(2)} mult`);
+        const ironCount = run.getDeck().filter(c =>
+          c.enhancement?.element === 'metal' && c.enhancement?.tier === 'base'
+        ).length;
+        const t2 = spirit.state?.t2Procs ?? 0;
+        const mult = (1 + ironCount * 0.1) * Math.pow(1.5, t2);
+        lines.push(`Iron in deck: ${ironCount}, Meteorite jackpots: ${t2}  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
       } else if (spirit.id === 'engine_fossil') {
-        const n = spirit.state?.earthCardCount ?? 0;
-        lines.push(`Earth cards in deck: ${n}  →  \u00D7${(1 + n * 0.2).toFixed(2)} mult`);
+        const t1 = spirit.state?.t1Procs ?? 0;
+        const t2 = spirit.state?.t2Procs ?? 0;
+        const mult = 1 + t1 * 0.1 + t2 * 0.3;
+        lines.push(`Clay: ${t1}, Pottery: ${t2}  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
       } else if (spirit.id === 'engine_moths') {
-        const n = spirit.state?.silkTriggerCount ?? 0;
-        lines.push(`Silk triggers: ${n}  →  \u00D7${(1 + n * 0.4).toFixed(2)} mult`);
+        const t1 = spirit.state?.t1Procs ?? 0;
+        const t2 = spirit.state?.t2Procs ?? 0;
+        const mult = 1 + t1 * 0.3 + t2 * 0.6;
+        lines.push(`Leaf creations: ${t1}, Silk avoidances: ${t2} (TODO)  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
+      } else if (spirit.id === 'engine_devotion') {
+        const n = spirit.state?.totalScored ?? 0;
+        lines.push(`Brights scored: ${n}  →  +${(n * 4)} mult`);
+      } else if (spirit.id === 'engine_habitat') {
+        const n = spirit.state?.totalScored ?? 0;
+        lines.push(`Animals scored: ${n}  →  +${(n * 2.5).toFixed(1)} mult`);
+      } else if (spirit.id === 'engine_ceremony') {
+        const n = spirit.state?.totalScored ?? 0;
+        lines.push(`Ribbons scored: ${n}  →  +${(n * 2)} mult`);
+      } else if (spirit.id === 'engine_agriculture') {
+        const n = spirit.state?.totalScored ?? 0;
+        lines.push(`Plains scored: ${n}  →  +${(n * 1)} mult`);
+      } else if (spirit.id === 'engine_lincoln') {
+        const n = spirit.state?.banks ?? 0;
+        lines.push(`Banks: ${n}  →  +${(n * 0.1).toFixed(1)} mult`);
+      } else if (spirit.id === 'engine_napoleon') {
+        const n = spirit.state?.pushFails ?? 0;
+        lines.push(`Push fails: ${n}  →  +${(n * 0.2).toFixed(1)} mult`);
+      } else if (spirit.id === 'decay_persimmon') {
+        const n = spirit.state?.remaining ?? 0;
+        lines.push(`Remaining: +${n} mult (loses 3/round)`);
+      } else if (spirit.id === 'decay_pear') {
+        const n = spirit.state?.remaining ?? 0;
+        lines.push(`Remaining: +${n} pts (loses 5/round)`);
+      } else if (spirit.id === 'engine_missing_number') {
+        const n = spirit.state?.totalStacks ?? 0;
+        lines.push(`4-stacks scored: ${n}  →  +${n * 5} mult`);
+      } else if (spirit.id === 'engine_palace') {
+        const n = spirit.state?.cardsAdded ?? 0;
+        lines.push(`Cards added: ${n}  →  \u00D7${(1 + n * 0.5).toFixed(2)} mult`);
+      } else if (spirit.id === 'engine_ship') {
+        const n = spirit.state?.cardsDiscarded ?? 0;
+        lines.push(`Cards discarded: ${n}  →  \u00D7${(1 + n * 0.3).toFixed(2)} mult`);
+      } else if (spirit.id === 'engine_surplus') {
+        const ki = run?.ki ?? 0;
+        lines.push(`Current ki: ${ki}  →  +${Math.floor(ki / 3)} mult`);
+      } else if (spirit.id === 'engine_northern_lion') {
+        const n = spirit.state?.freeRerolls ?? 0;
+        lines.push(`Free rerolls: ${n}`);
       } else {
         const r = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits });
         if (r) {
@@ -726,6 +840,66 @@ export class GameScene extends Phaser.Scene {
           if (r.addMult)      lines.push(`+${r.addMult.toFixed(2)} mult`);
         }
       }
+    }
+
+    // ── Meta spirit state ──────────────────────────────────────────────────
+    if (spirit.id === 'util_past_life') {
+      const otherCount = spirits.length - 1;
+      if (otherCount <= 0) {
+        lines.push('On release: no effect (no other spirits)');
+      } else {
+        lines.push(`On release: copies 1 random spirit from ${otherCount} other slot${otherCount > 1 ? 's' : ''}`);
+      }
+    } else if (spirit.id === 'engine_memory') {
+      let target = null;
+      for (let i = spirits.length - 1; i >= 0; i--) {
+        const s = spirits[i];
+        if (s === spirit) continue;
+        if (s.id === 'engine_memory') { target = null; break; } // blocked by another Memory
+        target = s;
+        break;
+      }
+      if (target) {
+        lines.push(`Copying: ${target.name}`);
+      } else {
+        lines.push('No valid target \u2014 inert');
+      }
+    } else if (spirit.id === 'game_mirror') {
+      const idx = spirits.indexOf(spirit);
+      let target = null;
+      if (idx > 0) {
+        for (let i = idx - 1; i >= 0; i--) {
+          if (spirits[i] && spirits[i] !== spirit) { target = spirits[i]; break; }
+        }
+      }
+      if (target) {
+        lines.push(`Copying: ${target.name}`);
+      } else {
+        lines.push('No left neighbor \u2014 inert');
+      }
+    }
+
+    // ── Legendary tooltips ─────────────────────────────────────────────────
+    if (spirit.id === 'legend_wuji') {
+      const emptySlots = run.spiritSlots - run.spirits.length;
+      lines.push(`Empty spirit slots: ${emptySlots}  \u2192  \u00D7${Math.pow(2, Math.max(0, emptySlots))} mult`);
+    } else if (spirit.id === 'legend_dao') {
+      const deck = run.getDeck();
+      const n = deck.filter(c => !c.enhancement && !c.ribbonStamp && !c.edition && !c.promotionProgress).length;
+      lines.push(`Unaltered cards: ${n}  \u2192  +${n} mult`);
+    } else if (spirit.id === 'legend_chi') {
+      const flow = run.flow;
+      lines.push(`Flow: ${flow.toFixed(2)}  \u2192  \u00D7${flow.toFixed(2)} mult-mult`);
+    } else if (spirit.id === 'legend_gankyil') {
+      lines.push('Auto-captures at 3-stack instead of 4-stack');
+    } else if (spirit.id === 'capstone_yinyang') {
+      lines.push('Each spirit slot fires twice during scoring');
+    } else if (spirit.id === 'capstone_universe') {
+      lines.push('Mult-modifying spirits also affect points');
+    } else if (spirit.id === 'capstone_time') {
+      lines.push('Push success \u00D71.3, fail \u00D70.95, round decay \u00D70.98');
+    } else if (spirit.id === 'capstone_nature') {
+      lines.push(`Points carry across captures (carryover: ${this._cumulativePoints ?? 0})`);
     }
 
     // ── Symbiont non-scoring state ─────────────────────────────────────────
@@ -740,6 +914,14 @@ export class GameScene extends Phaser.Scene {
       const used = spirit.state?.flipsUsedThisRound ?? 0;
       const max  = this._spirits?.filter(s => s.id === 'sym_osprey').length ?? 1;
       lines.push(`Deck flips to hand: ${used}/${max} used this round`);
+    } else if (spirit.id === 'sym_wolf') {
+      const stacks = spirit.stackCount ?? 1;
+      lines.push(`\u00D7${2 * stacks} mult per bright scored`);
+    } else if (spirit.id === 'sym_garden') {
+      lines.push('+0.2 additive mult per unique card in deck');
+    } else if (spirit.id === 'sym_badger') {
+      const n = spirit.state?.consumablesUsed ?? 0;
+      lines.push(`Consumables used: ${n}  \u2192  +${n} mult`);
     }
 
     return lines.length > 0 ? lines.join('\n') : null;
@@ -2020,7 +2202,7 @@ export class GameScene extends Phaser.Scene {
     this._selectedCardIds.clear();
     this._selectedConsumableIndex = null;
     this._markMode = null;
-    this._round.setSpirits(run.spirits);
+    this._round.setSpirits([...run.spirits, ...run.legendarySpirits]);
     this._round.setStyleBase(run.styleBase);
     this._round.startRound();
     this._afterRoundStart();

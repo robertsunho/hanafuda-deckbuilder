@@ -492,6 +492,24 @@ export const SPIRIT_CATALOG = [
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'swallow',
     rarity: null, category: 'symbiont',
   },
+  {
+    id: 'sym_wolf', name: 'Wolf',
+    description: '\xD72 mult per scored bright (stacks: \xD74/\xD76).',
+    channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'january_bear',
+    rarity: null, category: 'symbiont',
+  },
+  {
+    id: 'sym_garden', name: 'Garden',
+    description: '+0.2 additive mult per unique card in deck.',
+    channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'march_ladybugs',
+    rarity: null, category: 'symbiont',
+  },
+  {
+    id: 'sym_badger', name: 'Badger',
+    description: '+1 additive mult per consumable used (permanent across run).',
+    channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'december_fox',
+    rarity: null, category: 'symbiont',
+  },
 
   // ── Cross-Fusion Spirits (Tier 3 — Sacred Grove only) ─────────────────────
 
@@ -513,10 +531,10 @@ export const SPIRIT_CATALOG = [
 
   // ── Unity Spirits (Tier 4 — Sacred Grove only) ─────────────────────────────
 
-  { id: 'capstone_yinyang',  name: 'Yin-Yang',  description: 'Ultimate axis spirit. Effect TBD.',      channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_axis',     rarity: null, category: 'fusion_t4' },
-  { id: 'capstone_universe', name: 'Universe', description: 'Ultimate quadrant spirit. Effect TBD.',  channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_axis',     rarity: null, category: 'fusion_t4' },
-  { id: 'capstone_time',    name: 'Time',     description: 'Ultimate seasonal spirit. Effect TBD.',  channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_seasonal', rarity: null, category: 'fusion_t4' },
-  { id: 'capstone_nature',  name: 'Nature',   description: 'Ultimate half-year spirit. Effect TBD.', channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_seasonal', rarity: null, category: 'fusion_t4' },
+  { id: 'capstone_yinyang',  name: 'Yin-Yang',  description: 'Each spirit slot fires its effect twice in chain order.',                channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_axis',     rarity: null, category: 'fusion_t4', legendary: true, capstone: true },
+  { id: 'capstone_universe', name: 'Universe', description: 'Mult-modifying spirits also affect points by the same value.',       channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_axis',     rarity: null, category: 'fusion_t4', legendary: true, capstone: true },
+  { id: 'capstone_time',    name: 'Time',     description: 'Push success \xD71.3, fail \xD70.95, round decay \xD70.98.',          channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_seasonal', rarity: null, category: 'fusion_t4', legendary: true, capstone: true },
+  { id: 'capstone_nature',  name: 'Nature',   description: 'Points carry across captures within a round (mult still resets).',    channel: 'unity', cost: 0, tier: 4, fusionGroup: 'unity_seasonal', rarity: null, category: 'fusion_t4', legendary: true, capstone: true },
 
   // ── Economy Spirits ────────────────────────────────────────────────────────
 
@@ -611,16 +629,6 @@ export const SPIRIT_CATALOG = [
     category:    'economy_consumable',
   },
   {
-    id:          'econ_present',
-    name:        'Present',
-    description: '(Coming soon) Receive a random consumable when a yaku first triggers.',
-    channel:     'economy',
-    cost:        4,
-    tier:        1,
-    rarity:      'uncommon',
-    category:    'economy_consumable',
-  },
-  {
     id:          'econ_collector',
     name:        'Collector',
     description: '(Coming soon) Each round held earns +3 ki bonus at round end.',
@@ -634,26 +642,6 @@ export const SPIRIT_CATALOG = [
   // ── Gameplay Spirits ───────────────────────────────────────────────────────
 
   {
-    id:          'game_expanse',
-    name:        'Expanse',
-    description: 'Field holds 2 extra card slots (10 total).',
-    channel:     'gameplay',
-    cost:        4,
-    tier:        1,
-    rarity:      'uncommon',
-    category:    'gameplay',
-  },
-  {
-    id:          'game_well',
-    name:        'Well',
-    description: 'Draw 1 extra card whenever you capture.',
-    channel:     'gameplay',
-    cost:        3,
-    tier:        1,
-    rarity:      'uncommon',
-    category:    'gameplay',
-  },
-  {
     id:          'game_catcher',
     name:        'Catcher',
     description: 'Cards discarded due to a full hand go to the field instead of lost.',
@@ -664,41 +652,31 @@ export const SPIRIT_CATALOG = [
     category:    'gameplay',
   },
   {
-    id:          'game_surplus',
-    name:        'Surplus',
-    description: 'Start each round with 2 extra cards in hand.',
-    channel:     'gameplay',
-    cost:        4,
-    tier:        1,
-    rarity:      'uncommon',
-    category:    'gameplay',
-  },
-  {
-    id:          'game_gankyil',
-    name:        'Gankyil',
-    description: 'A stack of 3 cards on the field can be captured immediately.',
-    channel:     'gameplay',
-    cost:        5,
-    tier:        1,
-    rarity:      'uncommon',
-    category:    'gameplay',
-  },
-  {
-    id:          'game_angel',
-    name:        'Angel',
-    description: 'Each push deals 1 extra card.',
-    channel:     'gameplay',
-    cost:        3,
-    tier:        1,
-    rarity:      'uncommon',
-    category:    'gameplay',
-  },
-  {
     id:          'game_mirror',
     name:        'Mirror',
-    description: '(Coming soon) An adjacent spirit\'s scoring channel triggers twice.',
-    channel:     'gameplay',
+    description: 'Copies the effect of the closest spirit to its left.',
+    channel:     'meta',
     cost:        6,
+    tier:        1,
+    rarity:      'rare',
+    category:    'meta',
+  },
+  {
+    id:          'util_past_life',
+    name:        'Past Life',
+    description: 'When released, creates 1 copy of a random spirit from another occupied slot.',
+    channel:     'utility',
+    cost:        5,
+    tier:        1,
+    rarity:      'rare',
+    category:    'meta',
+  },
+  {
+    id:          'engine_memory',
+    name:        'Memory',
+    description: 'Copies the effect of the rightmost non-Memory spirit.',
+    channel:     'meta',
+    cost:        8,
     tier:        1,
     rarity:      'rare',
     category:    'meta',
@@ -719,7 +697,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'engine_glacier',
     name:        'Glacier',
-    description: 'Permanently gains +0.3 mult for each Water card that depreciates.',
+    description: '+0.2 mult-mult per Snow depreciation, +0.4 per Ice depreciation.',
     channel:     'multiplicative',
     cost:        4,
     tier:        1,
@@ -729,7 +707,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'engine_carbon',
     name:        'Carbon',
-    description: 'Permanently gains +0.5 mult for each Fire card that combusts.',
+    description: '+0.5 mult-mult per Ember break, +1.0 per Charcoal break.',
     channel:     'multiplicative',
     cost:        4,
     tier:        1,
@@ -739,7 +717,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'engine_velocity',
     name:        'Velocity',
-    description: 'Permanently gains +0.3 mult for each Metal card proc.',
+    description: '+0.1 mult-mult per Iron card in deck, \u00D71.5 per Meteorite jackpot (compounds).',
     channel:     'multiplicative',
     cost:        4,
     tier:        1,
@@ -749,7 +727,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'engine_fossil',
     name:        'Fossil',
-    description: 'Permanently gains +0.2 mult for each Earth (Clay/Pottery) card in deck.',
+    description: '+0.1 mult-mult per Clay interest proc, +0.3 per Pottery proc.',
     channel:     'multiplicative',
     cost:        3,
     tier:        1,
@@ -759,12 +737,303 @@ export const SPIRIT_CATALOG = [
   {
     id:          'engine_moths',
     name:        'Moths',
-    description: 'Permanently gains +0.4 mult for each Wood Silk card that prevents stranding.',
+    description: '+0.3 mult-mult per Leaf field slot creation. (Silk synergy coming soon)',
     channel:     'multiplicative',
     cost:        4,
     tier:        1,
     rarity:      'uncommon',
     category:    'engine_wuxing',
+  },
+
+  // ── Rank Additive Engine Spirits ──────────────────────────────────────────
+
+  {
+    id:          'engine_devotion',
+    name:        'Devotion',
+    description: '+4 additive mult per bright captured (permanent across run).',
+    channel:     'additive',
+    cost:        6,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_rank_additive',
+  },
+  {
+    id:          'engine_habitat',
+    name:        'Habitat',
+    description: '+2.5 additive mult per animal captured (permanent across run).',
+    channel:     'additive',
+    cost:        6,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_rank_additive',
+  },
+  {
+    id:          'engine_ceremony',
+    name:        'Ceremony',
+    description: '+2 additive mult per ribbon captured (permanent across run).',
+    channel:     'additive',
+    cost:        6,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_rank_additive',
+  },
+  {
+    id:          'engine_agriculture',
+    name:        'Agriculture',
+    description: '+1 additive mult per plain captured (permanent across run).',
+    channel:     'additive',
+    cost:        6,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_rank_additive',
+  },
+
+  // ── Conditional Spirits ───────────────────────────────────────────────────
+
+  {
+    id:          'cond_horizon',
+    name:        'Horizon',
+    description: '\xD72 mult if capture contains both air and land cards.',
+    channel:     'multiplicative',
+    cost:        7,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'conditional',
+  },
+  {
+    id:          'cond_dream',
+    name:        'Dream',
+    description: '\xD72 mult if capture contains both day and night cards.',
+    channel:     'multiplicative',
+    cost:        7,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'conditional',
+  },
+  {
+    id:          'cond_hierarchy',
+    name:        'Hierarchy',
+    description: '\xD71.5 mult per unique rank in capture (compounds).',
+    channel:     'multiplicative',
+    cost:        7,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'conditional',
+  },
+
+  // ── Counter Engine Spirits ────────────────────────────────────────────────
+
+  {
+    id:          'engine_missing_number',
+    name:        'Missing Number',
+    description: '+5 additive mult each time a 4-stack is scored (permanent across run).',
+    channel:     'additive',
+    cost:        7,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_misc',
+  },
+  {
+    id:          'engine_palace',
+    name:        'Palace',
+    description: '+0.5 mult-mult per card added to the deck (permanent across run).',
+    channel:     'multiplicative',
+    cost:        7,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_misc',
+  },
+  {
+    id:          'engine_ship',
+    name:        'Ship',
+    description: '+0.3 mult-mult per card discarded (permanent across run).',
+    channel:     'multiplicative',
+    cost:        6,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_misc',
+  },
+  {
+    id:          'engine_surplus',
+    name:        'Surplus',
+    description: '+1 additive mult per 3 ki currently owned (recalculated per capture).',
+    channel:     'additive',
+    cost:        6,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_misc',
+  },
+  {
+    id:          'engine_northern_lion',
+    name:        'Northern Lion',
+    description: 'Gains a free reroll each time you push successfully.',
+    channel:     'utility',
+    cost:        7,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_misc',
+  },
+  {
+    id:          'engine_lincoln',
+    name:        'Lincoln',
+    description: '+0.1 additive mult each time you bank (permanent engine).',
+    channel:     'additive',
+    cost:        6,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_misc',
+  },
+  {
+    id:          'engine_napoleon',
+    name:        'Napoleon',
+    description: '+0.2 additive mult each time a push fails (permanent engine).',
+    channel:     'additive',
+    cost:        7,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'engine_misc',
+  },
+
+  // ── Decay Spirits ─────────────────────────────────────────────────────────
+
+  {
+    id:          'decay_persimmon',
+    name:        'Persimmon',
+    description: 'Starts at +30 additive mult, loses 3 per round.',
+    channel:     'additive',
+    cost:        4,
+    tier:        1,
+    rarity:      'common',
+    category:    'decay',
+  },
+  {
+    id:          'decay_pear',
+    name:        'Pear',
+    description: 'Starts at +150 points, loses 5 per round.',
+    channel:     'point',
+    cost:        5,
+    tier:        1,
+    rarity:      'common',
+    category:    'decay',
+  },
+
+  // ── Rank Retrigger Spirits ────────────────────────────────────────────────
+
+  {
+    id:          'retrigger_rainbow',
+    name:        'Rainbow',
+    description: 'Retrigger scored brights (1 extra trigger per copy).',
+    channel:     'retrigger',
+    cost:        7,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'retrigger',
+  },
+  {
+    id:          'retrigger_family',
+    name:        'Family',
+    description: 'Retrigger scored animals (1 extra trigger per copy).',
+    channel:     'retrigger',
+    cost:        6,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'retrigger',
+  },
+  {
+    id:          'retrigger_wish',
+    name:        'Wish',
+    description: 'Retrigger scored ribbons (1 extra trigger per copy).',
+    channel:     'retrigger',
+    cost:        6,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'retrigger',
+  },
+  {
+    id:          'retrigger_dew',
+    name:        'Dew',
+    description: 'Retrigger scored plains (1 extra trigger per copy).',
+    channel:     'retrigger',
+    cost:        6,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'retrigger',
+  },
+  {
+    id:          'engine_applause',
+    name:        'Applause',
+    description: 'Retrigger held-in-hand effects (Iron, Meteorite, Clay, Pottery).',
+    channel:     'retrigger',
+    cost:        7,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'retrigger',
+  },
+
+  // ── Patron Legendaries ──────────────────────────────────────────────────────
+
+  {
+    id: 'legend_ebisu', name: 'Ebisu',
+    description: '+1 to all card deals (initial deal, all push deals).',
+    channel: 'utility', cost: 0, tier: 1,
+    rarity: 'legendary', category: 'legendary_patron', legendary: true,
+  },
+  {
+    id: 'legend_daikokuten', name: 'Daikokuten',
+    description: '+1 item per shop section.',
+    channel: 'utility', cost: 0, tier: 1,
+    rarity: 'legendary', category: 'legendary_patron', legendary: true,
+  },
+  {
+    id: 'legend_bishamonten', name: 'Bishamonten',
+    description: '+1 spirit slot.',
+    channel: 'utility', cost: 0, tier: 1,
+    rarity: 'legendary', category: 'legendary_patron', legendary: true,
+  },
+  {
+    id: 'legend_benzaiten', name: 'Benzaiten',
+    description: '+1 consumable slot.',
+    channel: 'utility', cost: 0, tier: 1,
+    rarity: 'legendary', category: 'legendary_patron', legendary: true,
+  },
+  {
+    id: 'legend_fukurokuju', name: 'Fukurokuju',
+    description: '+1 hand size limit.',
+    channel: 'utility', cost: 0, tier: 1,
+    rarity: 'legendary', category: 'legendary_patron', legendary: true,
+  },
+  {
+    id: 'legend_jurojin', name: 'Jur\u014Djin',
+    description: '+1 field slot.',
+    channel: 'utility', cost: 0, tier: 1,
+    rarity: 'legendary', category: 'legendary_patron', legendary: true,
+  },
+
+  // ── Unique Legendaries ──────────────────────────────────────────────────────
+
+  {
+    id: 'legend_wuji', name: 'Wuji',
+    description: 'Each empty spirit slot gives \xD72 mult.',
+    channel: 'multiplicative', cost: 0, tier: 1,
+    rarity: 'legendary', category: 'legendary_unique', legendary: true,
+  },
+  {
+    id: 'legend_dao', name: 'Dao',
+    description: '+1 mult per unaltered card in deck (no enhancement, stamp, edition, or promotion).',
+    channel: 'additive', cost: 0, tier: 1,
+    rarity: 'legendary', category: 'legendary_unique', legendary: true,
+  },
+  {
+    id: 'legend_chi', name: 'Chi',
+    description: "Mult-mult equals current flow value. Effectively doubles flow's scoring impact.",
+    channel: 'multiplicative', cost: 0, tier: 1,
+    rarity: 'legendary', category: 'legendary_unique', legendary: true,
+  },
+  {
+    id: 'legend_gankyil', name: 'Gankyil',
+    description: 'Auto-capture activates at 3-stack instead of 4-stack.',
+    channel: 'utility', cost: 0, tier: 1,
+    rarity: 'legendary', category: 'legendary_unique', legendary: true,
   },
 ];
 
@@ -784,7 +1053,9 @@ export const getSpiritDef = (id) => SPIRIT_CATALOG.find(s => s.id === id);
  * by a player with Symbiosis equipped.
  */
 export const ANIMAL_SYMBIONT_MAP = {
+  january_bear:        'sym_wolf',
   february_warbler:    'sym_caterpillar',
+  march_ladybugs:      'sym_garden',
   april_cuckoo:        'sym_cuckoo_egg',
   may_bridge:          'sym_algae',
   june_butterflies:    'sym_ants',
@@ -793,6 +1064,7 @@ export const ANIMAL_SYMBIONT_MAP = {
   september_sake:      'sym_snails',
   october_deer:        'sym_magpie',
   november_swallow:    'sym_osprey',
+  december_fox:        'sym_badger',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
