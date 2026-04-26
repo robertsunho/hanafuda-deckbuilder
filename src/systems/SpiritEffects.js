@@ -875,6 +875,14 @@ const _effects = {
     },
   },
 
+  engine_bullseye: {
+    applyEngine({ spirit }) {
+      const count = spirit.state?.qualifiedCount ?? 0;
+      if (count === 0) return null;
+      return { multiplyMult: 1 + count * 1.0 };
+    },
+  },
+
   engine_applause: {},  // retrigger handled inline at held-in-hand proc sites
 
   // ── Patron Legendaries ───────────────────────────────────────────────────

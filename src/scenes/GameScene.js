@@ -840,6 +840,12 @@ export class GameScene extends Phaser.Scene {
       } else if (spirit.id === 'engine_golden_toad') {
         const max = spirit.stackCount ?? 1;
         lines.push(`Applies Gold to up to ${max} non-edition card(s) per capture`);
+      } else if (spirit.id === 'engine_bullseye') {
+        const count = spirit.state?.qualifiedCount ?? 0;
+        const mult = 1 + count * 1.0;
+        const inv = this._round?._bullseyeInventory ?? { bright: 0, animal: 0, ribbon: 0, plain: 0 };
+        const progress = `${inv.bright}B/${inv.animal}A/${inv.ribbon}R/${inv.plain}P`;
+        lines.push(`Qualified rounds: ${count} (this round: ${progress})  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
       } else if (spirit.id === 'engine_void') {
         const destroyed = spirit.state?.destroyed ?? 0;
         const mult = 1 + destroyed * 0.3;

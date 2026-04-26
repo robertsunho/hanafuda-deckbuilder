@@ -322,6 +322,7 @@ class RunManager {
     if (spiritDef.id === 'engine_northern_lion')  spirit.state = { freeRerolls: 0 };
     if (spiritDef.id === 'engine_kintaro')       spirit.state = { goldsConsumed: 0 };
     if (spiritDef.id === 'engine_void')          spirit.state = { destroyed: 0 };
+    if (spiritDef.id === 'engine_bullseye')     spirit.state = { qualifiedCount: 0 };
     if (spiritDef.id === 'decay_persimmon')       spirit.state = { remaining: 30 };
     if (spiritDef.id === 'decay_pear')            spirit.state = { remaining: 150 };
     this._spirits.push(spirit);
@@ -442,6 +443,7 @@ class RunManager {
     if (spiritDef.id === 'engine_northern_lion')  spirit.state = { freeRerolls: 0 };
     if (spiritDef.id === 'engine_kintaro')       spirit.state = { goldsConsumed: 0 };
     if (spiritDef.id === 'engine_void')          spirit.state = { destroyed: 0 };
+    if (spiritDef.id === 'engine_bullseye')     spirit.state = { qualifiedCount: 0 };
     if (spiritDef.id === 'decay_persimmon')       spirit.state = { remaining: 30 };
     if (spiritDef.id === 'decay_pear')            spirit.state = { remaining: 150 };
     this._spirits.push(spirit);

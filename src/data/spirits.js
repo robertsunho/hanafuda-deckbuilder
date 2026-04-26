@@ -914,6 +914,16 @@ export const SPIRIT_CATALOG = [
     category:    'engine_destruction',
   },
   {
+    id:          'engine_bullseye',
+    name:        'Bullseye',
+    description: '+1 mult-mult per round where all 4 yaku ranks (Hikari, Tane, Tanzaku, Kasu) are completed.',
+    channel:     'multiplicative',
+    cost:        8,
+    tier:        1,
+    rarity:      'rare',
+    category:    'engine_round',
+  },
+  {
     id:          'engine_lincoln',
     name:        'Lincoln',
     description: '+0.1 additive mult each time you bank (permanent engine).',

@@ -63,6 +63,15 @@ import { rollProbability } from "./RNGHook.js";
 import logger           from "./GameplayLogger.js";
 import { SPIRIT_CATALOG, getSpiritDef, ANIMAL_SYMBIONT_MAP } from "../data/spirits.js";
 
+/** Maps yaku names to card rank categories for Bullseye tracking. */
+const YAKU_RANK = {
+  Hikari:  'bright',
+  Tane:    'animal',
+  Tanzaku: 'ribbon',
+  Kasu:    'plain',
+};
+const BULLSEYE_RANKS = ['bright', 'animal', 'ribbon', 'plain'];
+
 export default class GameRoundManager {
 
   // ── Round configuration (adjust freely for playtesting) ────────────────────
@@ -377,6 +386,7 @@ export default class GameRoundManager {
     this._atRiskScore              = 0;
     this._pushPenaltyActive        = false;
     this._pushCount                = 0;
+    this._bullseyeInventory        = { bright: 0, animal: 0, ribbon: 0, plain: 0 };
     this._roundEndingAfterDecision = false;
     this._dogProtection            = false;
     this._pigDoubleKi              = false;
@@ -1899,6 +1909,20 @@ export default class GameRoundManager {
           const bonus = Math.floor(run.ki * 0.10 * totalRewardStacks);
           if (bonus > 0) run.addKi(bonus);
         }
+      }
+
+      // engine_bullseye: track yaku rank triggers, fire when all 4 ranks covered.
+      for (const yaku of newYaku) {
+        const rank = YAKU_RANK[yaku.name];
+        if (rank) this._bullseyeInventory[rank]++;
+      }
+      while (BULLSEYE_RANKS.every(r => this._bullseyeInventory[r] >= 1)) {
+        for (const spirit of this._spirits) {
+          if (spirit.id === 'engine_bullseye' && spirit.state) {
+            spirit.state.qualifiedCount += (spirit.stackCount ?? 1);
+          }
+        }
+        for (const r of BULLSEYE_RANKS) this._bullseyeInventory[r]--;
       }
 
       // Spend the minimum qualifying cards for each newly triggered yaku so they
