@@ -184,7 +184,7 @@ export default class FieldManager {
         // Leaf/Silk Wood-enhanced cards bypass the field slot limit.
         if (card.enhancement?.element === 'wood') {
           this._slots.push({ month: card.month, cards: [card], state: 'normal' });
-          return { matched: false, discarded: false, captured: null, leafSlotCreated: card.enhancement.tier === 'base' };
+          return { matched: false, discarded: false, captured: null, woodSlotCreated: true };
         }
         return { matched: false, discarded: true, captured: null };
       }
@@ -244,7 +244,7 @@ export default class FieldManager {
         // Leaf/Silk bypass: Wood-enhanced cards ignore the slot limit.
         if (cards[0].enhancement?.element === 'wood') {
           this._slots.push({ month, cards: [...cards], state: 'normal' });
-          return { matched: false, discarded: false, captured: null, leafSlotCreated: cards[0].enhancement.tier === 'base' };
+          return { matched: false, discarded: false, captured: null, woodSlotCreated: true };
         }
         return { matched: false, discarded: true, captured: null };
       }
@@ -317,7 +317,7 @@ export default class FieldManager {
       // Leaf/Silk bypass: Wood-enhanced deck flip cards ignore the slot limit.
       if (card.enhancement?.element === 'wood') {
         this._slots.push({ month: card.month, cards: [card], state: 'normal' });
-        return { discarded: false, captured: null, leafSlotCreated: card.enhancement.tier === 'base' };
+        return { discarded: false, captured: null, woodSlotCreated: true };
       }
       return { discarded: true, captured: null };
     }

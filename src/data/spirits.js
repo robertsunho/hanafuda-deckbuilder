@@ -737,7 +737,7 @@ export const SPIRIT_CATALOG = [
   {
     id:          'engine_moths',
     name:        'Moths',
-    description: '+0.3 mult-mult per Leaf field slot creation. (Silk synergy coming soon)',
+    description: '+0.3 mult-mult per Wood field slot creation, +0.6 per Silk stranding avoidance.',
     channel:     'multiplicative',
     cost:        4,
     tier:        1,

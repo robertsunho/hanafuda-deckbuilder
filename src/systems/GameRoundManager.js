@@ -607,8 +607,8 @@ export default class GameRoundManager {
     }
 
     const handResult = this._field.playHandCards(cards, targetMonth);
-    // engine_moths: Leaf (base Wood) field slot creation.
-    if (handResult.leafSlotCreated) {
+    // engine_moths: Wood (Leaf or Silk) field slot creation.
+    if (handResult.woodSlotCreated) {
       for (const spirit of this._spirits) {
         if (spirit.id === 'engine_moths' && spirit.state) {
           spirit.state.t1Procs += (spirit.stackCount ?? 1);
@@ -1108,8 +1108,8 @@ export default class GameRoundManager {
       }
     }
     const result = this._field.addFlippedCard(card);
-    // engine_moths: Leaf (base Wood) field slot creation.
-    if (result.leafSlotCreated) {
+    // engine_moths: Wood (Leaf or Silk) field slot creation.
+    if (result.woodSlotCreated) {
       for (const spirit of this._spirits) {
         if (spirit.id === 'engine_moths' && spirit.state) {
           spirit.state.t1Procs += (spirit.stackCount ?? 1);
@@ -1646,6 +1646,30 @@ export default class GameRoundManager {
   }
 
   /**
+   * Returns true if any card in the array is Silk-enhanced (upgraded Wood).
+   * Used to detect anti-stranding eligibility.
+   * @param {object[]} cards
+   * @returns {boolean}
+   */
+  _strandHasSilk(cards) {
+    return cards.some(c =>
+      c.enhancement?.element === 'wood' && c.enhancement?.tier === 'upgraded'
+    );
+  }
+
+  /**
+   * Increment Moths tier 2 procs for a Silk anti-stranding event.
+   * Called once per stranding event prevented.
+   */
+  _creditMothsT2() {
+    for (const spirit of this._spirits) {
+      if (spirit.id === 'engine_moths' && spirit.state) {
+        spirit.state.t2Procs += (spirit.stackCount ?? 1);
+      }
+    }
+  }
+
+  /**
    * Draw and apply the top card of the deck (the automatic deck-flip phase).
    * Resolves the pending match (if any) based on whether the deck card shares
    * its month with the pending slot.  If the deck is empty the flip is skipped.
@@ -1698,11 +1722,10 @@ export default class GameRoundManager {
     if (pending) {
       if (this._field.matchesSlot(deckCard, pending)) {
         // Deck card is the same month as the pending match.
-        // Silk (Wood upgraded) cards in the pending slot are immune to stranding:
-        // they force a capture even when adding the deck card would normally strand.
-        const hasSilk = pending.cards.some(
-          c => c.enhancement?.element === 'wood' && c.enhancement.tier === 'upgraded'
-        );
+        // Silk (Wood upgraded) anti-stranding: if ANY card involved is Silk,
+        // force a capture instead of stranding.
+        const wouldStrand = pending.cards.length + 1 < this._field.autoCaptureThreshold;
+        const hasSilk = wouldStrand && this._strandHasSilk([...pending.cards, deckCard]);
         if (hasSilk) {
           // Push deck card into the pending slot then capture immediately.
           pending.cards.push(deckCard);
@@ -1711,7 +1734,7 @@ export default class GameRoundManager {
             this._addCapture(captured);
             _flipResult   = 'silk_capture';
             _flipCaptures = captured;
-            // TODO(PostD-2): Wire Silk stranding avoidance to engine_moths.t2Procs
+            this._creditMothsT2();
           }
         } else {
           // Standard addToPendingMatch handles 4-card auto-capture and stranding.
@@ -1738,8 +1761,18 @@ export default class GameRoundManager {
         // 4-card pending (hand card completed the month stack) → capture now.
         // 3-card pending → needs the 4th card before it can score; strand it
         //   back to 'normal' so it stays on the field for a future turn.
+        //   Silk anti-stranding: if any card in the 3-stack is Silk, bank instead.
         if (pending.cards.length === 3) {
-          this._field.strandPendingMatch();
+          if (this._strandHasSilk(pending.cards)) {
+            const captured = this._field.capturePendingMatch();
+            if (captured.length > 0) {
+              this._addCapture(captured);
+              _flipCaptures = [..._flipCaptures, ...captured];
+              this._creditMothsT2();
+            }
+          } else {
+            this._field.strandPendingMatch();
+          }
         } else {
           // 2 or 4 cards: the match is complete — capture immediately.
           const pendingCards = this._field.capturePendingMatch();

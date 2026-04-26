@@ -793,7 +793,7 @@ export class GameScene extends Phaser.Scene {
         const t1 = spirit.state?.t1Procs ?? 0;
         const t2 = spirit.state?.t2Procs ?? 0;
         const mult = 1 + t1 * 0.3 + t2 * 0.6;
-        lines.push(`Leaf creations: ${t1}, Silk avoidances: ${t2} (TODO)  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
+        lines.push(`Slot creations: ${t1}, Silk avoidances: ${t2}  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
       } else if (spirit.id === 'engine_devotion') {
         const n = spirit.state?.totalScored ?? 0;
         lines.push(`Brights scored: ${n}  →  +${(n * 4)} mult`);
