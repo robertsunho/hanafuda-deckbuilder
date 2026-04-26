@@ -59,6 +59,7 @@ import { getActiveEffect, applyHook,
   getMetalHeldMult, getMeteoriteJackpotChance,
   getEarthInterestRate, getWoodScoringMult, getEarthHeldMult,
 } from "./HexagramEffects.js";
+import { rollProbability } from "./RNGHook.js";
 import logger           from "./GameplayLogger.js";
 import { SPIRIT_CATALOG, getSpiritDef, ANIMAL_SYMBIONT_MAP } from "../data/spirits.js";
 
@@ -806,10 +807,6 @@ export default class GameRoundManager {
 
     this._atRiskScore       = this._runningScore;
     this._pushPenaltyActive = true;
-    // econ_lucky_charm: gain ki equal to 50% of current balance (max 20).
-    if (this._spirits.some(s => s.id === 'econ_lucky_charm')) {
-      run.addKi(Math.min(20, Math.floor(run.ki * 0.5)));
-    }
     // Hand cards carry over; deal a fixed number of additional cards.
     const dealCount = this._getNextPushDealCount();
     const handCount = Math.min(dealCount, this._deck.drawPileSize, this._hand.availableSlots);
@@ -896,7 +893,7 @@ export default class GameRoundManager {
       if (card.enhancement?.element === 'fire') {
         const tier = card.enhancement.tier;
         const breakChance = getFireBreakChance(tier);
-        if (Math.random() < breakChance) {
+        if (rollProbability(breakChance, 'fire_break')) {
           // engine_carbon: tier-aware break tracking (read tier before destruction).
           for (const spirit of this._spirits) {
             if (spirit.id === 'engine_carbon' && spirit.state) {
@@ -1163,7 +1160,7 @@ export default class GameRoundManager {
           const henh = handCard.enhancement;
           if (henh?.element === 'metal') {
             mult *= getMetalHeldMult(henh.tier);
-            if (henh.tier === 'upgraded' && Math.random() < getMeteoriteJackpotChance()) {
+            if (henh.tier === 'upgraded' && rollProbability(getMeteoriteJackpotChance(), 'meteorite_jackpot')) {
               run.addKi(30);
               // engine_velocity: +t2Procs per Meteorite jackpot.
               for (const spirit of this._spirits) {
@@ -1884,6 +1881,20 @@ export default class GameRoundManager {
       logger.logYakuState(yakuFromUnspent, newYaku);
 
       if (newYaku.length > 0) this._pushPenaltyActive = false;
+
+      // econ_reward: gain 10% of current ki per stack on each push success.
+      if (newYaku.length > 0 && this._pushCount > 0) {
+        let totalRewardStacks = 0;
+        for (const spirit of this._spirits) {
+          if (spirit.id === 'econ_reward') {
+            totalRewardStacks += (spirit.stackCount ?? 1);
+          }
+        }
+        if (totalRewardStacks > 0) {
+          const bonus = Math.floor(run.ki * 0.10 * totalRewardStacks);
+          if (bonus > 0) run.addKi(bonus);
+        }
+      }
 
       // Spend the minimum qualifying cards for each newly triggered yaku so they
       // disappear from the capture fan and appear in the banked pile.

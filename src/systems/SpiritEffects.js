@@ -329,7 +329,8 @@ const _effects = {
   econ_ingot:        {},  // +0.01% interest per ki — RunManager.interestRate
   econ_grace:        {},  // ×2/×3/×4 style combo ki (additive stacking)
   econ_recycling:    {},  // +5 ki per overflow discard
-  econ_lucky_charm:  {},  // +50% ki on push
+  econ_lucky_charm:  {},  // probability modifier — handled in RNGHook.js
+  econ_reward:       {},  // push-success ki bonus — handled in GameRoundManager
   econ_piggybank:    {},  // ×2/×3/×4 hand ki (additive stacking)
   econ_coupon:       {},  // 15% shop discount (stacks to 45%)
   econ_replica:      {},

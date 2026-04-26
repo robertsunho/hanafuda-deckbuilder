@@ -833,6 +833,14 @@ export class GameScene extends Phaser.Scene {
       } else if (spirit.id === 'engine_northern_lion') {
         const n = spirit.state?.freeRerolls ?? 0;
         lines.push(`Free rerolls: ${n}`);
+      } else if (spirit.id === 'econ_lucky_charm') {
+        const stacks = spirit.stackCount ?? 1;
+        const bonus = stacks * 15;
+        lines.push(`+${bonus}% to probability rolls`);
+      } else if (spirit.id === 'econ_reward') {
+        const stacks = spirit.stackCount ?? 1;
+        const pct = stacks * 10;
+        lines.push(`+${pct}% of current ki on each push success`);
       } else {
         const r = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits });
         if (r) {
