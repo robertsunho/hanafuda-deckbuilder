@@ -1138,6 +1138,11 @@ export default class GameRoundManager {
     }
 
     {
+      // Reset Golden Toad per-capture application counter.
+      for (const spirit of this._spirits) {
+        if (spirit.id === 'engine_golden_toad') spirit._captureAppliedCount = 0;
+      }
+
       // ── Capstone flags ──────────────────────────────────────────────────────
       const _yinYangActive  = this._spirits.some(s => s.id === 'capstone_yinyang');
       const _universeActive = this._spirits.some(s => s.id === 'capstone_universe');

@@ -836,6 +836,34 @@ const _effects = {
 
   engine_northern_lion: {},  // utility — handled in shop reroll logic
 
+  engine_kintaro: {
+    onCardScored({ card, spirit }) {
+      if (card.edition === 'gold') {
+        card.edition = null;  // consume the Gold edition
+        spirit.state.goldsConsumed += (spirit.stackCount ?? 1);
+      }
+      return null;
+    },
+    applyEngine({ spirit }) {
+      const consumed = spirit.state?.goldsConsumed ?? 0;
+      if (consumed === 0) return null;
+      return { multiplyMult: 1 + consumed * 0.1 };
+    },
+  },
+
+  engine_golden_toad: {
+    onCardScored({ card, spirit }) {
+      spirit._captureAppliedCount = spirit._captureAppliedCount ?? 0;
+      const maxApplications = spirit.stackCount ?? 1;
+      if (spirit._captureAppliedCount >= maxApplications) return null;
+      if (!card.edition) {
+        card.edition = 'gold';
+        spirit._captureAppliedCount++;
+      }
+      return null;
+    },
+  },
+
   engine_applause: {},  // retrigger handled inline at held-in-hand proc sites
 
   // ── Patron Legendaries ───────────────────────────────────────────────────

@@ -833,6 +833,13 @@ export class GameScene extends Phaser.Scene {
       } else if (spirit.id === 'engine_northern_lion') {
         const n = spirit.state?.freeRerolls ?? 0;
         lines.push(`Free rerolls: ${n}`);
+      } else if (spirit.id === 'engine_kintaro') {
+        const consumed = spirit.state?.goldsConsumed ?? 0;
+        const mult = 1 + consumed * 0.1;
+        lines.push(`Gold consumed: ${consumed}  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
+      } else if (spirit.id === 'engine_golden_toad') {
+        const max = spirit.stackCount ?? 1;
+        lines.push(`Applies Gold to up to ${max} non-edition card(s) per capture`);
       } else if (spirit.id === 'econ_lucky_charm') {
         const stacks = spirit.stackCount ?? 1;
         const bonus = stacks * 15;
