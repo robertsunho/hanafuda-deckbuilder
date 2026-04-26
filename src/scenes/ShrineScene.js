@@ -13,13 +13,15 @@ import run, { RunManager }                      from '../systems/RunManager.js';
 import { SPIRIT_CATALOG, getSpiritDef }         from '../data/spirits.js';
 import { getAvailableFusions }                  from '../data/fusionRecipes.js';
 import { CHAKRA_TOOLS,
-         WUXING_CONSUMABLES, getElementDef }    from '../data/consumables.js';
+         WUXING_CONSUMABLES, getElementDef,
+         ALCHEMICAL_CONSUMABLES }               from '../data/consumables.js';
 import { PRIMARY_STAMPS, SECONDARY_STAMPS,
          getStampDef }                          from '../data/stamps.js';
 import { ZODIAC_CONSUMABLES }                  from '../data/zodiacConsumables.js';
 import { generateShopCards }                   from '../data/shopCards.js';
 import logger                                   from '../systems/GameplayLogger.js';
 import { applyHook }                            from '../systems/HexagramEffects.js';
+import { getCardPoints }                        from '../systems/CardMutations.js';
 
 /** Resolve card → Phaser texture key (handles hex-duplicate suffix). */
 function _tex(card) { return card.baseImageId ?? card.id; }
@@ -101,7 +103,8 @@ export class ShrineScene extends Phaser.Scene {
   create() {
     const { isGrove } = this.scene.settings.data || {};
     this._isGrove    = isGrove ?? false;
-    const baseCount  = this._isGrove ? 4 : 2;
+    const _daikokutenBonus = run.legendarySpirits.some(s => s.id === 'legend_daikokuten') ? 1 : 0;
+    const baseCount  = (this._isGrove ? 4 : 2) + _daikokutenBonus;
     const itemCount  = applyHook('modifyShopCount', baseCount, baseCount, 'all');
 
     this._spiritOfferings  = this._generateSpiritOfferings(itemCount);
@@ -128,11 +131,33 @@ export class ShrineScene extends Phaser.Scene {
   _generateSpiritOfferings(count) {
     const pool = SPIRIT_CATALOG.filter(s => {
       if (s.tier !== 1) return false;
+      if (s.legendary) return false;  // legendaries offered separately
       const existing = run.spirits.find(r => r.id === s.id && !r.isNegative);
       const hasNeg   = run.negativeSpirits.some(r => r.id === s.id);
       return !(existing && (existing.stackCount ?? 1) >= 3 && hasNeg);
     });
-    return [...pool].sort(() => Math.random() - 0.5).slice(0, count);
+
+    const offerings = [];
+    for (let i = 0; i < count; i++) {
+      // Sacred Grove: 15% chance to offer a Legendary instead.
+      if (this._isGrove && Math.random() < 0.15) {
+        const leg = this._pickRandomLegendary();
+        if (leg) { offerings.push(leg); continue; }
+      }
+      // Normal spirit from pool.
+      if (pool.length > 0) {
+        const idx = Math.floor(Math.random() * pool.length);
+        offerings.push(pool.splice(idx, 1)[0]);
+      }
+    }
+    return offerings;
+  }
+
+  _pickRandomLegendary() {
+    const ownedIds = new Set(run.legendarySpirits.map(s => s.id));
+    const available = SPIRIT_CATALOG.filter(s => s.legendary && !ownedIds.has(s.id));
+    if (available.length === 0) return null;
+    return available[Math.floor(Math.random() * available.length)];
   }
 
   _generateDeckFixOfferings(count) {
@@ -142,7 +167,17 @@ export class ShrineScene extends Phaser.Scene {
       ...PRIMARY_STAMPS,
       ...(this._isGrove ? SECONDARY_STAMPS : []),
     ];
-    return [...pool].sort(() => Math.random() - 0.5).slice(0, count);
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+    const offerings = [];
+    for (let i = 0; i < count; i++) {
+      if (this._isGrove && Math.random() < 0.20) {
+        const alch = ALCHEMICAL_CONSUMABLES[Math.floor(Math.random() * ALCHEMICAL_CONSUMABLES.length)];
+        offerings.push(alch);
+      } else if (shuffled.length > 0) {
+        offerings.push(shuffled.shift());
+      }
+    }
+    return offerings;
   }
 
   _generateZodiacOfferings(count) {
@@ -294,6 +329,53 @@ export class ShrineScene extends Phaser.Scene {
       this.add.text(nx + NW / 2 - 3, SPIRIT_Y - NH / 2 + 2, '\u2205', {
         fontSize: '9px', color: '#5588aa',
       }).setOrigin(1, 0).setDepth(10);
+    }
+
+    // Legendary spirit slots (right of negatives)
+    const legSpirits = run.legendarySpirits;
+    const legSlots   = run.maxLegendarySlots;
+    const LEG_GAP    = SPIRIT_W + 12;
+    const LEG_X0     = NX0 + neg.length * (NW + 6) + (neg.length > 0 ? 12 : 0);
+    for (let i = 0; i < legSlots; i++) {
+      const ls = legSpirits[i];
+      const lx = LEG_X0 + i * LEG_GAP;
+      if (!ls) {
+        this._addRoundedRect(lx, SPIRIT_Y, SPIRIT_W, SPIRIT_H, 6, 0x1a1a0a, 1, 0x4a4a1a);
+        this.add.text(lx, SPIRIT_Y + SPIRIT_H / 2 - 6, 'L', {
+          fontSize: '8px', color: '#6a6a3a',
+        }).setOrigin(0.5);
+        continue;
+      }
+      const legCol = RARITY_COLOR.legendary;
+      this._addRoundedRect(lx, SPIRIT_Y, SPIRIT_W, SPIRIT_H, 6, 0x1a1a0a, 1, legCol);
+      this.add.rectangle(lx - SPIRIT_W / 2 + 2, SPIRIT_Y, 4, SPIRIT_H - 4, legCol);
+      this.add.text(lx, SPIRIT_Y, ls.name, {
+        fontSize: '9px', color: '#ffee88',
+        wordWrap: { width: SPIRIT_W - 8 }, align: 'center',
+      }).setOrigin(0.5);
+      const legTip = this.add.text(lx, SPIRIT_Y + SPIRIT_H / 2 + 4,
+        getSpiritDef(ls.id)?.description ?? ls.name,
+        {
+          fontSize: '10px', color: '#e8e8e8',
+          backgroundColor: '#0a0f1e',
+          padding: { x: 6, y: 4 },
+          wordWrap: { width: 180 },
+        }
+      ).setOrigin(0.5, 0).setDepth(62).setVisible(false);
+      const legHit = this.add.rectangle(lx, SPIRIT_Y, SPIRIT_W, SPIRIT_H, 0x000000, 0)
+        .setInteractive({ useHandCursor: false }).setDepth(5);
+      legHit.on('pointerover', () => legTip.setVisible(true));
+      legHit.on('pointerout',  () => legTip.setVisible(false));
+      // Sell button
+      const legSell = this.add.text(lx + SPIRIT_W / 2 - 5, SPIRIT_Y - SPIRIT_H / 2 + 5, '\u00D7', {
+        fontSize: '11px', color: '#774444',
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(12);
+      legSell.on('pointerover', () => legSell.setColor('#ff6666'));
+      legSell.on('pointerout',  () => legSell.setColor('#774444'));
+      legSell.on('pointerdown', () => {
+        run.sellLegendarySpirit(i);
+        this._buildUI();
+      });
     }
   }
 
@@ -491,19 +573,31 @@ export class ShrineScene extends Phaser.Scene {
       }).setOrigin(0.5, 0);
 
       if (category === 'spirit') {
-        const badge = CHANNEL_BADGE[offering.channel]
-                      ?? { label: (offering.channel ?? '?').toUpperCase(), bgColor: 0x333333, textColor: '#888888' };
-        this.add.rectangle(cx, top + 30, 60, 15, badge.bgColor, 0.9);
-        this.add.text(cx, top + 30, badge.label, {
-          fontSize: '8px', color: badge.textColor, fontStyle: 'bold',
-        }).setOrigin(0.5);
-        const ex = run.spirits.find(s => s.id === offering.id && !s.isNegative);
-        const sc = ex ? (ex.stackCount ?? 1) : 0;
-        if (sc > 0) {
-          const hn = run.negativeSpirits.some(s => s.id === offering.id);
-          this.add.text(cx, top + 44, (ex && sc >= 3 && !hn) ? `\xD7${sc} \u2192 TRANSCEND` : `Owned \xD7${sc}`, {
-            fontSize: '8px', color: (ex && sc >= 3 && !hn) ? '#ffcc44' : '#aaccff',
-          }).setOrigin(0.5, 0);
+        if (offering.legendary) {
+          this.add.rectangle(cx, top + 30, 60, 15, 0x6a5a00, 0.9);
+          this.add.text(cx, top + 30, 'LEGENDARY', {
+            fontSize: '7px', color: '#ffdd44', fontStyle: 'bold',
+          }).setOrigin(0.5);
+          if (run.legendarySpirits.some(s => s.id === offering.id)) {
+            this.add.text(cx, top + 44, 'Owned', {
+              fontSize: '8px', color: '#aaccff',
+            }).setOrigin(0.5, 0);
+          }
+        } else {
+          const badge = CHANNEL_BADGE[offering.channel]
+                        ?? { label: (offering.channel ?? '?').toUpperCase(), bgColor: 0x333333, textColor: '#888888' };
+          this.add.rectangle(cx, top + 30, 60, 15, badge.bgColor, 0.9);
+          this.add.text(cx, top + 30, badge.label, {
+            fontSize: '8px', color: badge.textColor, fontStyle: 'bold',
+          }).setOrigin(0.5);
+          const ex = run.spirits.find(s => s.id === offering.id && !s.isNegative);
+          const sc = ex ? (ex.stackCount ?? 1) : 0;
+          if (sc > 0) {
+            const hn = run.negativeSpirits.some(s => s.id === offering.id);
+            this.add.text(cx, top + 44, (ex && sc >= 3 && !hn) ? `\xD7${sc} \u2192 TRANSCEND` : `Owned \xD7${sc}`, {
+              fontSize: '8px', color: (ex && sc >= 3 && !hn) ? '#ffcc44' : '#aaccff',
+            }).setOrigin(0.5, 0);
+          }
         }
       }
     }
@@ -566,7 +660,7 @@ export class ShrineScene extends Phaser.Scene {
         const c = offering.card;
         return [
           c.name,
-          `${c.monthName ?? ''} · ${c.type} · ${c.points ?? 0}pt`,
+          `${c.monthName ?? ''} · ${c.type} · ${getCardPoints(c)}pt`,
           (c.vertical || c.temporal) ? `${c.vertical ?? ''}/${c.temporal ?? ''}` : '',
           offering.preEnhancement ? `Enh: ${offering.preEnhancement.element} (${offering.preEnhancement.tier})` : '',
           offering.preRibbon ? `Stamp: ${offering.preRibbon}` : '',
@@ -638,24 +732,40 @@ export class ShrineScene extends Phaser.Scene {
     }
 
     // ── Reroll button — always visible at fixed Y below purchase ──────────────
+    // engine_northern_lion: check for free rerolls.
+    const _lionFree = run.spirits
+      .reduce((sum, s) => sum + (s.id === 'engine_northern_lion' ? (s.state?.freeRerolls ?? 0) : 0), 0);
     const canReroll = run.ki >= this._rerollCost;
-    const bg  = canReroll ? 0x1a2a4a : 0x0e1520;
-    const bdr = canReroll ? 0x3a5a8a : 0x1e2d40;
+    const canAnyReroll = canReroll || _lionFree > 0;
+    const bg  = canAnyReroll ? 0x1a2a4a : 0x0e1520;
+    const bdr = canAnyReroll ? 0x3a5a8a : 0x1e2d40;
     const rBtn = this.add.rectangle(SHOP_CX, rerollY, 150, 26, bg).setStrokeStyle(1, bdr);
-    this.add.text(SHOP_CX, rerollY, `Reroll  ${this._rerollCost} ki`, {
-      fontSize: '12px', color: canReroll ? '#aaccee' : '#445566',
+    const rerollLabel = _lionFree > 0 ? `Reroll  FREE (${_lionFree})` : `Reroll  ${this._rerollCost} ki`;
+    this.add.text(SHOP_CX, rerollY, rerollLabel, {
+      fontSize: '12px', color: canAnyReroll ? '#aaccee' : '#445566',
     }).setOrigin(0.5);
 
-    if (canReroll) {
+    if (canAnyReroll) {
       rBtn.setInteractive({ useHandCursor: true });
       rBtn.on('pointerover', () => rBtn.setFillStyle(0x2a3a5a));
       rBtn.on('pointerout',  () => rBtn.setFillStyle(bg));
       rBtn.on('pointerdown', () => {
-        run.spendKi(this._rerollCost);
-        this._rerollCount++;
-        const baseCost = 3 + this._rerollCount * 2;
-        this._rerollCost = applyHook('modifyRerollCost', baseCost, baseCost, this._rerollCount);
-        const baseIc = this._isGrove ? 4 : 2;
+        if (_lionFree > 0) {
+          // Consume one free reroll from the first lion that has one.
+          for (const lion of run.spirits) {
+            if (lion.id === 'engine_northern_lion' && (lion.state?.freeRerolls ?? 0) > 0) {
+              lion.state.freeRerolls--;
+              break;
+            }
+          }
+        } else {
+          run.spendKi(this._rerollCost);
+          this._rerollCount++;
+          const baseCost = 3 + this._rerollCount * 2;
+          this._rerollCost = applyHook('modifyRerollCost', baseCost, baseCost, this._rerollCount);
+        }
+        const _daikokutenBonusReroll = run.legendarySpirits.some(s => s.id === 'legend_daikokuten') ? 1 : 0;
+        const baseIc = (this._isGrove ? 4 : 2) + _daikokutenBonusReroll;
         const ic = applyHook('modifyShopCount', baseIc, baseIc, 'all');
         this._rerollSection(this._spiritOfferings,  () => this._generateSpiritOfferings(ic));
         this._rerollSection(this._deckFixOfferings, () => this._generateDeckFixOfferings(ic));
@@ -752,6 +862,7 @@ export class ShrineScene extends Phaser.Scene {
 
   _getItemCost(offering, category) {
     if (!offering) return 0;
+    if (category === 'spirit' && offering.legendary) return RunManager.LEGENDARY_PURCHASE_COST;
     return category === 'card'
       ? this._price(offering.price)
       : this._price(offering.cost ?? 0);
@@ -761,6 +872,7 @@ export class ShrineScene extends Phaser.Scene {
     if (!offering) return false;
     switch (category) {
       case 'spirit': {
+        if (offering.legendary) return run.canAddLegendary;
         const existing = run.spirits.find(s => s.id === offering.id && !s.isNegative);
         return existing ? true : run.canAddSpirit;
       }
@@ -774,6 +886,18 @@ export class ShrineScene extends Phaser.Scene {
     switch (category) {
 
       case 'spirit': {
+        if (offering.legendary) {
+          const cost = RunManager.LEGENDARY_PURCHASE_COST;
+          if (run.ki < cost) break;
+          const result = run.addLegendarySpirit(offering);
+          if (result.success) {
+            run.spendKi(cost);
+            logger.logShopPurchase('legendary', offering.name, cost);
+            offeringsArray[index] = null;
+            this._buildUI();
+          }
+          break;
+        }
         const result = run.buySpirit(offering);
         if (result.success) {
           const discount = offering.cost - this._price(offering.cost);
@@ -790,6 +914,13 @@ export class ShrineScene extends Phaser.Scene {
 
       case 'deckfix': {
         const cost = this._price(offering.cost);
+        if (offering.category === 'alchemical') {
+          run.spendKi(cost);
+          logger.logShopPurchase('alchemical', offering.name, cost);
+          offeringsArray[index] = null;
+          this._activateAlchemical(offering);
+          break;
+        }
         if (offering.id.startsWith('chakra_')) {
           run.spendKi(cost);
           logger.logShopPurchase('chakra', offering.name, cost);
@@ -1711,5 +1842,129 @@ export class ShrineScene extends Phaser.Scene {
     const discount = Math.min(couponCount * 0.15, 0.45);
     let price = couponCount > 0 ? Math.ceil(base * (1 - discount)) : base;
     return applyHook('modifyShopPrice', price, price);
+  }
+
+  // ── Alchemical consumable activation ──────────────────────────────────────
+
+  _activateAlchemical(alchDef) {
+    const ConsumableEffects = this.scene.systems?.game?.registry?.get?.('ConsumableEffects');
+    // Direct import approach — ConsumableEffects is loaded at module level.
+    import('../systems/ConsumableEffects.js').then(mod => {
+      const effect = mod.default.get(alchDef.id);
+      if (!effect) { this._buildUI(); return; }
+
+      if (!effect.requiresInput) {
+        // No selection needed (Sulfur, Lead) — execute immediately.
+        const result = effect.execute({ params: {} });
+        this._showAlchemicalResult(result);
+        return;
+      }
+
+      // Needs spirit selection — show overlay.
+      this._showSpiritSelectionOverlay(alchDef, effect);
+    });
+  }
+
+  _showAlchemicalResult(result) {
+    for (const o of this._confirmObjs) o.destroy();
+    this._confirmObjs = [];
+    const cx = 640, cy = 360;
+    const push = obj => { this._confirmObjs.push(obj); return obj; };
+    const color = result.success ? 0x1a3a1a : 0x3a1a1a;
+    const border = result.success ? 0x44aa44 : 0xaa4444;
+    push(this.add.rectangle(cx, cy, 350, 80, color, 0.97).setStrokeStyle(2, border).setDepth(60));
+    push(this.add.text(cx, cy, result.message ?? (result.success ? 'Done!' : 'Failed'), {
+      fontSize: '13px', color: result.success ? '#aaffcc' : '#ffaaaa',
+      wordWrap: { width: 320 }, align: 'center',
+    }).setOrigin(0.5).setDepth(60));
+    this.time.delayedCall(1500, () => {
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    });
+  }
+
+  _showSpiritSelectionOverlay(alchDef, effect) {
+    for (const o of this._confirmObjs) o.destroy();
+    this._confirmObjs = [];
+    const push = obj => { this._confirmObjs.push(obj); return obj; };
+    const cx = 640, cy = 360;
+
+    const spirits = run.spirits;
+    const inputType = effect.inputType;
+    const isPair = inputType === 'spirit_pair' || inputType === 'spirit_pair_tier3';
+    const selected = [];
+
+    // Filter spirits based on inputType.
+    const eligible = spirits.map((s, i) => {
+      const def = getSpiritDef(s.id);
+      switch (inputType) {
+        case 'spirit_pair':              return { s, i, ok: true };
+        case 'spirit_pair_tier3':        return { s, i, ok: def?.tier === 3 };
+        case 'spirit_single_fusion':     return { s, i, ok: def?.tier === 2 || def?.tier === 3 };
+        case 'spirit_single_stackable':  return { s, i, ok: (s.stackCount ?? 1) < 3 };
+        case 'spirit_single_transcendable': return { s, i, ok: (s.stackCount ?? 1) >= 3 };
+        default: return { s, i, ok: true };
+      }
+    });
+
+    if (eligible.filter(e => e.ok).length === 0) {
+      this._showAlchemicalResult({ success: false, message: 'No eligible spirits' });
+      return;
+    }
+
+    // Backdrop.
+    push(this.add.rectangle(cx, cy, 700, 300, 0x0a0f1e, 0.97).setStrokeStyle(2, 0x4488aa).setDepth(55));
+    push(this.add.text(cx, cy - 120, `${alchDef.name}: Select ${isPair ? '2 spirits' : '1 spirit'}`, {
+      fontSize: '14px', color: '#ddeeff', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(55));
+
+    // Render spirit cards.
+    const GAP = 76, startX = cx - ((spirits.length - 1) * GAP) / 2;
+    for (const { s, i, ok } of eligible) {
+      const sx = startX + i * GAP;
+      const sy = cy;
+      const bgColor = ok ? 0x0d1b2a : 0x0a0a14;
+      const bdrColor = ok ? 0x4488aa : 0x222233;
+      const card = push(this.add.rectangle(sx, sy, 64, 80, bgColor).setStrokeStyle(1, bdrColor).setDepth(56));
+      push(this.add.text(sx, sy - 10, s.name, {
+        fontSize: '9px', color: ok ? '#cce0ff' : '#445566',
+        wordWrap: { width: 56 }, align: 'center',
+      }).setOrigin(0.5).setDepth(56));
+      if ((s.stackCount ?? 1) > 1) {
+        push(this.add.text(sx + 28, sy - 36, `\xD7${s.stackCount}`, {
+          fontSize: '9px', color: '#ffee66',
+        }).setOrigin(1, 0).setDepth(57));
+      }
+      if (!ok) continue;
+      card.setInteractive({ useHandCursor: true });
+      card.on('pointerdown', () => {
+        if (selected.includes(i)) return;
+        selected.push(i);
+        card.setStrokeStyle(2, 0x44ff44);
+        const needed = isPair ? 2 : 1;
+        if (selected.length >= needed) {
+          const params = isPair ? { spiritIndices: selected } : { spiritIndex: selected[0] };
+          const result = effect.execute({ params });
+          for (const o of this._confirmObjs) o.destroy();
+          this._confirmObjs = [];
+          this._showAlchemicalResult(result);
+        }
+      });
+    }
+
+    // Cancel button.
+    const cancelBtn = push(this.add.rectangle(cx, cy + 120, 90, 28, 0x2a1a1a)
+      .setStrokeStyle(1, 0xaa4444).setInteractive({ useHandCursor: true }).setDepth(56));
+    push(this.add.text(cx, cy + 120, 'Cancel', {
+      fontSize: '11px', color: '#ffaaaa',
+    }).setOrigin(0.5).setDepth(56));
+    cancelBtn.on('pointerdown', () => {
+      // Refund ki since alchemical wasn't consumed.
+      run.addKi(this._price(alchDef.cost));
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      this._buildUI();
+    });
   }
 }

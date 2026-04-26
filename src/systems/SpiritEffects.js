@@ -26,6 +26,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import run from './RunManager.js';
+import { addCardBonusPoints } from './CardMutations.js';
 
 // ── Factory helpers ───────────────────────────────────────────────────────────
 
@@ -872,6 +873,16 @@ const _effects = {
       const destroyed = spirit.state?.destroyed ?? 0;
       if (destroyed === 0) return null;
       return { multiplyMult: 1 + destroyed * 0.3 };
+    },
+  },
+
+  engine_irrigation: {
+    onCardScored({ card, spirit }) {
+      if (card.type === 'plain') {
+        addCardBonusPoints(card, 3 * (spirit.stackCount ?? 1));
+        return { addPoints: 3 };
+      }
+      return null;
     },
   },
 

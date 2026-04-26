@@ -53,6 +53,8 @@ export const YAKU_INFO = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 import SpiritEffects from './SpiritEffects.js';
+import { getFireFlatPoints } from './HexagramEffects.js';
+import { getCardPoints }     from './CardMutations.js';
 
 export default class ScoringEngine {
 
@@ -121,7 +123,7 @@ export default class ScoringEngine {
     const yakuMult = this.calculateTotalMultiplier(yakuList);
 
     // ── Step 2: Point Boost channel ───────────────────────────────────────
-    const rawBasePoints      = capturedCards.reduce((sum, c) => sum + c.points, 0);
+    const rawBasePoints      = capturedCards.reduce((sum, c) => sum + getCardPoints(c), 0);
     let boostedCardSum       = 0;
     const metalConsumableCount = 0; // Metal procs are now handled per-capture in GameRoundManager
     for (const card of capturedCards) {
@@ -130,8 +132,8 @@ export default class ScoringEngine {
 
       // Fire enhancement adds flat points on top of base; spirit boosts are skipped.
       let pts = isFire
-        ? card.points + (enh.tier === 'upgraded' ? 100 : 30)
-        : card.points;
+        ? getCardPoints(card) + getFireFlatPoints(enh.tier)
+        : getCardPoints(card);
 
       // Spirit point boosts — Fire cards have no identity so they're excluded.
       if (!isFire) {

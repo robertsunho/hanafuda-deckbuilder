@@ -60,6 +60,7 @@ import { getActiveEffect, applyHook,
   getEarthInterestRate, getWoodScoringMult, getEarthHeldMult,
 } from "./HexagramEffects.js";
 import { rollProbability } from "./RNGHook.js";
+import { getCardPoints }  from "./CardMutations.js";
 import logger           from "./GameplayLogger.js";
 import { SPIRIT_CATALOG, getSpiritDef, ANIMAL_SYMBIONT_MAP } from "../data/spirits.js";
 
@@ -490,7 +491,7 @@ export default class GameRoundManager {
     let mult   = 1.0;
 
     for (const card of fieldCards) {
-      let cardPts = card.points;
+      let cardPts = getCardPoints(card);
       const enh = card.enhancement;
       if (enh?.element === 'fire')  cardPts += getFireFlatPoints(enh.tier);
       if (enh?.element === 'water') {
@@ -1130,7 +1131,7 @@ export default class GameRoundManager {
     if (this._onScoringStep) this._onScoringStep({ type: 'capture_start' });
 
     this._capture.add(cards);
-    this._basePoints += cards.reduce((sum, c) => sum + c.points, 0);
+    this._basePoints += cards.reduce((sum, c) => sum + getCardPoints(c), 0);
     if (cards.length === 4) this._basePoints += 5;   // full-month bonus
 
     // score_field_at_round_end: captures add to pile but don't score.
@@ -1193,8 +1194,8 @@ export default class GameRoundManager {
       for (const card of cards) {
         const enh = card.enhancement;
 
-        // Base points + Fire additive (Ember/Charcoal add on top of base points).
-        let cardPts = card.points;
+        // Base points (includes persistent mutations) + Fire additive.
+        let cardPts = getCardPoints(card);
         if (enh?.element === 'fire')  cardPts += getFireFlatPoints(enh.tier);
 
         // Water mult (Snow/Ice) — applied after Fire additive.
@@ -1317,7 +1318,7 @@ export default class GameRoundManager {
         }
         for (let rt = 0; rt < retriggerCount; rt++) {
           const enh = card.enhancement;
-          let cardPts = card.points;
+          let cardPts = getCardPoints(card);
           if (enh?.element === 'fire')  cardPts += getFireFlatPoints(enh.tier);
           if (enh?.element === 'water') cardPts = Math.round(cardPts * getWaterMult(enh.tier, enh.depLevel ?? 0));
           if (enh?.element === 'wood')  mult *= getWoodScoringMult(enh.tier);
@@ -1461,8 +1462,8 @@ export default class GameRoundManager {
           const retriggerCount = stamp === 'stamp_gray' ? 3 : 1;
           const rEnh = card.enhancement;
           for (let rt = 0; rt < retriggerCount; rt++) {
-            // Base + Fire additive
-            let rPts = card.points;
+            // Base + Fire additive (includes persistent mutations)
+            let rPts = getCardPoints(card);
             if (rEnh?.element === 'fire')  rPts += getFireFlatPoints(rEnh.tier);
             // Water mult — use current depLevel; do NOT increment it
             if (rEnh?.element === 'water') {

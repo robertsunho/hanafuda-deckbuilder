@@ -20,6 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import ScoringEngine from "./ScoringEngine.js";
+import { getCardPoints } from "./CardMutations.js";
 
 const _engine = new ScoringEngine();   // stateless — one instance is enough
 
@@ -248,7 +249,7 @@ export default class CaptureManager {
    */
   rawCardPoints() {
     let total = 0;
-    for (const card of this._cards.values()) total += card.points;
+    for (const card of this._cards.values()) total += getCardPoints(card);
     return total;
   }
 

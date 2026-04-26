@@ -904,6 +904,16 @@ export const SPIRIT_CATALOG = [
     category:    'utility_edition',
   },
   {
+    id:          'engine_irrigation',
+    name:        'Irrigation',
+    description: 'Each plain card captured permanently gains +3 points (stacks across captures).',
+    channel:     'utility',
+    cost:        5,
+    tier:        1,
+    rarity:      'uncommon',
+    category:    'utility_card',
+  },
+  {
     id:          'engine_void',
     name:        'Void',
     description: '+0.3 mult-mult per destroyed card (permanent).',

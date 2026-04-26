@@ -5,6 +5,7 @@ import { getElementDef }     from '../data/consumables.js';
 import { getSpiritDef }      from '../data/spirits.js';
 import logger                from '../systems/GameplayLogger.js';
 import SpiritEffects         from '../systems/SpiritEffects.js';
+import { getCardPoints }     from '../systems/CardMutations.js';
 
 /** Resolve card → Phaser texture key (handles hex-duplicate suffix). */
 function _tex(card) { return card.baseImageId ?? card.id; }
@@ -2834,7 +2835,11 @@ export class GameScene extends Phaser.Scene {
       metal: { base: '+10 pts proc, feeds Velocity', upgraded: '+15 pts proc + free consumable, feeds Velocity' },
       wood:  { base: 'bypasses field slot limit, feeds Moths', upgraded: 'anti-strand + slot bypass, feeds Moths' },
     };
-    const lines = [card.name, `${card.monthName} · ${card.type} · ${card.points}pt`];
+    const bonus = card.mutations?.bonusPoints ?? 0;
+    const ptsLabel = bonus > 0
+      ? `${card.points} + ${bonus} = ${getCardPoints(card)}pt`
+      : `${card.points}pt`;
+    const lines = [card.name, `${card.monthName} · ${card.type} · ${ptsLabel}`];
     if (card.vertical && card.temporal) lines.push(`${card.vertical} / ${card.temporal}`);
     if (card.pathConverted) lines.push(`Path: was ${card._originalName ?? 'unknown'}`);
     if (card.treeConverted) lines.push(`Tree: copy of ${card.treeSourceName ?? 'unknown'}`);
