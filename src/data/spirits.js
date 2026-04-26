@@ -904,6 +904,16 @@ export const SPIRIT_CATALOG = [
     category:    'utility_edition',
   },
   {
+    id:          'engine_void',
+    name:        'Void',
+    description: '+0.3 mult-mult per destroyed card (permanent).',
+    channel:     'multiplicative',
+    cost:        8,
+    tier:        1,
+    rarity:      'rare',
+    category:    'engine_destruction',
+  },
+  {
     id:          'engine_lincoln',
     name:        'Lincoln',
     description: '+0.1 additive mult each time you bank (permanent engine).',

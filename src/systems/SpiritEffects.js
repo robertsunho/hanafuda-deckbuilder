@@ -864,6 +864,17 @@ const _effects = {
     },
   },
 
+  engine_void: {
+    onCardDestroyed({ spirit }) {
+      spirit.state.destroyed += (spirit.stackCount ?? 1);
+    },
+    applyEngine({ spirit }) {
+      const destroyed = spirit.state?.destroyed ?? 0;
+      if (destroyed === 0) return null;
+      return { multiplyMult: 1 + destroyed * 0.3 };
+    },
+  },
+
   engine_applause: {},  // retrigger handled inline at held-in-hand proc sites
 
   // ── Patron Legendaries ───────────────────────────────────────────────────

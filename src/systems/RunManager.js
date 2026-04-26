@@ -12,6 +12,7 @@ import { ZODIAC_CONSUMABLES, getZodiacDef }     from '../data/zodiacConsumables.
 import logger                                   from './GameplayLogger.js';
 import { resolveHexagram }                      from './HexagramGenerator.js';
 import { getActiveEffect, applyHook }          from './HexagramEffects.js';
+import SpiritEffects                           from './SpiritEffects.js';
 //
 //   import run from './systems/RunManager.js';
 //   run.addKi(5);
@@ -320,6 +321,7 @@ class RunManager {
     if (spiritDef.id === 'engine_ship')           spirit.state = { cardsDiscarded: 0 };
     if (spiritDef.id === 'engine_northern_lion')  spirit.state = { freeRerolls: 0 };
     if (spiritDef.id === 'engine_kintaro')       spirit.state = { goldsConsumed: 0 };
+    if (spiritDef.id === 'engine_void')          spirit.state = { destroyed: 0 };
     if (spiritDef.id === 'decay_persimmon')       spirit.state = { remaining: 30 };
     if (spiritDef.id === 'decay_pear')            spirit.state = { remaining: 150 };
     this._spirits.push(spirit);
@@ -439,6 +441,7 @@ class RunManager {
     if (spiritDef.id === 'engine_ship')           spirit.state = { cardsDiscarded: 0 };
     if (spiritDef.id === 'engine_northern_lion')  spirit.state = { freeRerolls: 0 };
     if (spiritDef.id === 'engine_kintaro')       spirit.state = { goldsConsumed: 0 };
+    if (spiritDef.id === 'engine_void')          spirit.state = { destroyed: 0 };
     if (spiritDef.id === 'decay_persimmon')       spirit.state = { remaining: 30 };
     if (spiritDef.id === 'decay_pear')            spirit.state = { remaining: 150 };
     this._spirits.push(spirit);
@@ -968,8 +971,24 @@ class RunManager {
   deleteCard(cardId) {
     const idx = this._deck.findIndex(c => c.id === cardId);
     if (idx !== -1) {
+      const card = this._deck[idx];
+      // Fire card-destroyed event BEFORE removal so handlers can inspect card.
+      this._fireCardDestroyedEvent(card);
       this._deck.splice(idx, 1);
       this._notifyBadger();
+    }
+  }
+
+  /**
+   * Fire the card-destroyed event for all spirits with onCardDestroyed handlers.
+   * @param {object} card - The card being destroyed
+   */
+  _fireCardDestroyedEvent(card) {
+    for (const spirit of this._spirits) {
+      const effect = SpiritEffects.get(spirit.id);
+      if (effect?.onCardDestroyed) {
+        effect.onCardDestroyed({ card, spirit, run: this });
+      }
     }
   }
 
