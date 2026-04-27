@@ -1030,45 +1030,6 @@ export const SPIRIT_CATALOG = [
     category:    'retrigger',
   },
 
-  // ── Patron Legendaries ──────────────────────────────────────────────────────
-
-  {
-    id: 'legend_ebisu', name: 'Ebisu',
-    description: '+1 to all card deals (initial deal, all push deals).',
-    channel: 'utility', cost: 0, tier: 1,
-    rarity: 'legendary', category: 'legendary_patron', legendary: true,
-  },
-  {
-    id: 'legend_daikokuten', name: 'Daikokuten',
-    description: '+1 item per shop section.',
-    channel: 'utility', cost: 0, tier: 1,
-    rarity: 'legendary', category: 'legendary_patron', legendary: true,
-  },
-  {
-    id: 'legend_bishamonten', name: 'Bishamonten',
-    description: '+1 spirit slot.',
-    channel: 'utility', cost: 0, tier: 1,
-    rarity: 'legendary', category: 'legendary_patron', legendary: true,
-  },
-  {
-    id: 'legend_benzaiten', name: 'Benzaiten',
-    description: '+1 consumable slot.',
-    channel: 'utility', cost: 0, tier: 1,
-    rarity: 'legendary', category: 'legendary_patron', legendary: true,
-  },
-  {
-    id: 'legend_fukurokuju', name: 'Fukurokuju',
-    description: '+1 hand size limit.',
-    channel: 'utility', cost: 0, tier: 1,
-    rarity: 'legendary', category: 'legendary_patron', legendary: true,
-  },
-  {
-    id: 'legend_jurojin', name: 'Jur\u014Djin',
-    description: '+1 field slot.',
-    channel: 'utility', cost: 0, tier: 1,
-    rarity: 'legendary', category: 'legendary_patron', legendary: true,
-  },
-
   // ── Unique Legendaries ──────────────────────────────────────────────────────
 
   {

@@ -103,8 +103,8 @@ export class ShrineScene extends Phaser.Scene {
   create() {
     const { isGrove } = this.scene.settings.data || {};
     this._isGrove    = isGrove ?? false;
-    const _daikokutenBonus = run.legendarySpirits.some(s => s.id === 'legend_daikokuten') ? 1 : 0;
-    const baseCount  = (this._isGrove ? 4 : 2) + _daikokutenBonus;
+    const _shopBonus = run.countBlessingsByEffect('plus_shop_offering');
+    const baseCount  = (this._isGrove ? 4 : 2) + _shopBonus;
     const itemCount  = applyHook('modifyShopCount', baseCount, baseCount, 'all');
 
     this._spiritOfferings  = this._generateSpiritOfferings(itemCount);
@@ -764,8 +764,8 @@ export class ShrineScene extends Phaser.Scene {
           const baseCost = 3 + this._rerollCount * 2;
           this._rerollCost = applyHook('modifyRerollCost', baseCost, baseCost, this._rerollCount);
         }
-        const _daikokutenBonusReroll = run.legendarySpirits.some(s => s.id === 'legend_daikokuten') ? 1 : 0;
-        const baseIc = (this._isGrove ? 4 : 2) + _daikokutenBonusReroll;
+        const _shopBonusReroll = run.countBlessingsByEffect('plus_shop_offering');
+        const baseIc = (this._isGrove ? 4 : 2) + _shopBonusReroll;
         const ic = applyHook('modifyShopCount', baseIc, baseIc, 'all');
         this._rerollSection(this._spiritOfferings,  () => this._generateSpiritOfferings(ic));
         this._rerollSection(this._deckFixOfferings, () => this._generateDeckFixOfferings(ic));

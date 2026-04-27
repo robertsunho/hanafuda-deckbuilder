@@ -263,6 +263,8 @@ export class GameScene extends Phaser.Scene {
     this._scoreTotText  = this.add.text(INFO_X, infoY, 'Total: 0',  { fontSize: '14px', color: '#ffffff', fontStyle: 'bold' });
     infoY += 18;
     this._thresholdText = this.add.text(INFO_X, infoY, 'Target: –', { fontSize: '13px', color: '#cc8866' });
+    infoY += 18;
+    this._blessingText = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#bb99dd' });
 
     // ── Spirits row — vertical label to the left of first card ───────────
     this.add.text(SPIRIT_START_X - SPIRIT_W / 2 - 14, SPIRIT_Y, 'SPIRITS', {
@@ -1963,6 +1965,12 @@ export class GameScene extends Phaser.Scene {
     const runScore = this._round.runningScore;
     const thr      = run.threshold;
     this._scoreTotText.setStyle({ color: runScore >= thr ? '#44ff88' : '#ffffff', fontStyle: 'bold' });
+
+    // Blessings display.
+    const blessings = run.blessings;
+    this._blessingText.setText(
+      blessings.length > 0 ? `Blessings: ${blessings.map(b => b.name).join(', ')}` : ''
+    );
 
     this._deckSprite.setVisible(drawSize > 0);
     this._deckCountText.setText(String(drawSize));

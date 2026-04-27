@@ -923,16 +923,6 @@ const _effects = {
 
   engine_applause: {},  // retrigger handled inline at held-in-hand proc sites
 
-  // ── Patron Legendaries ───────────────────────────────────────────────────
-  // Patrons modify game-state values — most have no scoring handler.
-
-  legend_ebisu:        {},  // +1 to all deals — handled in GameRoundManager
-  legend_daikokuten:   {},  // +1 shop item — handled in ShrineScene
-  legend_bishamonten:  {},  // +1 spirit slot — handled in RunManager.spiritSlots getter
-  legend_benzaiten:    {},  // +1 consumable slot — handled in RunManager.maxConsumableSlots getter
-  legend_fukurokuju:   {},  // +1 hand size — handled in GameRoundManager
-  legend_jurojin:      {},  // +1 field slot — handled in GameRoundManager
-
   // ── Unique Legendaries ───────────────────────────────────────────────────
 
   legend_wuji: {

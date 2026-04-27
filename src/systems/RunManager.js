@@ -13,6 +13,7 @@ import logger                                   from './GameplayLogger.js';
 import { resolveHexagram }                      from './HexagramGenerator.js';
 import { getActiveEffect, applyHook }          from './HexagramEffects.js';
 import SpiritEffects                           from './SpiritEffects.js';
+import { getBlessingDef }                      from '../data/blessings.js';
 //
 //   import run from './systems/RunManager.js';
 //   run.addKi(5);
@@ -96,6 +97,10 @@ class RunManager {
     this._legendarySpirits = [];
     /** Permanent field slot modifier (Amber alchemical reduces by 1). */
     this._permanentFieldSlotMod = 0;
+
+    // ── Blessings (permanent run modifiers) ───────────────────────────────────
+    /** @type {object[]} */
+    this._blessings = [];
 
     // ── Consumable inventory ─────────────────────────────────────────────────
     /** @type {object[]} */
@@ -248,7 +253,7 @@ class RunManager {
   get legendarySpirits()  { return [...this._legendarySpirits]; }
   get spiritSlots() {
     let base = applyHook('modifySpiritSlots', RunManager.MAX_SPIRIT_SLOTS, RunManager.MAX_SPIRIT_SLOTS);
-    if (this._legendarySpirits.some(s => s.id === 'legend_bishamonten')) base += 1;
+    base += this.countBlessingsByEffect('plus_spirit_slot');
     return base;
   }
   get canAddSpirit()      { return this._spirits.length < this.spiritSlots; }
@@ -256,7 +261,7 @@ class RunManager {
   get canAddLegendary()   { return this._legendarySpirits.length < this.maxLegendarySlots; }
   get maxConsumableSlots() {
     let base = this._maxConsumableSlots;
-    if (this._legendarySpirits.some(s => s.id === 'legend_benzaiten')) base += 1;
+    base += this.countBlessingsByEffect('plus_consumable_slot');
     return base;
   }
 
@@ -612,6 +617,27 @@ class RunManager {
     }
 
     return { success: true, fusedSpirit: fusedDef, fusionResult };
+  }
+
+  // ── Blessings ─────────────────────────────────────────────────────────────
+
+  get blessings() { return [...this._blessings]; }
+
+  addBlessing(blessingDefOrId) {
+    const def = typeof blessingDefOrId === 'string'
+      ? getBlessingDef(blessingDefOrId)
+      : blessingDefOrId;
+    if (!def) return;
+    if (this._blessings.some(b => b.id === def.id)) return;
+    this._blessings.push({ id: def.id, name: def.name, tier: def.tier, effect: def.effect });
+  }
+
+  hasBlessing(id) {
+    return this._blessings.some(b => b.id === id);
+  }
+
+  countBlessingsByEffect(effectId) {
+    return this._blessings.filter(b => b.effect === effectId).length;
   }
 
   // ── Consumable inventory ───────────────────────────────────────────────────

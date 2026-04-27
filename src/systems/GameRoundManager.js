@@ -269,6 +269,11 @@ export default class GameRoundManager {
     for (const key of Object.keys(result)) {
       result[key] = applyHook('modifyYakuThreshold', result[key], key, result[key]);
     }
+    // Hotei Blessing: -1 per stack to all yaku thresholds.
+    const hoteiStacks = run.countBlessingsByEffect('minus_yaku_threshold');
+    if (hoteiStacks > 0) {
+      for (const key of Object.keys(result)) result[key] -= hoteiStacks;
+    }
     // Floor at 1.
     for (const key of Object.keys(result)) {
       result[key] = Math.max(1, result[key]);
@@ -455,23 +460,23 @@ export default class GameRoundManager {
     // ── Empty-slot play tracking (for Fix D/E capture rules) ─────────────
     this._lastHandPlayToEmptySlot = null;
 
-    // Legendary patron bonuses.
-    const _jurojinBonus = this._spirits.some(s => s.id === 'legend_jurojin') ? 1 : 0;
-    const _fukurokujuBonus = this._spirits.some(s => s.id === 'legend_fukurokuju') ? 1 : 0;
-    const _ebisuBonus = this._spirits.some(s => s.id === 'legend_ebisu') ? 1 : 0;
+    // Blessing patron bonuses.
+    const _fieldSlotBonus   = run.countBlessingsByEffect('plus_field_slot');
+    const _handSizeBonus    = run.countBlessingsByEffect('plus_hand_size');
+    const _dealCountBonus   = run.countBlessingsByEffect('plus_deal_count');
 
-    // Field slot count: hexagram, Jurōjin, and Amber may adjust from base.
+    // Field slot count: hexagram, Blessings, and Amber may adjust from base.
     const _amberMod = run._permanentFieldSlotMod ?? 0;
-    const _fieldBase = Math.max(1, FieldManager.MAX_SLOTS + _jurojinBonus + _amberMod);
+    const _fieldBase = Math.max(1, FieldManager.MAX_SLOTS + _fieldSlotBonus + _amberMod);
     this._field.setMaxSlots(applyHook('modifyFieldSlots', _fieldBase, _fieldBase));
     this._field.setCaptureRule(applyHook('overridesCaptureRule', 'month'));
 
     // Gankyil legendary: auto-capture at 3-stack instead of 4-stack.
     this._field.autoCaptureThreshold = this._spirits.some(s => s.id === 'legend_gankyil') ? 3 : 4;
 
-    const _baseHandSize   = applyHook('modifyHandSize', GameRoundManager.HAND_SIZE + _fukurokujuBonus, GameRoundManager.HAND_SIZE + _fukurokujuBonus);
-    this._hand.maxSize    = _baseHandSize;  // enforce hand cap (silently skips draws beyond this)
-    const _initialDeal    = applyHook('modifyCardsDealt', _baseHandSize + _ebisuBonus, _baseHandSize + _ebisuBonus, 'initial');
+    const _baseHandSize   = applyHook('modifyHandSize', GameRoundManager.HAND_SIZE + _handSizeBonus, GameRoundManager.HAND_SIZE + _handSizeBonus);
+    this._hand.maxSize    = _baseHandSize;
+    const _initialDeal    = applyHook('modifyCardsDealt', _baseHandSize + _dealCountBonus, _baseHandSize + _dealCountBonus, 'initial');
     this._hand.add(this._deck.draw(_initialDeal));
 
     // Deal field cards one at a time so stacking rules are applied per card.
@@ -1004,11 +1009,11 @@ export default class GameRoundManager {
    * Push 1: +4, Push 2: +2, Push 3+: +1.
    */
   _getNextPushDealCount() {
-    const ebisuBonus = this._spirits.some(s => s.id === 'legend_ebisu') ? 1 : 0;
+    const dealBonus = run.countBlessingsByEffect('plus_deal_count');
     let base;
-    if      (this._pushCount === 1) base = 4 + ebisuBonus;
-    else if (this._pushCount === 2) base = 2 + ebisuBonus;
-    else                            base = 1 + ebisuBonus;
+    if      (this._pushCount === 1) base = 4 + dealBonus;
+    else if (this._pushCount === 2) base = 2 + dealBonus;
+    else                            base = 1 + dealBonus;
     const phase = this._pushCount === 1 ? 'push1' : this._pushCount === 2 ? 'push2' : 'push3plus';
     return applyHook('modifyCardsDealt', base, base, phase);
   }
