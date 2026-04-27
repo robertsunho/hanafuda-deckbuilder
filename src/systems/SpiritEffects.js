@@ -892,17 +892,6 @@ const _effects = {
     },
   },
 
-  engine_void: {
-    onCardDestroyed({ spirit }) {
-      spirit.state.destroyed += (spirit.stackCount ?? 1);
-    },
-    applyEngine({ spirit }) {
-      const destroyed = spirit.state?.destroyed ?? 0;
-      if (destroyed === 0) return null;
-      return { multiplyMult: 1 + destroyed * 0.3 };
-    },
-  },
-
   engine_irrigation: {
     onCardScored({ card, spirit }) {
       if (card.type === 'plain') {
@@ -923,34 +912,59 @@ const _effects = {
 
   engine_applause: {},  // retrigger handled inline at held-in-hand proc sites
 
-  // ── Unique Legendaries ───────────────────────────────────────────────────
+  // ── Unique Legendary ────────────────────────────────────────────────────
+
+  legend_gankyil: {},  // auto-capture at 3-stack — handled in FieldManager
+
+  // ── Demoted Rares ─────────────────────────────────────────────────────
 
   legend_wuji: {
-    applyEngine() {
-      const emptySlots = run.spiritSlots - run.spirits.length;
-      if (emptySlots <= 0) return null;
-      return { multiplyMult: Math.pow(2, emptySlots) };
+    onCardDestroyed({ spirit }) {
+      spirit.state.destroyed += (spirit.stackCount ?? 1);
+    },
+    applyEngine({ spirit }) {
+      const destroyed = spirit.state?.destroyed ?? 0;
+      if (destroyed === 0) return null;
+      return { multiplyMult: 1 + destroyed * 0.3 };
     },
   },
 
   legend_dao: {
-    applyEngine() {
+    applyEngine({ spirit }) {
       const n = _countUnalteredCards(run.getDeck());
+      const stacks = spirit.stackCount ?? 1;
       if (n === 0) return null;
-      return { addMult: n };
+      return { multiplyMult: 1 + n * 0.1 * stacks };
     },
   },
 
   legend_chi: {
-    applyEngine() {
-      const flow = run.flow;
-      if (flow <= 0) return null;
-      return { multiplyMult: flow };
+    applyEngine({ spirit }) {
+      const stacks = spirit.stackCount ?? 1;
+      return { multiplyMult: run.flow * stacks };
     },
   },
 
-  legend_gankyil: {},  // auto-capture at 3-stack — handled in FieldManager
-  legend_waidan:  {},  // shop-exit negative consumable — handled in ShrineScene
+  legend_tengu: {
+    applyEngine({ spirit }) {
+      const stacks = spirit.stackCount ?? 1;
+      const spiritCount = run.spirits.length + run.negativeSpirits.length;
+      if (spiritCount === 0) return null;
+      return { multiplyMult: 1 + 0.3 * spiritCount * stacks };
+    },
+  },
+
+  legend_waidan: {},  // Sacred Grove exit — handled in ShrineScene
+
+  legend_feng_shui: {
+    applyEngine({ spirit }) {
+      const stacks = spirit.stackCount ?? 1;
+      const fengShuiSlotCount = run.spirits.filter(s => s.id === 'legend_feng_shui').length;
+      const occupiedNonFengShui = run.spirits.length - fengShuiSlotCount;
+      const emptySlots = run.spiritSlots - occupiedNonFengShui;
+      return { multiplyMult: 1 + 0.5 * emptySlots * stacks };
+    },
+  },
 };
 
 // ── Public interface ──────────────────────────────────────────────────────────

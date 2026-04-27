@@ -914,16 +914,6 @@ export const SPIRIT_CATALOG = [
     category:    'utility_card',
   },
   {
-    id:          'engine_void',
-    name:        'Void',
-    description: '+0.3 mult-mult per destroyed card (permanent).',
-    channel:     'multiplicative',
-    cost:        8,
-    tier:        1,
-    rarity:      'rare',
-    category:    'engine_destruction',
-  },
-  {
     id:          'engine_bullseye',
     name:        'Bullseye',
     description: '+1 mult-mult per round where all 4 yaku ranks (Hikari, Tane, Tanzaku, Kasu) are completed.',
@@ -1030,37 +1020,52 @@ export const SPIRIT_CATALOG = [
     category:    'retrigger',
   },
 
-  // ── Unique Legendaries ──────────────────────────────────────────────────────
+  // ── Unique Legendary ────────────────────────────────────────────────────────
 
-  {
-    id: 'legend_wuji', name: 'Wuji',
-    description: 'Each empty spirit slot gives \xD72 mult.',
-    channel: 'multiplicative', cost: 0, tier: 1,
-    rarity: 'legendary', category: 'legendary_unique', legendary: true,
-  },
-  {
-    id: 'legend_dao', name: 'Dao',
-    description: '+1 mult per unaltered card in deck (no enhancement, stamp, edition, or promotion).',
-    channel: 'additive', cost: 0, tier: 1,
-    rarity: 'legendary', category: 'legendary_unique', legendary: true,
-  },
-  {
-    id: 'legend_chi', name: 'Chi',
-    description: "Mult-mult equals current flow value. Effectively doubles flow's scoring impact.",
-    channel: 'multiplicative', cost: 0, tier: 1,
-    rarity: 'legendary', category: 'legendary_unique', legendary: true,
-  },
   {
     id: 'legend_gankyil', name: 'Gankyil',
     description: 'Auto-capture activates at 3-stack instead of 4-stack.',
     channel: 'utility', cost: 0, tier: 1,
     rarity: 'legendary', category: 'legendary_unique', legendary: true,
   },
+
+  // ── Demoted Rares (formerly Legendary) ────────────────────────────────────
+
+  {
+    id: 'legend_wuji', name: 'Wuji',
+    description: '+0.3 mult-mult per destroyed card (permanent).',
+    channel: 'multiplicative', cost: 8, tier: 1,
+    rarity: 'rare', category: 'engine_destruction',
+  },
+  {
+    id: 'legend_dao', name: 'Dao',
+    description: '+0.1 mult-mult per unaltered card in deck (per stack).',
+    channel: 'multiplicative', cost: 8, tier: 1,
+    rarity: 'rare', category: 'engine_deck',
+  },
+  {
+    id: 'legend_chi', name: 'Chi',
+    description: 'multiplyMult equal to current flow value (additive across stacks).',
+    channel: 'multiplicative', cost: 8, tier: 1,
+    rarity: 'rare', category: 'engine_flow',
+  },
+  {
+    id: 'legend_tengu', name: 'Tengu',
+    description: '+0.3 mult-mult per equipped spirit (regular + negative, includes itself).',
+    channel: 'multiplicative', cost: 8, tier: 1,
+    rarity: 'rare', category: 'engine_spirit_count',
+  },
   {
     id: 'legend_waidan', name: 'Waidan',
-    description: 'At shop exit, creates a negative copy of a random consumable in inventory.',
-    channel: 'utility', cost: 0, tier: 1,
-    rarity: 'legendary', category: 'legendary_economy', legendary: true,
+    description: 'On Sacred Grove exit, creates a negative copy of a random consumable per stack.',
+    channel: 'utility', cost: 8, tier: 1,
+    rarity: 'rare', category: 'utility_economy',
+  },
+  {
+    id: 'legend_feng_shui', name: 'Feng Shui',
+    description: '1\u00D7 base mult, +0.5 per empty spirit slot (ignores Feng Shui slots when counting).',
+    channel: 'multiplicative', cost: 8, tier: 1,
+    rarity: 'rare', category: 'engine_slot',
   },
 ];
 

@@ -849,12 +849,9 @@ export class GameScene extends Phaser.Scene {
         const inv = this._round?._bullseyeInventory ?? { bright: 0, animal: 0, ribbon: 0, plain: 0 };
         const progress = `${inv.bright}B/${inv.animal}A/${inv.ribbon}R/${inv.plain}P`;
         lines.push(`Qualified rounds: ${count} (this round: ${progress})  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
-      } else if (spirit.id === 'engine_void') {
-        const destroyed = spirit.state?.destroyed ?? 0;
-        const mult = 1 + destroyed * 0.3;
-        lines.push(`Cards destroyed: ${destroyed}  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
       } else if (spirit.id === 'legend_waidan') {
-        lines.push('Creates a negative copy of a random consumable on shop exit');
+        const stacks = spirit.stackCount ?? 1;
+        lines.push(`Sacred Grove exit: creates ${stacks} negative copy/copies of random consumable(s)`);
       } else if (spirit.id === 'util_festival') {
         const stacks = spirit.stackCount ?? 1;
         lines.push(`Generates a colored stamp on each ribbon capture (\u00D7${stacks} per ribbon, slot-gated)`);
@@ -912,19 +909,35 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // ── Legendary tooltips ─────────────────────────────────────────────────
-    if (spirit.id === 'legend_wuji') {
-      const emptySlots = run.spiritSlots - run.spirits.length;
-      lines.push(`Empty spirit slots: ${emptySlots}  \u2192  \u00D7${Math.pow(2, Math.max(0, emptySlots))} mult`);
+    // ── Legendary + demoted rare tooltips ───────────────────────────────────
+    if (spirit.id === 'legend_gankyil') {
+      lines.push('Auto-captures at 3-stack instead of 4-stack');
+    } else if (spirit.id === 'legend_wuji') {
+      const destroyed = spirit.state?.destroyed ?? 0;
+      const mult = 1 + destroyed * 0.3;
+      lines.push(`Cards destroyed: ${destroyed}  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
     } else if (spirit.id === 'legend_dao') {
       const deck = run.getDeck();
       const n = deck.filter(c => !c.enhancement && !c.ribbonStamp && !c.edition && !c.promotionProgress).length;
-      lines.push(`Unaltered cards: ${n}  \u2192  +${n} mult`);
+      const stacks = spirit.stackCount ?? 1;
+      const mult = 1 + n * 0.1 * stacks;
+      lines.push(`Unaltered in deck: ${n}  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
     } else if (spirit.id === 'legend_chi') {
-      const flow = run.flow;
-      lines.push(`Flow: ${flow.toFixed(2)}  \u2192  \u00D7${flow.toFixed(2)} mult-mult`);
-    } else if (spirit.id === 'legend_gankyil') {
-      lines.push('Auto-captures at 3-stack instead of 4-stack');
+      const stacks = spirit.stackCount ?? 1;
+      const mult = run.flow * stacks;
+      lines.push(`Flow: ${run.flow.toFixed(2)} \u00D7 ${stacks} stack(s)  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
+    } else if (spirit.id === 'legend_tengu') {
+      const stacks = spirit.stackCount ?? 1;
+      const spiritCount = run.spirits.length + run.negativeSpirits.length;
+      const mult = 1 + 0.3 * spiritCount * stacks;
+      lines.push(`Spirits + negatives: ${spiritCount}  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
+    } else if (spirit.id === 'legend_feng_shui') {
+      const stacks = spirit.stackCount ?? 1;
+      const fengShuiSlotCount = run.spirits.filter(s => s.id === 'legend_feng_shui').length;
+      const occupiedNonFengShui = run.spirits.length - fengShuiSlotCount;
+      const emptySlots = run.spiritSlots - occupiedNonFengShui;
+      const mult = 1 + 0.5 * emptySlots * stacks;
+      lines.push(`Empty slots (FS-adjusted): ${emptySlots}  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
     } else if (spirit.id === 'capstone_yinyang') {
       lines.push('Each spirit slot fires twice during scoring');
     } else if (spirit.id === 'capstone_universe') {

@@ -1830,12 +1830,17 @@ export class ShrineScene extends Phaser.Scene {
     btn.on('pointerover', () => btn.setFillStyle(0x2a6a3a));
     btn.on('pointerout',  () => btn.setFillStyle(0x1a4a2a));
     btn.on('pointerdown', () => {
-      // legend_waidan: create a negative copy of a random consumable on shop exit.
-      if (run.legendarySpirits.some(s => s.id === 'legend_waidan')) {
-        const all = [...run._consumables, ...run._negativeConsumables];
-        if (all.length > 0) {
-          const pick = all[Math.floor(Math.random() * all.length)];
-          run.addNegativeConsumable(pick);
+      // legend_waidan: Sacred Grove only — create negative consumable copies per stack.
+      if (this._isGrove) {
+        const waidanStacks = run.spirits
+          .filter(s => s.id === 'legend_waidan')
+          .reduce((sum, s) => sum + (s.stackCount ?? 1), 0);
+        for (let i = 0; i < waidanStacks; i++) {
+          const all = [...run._consumables, ...run._negativeConsumables];
+          if (all.length > 0) {
+            const pick = all[Math.floor(Math.random() * all.length)];
+            run.addNegativeConsumable(pick);
+          }
         }
       }
       logger.logShopExit(run.ki);
