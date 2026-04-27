@@ -63,6 +63,7 @@ import { rollProbability } from "./RNGHook.js";
 import { getCardPoints }  from "./CardMutations.js";
 import logger           from "./GameplayLogger.js";
 import { SPIRIT_CATALOG, getSpiritDef, ANIMAL_SYMBIONT_MAP } from "../data/spirits.js";
+import { getProportionalYakuThreshold } from "../data/yakuThresholds.js";
 
 /** Maps yaku names to card rank categories for Bullseye tracking. */
 const YAKU_RANK = {
@@ -245,8 +246,17 @@ export default class GameRoundManager {
    * Snake consumable modifier applied this round.
    */
   _getCaptureThresholds() {
-    const base = { kasu: 6, tanzaku: 3, tane: 3, hikari: 2 };
-    const result = { ...base };
+    // Proportional baseline from deck composition.
+    const deck = run.getDeck();
+    const deckSize = deck.length;
+    const counts = { bright: 0, animal: 0, ribbon: 0, plain: 0 };
+    for (const c of deck) { if (c.type in counts) counts[c.type]++; }
+    const result = {
+      hikari:  getProportionalYakuThreshold(counts.bright, deckSize),
+      tane:    getProportionalYakuThreshold(counts.animal, deckSize),
+      tanzaku: getProportionalYakuThreshold(counts.ribbon, deckSize),
+      kasu:    getProportionalYakuThreshold(counts.plain,  deckSize),
+    };
     // Snake consumable: lower specific thresholds by the consumed amount.
     if (this._snakeThresholdMods) {
       for (const [key, reduction] of Object.entries(this._snakeThresholdMods)) {
@@ -254,8 +264,14 @@ export default class GameRoundManager {
       }
     }
     // Hexagram modifier — applied per-yaku after snake mods.
+    // TODO(PostD-9a): Hexagram threshold modifiers were designed for fixed thresholds.
+    // Under proportional model, relative impact may shift. Review during balance tuning.
     for (const key of Object.keys(result)) {
       result[key] = applyHook('modifyYakuThreshold', result[key], key, result[key]);
+    }
+    // Floor at 1.
+    for (const key of Object.keys(result)) {
+      result[key] = Math.max(1, result[key]);
     }
     return result;
   }

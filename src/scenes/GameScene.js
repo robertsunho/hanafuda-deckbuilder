@@ -969,6 +969,8 @@ export class GameScene extends Phaser.Scene {
     const TYPE_ORDER   = ['bright', 'animal', 'ribbon', 'plain'];
     const TYPE_SYMBOLS = { bright: '★', animal: '♦', ribbon: '║', plain: '□' };
     const TYPE_COLORS  = { bright: '#ffee88', animal: '#88ccff', ribbon: '#ff8888', plain: '#aaaaaa' };
+    const YAKU_KEY     = { bright: 'hikari', animal: 'tane', ribbon: 'tanzaku', plain: 'kasu' };
+    const thresholds   = this._round._getCaptureThresholds();
 
     // Group by type — exclude spent cards (they appear in the banked pile only).
     const fanCards = capturedCards.filter(c => !spentIds.has(c.id));
@@ -983,10 +985,12 @@ export class GameScene extends Phaser.Scene {
     for (const type of TYPE_ORDER) {
       const cards = byType[type];
 
-      // Type symbol label — between right divider (1036) and first card (CAPTURE_X).
+      // Type symbol + threshold label.
+      const thKey = YAKU_KEY[type];
+      const th = thresholds[thKey] ?? '?';
       this._captureObjs.push(
-        this.add.text(1046, fanY + CAPTURE_CARD_H / 2, TYPE_SYMBOLS[type], {
-          fontSize: '12px', color: TYPE_COLORS[type],
+        this.add.text(1046, fanY + CAPTURE_CARD_H / 2, `${TYPE_SYMBOLS[type]}(${th})`, {
+          fontSize: '11px', color: TYPE_COLORS[type],
         }).setOrigin(0.5, 0.5)
       );
 
