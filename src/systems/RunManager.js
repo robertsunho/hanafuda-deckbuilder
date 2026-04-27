@@ -100,6 +100,8 @@ class RunManager {
     // ── Consumable inventory ─────────────────────────────────────────────────
     /** @type {object[]} */
     this._consumables = [];
+    /** @type {object[]} Negative consumables (slot-free, single-use). */
+    this._negativeConsumables = [];
     /** @type {number} Mutable max consumable slots (hexagram can override). */
     this._maxConsumableSlots = RunManager.MAX_CONSUMABLE_SLOTS;
 
@@ -682,6 +684,33 @@ class RunManager {
     this._consumables.splice(index, 1);
     if (refund > 0) this._ki += refund;
     return { success: true, kiReturned: refund };
+  }
+
+  // ── Negative consumable inventory ──────────────────────────────────────────
+
+  get negativeConsumables() { return [...this._negativeConsumables]; }
+
+  addNegativeConsumable(consumableDef) {
+    this._negativeConsumables.push({ id: consumableDef.id, name: consumableDef.name, description: consumableDef.description, category: consumableDef.category });
+  }
+
+  removeNegativeConsumable(index) {
+    if (index < 0 || index >= this._negativeConsumables.length) return null;
+    return this._negativeConsumables.splice(index, 1)[0];
+  }
+
+  /**
+   * Use a consumable by id, preferring regular inventory, falling back to negatives.
+   * Returns the consumed entry or null if not found.
+   * @param {string} consumableId
+   * @returns {object|null}
+   */
+  consumeById(consumableId) {
+    const regIdx = this._consumables.findIndex(c => c.id === consumableId);
+    if (regIdx !== -1) return this._consumables.splice(regIdx, 1)[0];
+    const negIdx = this._negativeConsumables.findIndex(c => c.id === consumableId);
+    if (negIdx !== -1) return this._negativeConsumables.splice(negIdx, 1)[0];
+    return null;
   }
 
   // ── Run progression ────────────────────────────────────────────────────────

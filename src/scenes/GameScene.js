@@ -851,6 +851,11 @@ export class GameScene extends Phaser.Scene {
         const destroyed = spirit.state?.destroyed ?? 0;
         const mult = 1 + destroyed * 0.3;
         lines.push(`Cards destroyed: ${destroyed}  \u2192  \u00D7${mult.toFixed(2)} mult-mult`);
+      } else if (spirit.id === 'legend_waidan') {
+        lines.push('Creates a negative copy of a random consumable on shop exit');
+      } else if (spirit.id === 'util_festival') {
+        const stacks = spirit.stackCount ?? 1;
+        lines.push(`Generates a colored stamp on each ribbon capture (\u00D7${stacks} per ribbon, slot-gated)`);
       } else if (spirit.id === 'econ_lucky_charm') {
         const stacks = spirit.stackCount ?? 1;
         const bonus = stacks * 15;
@@ -1101,39 +1106,69 @@ export class GameScene extends Phaser.Scene {
 
   _renderConsumables() {
     const consumables = run.consumables;  // packed array, no gaps
+    const negatives   = run.negativeConsumables;
     const idle        = this._round.phase === 'idle' && !this._animating
                           && !this._yakuGuideOpen && !this._captureOverlayOpen
                           && !this._markMode;
 
-    for (let i = 0; i < consumables.length; i++) {
-      const cons     = consumables[i];
-      const selected = this._selectedConsumableIndex === i;
-      const x        = CONS_BASE_X + i * SLOT_FAN_X;
+    // Build unified display list: regular items + deduplicated negative-only items.
+    const regIds = new Set(consumables.map(c => c.id));
+    const negOnlyMap = new Map();
+    for (const nc of negatives) {
+      if (!regIds.has(nc.id)) negOnlyMap.set(nc.id, nc);
+    }
+    const displayList = [
+      ...consumables.map((c, i) => ({ cons: c, regIndex: i, isNegOnly: false })),
+      ...[...negOnlyMap.values()].map(c => ({ cons: c, regIndex: -1, isNegOnly: true })),
+    ];
+
+    for (let di = 0; di < displayList.length; di++) {
+      const { cons, isNegOnly } = displayList[di];
+      const selected = this._selectedConsumableIndex === di;
+      const x        = CONS_BASE_X + di * SLOT_FAN_X;
       const y        = CONS_BASE_Y - (selected ? 15 : 0);
-      const depth    = selected ? 10 : i;  // selected card pops above the stack
+      const depth    = selected ? 10 : di;
 
       const rarityCol = RARITY_COLOR[cons.rarity] ?? RARITY_COLOR.common;
+      const borderCol = isNegOnly ? 0xaa44cc : (selected ? rarityCol : 0x2a3a50);
 
       // Card background.
-      const card = this._addRoundedRect(x, y, CONS_CARD_W, CONS_CARD_H, 6, 0x0d1b2a, 1, selected ? rarityCol : 0x2a3a50, 2)
+      const card = this._addRoundedRect(x, y, CONS_CARD_W, CONS_CARD_H, 6,
+        isNegOnly ? 0x1a0d2a : 0x0d1b2a, 1, borderCol, 2)
         .setDepth(depth);
       this._consumableObjs.push(card);
 
-      // Rarity left-border strip (matches spirit-column style).
+      // Rarity left-border strip.
       this._consumableObjs.push(
-        this.add.rectangle(x - CONS_CARD_W / 2 + 2, y, 4, CONS_CARD_H - 4, rarityCol)
+        this.add.rectangle(x - CONS_CARD_W / 2 + 2, y, 4, CONS_CARD_H - 4,
+          isNegOnly ? 0xaa44cc : rarityCol)
           .setDepth(depth)
       );
 
-      // Name label — centred on card.
+      // Name label.
       this._consumableObjs.push(
-        this.add.text(x, y, cons.name, { fontSize: '11px', color: '#cce0ff' })
+        this.add.text(x, y, cons.name, { fontSize: '11px', color: isNegOnly ? '#ddaaff' : '#cce0ff' })
           .setOrigin(0.5).setDepth(depth + 0.1)
       );
 
-      // Hover tooltip — to the right of the card (into play area).
+      // Negative consumable badge — shows count of negative copies of same ID.
+      const negCount = negatives.filter(c => c.id === cons.id).length;
+      if (negCount > 0) {
+        const bx = x + CONS_CARD_W / 2 - 8;
+        const by = y - CONS_CARD_H / 2 + 8;
+        this._consumableObjs.push(
+          this.add.circle(bx, by, 8, 0xaa44cc).setDepth(depth + 0.2)
+        );
+        this._consumableObjs.push(
+          this.add.text(bx, by, isNegOnly ? `${negCount}` : `+${negCount}`,
+            { fontSize: '9px', color: '#ffffff', fontStyle: 'bold' })
+            .setOrigin(0.5).setDepth(depth + 0.3)
+        );
+      }
+
+      // Hover tooltip.
       const tooltip = this.add.text(
-        x + CONS_CARD_W / 2 + 8, y, cons.description,
+        x + CONS_CARD_W / 2 + 8, y, cons.description ?? cons.id,
         {
           fontSize: '11px', color: '#e8e8e8',
           backgroundColor: '#0a0f1e',
@@ -1153,10 +1188,13 @@ export class GameScene extends Phaser.Scene {
         card.on('pointerout',  () => tooltip.setVisible(false));
         card.on('pointerdown', () => {
           tooltip.setVisible(false);
-          this._toggleConsumableSelection(i);
+          this._toggleConsumableSelection(di);
         });
       }
     }
+
+    // Store display list for activation routing.
+    this._consDisplayList = displayList;
   }
 
   // ── Captured-cards overlay ─────────────────────────────────────────────────
@@ -1311,7 +1349,7 @@ export class GameScene extends Phaser.Scene {
    * targetType: 'slot' (Ox/Monkey) or 'yaku' (Snake).
    * On selection, re-executes the consumable with params and removes it from inventory.
    */
-  _showZodiacTargetPicker(cons, inventoryIndex, targetType) {
+  _showZodiacTargetPicker(cons, targetType) {
     const objs = [];
     const cx = FIELD_CX, cy = 360;
     const W = 400, H = 280;
@@ -1345,7 +1383,7 @@ export class GameScene extends Phaser.Scene {
         btn.on('pointerdown', () => {
           objs.forEach(o => o.destroy());
           const result = this._round.useConsumable(cons, { slotIndex: i });
-          run.useConsumable(inventoryIndex);
+          run.consumeById(cons.id);
           this._setStatus(result.message ?? `Used ${cons.name}.`);
           this._renderAll();
           this._updateInfoTexts();
@@ -1369,7 +1407,7 @@ export class GameScene extends Phaser.Scene {
         btn.on('pointerdown', () => {
           objs.forEach(o => o.destroy());
           const result = this._round.useConsumable(cons, { yakuName });
-          run.useConsumable(inventoryIndex);
+          run.consumeById(cons.id);
           this._setStatus(result.message ?? `Used ${cons.name}.`);
           this._renderAll();
           this._updateInfoTexts();
@@ -1457,7 +1495,8 @@ export class GameScene extends Phaser.Scene {
 
     // ── Use / Activate button (consumable selected) ────────────────────────
     if (idle && this._selectedConsumableIndex !== null) {
-      const cons = run.consumables[this._selectedConsumableIndex];
+      const entry = this._consDisplayList?.[this._selectedConsumableIndex];
+      const cons = entry?.cons;
       if (cons) {
         const y       = 700;
         const isMark    = cons.id && (cons.id.startsWith('mark_') || cons.id.startsWith('element_'));
@@ -1473,15 +1512,14 @@ export class GameScene extends Phaser.Scene {
             this._activateMark(cons, this._selectedConsumableIndex);
             this._selectedConsumableIndex = null;
           } else {
-            const idx = this._selectedConsumableIndex;
             // Check if this consumable needs a target before executing.
             const precheck = this._round.useConsumable(cons, {});
             if (!precheck.success && precheck.needsTarget) {
               this._selectedConsumableIndex = null;
-              this._showZodiacTargetPicker(cons, idx, precheck.needsTarget);
+              this._showZodiacTargetPicker(cons, precheck.needsTarget);
             } else {
               this._selectedConsumableIndex = null;
-              run.useConsumable(idx);
+              run.consumeById(cons.id);
               this._clearObjs(this._consumableObjs);
               this._clearObjs(this._actionBtnObjs);
               if (precheck.revealedCards) {
@@ -1598,12 +1636,12 @@ export class GameScene extends Phaser.Scene {
    */
   _onMarkCardSelected(card) {
     if (!this._markMode) return;
-    const { id, index } = this._markMode;
-    const consName = run.consumables[index]?.name ?? id;
+    const { id } = this._markMode;
+    const consName = id;
 
     if (id === 'mark_impermanence') {
       run.promoteCard(card.id);
-      run.useConsumable(index);
+      run.consumeById(id);
       logger.logConsumableUse(consName, `promoted ${card.id}`);
       this._markMode = null;
       this._setStatus(`Impermanence: ${card.name} promoted.`);
@@ -1613,7 +1651,7 @@ export class GameScene extends Phaser.Scene {
       run.deleteCard(card.id);
       this._round.removeCardFromHand(card.id);
       this._round.removeCardFromField(card.id);
-      run.useConsumable(index);
+      run.consumeById(id);
       logger.logConsumableUse(consName, `deleted ${card.id}`);
       this._markMode = null;
       this._setStatus(`Non-being: ${card.name} removed from your deck.`);
@@ -1640,7 +1678,7 @@ export class GameScene extends Phaser.Scene {
           ? `with ${ENH_NAMES_TR[te.element]?.[te.tier] ?? te.element} enhancement`
           : 'no enhancement';
         run.transcendCard(sourceCard.id, card.id);
-        run.useConsumable(index);
+        run.consumeById(id);
         logger.logConsumableUse(consName, `${sourceCard.id} → ${card.id}`);
         this._markMode = null;
         this._setStatus(`Transcendence: ${sourceCard.name} → copy of ${card.name} (${enhMsg}).`);
@@ -1687,7 +1725,7 @@ export class GameScene extends Phaser.Scene {
         no_effect:    'No effect.',
       };
 
-      run.useConsumable(index);
+      run.consumeById(id);
       logger.logConsumableUse(consName, `${result.action} on ${card.id}`);
       this._markMode = null;
       this._setStatus(ACTION_MSG[result.action] ?? 'Done.');

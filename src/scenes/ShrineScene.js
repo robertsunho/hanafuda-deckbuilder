@@ -1829,7 +1829,18 @@ export class ShrineScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x44aa66).setInteractive({ useHandCursor: true });
     btn.on('pointerover', () => btn.setFillStyle(0x2a6a3a));
     btn.on('pointerout',  () => btn.setFillStyle(0x1a4a2a));
-    btn.on('pointerdown', () => { logger.logShopExit(run.ki); this.scene.start('GameScene'); });
+    btn.on('pointerdown', () => {
+      // legend_waidan: create a negative copy of a random consumable on shop exit.
+      if (run.legendarySpirits.some(s => s.id === 'legend_waidan')) {
+        const all = [...run._consumables, ...run._negativeConsumables];
+        if (all.length > 0) {
+          const pick = all[Math.floor(Math.random() * all.length)];
+          run.addNegativeConsumable(pick);
+        }
+      }
+      logger.logShopExit(run.ki);
+      this.scene.start('GameScene');
+    });
     this.add.text(640, BTN_Y, label, {
       fontSize: '16px', color: '#ffffff', stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5);

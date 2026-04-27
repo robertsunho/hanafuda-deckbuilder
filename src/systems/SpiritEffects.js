@@ -27,6 +27,19 @@
 
 import run from './RunManager.js';
 import { addCardBonusPoints } from './CardMutations.js';
+import { getStampDef } from '../data/stamps.js';
+
+/** Maps ribbon card IDs to the stamp color they generate for Festival. */
+const RIBBON_STAMP_MAP = {
+  // Poetry ribbons → red
+  january_ribbon: 'stamp_red', february_ribbon: 'stamp_red', march_ribbon: 'stamp_red',
+  // Blue ribbons → blue
+  june_ribbon: 'stamp_blue', september_ribbon: 'stamp_blue', october_ribbon: 'stamp_blue',
+  // Plain ribbons → yellow
+  april_ribbon: 'stamp_yellow', may_ribbon: 'stamp_yellow', july_ribbon: 'stamp_yellow',
+  // Special ribbon → white
+  november_ribbon: 'stamp_white',
+};
 
 // ── Factory helpers ───────────────────────────────────────────────────────────
 
@@ -321,7 +334,21 @@ const _effects = {
 
   util_glory:      {},  // bright captured → draw 2 cards
   util_symbiosis:  {},  // animal captured → summon symbiont
-  util_festival:   {},  // ribbon captured → stamp (TBD)
+  util_festival: {
+    onCardScored({ card, spirit }) {
+      if (card.type !== 'ribbon') return null;
+      const stampId = RIBBON_STAMP_MAP[card.id];
+      if (!stampId) return null;
+      const stacks = spirit.stackCount ?? 1;
+      const available = run.maxConsumableSlots - run.consumables.length;
+      const toGen = Math.min(stacks, available);
+      for (let i = 0; i < toGen; i++) {
+        const def = getStampDef(stampId);
+        if (def) run.addConsumable({ id: def.id, name: def.name, description: def.description, category: 'stamp' });
+      }
+      return null;
+    },
+  },
   util_irrigation: {},  // plain captured → +10 pts to running score
 
   // ── Economy Spirits ────────────────────────────────────────────────────────
@@ -933,6 +960,7 @@ const _effects = {
   },
 
   legend_gankyil: {},  // auto-capture at 3-stack — handled in FieldManager
+  legend_waidan:  {},  // shop-exit negative consumable — handled in ShrineScene
 };
 
 // ── Public interface ──────────────────────────────────────────────────────────

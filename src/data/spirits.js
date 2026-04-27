@@ -408,9 +408,9 @@ export const SPIRIT_CATALOG = [
   {
     id:          'util_festival',
     name:        'Festival',
-    description: '(Coming soon) Capturing a ribbon card stamps a bonus.',
+    description: 'Capturing a colored ribbon generates a stamp of that color (per stack, slot-gated).',
     channel:     'utility',
-    cost:        3,
+    cost:        5,
     tier:        1,
     rarity:      'uncommon',
     category:    'utility',
@@ -1094,6 +1094,12 @@ export const SPIRIT_CATALOG = [
     description: 'Auto-capture activates at 3-stack instead of 4-stack.',
     channel: 'utility', cost: 0, tier: 1,
     rarity: 'legendary', category: 'legendary_unique', legendary: true,
+  },
+  {
+    id: 'legend_waidan', name: 'Waidan',
+    description: 'At shop exit, creates a negative copy of a random consumable in inventory.',
+    channel: 'utility', cost: 0, tier: 1,
+    rarity: 'legendary', category: 'legendary_economy', legendary: true,
   },
 ];
 
