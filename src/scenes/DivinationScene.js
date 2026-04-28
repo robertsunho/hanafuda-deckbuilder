@@ -261,27 +261,28 @@ export class DivinationScene extends Phaser.Scene {
       return;
     }
 
-    // Chinese character — large
+    // Chinese character — large, positioned above the hexagram frame
     const charText = this.add.text(CX, 160, hex.chineseCharacter, {
       fontSize: '80px', color: '#e8c96a',
       stroke: '#000000', strokeThickness: 4,
     }).setOrigin(0.5).setAlpha(0);
     this._uiObjs.push(charText);
 
+    // Below the hexagram frame (frame bottom ≈ 420), above Begin Run (620)
     // Pinyin + English name
-    const nameText = this.add.text(CX, 220, `${hex.chineseName}  /  ${hex.englishName}`, {
+    const nameText = this.add.text(CX, 462, `${hex.chineseName}  /  ${hex.englishName}`, {
       fontSize: '18px', color: '#c8d8e8',
     }).setOrigin(0.5).setAlpha(0);
     this._uiObjs.push(nameText);
 
     // Number
-    const numText = this.add.text(CX, 248, `Hexagram #${hex.number}`, {
+    const numText = this.add.text(CX, 490, `Hexagram #${hex.number}`, {
       fontSize: '13px', color: '#667788',
     }).setOrigin(0.5).setAlpha(0);
     this._uiObjs.push(numText);
 
     // Effect description (word-wrapped)
-    const descText = this.add.text(CX, 290, hex.description, {
+    const descText = this.add.text(CX, 516, hex.description, {
       fontSize: '14px', color: '#99aabb',
       wordWrap: { width: 500 },
       align: 'center',
@@ -355,7 +356,7 @@ export class DivinationScene extends Phaser.Scene {
     pickerObjs.push(closeBtn);
 
     // Pagination state
-    const hexagrams = HEXAGRAM_LIST;
+    const hexagrams = [...HEXAGRAM_LIST].sort((a, b) => a.number - b.number);
     const perPage = 16;
     const totalPages = Math.ceil(hexagrams.length / perPage);
     let currentPage = 0;
@@ -387,11 +388,11 @@ export class DivinationScene extends Phaser.Scene {
           fontSize: '28px', color: '#e8c96a',
         }).setDepth(202);
 
-        const nameLabel = this.add.text(x + 44, y + 4, `#${h.number} ${h.englishName}`, {
+        const nameLabel = this.add.text(x + 70, y + 4, `#${h.number} ${h.englishName}`, {
           fontSize: '13px', color: '#c8d8e8',
         }).setDepth(202);
 
-        const effectLabel = this.add.text(x + 44, y + 24, h.effect, {
+        const effectLabel = this.add.text(x + 70, y + 24, h.effect, {
           fontSize: '11px', color: '#667788',
         }).setDepth(202);
 

@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// HexagramCollectionScene — grid of all 64 hexagrams with lock/unlock states
+// HexagramCollectionScene — compact grid of all 64 hexagrams with hover tooltip
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { HEXAGRAM_LIST } from '../data/hexagrams.js';
@@ -9,13 +9,15 @@ const W  = 1280;
 const H  = 720;
 const CX = W / 2;
 
-// Grid layout
-const COLS      = 8;
-const CELL_W    = 130;
-const CELL_H    = 72;
-const GRID_X    = CX - (COLS * CELL_W) / 2 + CELL_W / 2;  // left-align first column
-const GRID_TOP  = 100;
-const PER_PAGE  = 32;  // 4 rows × 8 cols per page
+// Grid layout — 8×8 = 64 tiles, all on one screen
+const COLS     = 8;
+const ROWS     = 8;
+const GRID_W   = 880;
+const GRID_H   = 520;
+const CELL_W   = Math.floor(GRID_W / COLS);
+const CELL_H   = Math.floor(GRID_H / ROWS);
+const GRID_X   = CX - GRID_W / 2 + CELL_W / 2;
+const GRID_TOP = 100;
 
 export class HexagramCollectionScene extends Phaser.Scene {
   constructor() {
@@ -26,10 +28,6 @@ export class HexagramCollectionScene extends Phaser.Scene {
     this._beaten = new Set(
       JSON.parse(localStorage.getItem('hanatu_beaten_hexagrams') || '[]')
     );
-    this._page = 0;
-    this._totalPages = Math.ceil(HEXAGRAM_LIST.length / PER_PAGE);
-    this._gridObjs = [];
-    this._detailObjs = [];
 
     // Background
     this.add.rectangle(CX, H / 2, W, H, 0x060c18);
@@ -41,10 +39,9 @@ export class HexagramCollectionScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Progress counter
-    this._progressText = this.add.text(CX, 62, '', {
+    this.add.text(CX, 64, `Unlocked: ${this._beaten.size} / ${HEXAGRAM_LIST.length}`, {
       fontSize: '13px', color: '#667788',
     }).setOrigin(0.5);
-    this._updateProgress();
 
     // Back button
     const backBtn = this.add.text(30, 26, '< Menu', {
@@ -56,124 +53,98 @@ export class HexagramCollectionScene extends Phaser.Scene {
     backBtn.on('pointerout',  () => backBtn.setStyle({ color: '#88aacc' }));
     backBtn.on('pointerdown', () => this.scene.start('MenuScene'));
 
-    // Pagination controls (persistent)
-    this._pageText = this.add.text(CX, H - 30, '', {
-      fontSize: '13px', color: '#667788',
-    }).setOrigin(0.5);
+    // Hover tooltip panel — fixed at bottom
+    const panelY = H - 50;
+    this._infoBg = this.add.rectangle(CX, panelY, 860, 70, 0x0a0f1e, 0.92)
+      .setStrokeStyle(1, 0x2a3a50).setVisible(false);
+    this._infoLabel = this.add.text(CX, panelY - 14, '', {
+      fontSize: '14px', color: '#cce0ff', fontStyle: 'bold',
+    }).setOrigin(0.5).setVisible(false);
+    this._infoDesc = this.add.text(CX, panelY + 10, '', {
+      fontSize: '12px', color: '#99aabb',
+      wordWrap: { width: 820 }, align: 'center',
+    }).setOrigin(0.5, 0).setVisible(false);
 
-    this._prevBtn = this.add.text(CX - 100, H - 30, '< Prev', {
-      fontSize: '13px', color: '#88aacc',
-      backgroundColor: '#1a2a3a', padding: { x: 8, y: 3 },
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    this._prevBtn.on('pointerdown', () => { this._page--; this._renderGrid(); });
+    // Render all 64 tiles sorted by number
+    const sorted = [...HEXAGRAM_LIST].sort((a, b) => a.number - b.number);
 
-    this._nextBtn = this.add.text(CX + 100, H - 30, 'Next >', {
-      fontSize: '13px', color: '#88aacc',
-      backgroundColor: '#1a2a3a', padding: { x: 8, y: 3 },
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    this._nextBtn.on('pointerdown', () => { this._page++; this._renderGrid(); });
-
-    this._renderGrid();
-  }
-
-  _updateProgress() {
-    this._progressText.setText(
-      `Unlocked: ${this._beaten.size} / ${HEXAGRAM_LIST.length}`
-    );
-  }
-
-  // ── Grid rendering ──────────────────────────────────────────────────────
-  _renderGrid() {
-    this._gridObjs.forEach(o => o.destroy());
-    this._gridObjs.length = 0;
-
-    const start = this._page * PER_PAGE;
-    const end   = Math.min(start + PER_PAGE, HEXAGRAM_LIST.length);
-
-    for (let idx = start; idx < end; idx++) {
-      const hex    = HEXAGRAM_LIST[idx];
-      const local  = idx - start;
-      const col    = local % COLS;
-      const row    = Math.floor(local / COLS);
-      const x      = GRID_X + col * CELL_W;
-      const y      = GRID_TOP + row * CELL_H;
+    for (let i = 0; i < sorted.length; i++) {
+      const hex = sorted[i];
+      const col = i % COLS;
+      const row = Math.floor(i / COLS);
+      const x   = GRID_X + col * CELL_W;
+      const y   = GRID_TOP + row * CELL_H;
       const unlocked = this._beaten.has(hex.id);
 
-      // Cell background
-      const bg = this.add.rectangle(x, y, CELL_W - 6, CELL_H - 4,
-        unlocked ? 0x1a2a3a : 0x0e1520
-      ).setStrokeStyle(1, unlocked ? 0x3a5a7a : 0x1a2a3a);
-      this._gridObjs.push(bg);
+      const bgColor  = unlocked ? 0x1a2a3a : 0x0e1520;
+      const bdrColor = unlocked ? 0x3a5a7a : 0x1a2a3a;
 
+      const bg = this.add.rectangle(x, y, CELL_W - 4, CELL_H - 4, bgColor)
+        .setStrokeStyle(1, bdrColor);
+
+      // Number — top-left corner
+      this.add.text(x - CELL_W / 2 + 6, y - CELL_H / 2 + 4, `${hex.number}`, {
+        fontSize: '9px', color: unlocked ? '#667788' : '#334455',
+      }).setOrigin(0, 0);
+
+      // Chinese character(s) — centered, large
+      this.add.text(x, y + 2, unlocked ? hex.chineseCharacter : '?', {
+        fontSize: '26px', color: unlocked ? '#e8c96a' : '#334455',
+        fontStyle: 'bold',
+      }).setOrigin(0.5);
+
+      // Interaction
+      bg.setInteractive({ useHandCursor: unlocked });
+      bg.on('pointerover', () => {
+        bg.setFillStyle(unlocked ? 0x2a4a5a : 0x151e28);
+        this._showInfo(hex, unlocked);
+      });
+      bg.on('pointerout', () => {
+        bg.setFillStyle(bgColor);
+        this._hideInfo();
+      });
       if (unlocked) {
-        // Chinese character
-        this._gridObjs.push(
-          this.add.text(x - CELL_W / 2 + 10, y - 10, hex.chineseCharacter, {
-            fontSize: '26px', color: '#e8c96a',
-          }).setOrigin(0, 0.5)
-        );
-
-        // Name + number
-        this._gridObjs.push(
-          this.add.text(x - CELL_W / 2 + 42, y - 14, `#${hex.number}`, {
-            fontSize: '10px', color: '#556677',
-          }).setOrigin(0, 0.5)
-        );
-        this._gridObjs.push(
-          this.add.text(x - CELL_W / 2 + 42, y + 2, hex.englishName, {
-            fontSize: '11px', color: '#aabbcc',
-            wordWrap: { width: CELL_W - 52 },
-          }).setOrigin(0, 0.5)
-        );
-
-        // Category tag
-        this._gridObjs.push(
-          this.add.text(x + CELL_W / 2 - 8, y + CELL_H / 2 - 10,
-            hex.category.replace(/_/g, ' '), {
-            fontSize: '8px', color: '#445566',
-          }).setOrigin(1, 1)
-        );
-
-        // Interactive — open detail
-        bg.setInteractive({ useHandCursor: true });
-        bg.on('pointerover', () => bg.setFillStyle(0x2a4a5a));
-        bg.on('pointerout',  () => bg.setFillStyle(0x1a2a3a));
         bg.on('pointerdown', () => this._showDetail(hex));
-      } else {
-        // Locked appearance
-        this._gridObjs.push(
-          this.add.text(x, y - 6, '?', {
-            fontSize: '22px', color: '#223344',
-          }).setOrigin(0.5)
-        );
-        this._gridObjs.push(
-          this.add.text(x, y + 14, `#${hex.number}`, {
-            fontSize: '10px', color: '#223344',
-          }).setOrigin(0.5)
-        );
       }
     }
-
-    // Update pagination visibility
-    this._pageText.setText(`${this._page + 1} / ${this._totalPages}`);
-    this._prevBtn.setVisible(this._page > 0);
-    this._nextBtn.setVisible(this._page < this._totalPages - 1);
   }
 
-  // ── Detail panel ────────────────────────────────────────────────────────
+  _showInfo(hex, unlocked) {
+    if (unlocked) {
+      this._infoLabel.setText(`#${hex.number} \u2014 ${hex.chineseCharacter} (${hex.chineseName}) \u2014 ${hex.englishName}`);
+      this._infoDesc.setText(hex.description);
+    } else {
+      this._infoLabel.setText(`#${hex.number} \u2014 ??? (Locked)`);
+      this._infoDesc.setText('Complete a run with this hexagram to unlock.');
+    }
+    this._infoBg.setVisible(true);
+    this._infoLabel.setVisible(true);
+    this._infoDesc.setVisible(true);
+  }
+
+  _hideInfo() {
+    this._infoBg.setVisible(false);
+    this._infoLabel.setVisible(false);
+    this._infoDesc.setVisible(false);
+  }
+
+  // ── Detail panel (click to open) ──────────────────────────────────────────
+
   _showDetail(hex) {
-    this._clearDetail();
+    if (this._detailObjs) this._clearDetail();
+    this._detailObjs = [];
 
     // Overlay
     const overlay = this.add.rectangle(CX, H / 2, W, H, 0x000000, 0.88)
       .setDepth(100).setInteractive();
     this._detailObjs.push(overlay);
 
-    // Panel background
+    // Panel
     const pw = 520, ph = 400;
-    const panel = this.add.rectangle(CX, H / 2, pw, ph, 0x0d1b2a)
-      .setStrokeStyle(2, 0x3a5a7a).setDepth(101);
-    this._detailObjs.push(panel);
+    this._detailObjs.push(
+      this.add.rectangle(CX, H / 2, pw, ph, 0x0d1b2a)
+        .setStrokeStyle(2, 0x3a5a7a).setDepth(101)
+    );
 
     // Chinese character
     this._detailObjs.push(
@@ -185,16 +156,14 @@ export class HexagramCollectionScene extends Phaser.Scene {
 
     // Pinyin / English name
     this._detailObjs.push(
-      this.add.text(CX, H / 2 - 70,
-        `${hex.chineseName}  /  ${hex.englishName}`, {
+      this.add.text(CX, H / 2 - 70, `${hex.chineseName}  /  ${hex.englishName}`, {
         fontSize: '18px', color: '#c8d8e8',
       }).setOrigin(0.5).setDepth(102)
     );
 
     // Number + category
     this._detailObjs.push(
-      this.add.text(CX, H / 2 - 44,
-        `#${hex.number}  —  ${hex.category.replace(/_/g, ' ')}`, {
+      this.add.text(CX, H / 2 - 44, `#${hex.number}  \u2014  ${hex.category.replace(/_/g, ' ')}`, {
         fontSize: '12px', color: '#556677',
       }).setOrigin(0.5).setDepth(102)
     );
@@ -203,8 +172,7 @@ export class HexagramCollectionScene extends Phaser.Scene {
     this._detailObjs.push(
       this.add.text(CX, H / 2 - 10, hex.description, {
         fontSize: '14px', color: '#99aabb',
-        wordWrap: { width: pw - 60 },
-        align: 'center',
+        wordWrap: { width: pw - 60 }, align: 'center',
       }).setOrigin(0.5, 0).setDepth(102)
     );
 
@@ -244,7 +212,9 @@ export class HexagramCollectionScene extends Phaser.Scene {
   }
 
   _clearDetail() {
-    this._detailObjs.forEach(o => o.destroy());
-    this._detailObjs.length = 0;
+    if (this._detailObjs) {
+      this._detailObjs.forEach(o => o.destroy());
+      this._detailObjs = null;
+    }
   }
 }
