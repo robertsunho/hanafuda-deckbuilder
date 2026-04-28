@@ -266,6 +266,17 @@ export class GameScene extends Phaser.Scene {
     infoY += 18;
     this._blessingText = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#bb99dd' });
 
+    // ── Options button ──────────────────────────────────────────────────
+    {
+      const optBtn = this.add.text(INFO_X, infoY + 22, '\u2699 Options', {
+        fontSize: '12px', color: '#889aaa',
+        backgroundColor: '#0e1520', padding: { x: 6, y: 3 },
+      }).setInteractive({ useHandCursor: true });
+      optBtn.on('pointerover', () => optBtn.setStyle({ color: '#ccddee' }));
+      optBtn.on('pointerout',  () => optBtn.setStyle({ color: '#889aaa' }));
+      optBtn.on('pointerdown', () => this._openOptionsPopup());
+    }
+
     // ── Dev mode indicator ──────────────────────────────────────────────
     if (run.devMode) {
       this.add.text(1270, 10, 'DEV', {
@@ -2934,5 +2945,102 @@ export class GameScene extends Phaser.Scene {
   _hideCardTooltip() {
     this._cardTooltipBg?.setVisible(false);
     this._cardTooltipText?.setVisible(false);
+  }
+
+  // ── Options popup ─────────────────────────────────────────────────────────
+
+  _openOptionsPopup() {
+    if (this._optionsObjs) return;
+    this._optionsObjs = [];
+
+    const cx = 640, cy = 360;
+
+    const overlay = this.add.rectangle(cx, cy, 1280, 720, 0x000000, 0.7)
+      .setDepth(200).setInteractive();
+    this._optionsObjs.push(overlay);
+
+    const panel = this.add.rectangle(cx, cy, 360, 260, 0x0d1b2a)
+      .setStrokeStyle(2, 0x4a6a8a).setDepth(201);
+    this._optionsObjs.push(panel);
+
+    this._optionsObjs.push(
+      this.add.text(cx, cy - 100, 'Options', {
+        fontSize: '20px', color: '#c8d8e8', fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(202)
+    );
+
+    const closeAll = () => {
+      this._optionsObjs.forEach(o => o.destroy());
+      this._optionsObjs = null;
+    };
+
+    // Copy Playtest Log
+    this._optionsObjs.push(...this._makePopupBtn(cx, cy - 40, 'Copy Playtest Log', () => {
+      logger.copyToClipboard().then(ok => {
+        closeAll();
+        this._showToast(ok ? 'Playtest log copied to clipboard' : 'Copy failed — see console');
+      });
+    }));
+
+    // Return to Main Menu
+    this._optionsObjs.push(...this._makePopupBtn(cx, cy + 20, 'Return to Main Menu', () => {
+      closeAll();
+      this._showForfeitConfirm();
+    }));
+
+    // Close
+    this._optionsObjs.push(...this._makePopupBtn(cx, cy + 80, 'Close', closeAll));
+
+    overlay.on('pointerdown', closeAll);
+  }
+
+  _showForfeitConfirm() {
+    const objs = [];
+    const cx = 640, cy = 360;
+
+    const overlay = this.add.rectangle(cx, cy, 1280, 720, 0x000000, 0.85)
+      .setDepth(210).setInteractive();
+    objs.push(overlay);
+
+    objs.push(this.add.rectangle(cx, cy, 420, 200, 0x2a1a1a)
+      .setStrokeStyle(2, 0xaa4444).setDepth(211));
+
+    objs.push(this.add.text(cx, cy - 65, 'Forfeit Run?', {
+      fontSize: '18px', color: '#ff8888', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(212));
+
+    objs.push(this.add.text(cx, cy - 20, 'This will end your current run.\nProgress will not be saved.', {
+      fontSize: '13px', color: '#ddcccc', align: 'center',
+    }).setOrigin(0.5).setDepth(212));
+
+    const closeAll = () => objs.forEach(o => o.destroy());
+
+    objs.push(...this._makePopupBtn(cx - 80, cy + 55, 'Cancel', closeAll, 0x1a2a3a, 0x3a5a7a));
+    objs.push(...this._makePopupBtn(cx + 80, cy + 55, 'Forfeit', () => {
+      closeAll();
+      logger.logRunEnd('forfeit', run.round);
+      this.scene.start('MenuScene');
+    }, 0x3a1a1a, 0xaa4444));
+  }
+
+  _makePopupBtn(x, y, label, onClick, bg = 0x1a3050, border = 0x4a6a8a) {
+    const btn = this.add.rectangle(x, y, 240, 36, bg)
+      .setStrokeStyle(1, border).setDepth(202)
+      .setInteractive({ useHandCursor: true });
+    const txt = this.add.text(x, y, label, {
+      fontSize: '14px', color: '#c8d8e8',
+    }).setOrigin(0.5).setDepth(203);
+    btn.on('pointerover', () => btn.setFillStyle(bg + 0x101010));
+    btn.on('pointerout',  () => btn.setFillStyle(bg));
+    btn.on('pointerdown', onClick);
+    return [btn, txt];
+  }
+
+  _showToast(message) {
+    const toast = this.add.text(640, 620, message, {
+      fontSize: '14px', color: '#ffffff',
+      backgroundColor: '#0a0f1e', padding: { x: 12, y: 8 },
+    }).setOrigin(0.5).setDepth(300);
+    this.time.delayedCall(2000, () => toast.destroy());
   }
 }

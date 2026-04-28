@@ -494,6 +494,13 @@ export default class GameRoundManager {
     // Peek at next deck card if reveal hexagram is active.
     this._peekNextDeckFlip();
 
+    // Log yaku thresholds at round start.
+    const _thresholds = this._getCaptureThresholds();
+    const _deck = run.getDeck();
+    const _comp = { bright: 0, animal: 0, ribbon: 0, plain: 0, total: _deck.length };
+    for (const c of _deck) { if (c.type in _comp) _comp[c.type]++; }
+    logger.logYakuThresholds(_thresholds, _comp);
+
     return this;
   }
 
@@ -1916,6 +1923,9 @@ export default class GameRoundManager {
       if (_disablesYaku) newYaku.length = 0;
       this._yakuBeforeTurn = new Map(yakuFromUnspent.map(y => [y.name, y.bonus]));
       logger.logYakuState(yakuFromUnspent, newYaku);
+      for (const y of newYaku) {
+        logger.logYakuAchieved(y.name, y.count, y.threshold);
+      }
 
       if (newYaku.length > 0) this._pushPenaltyActive = false;
 

@@ -1839,7 +1839,7 @@ export class ShrineScene extends Phaser.Scene {
           const all = [...run._consumables, ...run._negativeConsumables];
           if (all.length > 0) {
             const pick = all[Math.floor(Math.random() * all.length)];
-            run.addNegativeConsumable(pick);
+            run.addNegativeConsumable(pick, 'Waidan Sacred Grove exit');
           }
         }
       }

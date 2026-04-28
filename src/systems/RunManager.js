@@ -212,8 +212,10 @@ class RunManager {
    * Add ki to the balance.
    * @param {number} amount  Must be a positive integer.
    */
-  addKi(amount) {
+  addKi(amount, reason = 'unspecified') {
+    if (amount <= 0) return;
     this._ki += amount;
+    logger.logKiChange(amount, reason, this._ki);
   }
 
   /**
@@ -221,11 +223,12 @@ class RunManager {
    * @param {number} amount
    * @throws {Error} if the balance would go negative.
    */
-  spendKi(amount) {
+  spendKi(amount, reason = 'unspecified') {
     if (amount > this._ki) {
       throw new Error(`Cannot spend ${amount} ki — balance is only ${this._ki}.`);
     }
     this._ki -= amount;
+    if (amount > 0) logger.logKiChange(-amount, reason, this._ki);
   }
 
   // ── Hexagram ───────────────────────────────────────────────────────────────
@@ -316,9 +319,11 @@ class RunManager {
           id: spiritDef.id, name: spiritDef.name,
           stackCount: snapshotStacks, isNegative: true, state: existing.state ?? null,
         });
+        logger.logSpiritTranscended(spiritDef.name);
         return { success: true, result: 'transcended' };
       }
 
+      logger.logSpiritStacked(spiritDef.name, existing.stackCount);
       return { success: true, result: 'stacked' };
     }
 
@@ -649,6 +654,7 @@ class RunManager {
     if (!def) return;
     if (this._blessings.some(b => b.id === def.id)) return;
     this._blessings.push({ id: def.id, name: def.name, tier: def.tier, effect: def.effect });
+    logger.logBlessingObtained(def.id, def.name, def.tier);
   }
 
   hasBlessing(id) {
@@ -729,6 +735,7 @@ class RunManager {
     const refund = def ? Math.floor(def.cost / 2) : 0;
     this._consumables.splice(index, 1);
     if (refund > 0) this._ki += refund;
+    logger.logConsumableSold(cons.name ?? cons.id, refund);
     return { success: true, kiReturned: refund };
   }
 
@@ -736,8 +743,9 @@ class RunManager {
 
   get negativeConsumables() { return [...this._negativeConsumables]; }
 
-  addNegativeConsumable(consumableDef) {
+  addNegativeConsumable(consumableDef, source = 'unspecified') {
     this._negativeConsumables.push({ id: consumableDef.id, name: consumableDef.name, description: consumableDef.description, category: consumableDef.category });
+    logger.logNegativeConsumableObtained(consumableDef.name ?? consumableDef.id, source);
   }
 
   removeNegativeConsumable(index) {
@@ -818,7 +826,9 @@ class RunManager {
     const time = this._legendarySpirits.some(s => s.id === 'capstone_time');
     const base = time ? 1.3 : 1.1;
     const mult = applyHook('modifyPushSuccess', base, base);
+    const oldFlow = this._flow;
     this._flow *= mult;
+    logger.logFlowChange(oldFlow, this._flow, 'push success');
     const effect = getActiveEffect();
     if (effect?.onPushSuccess) effect.onPushSuccess(this);
   }
@@ -831,7 +841,9 @@ class RunManager {
     const time = this._legendarySpirits.some(s => s.id === 'capstone_time');
     const base = time ? 0.95 : 0.9;
     const mult = applyHook('modifyPushFailure', base, base);
+    const oldFlow = this._flow;
     this._flow *= mult;
+    logger.logFlowChange(oldFlow, this._flow, 'push failure');
     const effect = getActiveEffect();
     if (effect?.onPushFailure) effect.onPushFailure(this);
   }
@@ -844,7 +856,9 @@ class RunManager {
     const time = this._legendarySpirits.some(s => s.id === 'capstone_time');
     const base = time ? 0.98 : RunManager.FLOW_DECAY_RATE;
     const rate = applyHook('modifyFlowDecay', base, base);
+    const oldFlow = this._flow;
     this._flow *= rate;
+    logger.logFlowChange(oldFlow, this._flow, 'round decay');
   }
 
   /**
@@ -857,7 +871,9 @@ class RunManager {
     if (this._triggeredCombos.has(comboId)) return false;
     this._triggeredCombos.add(comboId);
     const flowBonus = applyHook('modifyStyleFlow', comboValue, comboValue);
+    const oldFlow = this._flow;
     this._flow += flowBonus;
+    logger.logFlowChange(oldFlow, this._flow, `style combo: ${comboId}`);
     return true;
   }
 
@@ -1052,6 +1068,7 @@ class RunManager {
       const card = this._deck[idx];
       // Fire card-destroyed event BEFORE removal so handlers can inspect card.
       this._fireCardDestroyedEvent(card);
+      logger.logCardDestroyed(card.name ?? card.id, 'deleteCard');
       this._deck.splice(idx, 1);
       this._notifyBadger();
     }
@@ -1121,6 +1138,7 @@ class RunManager {
       shopPurchased: true,
     };
     this._deck.push(newCard);
+    logger.logCardAdded(newCard.name ?? newCard.id, 'shop purchase');
     // engine_palace: increment counter when a card is added to the deck.
     for (const spirit of this._spirits) {
       if (spirit.id === 'engine_palace' && spirit.state) spirit.state.cardsAdded++;
@@ -1386,6 +1404,7 @@ class RunManager {
     if (this._ki < cost) return { success: false, reason: 'Not enough ki' };
     this._ki -= cost;
     card.ribbonStamp = stampId;
+    logger.logCardStamped(card.name ?? card.id, stampId);
     this._notifyBadger();
     return { success: true };
   }

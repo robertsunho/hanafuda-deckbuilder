@@ -294,6 +294,103 @@ class GameplayLogger {
     }
   }
 
+  // ── Spirit lifecycle ──────────────────────────────────────────────────
+
+  logSpiritSold(spiritName, kiReturned, slotIndex) {
+    this._log(`  [SPIRIT SOLD] ${spiritName} from slot ${slotIndex} (+${kiReturned} ki)`);
+  }
+
+  logSpiritStacked(spiritName, newStackCount) {
+    this._log(`  [SPIRIT STACKED] ${spiritName} → stack ${newStackCount}`);
+  }
+
+  logSpiritTranscended(spiritName) {
+    this._log(`  [SPIRIT TRANSCENDED] ${spiritName} → negative copy`);
+  }
+
+  // ── Blessings ───────────────────────────────────────────────────────────
+
+  logBlessingObtained(blessingId, blessingName, tier) {
+    this._log(`  [BLESSING] ${blessingName} (Tier ${tier}, ${blessingId})`);
+  }
+
+  // ── Consumable lifecycle ────────────────────────────────────────────────
+
+  logConsumableSold(consumableName, kiReturned) {
+    this._log(`  [CONSUMABLE SOLD] ${consumableName} (+${kiReturned} ki)`);
+  }
+
+  logNegativeConsumableObtained(consumableName, source) {
+    this._log(`  [NEG CONSUMABLE] ${consumableName} (${source})`);
+  }
+
+  // ── Ki transactions ─────────────────────────────────────────────────────
+
+  logKiChange(delta, reason, newBalance) {
+    const sign = delta >= 0 ? '+' : '';
+    this._log(`  [KI] ${sign}${delta} (${reason}) → ${newBalance}`);
+  }
+
+  // ── Flow changes ────────────────────────────────────────────────────────
+
+  logFlowChange(oldValue, newValue, reason) {
+    const delta = (newValue - oldValue).toFixed(3);
+    const sign = parseFloat(delta) >= 0 ? '+' : '';
+    this._log(`  [FLOW] ${oldValue.toFixed(3)} → ${newValue.toFixed(3)} (${sign}${delta}, ${reason})`);
+  }
+
+  // ── Shop offerings ──────────────────────────────────────────────────────
+
+  logShopOfferings(sections) {
+    this._log('  Shop offerings:');
+    for (const section of sections) {
+      if (!section.items || section.items.length === 0) continue;
+      this._log(`    ${section.name}: ${section.items.map(i => `${i.name ?? i.id}(${i.cost ?? '?'}ki)`).join(', ')}`);
+    }
+  }
+
+  // ── Card lifecycle ──────────────────────────────────────────────────────
+
+  logCardEnhanced(cardName, element, tier) {
+    this._log(`  [CARD ENHANCED] ${cardName} → ${tier} ${element}`);
+  }
+
+  logCardStamped(cardName, stampId) {
+    this._log(`  [CARD STAMPED] ${cardName} → ${stampId}`);
+  }
+
+  logCardEditionApplied(cardName, edition) {
+    this._log(`  [CARD EDITION] ${cardName} → ${edition}`);
+  }
+
+  logCardDestroyed(cardName, reason) {
+    this._log(`  [CARD DESTROYED] ${cardName} (${reason})`);
+  }
+
+  logCardAdded(cardName, source) {
+    this._log(`  [CARD ADDED] ${cardName} (${source})`);
+  }
+
+  logCardTranscended(sourceName, targetName) {
+    this._log(`  [CARD TRANSCENDED] ${sourceName} → copy of ${targetName}`);
+  }
+
+  // ── Yaku thresholds ─────────────────────────────────────────────────────
+
+  logYakuThresholds(thresholds, deckComp) {
+    this._log(`  [THRESHOLDS] ★(${thresholds.hikari}) ♦(${thresholds.tane}) ║(${thresholds.tanzaku}) □(${thresholds.kasu}) — deck: ${deckComp.bright}B ${deckComp.animal}A ${deckComp.ribbon}R ${deckComp.plain}P (${deckComp.total})`);
+  }
+
+  logYakuAchieved(yakuName, count, threshold) {
+    this._log(`  [YAKU ACHIEVED] ${yakuName}: ${count} captured (threshold ${threshold})`);
+  }
+
+  // ── Style hand ──────────────────────────────────────────────────────────
+
+  logStyleHandAchieved(comboName) {
+    this._log(`  [STYLE HAND] ${comboName}`);
+  }
+
   // ── Helpers ─────────────────────────────────────────────────────────────
 
   _cardLabel(card) {
