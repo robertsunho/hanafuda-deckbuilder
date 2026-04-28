@@ -122,7 +122,7 @@ export class ShrineScene extends Phaser.Scene {
     this._shopTooltip  = null;
     this._selectedItem = null;
     this._rerollCount  = 0;
-    this._rerollCost   = applyHook('modifyRerollCost', 3, 3, this._rerollCount);
+    this._rerollCost   = run.getEffectiveCost(applyHook('modifyRerollCost', 3, 3, this._rerollCount));
     this._buildUI();
   }
 
@@ -762,7 +762,7 @@ export class ShrineScene extends Phaser.Scene {
           run.spendKi(this._rerollCost);
           this._rerollCount++;
           const baseCost = 3 + this._rerollCount * 2;
-          this._rerollCost = applyHook('modifyRerollCost', baseCost, baseCost, this._rerollCount);
+          this._rerollCost = run.getEffectiveCost(applyHook('modifyRerollCost', baseCost, baseCost, this._rerollCount));
         }
         const _shopBonusReroll = run.countBlessingsByEffect('plus_shop_offering');
         const baseIc = (this._isGrove ? 4 : 2) + _shopBonusReroll;
@@ -862,10 +862,10 @@ export class ShrineScene extends Phaser.Scene {
 
   _getItemCost(offering, category) {
     if (!offering) return 0;
-    if (category === 'spirit' && offering.legendary) return RunManager.LEGENDARY_PURCHASE_COST;
-    return category === 'card'
-      ? this._price(offering.price)
-      : this._price(offering.cost ?? 0);
+    let base;
+    if (category === 'spirit' && offering.legendary) base = RunManager.LEGENDARY_PURCHASE_COST;
+    else base = category === 'card' ? this._price(offering.price) : this._price(offering.cost ?? 0);
+    return run.getEffectiveCost(base);
   }
 
   _canBuyItem(offering, category) {
@@ -887,7 +887,7 @@ export class ShrineScene extends Phaser.Scene {
 
       case 'spirit': {
         if (offering.legendary) {
-          const cost = RunManager.LEGENDARY_PURCHASE_COST;
+          const cost = run.getEffectiveCost(RunManager.LEGENDARY_PURCHASE_COST);
           if (run.ki < cost) break;
           const result = run.addLegendarySpirit(offering);
           if (result.success) {
@@ -1428,7 +1428,7 @@ export class ShrineScene extends Phaser.Scene {
   // ── Buy consumable → use-or-carry ─────────────────────────────────────────
 
   _buyConsumable(markDef) {
-    const pCost = this._price(markDef.cost);
+    const pCost = run.getEffectiveCost(this._price(markDef.cost));
     if (run.ki < pCost) return;
     run.spendKi(pCost);
     logger.logShopPurchase('consumable', markDef.name, pCost);

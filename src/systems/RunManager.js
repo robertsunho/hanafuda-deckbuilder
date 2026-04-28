@@ -84,6 +84,9 @@ class RunManager {
    * Call this before starting a new run so no stale data carries over.
    */
   reset() {
+    // ── Dev mode ───────────────────────────────────────────────────────────
+    this._devMode = false;
+
     // ── Ki economy ───────────────────────────────────────────────────────────
     /** @type {number} */
     this._ki = 0;
@@ -191,6 +194,19 @@ class RunManager {
   get styleBase() { return this._styleBase; }
   /** The current flow multiplier — applied to every capture score. */
   get flow()      { return this._flow; }
+  get devMode()   { return this._devMode; }
+
+  /** Compute effective ki cost (0 in dev mode). */
+  getEffectiveCost(baseCost) {
+    return this._devMode ? 0 : baseCost;
+  }
+
+  /** Start a new run in dev mode (free shop, 999 ki). */
+  startDevModeRun() {
+    this.reset();
+    this._devMode = true;
+    this._ki = 999;
+  }
 
   /**
    * Add ki to the balance.
@@ -227,6 +243,8 @@ class RunManager {
     this._hexagramState = null;
     const effect = getActiveEffect();
     if (effect?.onRunStart) effect.onRunStart(this);
+    // Dev mode: restore 999 ki after hexagram onRunStart may have overridden it.
+    if (this._devMode) this._ki = 999;
     this._applyHexagramDeckModification();
   }
 
@@ -272,7 +290,8 @@ class RunManager {
    * @returns {{ success: boolean, reason?: string }}
    */
   buySpirit(spiritDef) {
-    if (this._ki < spiritDef.cost) return { success: false, reason: 'Not enough ki' };
+    const cost = this.getEffectiveCost(spiritDef.cost);
+    if (this._ki < cost) return { success: false, reason: 'Not enough ki' };
 
     // Check if we already own a regular (non-negative) copy.
     const existing = this._spirits.find(s => s.id === spiritDef.id && !s.isNegative);
@@ -284,7 +303,7 @@ class RunManager {
         return { success: false, reason: 'Maximum spirit copies reached' };
       }
 
-      this._ki -= spiritDef.cost;
+      this._ki -= cost;
       existing.stackCount = (existing.stackCount ?? 1) + 1;
 
       if (existing.stackCount >= 4) {
@@ -691,8 +710,9 @@ class RunManager {
     if (!this.canAddConsumable) return { success: false, reason: 'Consumable inventory full' };
     const def = getZodiacDef(consumableId);
     if (!def) return { success: false, reason: 'Unknown consumable' };
-    if (this._ki < def.cost) return { success: false, reason: 'Not enough ki' };
-    this._ki -= def.cost;
+    const cost = this.getEffectiveCost(def.cost);
+    if (this._ki < cost) return { success: false, reason: 'Not enough ki' };
+    this._ki -= cost;
     this._consumables.push({ id: def.id, name: def.name, description: def.description, category: def.category });
     return { success: true };
   }
@@ -965,10 +985,11 @@ class RunManager {
     if (!(yakuId in this._yakuUpgrades)) {
       throw new Error(`Unknown yaku upgrade id: ${yakuId}`);
     }
-    if (this._ki < 5) {
+    const cost = this.getEffectiveCost(5);
+    if (this._ki < cost) {
       throw new Error('Not enough ki to buy a yaku upgrade (costs 5).');
     }
-    this._ki -= 5;
+    this._ki -= cost;
     this._yakuUpgrades[yakuId]++;
   }
 
@@ -1090,8 +1111,9 @@ class RunManager {
    * @returns {{ success: boolean, reason?: string, card?: object }}
    */
   buyCard(cardData, price) {
-    if (this._ki < price) return { success: false, reason: 'Not enough ki' };
-    this._ki -= price;
+    const cost = this.getEffectiveCost(price);
+    if (this._ki < cost) return { success: false, reason: 'Not enough ki' };
+    this._ki -= cost;
     const suffix  = `_shop_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const newCard = {
       ...JSON.parse(JSON.stringify(cardData)),
@@ -1360,8 +1382,9 @@ class RunManager {
     if (!card) return { success: false, reason: 'Card not found' };
     const stampDef = getStampDef(stampId);
     if (!stampDef) return { success: false, reason: 'Unknown stamp type' };
-    if (this._ki < stampDef.cost) return { success: false, reason: 'Not enough ki' };
-    this._ki -= stampDef.cost;
+    const cost = this.getEffectiveCost(stampDef.cost);
+    if (this._ki < cost) return { success: false, reason: 'Not enough ki' };
+    this._ki -= cost;
     card.ribbonStamp = stampId;
     this._notifyBadger();
     return { success: true };

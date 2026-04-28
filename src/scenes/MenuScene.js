@@ -37,6 +37,9 @@ export class MenuScene extends Phaser.Scene {
     this._makeButton(CX, btnY, 'New Run', () => this._startNewRun());
     btnY += 70;
 
+    this._makeButton(CX, btnY, 'Dev Mode', () => this._startDevRun(), { color: '#ff8844', bg: 0x3a2010, border: 0x8a5a2a });
+    btnY += 70;
+
     // Hexagram Collection — visible only if player has beaten at least one
     const beaten = JSON.parse(localStorage.getItem('hanatu_beaten_hexagrams') || '[]');
     if (beaten.length > 0) {
@@ -52,6 +55,11 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5);
   }
 
+  _startDevRun() {
+    run.startDevModeRun();
+    this.scene.start('DivinationScene');
+  }
+
   _startNewRun() {
     run.reset();
 
@@ -65,20 +73,23 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  _makeButton(x, y, label, onClick) {
+  _makeButton(x, y, label, onClick, style = {}) {
     const w = 280;
     const h = 48;
+    const bgCol  = style.bg     ?? 0x1a3050;
+    const bdrCol = style.border ?? 0x4a6a8a;
+    const txtCol = style.color  ?? '#c8d8e8';
 
-    const bg = this.add.rectangle(x, y, w, h, 0x1a3050)
-      .setStrokeStyle(2, 0x4a6a8a)
+    const bg = this.add.rectangle(x, y, w, h, bgCol)
+      .setStrokeStyle(2, bdrCol)
       .setInteractive({ useHandCursor: true });
 
     const text = this.add.text(x, y, label, {
-      fontSize: '18px', color: '#c8d8e8',
+      fontSize: '18px', color: txtCol,
     }).setOrigin(0.5);
 
-    bg.on('pointerover', () => bg.setFillStyle(0x2a4a6a));
-    bg.on('pointerout',  () => bg.setFillStyle(0x1a3050));
+    bg.on('pointerover', () => bg.setFillStyle(bgCol + 0x101010));
+    bg.on('pointerout',  () => bg.setFillStyle(bgCol));
     bg.on('pointerdown', onClick);
 
     return { bg, text };

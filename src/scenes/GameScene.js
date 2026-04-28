@@ -266,6 +266,14 @@ export class GameScene extends Phaser.Scene {
     infoY += 18;
     this._blessingText = this.add.text(INFO_X, infoY, '', { fontSize: '11px', color: '#bb99dd' });
 
+    // ── Dev mode indicator ──────────────────────────────────────────────
+    if (run.devMode) {
+      this.add.text(1270, 10, 'DEV', {
+        fontSize: '14px', color: '#ff8844', fontStyle: 'bold',
+        stroke: '#000000', strokeThickness: 2,
+      }).setOrigin(1, 0).setDepth(100);
+    }
+
     // ── Spirits row — vertical label to the left of first card ───────────
     this.add.text(SPIRIT_START_X - SPIRIT_W / 2 - 14, SPIRIT_Y, 'SPIRITS', {
       fontSize: '10px', color: '#556677',
