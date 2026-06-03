@@ -57,7 +57,7 @@ export const STAMPS = [
     id:          'stamp_orange',
     name:        'Orange Stamp',
     tier:        'secondary',
-    description: 'When captured, draw +1 card and gain +3 ki.',
+    description: 'Captured: draw +1 card. Yaku contribution: +3 ki.',
     trigger:     'captured',
     color:       '#cc7733',
     hexColor:    0xcc7733,
@@ -67,8 +67,8 @@ export const STAMPS = [
     id:          'stamp_green',
     name:        'Green Stamp',
     tier:        'secondary',
-    description: 'When discarded to a full field, gain +8 ki.',
-    trigger:     'discarded',
+    description: 'Captured: gain a free consumable. Discarded to full field: +3 ki.',
+    trigger:     'captured',
     color:       '#33aa55',
     hexColor:    0x33aa55,
     cost:        5,
@@ -77,7 +77,7 @@ export const STAMPS = [
     id:          'stamp_purple',
     name:        'Purple Stamp',
     tier:        'secondary',
-    description: 'When this card contributes to a new yaku, gain a free consumable.',
+    description: 'Discarded to full field: draw +1 card. Yaku contribution: gain a free consumable.',
     trigger:     'yaku',
     color:       '#aa44cc',
     hexColor:    0xaa44cc,
@@ -89,17 +89,17 @@ export const STAMPS = [
     id:          'stamp_black',
     name:        'Black Stamp',
     tier:        'tertiary',
-    description: 'When captured, draw +1 card, gain a free consumable, and gain +3 ki.',
+    description: 'Captured: gain a free consumable. Discarded to full field: draw +1 card. Yaku contribution: +3 ki.',
     trigger:     'captured',
-    color:       '#778899',
-    hexColor:    0x778899,
+    color:       '#222222',
+    hexColor:    0x222222,
     cost:        9,
   },
   {
     id:          'stamp_gray',
     name:        'Gray Stamp',
-    tier:        'tertiary',
-    description: 'When captured, triple retrigger — this card scores four times total.',
+    tier:        'quaternary',
+    description: 'Captured: free consumable. Discarded: draw +1. Yaku: +3 ki. All effects retrigger 3 additional times.',
     trigger:     'captured',
     color:       '#aabbcc',
     hexColor:    0xaabbcc,
@@ -109,7 +109,8 @@ export const STAMPS = [
 
 export const PRIMARY_STAMPS   = STAMPS.filter(s => s.tier === 'primary');
 export const SECONDARY_STAMPS = STAMPS.filter(s => s.tier === 'secondary');
-export const TERTIARY_STAMPS  = STAMPS.filter(s => s.tier === 'tertiary');
+export const TERTIARY_STAMPS    = STAMPS.filter(s => s.tier === 'tertiary');
+export const QUATERNARY_STAMPS  = STAMPS.filter(s => s.tier === 'quaternary');
 
 /**
  * Look up a stamp definition by its id.
@@ -117,3 +118,28 @@ export const TERTIARY_STAMPS  = STAMPS.filter(s => s.tier === 'tertiary');
  * @returns {object|null}
  */
 export const getStampDef = (id) => STAMPS.find(s => s.id === id) ?? null;
+
+// ── Stamp mixing matrix ─────────────────────────────────────────────────────
+// Keys are sorted-alphabetically pairs of stamp IDs joined by '|'.
+// Any combination not listed here falls through to overwrite behavior.
+const STAMP_MIX = {
+  'stamp_red|stamp_yellow':    'stamp_orange',
+  'stamp_blue|stamp_yellow':   'stamp_green',
+  'stamp_blue|stamp_red':      'stamp_purple',
+  'stamp_green|stamp_red':     'stamp_black',
+  'stamp_purple|stamp_yellow': 'stamp_black',
+  'stamp_blue|stamp_orange':   'stamp_black',
+  'stamp_black|stamp_white':   'stamp_gray',
+};
+
+/**
+ * Determine the result of applying a stamp to a card that may already have one.
+ * @param {string|null|undefined} existingStampId
+ * @param {string} appliedStampId
+ * @returns {string} The resulting stamp ID.
+ */
+export const mixStamps = (existingStampId, appliedStampId) => {
+  if (!existingStampId) return appliedStampId;
+  const [a, b] = [existingStampId, appliedStampId].sort();
+  return STAMP_MIX[`${a}|${b}`] ?? appliedStampId;
+};

@@ -3,16 +3,16 @@
 //
 // Manages the ki economy, spirit loadout, consumable inventory, deck state,
 // and run progression for the entire run.  Import the exported instance:
-import { findFusionRecipe }                     from '../data/fusionRecipes.js';
-import { getSpiritDef }                         from '../data/spirits.js';
+import { getSpiritDef, SPIRIT_CATALOG }          from '../data/spirits.js';
 import { cards as ALL_CARDS, baseCards }          from '../data/cards.js';
-import { WUXING_CONSUMABLES }                   from '../data/consumables.js';
-import { getStampDef }                          from '../data/stamps.js';
+import { WUXING_CONSUMABLES, CHAKRA_TOOLS, getElementDef } from '../data/consumables.js';
+import { getStampDef, mixStamps, PRIMARY_STAMPS } from '../data/stamps.js';
 import { ZODIAC_CONSUMABLES, getZodiacDef }     from '../data/zodiacConsumables.js';
 import logger                                   from './GameplayLogger.js';
 import { resolveHexagram }                      from './HexagramGenerator.js';
+import { getHexagram as getHexagramDef }        from '../data/hexagrams.js';
 import { getActiveEffect, applyHook }          from './HexagramEffects.js';
-import SpiritEffects                           from './SpiritEffects.js';
+import SpiritEffects, { NEGATIVE_SNAPSHOT }     from './SpiritEffects.js';
 import { getBlessingDef }                      from '../data/blessings.js';
 //
 //   import run from './systems/RunManager.js';
@@ -20,6 +20,162 @@ import { getBlessingDef }                      from '../data/blessings.js';
 //   run.advanceRound();
 //
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ── Per-element accumulator model ────────────────────────────────────────────
+
+/** Spirit IDs that use the per-element accumulator model. */
+export const ACCUMULATOR_SPIRIT_IDS = new Set([
+  'sym_ants', 'sym_snails', 'sym_algae', 'sym_badger',
+  'engine_devotion', 'engine_habitat', 'engine_ceremony', 'engine_agriculture',
+  'engine_lincoln', 'engine_palace',
+  'engine_glacier', 'engine_carbon', 'engine_fossil', 'engine_moths',
+  'engine_velocity',
+  'engine_kintaro', 'engine_bullseye', 'engine_missing_number',
+  'engine_ship', 'engine_napoleon',
+  'legend_wuji',
+  'engine_wildlife', 'engine_plenty',
+  'engine_radiance', 'engine_banner',
+  'engine_northern_lion',
+  'util_past_life',
+  'sym_cuckoo_egg',
+]);
+
+/** Initial per-element state shape for each accumulator spirit. */
+const ACCUMULATOR_INIT = {
+  sym_ants:        () => ({ totalPlayed: 0 }),
+  sym_snails:      () => ({ totalUnplayed: 0 }),
+  sym_algae:       () => ({ summonCount: 0 }),
+  sym_badger:      () => ({ consumablesUsed: 0 }),
+  engine_devotion: () => ({ totalScored: 0 }),
+  engine_habitat:  () => ({ totalScored: 0 }),
+  engine_ceremony: () => ({ totalScored: 0 }),
+  engine_agriculture: () => ({ totalScored: 0 }),
+  engine_lincoln:  () => ({ banks: 0 }),
+  engine_palace:   () => ({ cardsAdded: 0 }),
+  engine_glacier:  () => ({ t1Procs: 0, t2Procs: 0 }),
+  engine_carbon:   () => ({ t1Procs: 0, t2Procs: 0 }),
+  engine_fossil:   () => ({ t1Procs: 0, t2Procs: 0 }),
+  engine_moths:    () => ({ t1Procs: 0, t2Procs: 0 }),
+  engine_velocity: () => ({ t2Procs: 0 }),
+  engine_kintaro:  () => ({ goldsConsumed: 0 }),
+  engine_bullseye: () => ({ qualifiedCount: 0 }),
+  engine_missing_number: () => ({ totalStacks: 0 }),
+  engine_ship:     () => ({ cardsDiscarded: 0 }),
+  engine_napoleon: () => ({ pushFails: 0 }),
+  legend_wuji:     () => ({ destroyed: 0 }),
+  engine_wildlife: () => ({ seenAnimals: [] }),
+  engine_plenty:   () => ({ seenPlains: [] }),
+  engine_radiance: () => ({ seenBrights: [] }),
+  engine_banner:   () => ({ seenRibbons: [] }),
+  engine_northern_lion: () => ({ pushesWitnessed: 0 }),
+  util_past_life:  () => ({}),  // only acquiredRound
+  sym_cuckoo_egg:  () => ({}),  // only acquiredRound; maturity = 3 rounds held
+};
+
+/**
+ * Sum a numeric per-element key across a spirit's elements array.
+ * Falls back to spirit.state for negatives / non-accumulators.
+ */
+export function aggregateNumericState(spirit, key) {
+  if (spirit.elements) {
+    return spirit.elements.reduce((sum, el) => sum + (el[key] ?? 0), 0);
+  }
+  return spirit.state?.[key] ?? 0;
+}
+
+/**
+ * Get the longest-held element's value (first in array) for display.
+ */
+export function longestHeldValue(spirit, key) {
+  if (spirit.elements && spirit.elements.length > 0) {
+    return spirit.elements[0][key] ?? 0;
+  }
+  return spirit.state?.[key] ?? 0;
+}
+
+/**
+ * Increment a key on every element of an accumulator spirit.
+ * Falls back to spirit.state for negatives / non-accumulators.
+ */
+export function incrementPerElement(spirit, key, amount = 1) {
+  if (spirit.isNegative) {
+    if (!spirit.state) spirit.state = {};
+    // Cat 1 single-key
+    if (spirit.state.key !== undefined && spirit.state.key === key) {
+      spirit.state.newEvents = (spirit.state.newEvents ?? 0) + amount;
+    }
+    // Cat 1 dual-key (Glacier/Carbon/Fossil/Moths)
+    else if (spirit.state.key1 !== undefined && spirit.state.key1 === key) {
+      spirit.state.newEvents1 = (spirit.state.newEvents1 ?? 0) + amount;
+    } else if (spirit.state.key2 !== undefined && spirit.state.key2 === key) {
+      spirit.state.newEvents2 = (spirit.state.newEvents2 ?? 0) + amount;
+    }
+    // Cat 1' exponential (Velocity)
+    else if (spirit.state.t2ProcsAtTranscend !== undefined && key === 't2Procs') {
+      spirit.state.newT2Procs = (spirit.state.newT2Procs ?? 0) + amount;
+    }
+    // Fallback for negatives without key markers (Cat 2/4/5)
+    else if (spirit.state.key === undefined && spirit.state.key1 === undefined) {
+      spirit.state[key] = (spirit.state[key] ?? 0) + amount;
+    }
+    return;
+  }
+  if (spirit.elements) {
+    for (const el of spirit.elements) el[key] = (el[key] ?? 0) + amount;
+  } else {
+    if (!spirit.state) spirit.state = {};
+    spirit.state[key] = (spirit.state[key] ?? 0) + amount;
+  }
+}
+
+/**
+ * Append a unique value to a per-element array key.
+ * Each element tracks its own unique set independently.
+ */
+export function addUniqueToElements(spirit, key, value) {
+  if (spirit.isNegative) {
+    if (!spirit.state) spirit.state = {};
+    // Cat 2/4: state[key] is array-of-arrays; add value to each sub-array if not present.
+    if (Array.isArray(spirit.state[key])) {
+      for (const arr of spirit.state[key]) {
+        if (!arr.includes(value)) arr.push(value);
+      }
+    }
+    return;
+  }
+  if (spirit.elements) {
+    for (const el of spirit.elements) {
+      if (!el[key]) el[key] = [];
+      if (!el[key].includes(value)) el[key].push(value);
+    }
+  } else {
+    if (!spirit.state) spirit.state = {};
+    if (!spirit.state[key]) spirit.state[key] = [];
+    if (!spirit.state[key].includes(value)) spirit.state[key].push(value);
+  }
+}
+
+/**
+ * Sum array lengths across elements (for uniqueness-tracker spirits).
+ */
+export function aggregateArrayLength(spirit, key) {
+  if (spirit.elements) {
+    return spirit.elements.reduce((sum, el) => sum + (el[key]?.length ?? 0), 0);
+  }
+  return spirit.state?.[key]?.length ?? 0;
+}
+
+/** Count truly-unique values across all elements/sub-arrays. For tooltip display. */
+export function aggregateUniqueCount(spirit, key) {
+  if (spirit.isNegative) {
+    const arrays = spirit.state?.[key] ?? [];
+    return new Set(arrays.flat()).size;
+  }
+  if (spirit.elements) {
+    return new Set(spirit.elements.flatMap(el => el[key] ?? [])).size;
+  }
+  return spirit.state?.[key]?.length ?? 0;
+}
 
 // ── Card promotion helpers ────────────────────────────────────────────────────
 
@@ -57,6 +213,18 @@ class RunManager {
   static FLOW_DECAY_RATE = 0.95;
 
   /**
+   * Push outcome multipliers indexed by resolution depth.
+   * On bank: resolution depth = _pushDepth. On fail: depth = _pushDepth + 1.
+   */
+  static PUSH_CURVE = {
+    0: { success: 1.00 },
+    1: { success: 1.10, failure: 0.90 },
+    2: { success: 1.25, failure: 0.80 },
+    3: { success: 1.50, failure: 0.65 },
+    4: { success: 2.00, failure: 0.50 },
+  };
+
+  /**
    * Minimum score required to survive each round (index 0 = Round 1).
    * Failing to meet the threshold ends the run immediately.
    */
@@ -86,16 +254,21 @@ class RunManager {
   reset() {
     // ── Dev mode ───────────────────────────────────────────────────────────
     this._devMode = false;
+    this._forceCatTarget = null; // debug: force next Cat summon to this spirit id
+    this._forcedPastLifeTarget = null; // debug: force next Past Life copy target
+    this._forcedCuckooHatchTarget = null; // debug: force next Cuckoo Egg hatch target
 
     // ── Ki economy ───────────────────────────────────────────────────────────
     /** @type {number} */
     this._ki = 0;
 
     // ── Spirit loadout ───────────────────────────────────────────────────────
-    /** @type {object[]} */
-    this._spirits = [];
-    /** @type {object[]} Spirits that have transcended (stack of 4 → zero-slot negative copy). */
-    this._negativeSpirits = [];
+    /**
+     * Unified spirit array — canonical storage for both regular and negative spirits.
+     * Display order = scoring chain order. Negatives have `isNegative: true`.
+     * @type {object[]}
+     */
+    this._allSpirits = [];
     /** @type {object[]} Legendary spirits (separate slot category). */
     this._legendarySpirits = [];
     /** Permanent field slot modifier (Amber alchemical reduces by 1). */
@@ -121,12 +294,6 @@ class RunManager {
     this._totalScore = 0;
 
     /**
-     * Style Base — legacy; kept for UI display only (no longer used in scoring).
-     * @deprecated Use this._flow for all scoring.
-     */
-    this._styleBase = 1.0;
-
-    /**
      * Flow — the single persistent scoring multiplier for the run.
      * Starts at 1.0.  Modified by push outcomes and one-time style combo milestones.
      *   Push success (new yaku after push): flow × 1.1
@@ -148,18 +315,10 @@ class RunManager {
     /** True if the run ended in victory (all 36 rounds cleared). */
     this._runWon  = false;
 
-    // ── Yaku upgrades ────────────────────────────────────────────────────────
-    /**
-     * Permanent upgrade levels for each yaku (purchased at the shrine).
-     * Each level adds +0.2 to the yaku's base bonus.
-     * @type {{ kasu: number, tanzaku: number, tane: number, hikari: number }}
-     */
-    this._yakuUpgrades = { kasu: 0, tanzaku: 0, tane: 0, hikari: 0 };
-
     // ── Persistent deck ──────────────────────────────────────────────────────
     /**
      * The canonical deck array — deep-copied from baseCards at run start.
-     * Survives across rounds.  Three Marks mutations are applied in-place.
+     * Survives across rounds.  Deck mutations are applied in-place.
      * DeckManager.resetWithCards() receives a shallow copy each round so
      * card object references are shared (mutations propagate automatically).
      * @type {object[]}
@@ -191,14 +350,20 @@ class RunManager {
   // ── Ki economy ─────────────────────────────────────────────────────────────
 
   get ki()        { return this._ki; }
-  get styleBase() { return this._styleBase; }
   /** The current flow multiplier — applied to every capture score. */
   get flow()      { return this._flow; }
   get devMode()   { return this._devMode; }
 
   /** Compute effective ki cost (0 in dev mode). */
   getEffectiveCost(baseCost) {
-    return this._devMode ? 0 : baseCost;
+    if (this._devMode) return 0;
+    // Hexagram modifier first — establishes the base price for this run.
+    const hexAdjusted = applyHook('modifyShopPrice', baseCost, baseCost);
+    // Coupon discount applies to the hex-adjusted price.
+    const couponStacks = this.countStackedById('econ_coupon');
+    if (couponStacks <= 0) return hexAdjusted;
+    const remainingPct = Math.max(0, 100 - couponStacks * 15);
+    return Math.ceil(hexAdjusted * remainingPct / 100);
   }
 
   /** Start a new run in dev mode (free shop, 999 ki). */
@@ -207,6 +372,9 @@ class RunManager {
     this._devMode = true;
     this._ki = 999;
   }
+
+  /** Debug: force the next Cat summon to target a specific spirit id (one-shot). */
+  forceCatTarget(spiritId) { this._forceCatTarget = spiritId; }
 
   /**
    * Add ki to the balance.
@@ -244,6 +412,8 @@ class RunManager {
   setHexagram(hexagramId) {
     this._hexagramId    = hexagramId ?? null;
     this._hexagramState = null;
+    const hexagram = this._hexagramId ? getHexagramDef(this._hexagramId) : null;
+    logger.logHexagramAssignment(hexagram);
     const effect = getActiveEffect();
     if (effect?.onRunStart) effect.onRunStart(this);
     // Dev mode: restore 999 ki after hexagram onRunStart may have overridden it.
@@ -269,17 +439,35 @@ class RunManager {
 
   // ── Spirit loadout ─────────────────────────────────────────────────────────
 
-  get spirits()           { return [...this._spirits]; }
-  get negativeSpirits()   { return [...this._negativeSpirits]; }
+  get spirits()           { return this._allSpirits.filter(s => !s.isNegative && (s.stackCount ?? 1) > 0); }
+  get negativeSpirits()   { return this._allSpirits.filter(s => s.isNegative); }
+  get allSpirits()        { return [...this._allSpirits]; }
   get legendarySpirits()  { return [...this._legendarySpirits]; }
+  /** Active scoring spirits: regulars + legendaries. Used by most engine iteration. */
+  get activeSpirits()     { return [...this.spirits, ...this._legendarySpirits]; }
+  /** All scoring spirits: regulars + negatives + legendaries. */
+  get scoringSpirits()    { return [...this.spirits, ...this.negativeSpirits, ...this._legendarySpirits]; }
   get spiritSlots() {
     let base = applyHook('modifySpiritSlots', RunManager.MAX_SPIRIT_SLOTS, RunManager.MAX_SPIRIT_SLOTS);
     base += this.countBlessingsByEffect('plus_spirit_slot');
     return base;
   }
-  get canAddSpirit()      { return this._spirits.length < this.spiritSlots; }
+  get canAddSpirit()      { return this._allSpirits.filter(s => !s.isNegative).length < this.spiritSlots; }
   get maxLegendarySlots() { return 2; }
   get canAddLegendary()   { return this._legendarySpirits.length < this.maxLegendarySlots; }
+
+  /**
+   * Sum stackCount across all spirit instances with the given id.
+   * Counts both regular and negative spirits.
+   * @param {string} id  Spirit id to count.
+   * @returns {number}   Total stack count across all matching instances.
+   */
+  countStackedById(id) {
+    return this._allSpirits
+      .filter(s => s.id === id)
+      .reduce((sum, s) => sum + effectivePower(s), 0);
+  }
+
   get maxConsumableSlots() {
     let base = this._maxConsumableSlots;
     base += this.countBlessingsByEffect('plus_consumable_slot');
@@ -296,79 +484,65 @@ class RunManager {
     const cost = this.getEffectiveCost(spiritDef.cost);
     if (this._ki < cost) return { success: false, reason: 'Not enough ki' };
 
-    // Check if we already own a regular (non-negative) copy.
-    const existing = this._spirits.find(s => s.id === spiritDef.id && !s.isNegative);
-    const hasNegative = this._negativeSpirits.some(s => s.id === spiritDef.id);
-
-    if (existing) {
-      // Already at max stack AND already have a negative copy — cannot buy.
-      if ((existing.stackCount ?? 1) >= 3 && hasNegative) {
-        return { success: false, reason: 'Maximum spirit copies reached' };
-      }
-
-      this._ki -= cost;
-      existing.stackCount = (existing.stackCount ?? 1) + 1;
-
-      if (existing.stackCount >= 4) {
-        // Transcend: collapse into a zero-slot negative copy preserving
-        // the pre-transcendence stack power (3 for natural 4th-copy path).
-        const snapshotStacks = existing.stackCount - 1;
-        const idx = this._spirits.indexOf(existing);
-        this._spirits.splice(idx, 1);
-        this._negativeSpirits.push({
-          id: spiritDef.id, name: spiritDef.name,
-          stackCount: snapshotStacks, isNegative: true, state: existing.state ?? null,
-        });
-        logger.logSpiritTranscended(spiritDef.name);
-        return { success: true, result: 'transcended' };
-      }
-
-      logger.logSpiritStacked(spiritDef.name, existing.stackCount);
-      return { success: true, result: 'stacked' };
+    // Pre-check: if buying would require a new slot but none available, fail before charging.
+    const existing = this._allSpirits.find(s => s.id === spiritDef.id && !s.isNegative);
+    if (!existing && !this.canAddSpirit) {
+      return { success: false, reason: 'No spirit slots available' };
     }
 
-    // New spirit — needs an open slot.
-    if (!this.canAddSpirit) return { success: false, reason: 'No spirit slots available' };
+    const result = this._acquireSpiritStack(spiritDef, 1);
+    if (!result.success) return result;
 
-    this._ki -= spiritDef.cost;
-    const spirit = { id: spiritDef.id, name: spiritDef.name, stackCount: 1 };
-    // Initialize persistent state for stateful spirits.
-    if (spiritDef.id === 'engine_wildlife')  spirit.state = { seenAnimals: [] };
-    if (spiritDef.id === 'engine_plenty')    spirit.state = { seenPlains: [] };
-    if (spiritDef.id === 'util_irrigation')  spirit.state = { irrigationBonus: 0 };
-    if (spiritDef.id === 'engine_glacier')   spirit.state = { t1Procs: 0, t2Procs: 0 };
-    if (spiritDef.id === 'engine_carbon')    spirit.state = { t1Procs: 0, t2Procs: 0 };
-    if (spiritDef.id === 'engine_velocity')  spirit.state = { t2Procs: 0 };  // t1 is live deck count
-    if (spiritDef.id === 'engine_fossil')    spirit.state = { t1Procs: 0, t2Procs: 0 };
-    if (spiritDef.id === 'engine_moths')     spirit.state = { t1Procs: 0, t2Procs: 0 };  // t2 deferred
-    if (spiritDef.id === 'engine_devotion')     spirit.state = { totalScored: 0 };
-    if (spiritDef.id === 'engine_habitat')      spirit.state = { totalScored: 0 };
-    if (spiritDef.id === 'engine_ceremony')     spirit.state = { totalScored: 0 };
-    if (spiritDef.id === 'engine_agriculture')  spirit.state = { totalScored: 0 };
-    if (spiritDef.id === 'engine_lincoln')        spirit.state = { banks: 0 };
-    if (spiritDef.id === 'engine_napoleon')       spirit.state = { pushFails: 0 };
-    if (spiritDef.id === 'engine_missing_number') spirit.state = { totalStacks: 0 };
-    if (spiritDef.id === 'engine_palace')         spirit.state = { cardsAdded: 0 };
-    if (spiritDef.id === 'engine_ship')           spirit.state = { cardsDiscarded: 0 };
-    if (spiritDef.id === 'engine_northern_lion')  spirit.state = { freeRerolls: 0 };
-    if (spiritDef.id === 'engine_kintaro')       spirit.state = { goldsConsumed: 0 };
-    if (spiritDef.id === 'legend_wuji')          spirit.state = { destroyed: 0 };
-    if (spiritDef.id === 'engine_bullseye')     spirit.state = { qualifiedCount: 0 };
-    if (spiritDef.id === 'decay_persimmon')       spirit.state = { remaining: 30 };
-    if (spiritDef.id === 'decay_pear')            spirit.state = { remaining: 150 };
-    this._spirits.push(spirit);
-    return { success: true, result: 'added' };
+    this._ki -= cost;
+
+    if (result.result === 'transcended') {
+      logger.logSpiritTranscended(spiritDef.name);
+    } else if (result.result === 'stacked') {
+      const updated = this._allSpirits.find(s => s.id === spiritDef.id && !s.isNegative);
+      logger.logSpiritStacked(spiritDef.name, updated?.stackCount ?? 1);
+    }
+
+    return { success: true, result: result.result };
+  }
+
+  /** Initialize persistent state for stateful spirits. Mutates spirit in-place. */
+  /** Initialize state or elements for a spirit. Accumulators get elements array matching stackCount. */
+  _initSpiritState(spirit) {
+    if (ACCUMULATOR_SPIRIT_IDS.has(spirit.id)) {
+      if (!spirit.elements) {
+        const count = spirit.stackCount ?? 1;
+        spirit.elements = [];
+        for (let i = 0; i < count; i++) spirit.elements.push(this._freshAccumulatorElement(spirit.id));
+      }
+      return;
+    }
+    // Non-accumulator state init
+    if (spirit.id === 'game_catcher')        spirit.state = { catchesUsedThisRound: 0 };
+    if (spirit.id === 'decay_persimmon')      spirit.state = { remaining: 30 };
+    if (spirit.id === 'decay_pear')           spirit.state = { remaining: 150 };
   }
 
   /**
    * Swap two spirits by slot index.
    */
   swapSpirits(indexA, indexB) {
-    if (indexA < 0 || indexA >= this._spirits.length) return;
-    if (indexB < 0 || indexB >= this._spirits.length) return;
-    const temp = this._spirits[indexA];
-    this._spirits[indexA] = this._spirits[indexB];
-    this._spirits[indexB] = temp;
+    if (indexA < 0 || indexA >= this._allSpirits.length) return;
+    if (indexB < 0 || indexB >= this._allSpirits.length) return;
+    const temp = this._allSpirits[indexA];
+    this._allSpirits[indexA] = this._allSpirits[indexB];
+    this._allSpirits[indexB] = temp;
+  }
+
+  /**
+   * Move a spirit from one position to another (insertion-based reorder).
+   * @param {number} fromIndex  Source index in _allSpirits.
+   * @param {number} toIndex    Target index in _allSpirits (before insertion).
+   */
+  moveSpirit(fromIndex, toIndex) {
+    if (fromIndex < 0 || fromIndex >= this._allSpirits.length) return;
+    const spirit = this._allSpirits.splice(fromIndex, 1)[0];
+    const adjusted = toIndex > fromIndex ? toIndex - 1 : toIndex;
+    this._allSpirits.splice(Math.min(adjusted, this._allSpirits.length), 0, spirit);
   }
 
   /**
@@ -380,19 +554,15 @@ class RunManager {
    * @param {object[]} newlyCapturedCards  Card objects just captured.
    */
   onCardsCaptured(newlyCapturedCards) {
-    for (const spirit of this._spirits) {
-      if (spirit.id === 'engine_wildlife' && spirit.state) {
+    for (const spirit of this._allSpirits) {
+      if (spirit.id === 'engine_wildlife') {
         for (const card of newlyCapturedCards) {
-          if (card.type === 'animal' && !spirit.state.seenAnimals.includes(card.id)) {
-            spirit.state.seenAnimals.push(card.id);
-          }
+          if (card.type === 'animal') addUniqueToElements(spirit, 'seenAnimals', card.id);
         }
       }
-      if (spirit.id === 'engine_plenty' && spirit.state) {
+      if (spirit.id === 'engine_plenty') {
         for (const card of newlyCapturedCards) {
-          if (card.type === 'plain' && !spirit.state.seenPlains.includes(card.id)) {
-            spirit.state.seenPlains.push(card.id);
-          }
+          if (card.type === 'plain') addUniqueToElements(spirit, 'seenPlains', card.id);
         }
       }
     }
@@ -401,24 +571,66 @@ class RunManager {
   /**
    * Add a symbiont spirit generated during gameplay.
    * Symbionts cost no ki and bypass the normal shop flow.
+   *
+   * Cascading transcendence: while pendingStacks >= 4, peel off 4 stacks
+   * at a time to create a 1-stack Negative. Multiple Negatives can be
+   * created in a single call. Negatives don't occupy spirit slots.
+   *
    * @param {object} spiritDef  Entry from SPIRIT_CATALOG (tier 0, channel 'symbiont').
-   * @returns {{ success: boolean }}
+   * @param {number} stackCount Number of stacks to add (default 1).
+   * @returns {{ success: boolean, result?: string }}
    */
-  addSymbiontSpirit(spiritDef) {
-    if (!this.canAddSpirit) return { success: false };
-    const spirit = { id: spiritDef.id, name: spiritDef.name, symbiont: true };
-    if (spiritDef.id === 'sym_caterpillar') spirit.state = { leafsEaten: 0 };
-    if (spiritDef.id === 'sym_cuckoo_egg')  spirit.state = { roundsRemaining: 3 };
-    if (spiritDef.id === 'sym_algae')       spirit.state = { summonCount: 0 };
-    if (spiritDef.id === 'sym_ants')        spirit.state = { totalPlayed: 0 };
-    if (spiritDef.id === 'sym_crow')        spirit.state = {};
-    if (spiritDef.id === 'sym_ducks')       spirit.state = { multValue: 1 };
-    if (spiritDef.id === 'sym_snails')      spirit.state = { totalUnplayed: 0 };
-    if (spiritDef.id === 'sym_magpie')      spirit.state = {};
-    if (spiritDef.id === 'sym_osprey')      spirit.state = { flipsUsedThisRound: 0 };
-    if (spiritDef.id === 'sym_badger')      spirit.state = { consumablesUsed: 0 };
-    this._spirits.push(spirit);
-    return { success: true };
+  addSymbiontSpirit(spiritDef, stackCount = 1) {
+    return this._acquireSpiritStack(spiritDef, stackCount);
+  }
+
+  _buildSymbiontSpirit(spiritDef, stackCount) {
+    const spirit = { id: spiritDef.id, name: spiritDef.name, symbiont: true, stackCount, sellPriceBonus: 0 };
+    this._initSpiritElements(spirit);
+    return spirit;
+  }
+
+  _freshAccumulatorElement(spiritId) {
+    const initFn = ACCUMULATOR_INIT[spiritId];
+    return initFn ? { ...initFn(), acquiredRound: this._round ?? 0 } : {};
+  }
+
+  /** Initialize state/elements for any spirit. Accumulators get elements array matching stackCount. */
+  _initSpiritElements(spirit) {
+    if (ACCUMULATOR_SPIRIT_IDS.has(spirit.id)) {
+      if (!spirit.elements) {
+        const count = spirit.stackCount ?? 1;
+        spirit.elements = [];
+        for (let i = 0; i < count; i++) spirit.elements.push(this._freshAccumulatorElement(spirit.id));
+      }
+      return;
+    }
+    // Non-accumulator init
+    if (spirit.id === 'sym_caterpillar') spirit.state = { leafsEaten: 0 };
+    else if (spirit.id === 'sym_crow')        spirit.state = {};
+    else if (spirit.id === 'sym_ducks')       spirit.state = { multValue: 0 };
+    else if (spirit.id === 'sym_magpie')      spirit.state = {};
+    else if (spirit.id === 'sym_osprey')      spirit.state = { flipsUsedThisRound: 0 };
+    else if (spirit.id === 'game_catcher')   spirit.state = { catchesUsedThisRound: 0 };
+  }
+
+  /** Add an accumulator element when stacking an existing spirit. */
+  _addAccumulatorElement(spirit) {
+    if (ACCUMULATOR_SPIRIT_IDS.has(spirit.id)) {
+      if (!spirit.elements) spirit.elements = [];
+      spirit.elements.push(this._freshAccumulatorElement(spirit.id));
+    }
+  }
+
+  /** Aggregate elements into a single state object for negative creation. */
+  _aggregateElementsForNegative(spirit, powerLevel = 3) {
+    if (!spirit.elements || spirit.elements.length === 0) return spirit.state ?? null;
+    const snapshotFn = NEGATIVE_SNAPSHOT[spirit.id];
+    if (!snapshotFn) {
+      console.warn(`[F2.5] No NEGATIVE_SNAPSHOT entry for ${spirit.id}; using legacy fallback.`);
+      return spirit.state ?? null;
+    }
+    return snapshotFn(spirit, powerLevel);
   }
 
   /**
@@ -430,55 +642,7 @@ class RunManager {
   summonSpirit(spiritId) {
     const spiritDef = getSpiritDef(spiritId);
     if (!spiritDef) return { success: false, reason: 'Unknown spirit' };
-
-    const existing    = this._spirits.find(s => s.id === spiritDef.id && !s.isNegative);
-    const hasNegative = this._negativeSpirits.some(s => s.id === spiritDef.id);
-
-    if (existing) {
-      if ((existing.stackCount ?? 1) >= 3 && hasNegative) {
-        return { success: false, reason: 'Maximum spirit copies reached' };
-      }
-      existing.stackCount = (existing.stackCount ?? 1) + 1;
-      if (existing.stackCount >= 4) {
-        const idx = this._spirits.indexOf(existing);
-        this._spirits.splice(idx, 1);
-        this._negativeSpirits.push({
-          id: spiritDef.id, name: spiritDef.name,
-          stackCount: 1, isNegative: true, state: null,
-        });
-        return { success: true, result: 'transcended' };
-      }
-      return { success: true, result: 'stacked' };
-    }
-
-    if (!this.canAddSpirit) return { success: false, reason: 'No spirit slots available' };
-
-    const spirit = { id: spiritDef.id, name: spiritDef.name, stackCount: 1 };
-    if (spiritDef.id === 'engine_wildlife')  spirit.state = { seenAnimals: [] };
-    if (spiritDef.id === 'engine_plenty')    spirit.state = { seenPlains: [] };
-    if (spiritDef.id === 'util_irrigation')  spirit.state = { irrigationBonus: 0 };
-    if (spiritDef.id === 'engine_glacier')   spirit.state = { t1Procs: 0, t2Procs: 0 };
-    if (spiritDef.id === 'engine_carbon')    spirit.state = { t1Procs: 0, t2Procs: 0 };
-    if (spiritDef.id === 'engine_velocity')  spirit.state = { t2Procs: 0 };  // t1 is live deck count
-    if (spiritDef.id === 'engine_fossil')    spirit.state = { t1Procs: 0, t2Procs: 0 };
-    if (spiritDef.id === 'engine_moths')     spirit.state = { t1Procs: 0, t2Procs: 0 };  // t2 deferred
-    if (spiritDef.id === 'engine_devotion')     spirit.state = { totalScored: 0 };
-    if (spiritDef.id === 'engine_habitat')      spirit.state = { totalScored: 0 };
-    if (spiritDef.id === 'engine_ceremony')     spirit.state = { totalScored: 0 };
-    if (spiritDef.id === 'engine_agriculture')  spirit.state = { totalScored: 0 };
-    if (spiritDef.id === 'engine_lincoln')        spirit.state = { banks: 0 };
-    if (spiritDef.id === 'engine_napoleon')       spirit.state = { pushFails: 0 };
-    if (spiritDef.id === 'engine_missing_number') spirit.state = { totalStacks: 0 };
-    if (spiritDef.id === 'engine_palace')         spirit.state = { cardsAdded: 0 };
-    if (spiritDef.id === 'engine_ship')           spirit.state = { cardsDiscarded: 0 };
-    if (spiritDef.id === 'engine_northern_lion')  spirit.state = { freeRerolls: 0 };
-    if (spiritDef.id === 'engine_kintaro')       spirit.state = { goldsConsumed: 0 };
-    if (spiritDef.id === 'legend_wuji')          spirit.state = { destroyed: 0 };
-    if (spiritDef.id === 'engine_bullseye')     spirit.state = { qualifiedCount: 0 };
-    if (spiritDef.id === 'decay_persimmon')       spirit.state = { remaining: 30 };
-    if (spiritDef.id === 'decay_pear')            spirit.state = { remaining: 150 };
-    this._spirits.push(spirit);
-    return { success: true, result: 'added' };
+    return this._acquireSpiritStack(spiritDef, 1);
   }
 
   /**
@@ -487,79 +651,219 @@ class RunManager {
    * @throws {Error} if all slots are occupied.
    */
   addSpirit(spirit) {
-    if (this._spirits.length >= this.spiritSlots) {
+    const regularCount = this._allSpirits.filter(s => !s.isNegative).length;
+    if (regularCount >= this.spiritSlots) {
       throw new Error(`Spirit loadout is full (max ${this.spiritSlots} slots).`);
     }
-    this._spirits.push(spirit);
+    this._allSpirits.push(spirit);
   }
 
   /**
-   * Remove the spirit at the given slot index.
+   * Remove the spirit at the given _allSpirits index.
    * @param {number} index
    * @returns {object} The removed spirit.
    * @throws {Error} if the index is out of range.
    */
   removeSpirit(index) {
-    if (index < 0 || index >= this._spirits.length) {
+    if (index < 0 || index >= this._allSpirits.length) {
       throw new Error(`No spirit at index ${index}.`);
     }
-    return this._spirits.splice(index, 1)[0];
+    return this._allSpirits.splice(index, 1)[0];
   }
 
   /**
    * Release a spirit, removing it from the loadout. No ki refund.
-   * @param {number} index
+   * @param {number} index  Index into _allSpirits.
    * @returns {{ released: object }}
    * @throws {Error} if the index is out of range.
    */
   releaseSpirit(index) {
     const released = this.removeSpirit(index);
-
-    // Past Life: on release, create copies of a random remaining spirit.
-    if (released.id === 'util_past_life' && this._spirits.length > 0) {
-      const count = released.stackCount ?? 1;
-      const targetIdx = Math.floor(Math.random() * this._spirits.length);
-      const target = this._spirits[targetIdx];
-      for (let i = 0; i < count; i++) {
-        this._addPastLifeCopy(target);
-      }
-    }
-
-    return { released };
+    if (!released) return { released: null, kiRefund: 0 };
+    const def = getSpiritDef(released.id);
+    const baseCost = def?.cost ?? 0;
+    const baseRefund = Math.floor(baseCost / 2);
+    const bonusRefund = released.sellPriceBonus ?? 0;
+    const kiRefund = baseRefund + bonusRefund;
+    if (kiRefund > 0) this._ki += kiRefund;
+    return { released, kiRefund };
   }
 
   /**
-   * Internal helper for Past Life duplication.
-   * Adds one copy of the target spirit, respecting stacking and transcendence.
+   * Fire Past Life copy effect: pick random target, add copy at given power.
+   * Targets both regulars and negatives (excludes Past Life itself).
    */
-  _addPastLifeCopy(target) {
-    const existing = this._spirits.find(s => s.id === target.id && !s.isNegative);
-    const hasNegative = this._negativeSpirits.some(s => s.id === target.id);
+  _firePastLifeCopy(powerLevel) {
+    const candidates = this._allSpirits.filter(s => s.id !== 'util_past_life');
+    if (candidates.length === 0) return;
+    let target;
+    if (this._forcedPastLifeTarget) {
+      target = candidates.find(s => s.id === this._forcedPastLifeTarget);
+      this._forcedPastLifeTarget = null;
+    }
+    if (!target) target = candidates[Math.floor(Math.random() * candidates.length)];
+    this._addPastLifeCopy(target, powerLevel);
+  }
 
-    if (existing) {
-      if ((existing.stackCount ?? 1) >= 3 && hasNegative) return; // max reached
-      existing.stackCount = (existing.stackCount ?? 1) + 1;
-      if (existing.stackCount >= 4) {
-        const idx = this._spirits.indexOf(existing);
-        this._spirits.splice(idx, 1);
-        this._negativeSpirits.push({
-          id: target.id, name: target.name,
-          stackCount: 1, isNegative: true, state: null,
-        });
-      }
+  /**
+   * Add a Past Life copy of the target at given power level.
+   * Regular targets: adds N stacks (may cascade-transcend).
+   * Negative targets: creates new negative at powerLevel=N.
+   */
+  _addPastLifeCopy(target, powerLevel = 1) {
+    if (target.isNegative) {
+      // Negatives don't stack-merge — create parallel entry.
+      this._allSpirits.push({
+        id: target.id, name: target.name,
+        symbiont: target.symbiont || undefined,
+        stackCount: 1, isNegative: true, powerLevel,
+        acquiredRound: this._round ?? 0, state: null,
+      });
       return;
     }
+    const def = getSpiritDef(target.id) ?? target;
+    this._acquireSpiritStack(def, powerLevel);
+  }
 
-    if (!this.canAddSpirit) return; // no empty slots
+  /** Debug: force the next Past Life copy to target a specific spirit id (one-shot). */
+  forcePastLifeTarget(spiritId) { this._forcedPastLifeTarget = spiritId; }
 
-    const copy = {
-      id: target.id,
-      name: target.name,
-      stackCount: 1,
-    };
-    if (target.state) copy.state = JSON.parse(JSON.stringify(target.state));
-    if (target.symbiont) copy.symbiont = true;
-    this._spirits.push(copy);
+  /**
+   * Fire Cuckoo Egg hatch: add a random Tier-2 fusion spirit.
+   * All mature elements in a single sale produce the SAME fusion (RNG-synced).
+   * @param {number} matureStacks  Number of mature elements hatching.
+   * @returns {object|null} The hatched fusion def, or null if failed.
+   */
+  _fireCuckooHatch(matureStacks) {
+    if (matureStacks <= 0 || !this.canAddSpirit) return null;
+    const fusions = SPIRIT_CATALOG.filter(s => s.category === 'fusion_t2');
+    if (fusions.length === 0) return null;
+    let target;
+    if (this._forcedCuckooHatchTarget) {
+      target = fusions.find(s => s.id === this._forcedCuckooHatchTarget);
+      this._forcedCuckooHatchTarget = null;
+    }
+    if (!target) target = fusions[Math.floor(Math.random() * fusions.length)];
+    this._acquireSpiritStack(target, matureStacks);
+    return target;
+  }
+
+  /** Debug: force the next Cuckoo Egg hatch target. */
+  forceCuckooHatchTarget(fusionId) { this._forcedCuckooHatchTarget = fusionId; }
+
+  // ── Unified spirit mutation API ───────────────────────────────────────────
+
+  /**
+   * Universal spirit-stack acquisition. Adds N stacks of spiritDef:
+   *   - Merges into existing same-id non-negative spirit.
+   *   - Creates a new entry if none exists (subject to slot validation).
+   *   - Cascade-transcends at stackCount 4: negative with powerLevel = min(3, count-1).
+   *   - Iterates one stack at a time so cascade + re-stacking both work.
+   *
+   * @param {object} spiritDef    Spirit definition (must have id, name).
+   * @param {number} stackCount   Stacks to add (default 1).
+   * @param {object} [options]
+   * @param {boolean} [options.skipSlotCheck=false]  Bypass slot validation.
+   * @returns {{ success: boolean, result?: string, reason?: string }}
+   */
+  _acquireSpiritStack(spiritDef, stackCount = 1, options = {}) {
+    const { skipSlotCheck = false } = options;
+    const isSymbiont = spiritDef.channel === 'symbiont' || spiritDef.category === 'symbiont';
+    let lastResult = null;
+
+    for (let i = 0; i < stackCount; i++) {
+      const existing = this._allSpirits.find(s => s.id === spiritDef.id && !s.isNegative);
+
+      if (existing) {
+        existing.stackCount = (existing.stackCount ?? 1) + 1;
+        this._addAccumulatorElement(existing);
+
+        if (existing.stackCount >= 4) {
+          const snapshotPower = Math.min(3, existing.stackCount - 1);
+          const aggregatedState = this._aggregateElementsForNegative(existing, snapshotPower);
+          const idx = this._allSpirits.indexOf(existing);
+          this._allSpirits.splice(idx, 1);
+          this._allSpirits.push({
+            id: spiritDef.id, name: spiritDef.name,
+            stackCount: 1, isNegative: true, powerLevel: snapshotPower,
+            state: aggregatedState, acquiredRound: this._round ?? 0,
+            symbiont: isSymbiont || undefined, sellPriceBonus: 0,
+          });
+          lastResult = 'transcended';
+        } else {
+          lastResult = 'stacked';
+        }
+      } else {
+        if (!skipSlotCheck && !this.canAddSpirit) {
+          return { success: false, reason: 'No spirit slots available', result: lastResult };
+        }
+        let spirit;
+        if (isSymbiont) {
+          spirit = this._buildSymbiontSpirit(spiritDef, 1);
+        } else {
+          spirit = { id: spiritDef.id, name: spiritDef.name, stackCount: 1, acquiredRound: this._round ?? 0, sellPriceBonus: 0 };
+          this._initSpiritState(spirit);
+        }
+        this._allSpirits.push(spirit);
+        lastResult = 'added';
+      }
+    }
+
+    return { success: true, result: lastResult };
+  }
+
+  /**
+   * Push a fully-formed spirit entry directly into _allSpirits without stacking,
+   * cascade-transcendence, or symbiont auto-flagging. Use ONLY for:
+   *   - Creating specific negatives with explicit powerLevel (Amber)
+   *   - Duplicating an existing negative as a parallel entry (Sulfur negative-target)
+   *   - Past Life negative-target copies
+   *
+   * For regular acquisition use _acquireSpiritStack() instead.
+   * @param {object} spiritEntry  Full spirit object with all required fields set.
+   */
+  addSpiritDirect(spiritEntry) {
+    this._allSpirits.push(spiritEntry);
+  }
+
+  /**
+   * Remove a specific spirit object by reference.
+   * @param {object} spirit  The spirit object to remove.
+   * @returns {boolean} True if found and removed.
+   */
+  removeSpiritObj(spirit) {
+    const idx = this._allSpirits.indexOf(spirit);
+    if (idx >= 0) { this._allSpirits.splice(idx, 1); return true; }
+    return false;
+  }
+
+  /**
+   * Remove all spirits with stackCount <= 0.
+   */
+  removeZeroStackSpirits() {
+    this._allSpirits = this._allSpirits.filter(s => (s.stackCount ?? 1) > 0);
+  }
+
+  /**
+   * Replace a spirit object in-place (by reference lookup).
+   * Used for metamorphosis (e.g. Caterpillar → Moth).
+   * @param {object} oldSpirit  The spirit to replace.
+   * @param {object} newSpirit  The replacement.
+   * @returns {boolean} True if found and replaced.
+   */
+  replaceSpiritObj(oldSpirit, newSpirit) {
+    const idx = this._allSpirits.indexOf(oldSpirit);
+    if (idx >= 0) { this._allSpirits[idx] = newSpirit; return true; }
+    return false;
+  }
+
+  /**
+   * Insert a spirit at a specific _allSpirits index.
+   * @param {number} index
+   * @param {object} spiritEntry
+   */
+  insertSpiritAt(index, spiritEntry) {
+    this._allSpirits.splice(index, 0, spiritEntry);
   }
 
   // ── Legendary spirit slots ─────────────────────────────────────────────────
@@ -593,56 +897,6 @@ class RunManager {
     return { success: true, refund: RunManager.LEGENDARY_SELL_VALUE };
   }
 
-  /**
-   * Fuse two equipped spirits into one using a known fusion recipe.
-   * Removes both input spirits and adds the fused result, freeing one slot.
-   * No ki cost — the cost was purchasing both inputs.
-   *
-   * @param {string} spiritIdA
-   * @param {string} spiritIdB
-   * @returns {{ success: boolean, reason?: string, fusedSpirit?: object }}
-   */
-  fuseSpirits(spiritIdA, spiritIdB) {
-    const recipe = findFusionRecipe(spiritIdA, spiritIdB);
-    if (!recipe) return { success: false, reason: 'No fusion recipe exists for these spirits.' };
-
-    const indexA = this._spirits.findIndex(s => s.id === spiritIdA);
-    const indexB = this._spirits.findIndex(s => s.id === spiritIdB);
-    if (indexA === -1 || indexB === -1) return { success: false, reason: 'Spirits not equipped.' };
-
-    // Remove higher index first to keep lower index stable.
-    const [first, second] = indexA > indexB ? [indexA, indexB] : [indexB, indexA];
-    this._spirits.splice(first, 1);
-    this._spirits.splice(second, 1);
-
-    const fusedDef = getSpiritDef(recipe.output);
-
-    // Check if a copy already exists — if so, stack it (or transcend at ×4).
-    const existing  = this._spirits.find(s => s.id === fusedDef.id && !s.isNegative);
-    const hasNeg    = this._negativeSpirits.some(s => s.id === fusedDef.id);
-    let fusionResult = 'added';
-
-    if (existing) {
-      existing.stackCount = (existing.stackCount ?? 1) + 1;
-      if (existing.stackCount >= 4 && !hasNeg) {
-        const snapshotStacks = existing.stackCount - 1;
-        const idx = this._spirits.indexOf(existing);
-        this._spirits.splice(idx, 1);
-        this._negativeSpirits.push({
-          id: fusedDef.id, name: fusedDef.name,
-          stackCount: snapshotStacks, isNegative: true, state: existing.state ?? null,
-        });
-        fusionResult = 'transcended';
-      } else {
-        fusionResult = 'stacked';
-      }
-    } else {
-      this._spirits.push({ id: fusedDef.id, name: fusedDef.name, stackCount: 1 });
-    }
-
-    return { success: true, fusedSpirit: fusedDef, fusionResult };
-  }
-
   // ── Blessings ─────────────────────────────────────────────────────────────
 
   get blessings() { return [...this._blessings]; }
@@ -669,6 +923,14 @@ class RunManager {
 
   get consumables()      { return [...this._consumables]; }
   get canAddConsumable() { return this._consumables.length < this.maxConsumableSlots; }
+
+  swapConsumables(indexA, indexB) {
+    if (indexA < 0 || indexA >= this._consumables.length) return;
+    if (indexB < 0 || indexB >= this._consumables.length) return;
+    const temp = this._consumables[indexA];
+    this._consumables[indexA] = this._consumables[indexB];
+    this._consumables[indexB] = temp;
+  }
 
   /**
    * Add a consumable to the inventory.
@@ -731,8 +993,14 @@ class RunManager {
   sellConsumable(index) {
     if (index < 0 || index >= this._consumables.length) return { success: false, reason: 'Invalid index' };
     const cons = this._consumables[index];
-    const def  = getZodiacDef(cons.id);
-    const refund = def ? Math.floor(def.cost / 2) : 0;
+    let baseCost = 0;
+    if (cons.id.startsWith('element_'))     baseCost = getElementDef(cons.id)?.cost ?? 0;
+    else if (cons.id.startsWith('stamp_'))  baseCost = getStampDef(cons.id)?.cost ?? 0;
+    else if (cons.id.startsWith('chakra_')) baseCost = CHAKRA_TOOLS.find(c => c.id === cons.id)?.cost ?? 0;
+    else                                    baseCost = getZodiacDef(cons.id)?.cost ?? cons.cost ?? 0;
+    const baseRefund = Math.floor(baseCost / 2);
+    const bonusRefund = cons.sellPriceBonus ?? 0;
+    const refund = baseRefund + bonusRefund;
     this._consumables.splice(index, 1);
     if (refund > 0) this._ki += refund;
     logger.logConsumableSold(cons.name ?? cons.id, refund);
@@ -807,58 +1075,70 @@ class RunManager {
   /** True if the run ended in victory. */
   get runWon()  { return this._runWon; }
 
-  // ── Style Base (legacy) ────────────────────────────────────────────────────
-
-  /** @deprecated Kept for backward compat; no longer used in scoring. */
-  accumulateStyle(amount = 0.1) { this._styleBase += amount; }
-  /** @deprecated Kept for backward compat; no longer used in scoring. */
-  addStyleBase(amount) { this._styleBase += amount; }
-  /** @deprecated Kept for backward compat; no longer used in scoring. */
-  decayStyle() { this._styleBase = 1.0 + (this._styleBase - 1.0) * 0.7; }
-
   // ── Flow system ────────────────────────────────────────────────────────────
 
   /**
-   * Called when the player successfully pushes and then completes a new yaku.
-   * Permanently increases flow by 10%.
+   * Called when the player completes a new yaku after pushing.
+   * Increments push depth — flow is not mutated until bank resolution.
+   * @param {object} [roundManager]  GRM instance for depth tracking.
    */
-  onPushSuccess() {
-    const time = this._legendarySpirits.some(s => s.id === 'capstone_time');
-    const base = time ? 1.3 : 1.1;
-    const mult = applyHook('modifyPushSuccess', base, base);
-    const oldFlow = this._flow;
-    this._flow *= mult;
-    logger.logFlowChange(oldFlow, this._flow, 'push success');
+  onPushSuccess(roundManager) {
+    if (roundManager) roundManager._pushDepth++;
     const effect = getActiveEffect();
     if (effect?.onPushSuccess) effect.onPushSuccess(this);
   }
 
   /**
    * Called when the round ends after a push with no new yaku (push failure).
-   * Permanently decreases flow.  Default: ×0.9.  No score penalty is applied.
+   * Applies the failure multiplier from the push curve.
+   * @param {object} [roundManager]  GRM instance for depth lookup.
    */
-  onPushFailure() {
-    const time = this._legendarySpirits.some(s => s.id === 'capstone_time');
-    const base = time ? 0.95 : 0.9;
-    const mult = applyHook('modifyPushFailure', base, base);
-    const oldFlow = this._flow;
-    this._flow *= mult;
-    logger.logFlowChange(oldFlow, this._flow, 'push failure');
+  onPushFailure(roundManager) {
+    if (roundManager) {
+      const depth = roundManager._pushDepth + 1;
+      const mult  = getPushMultiplier(depth, 'failure');
+      const oldFlow = this._flow;
+      this._flow *= mult;
+      logger.logFlowChange(oldFlow, this._flow, `push failure (depth ${depth})`);
+    }
     const effect = getActiveEffect();
     if (effect?.onPushFailure) effect.onPushFailure(this);
+  }
+
+  /**
+   * Called when the player banks. Applies the success multiplier from the
+   * push curve based on current push depth. At depth 0 the multiplier is 1.0.
+   * @param {object} [roundManager]  GRM instance for depth lookup.
+   */
+  onBank(roundManager) {
+    if (!roundManager) return;
+    const depth = roundManager._pushDepth;
+    const mult  = getPushMultiplier(depth, 'success');
+    if (mult !== 1.0) {
+      const oldFlow = this._flow;
+      this._flow *= mult;
+      logger.logFlowChange(oldFlow, this._flow, `bank (depth ${depth})`);
+    }
   }
 
   /**
    * Apply end-of-round flow decay. Call after push/bank resolution, before shop.
    * Default: ×0.95 per round.  Hexagram can modify this rate.
    */
-  applyFlowDecay() {
+  /** Effective flow decay rate after Capstone Time + hexagram modifiers. */
+  getEffectiveFlowDecay() {
     const time = this._legendarySpirits.some(s => s.id === 'capstone_time');
-    const base = time ? 0.98 : RunManager.FLOW_DECAY_RATE;
-    const rate = applyHook('modifyFlowDecay', base, base);
-    const oldFlow = this._flow;
-    this._flow *= rate;
-    logger.logFlowChange(oldFlow, this._flow, 'round decay');
+    const base = time ? 1.0 : RunManager.FLOW_DECAY_RATE;
+    return applyHook('modifyFlowDecay', base, base);
+  }
+
+  applyFlowDecay() {
+    const rate = this.getEffectiveFlowDecay();
+    if (rate !== 1.0) {
+      const oldFlow = this._flow;
+      this._flow *= rate;
+      logger.logFlowChange(oldFlow, this._flow, 'round decay');
+    }
   }
 
   /**
@@ -873,7 +1153,7 @@ class RunManager {
     const flowBonus = applyHook('modifyStyleFlow', comboValue, comboValue);
     const oldFlow = this._flow;
     this._flow += flowBonus;
-    logger.logFlowChange(oldFlow, this._flow, `style combo: ${comboId}`);
+    logger.logFlowChange(oldFlow, this._flow, `style combo: ${comboId}`, 'additive');
     return true;
   }
 
@@ -896,7 +1176,6 @@ class RunManager {
    */
   advanceRound(roundScore = 0) {
     this._totalScore += roundScore;
-    this.decayStyle();
     this._round++;
     return this;
   }
@@ -949,20 +1228,29 @@ class RunManager {
    */
   calculateKiReward(result) {
     const cardsInHand  = result.cardsInHand  ?? 0;
-    const styleCombos  = result.styleCombos  ?? 0;
     const earthKiBonus = result.earthKiBonus ?? 0;
     const pushFailed   = result.penaltyApplied ?? false;
-    const piggyCount   = this._spirits.filter(s => s.id === 'econ_piggybank').length;
-    const graceCount   = this._spirits.filter(s => s.id === 'econ_grace').length;
-    // Push failure forfeits all hand-derived ki.
-    const piggyMult    = piggyCount > 0 ? Math.min(1 + piggyCount, 4) : 1;
+    const pushDepth    = result.pushDepth ?? 0;
+    const outcome      = pushFailed ? 'failure' : 'success';
+    const piggyStacks  = this.countStackedById('econ_piggybank');
+    const piggyMult    = piggyStacks > 0 ? (1 + piggyStacks) : 1;
     let handKi         = pushFailed ? 0 : cardsInHand * piggyMult;
     handKi             = applyHook('modifyHandKi', handKi, handKi);
-    const graceMult    = graceCount > 0 ? Math.min(1 + graceCount, 4) : 1;
-    const baseComboKi  = styleCombos * graceMult;
-    const comboKi      = this.styleComboKi(baseComboKi);
-    const total        = 5 + handKi + comboKi + earthKiBonus;
-    return applyHook('modifyKiReward', total, total, { cardsInHand, styleCombos });
+    const pushMult     = getPushMultiplier(pushDepth, outcome);
+    const interestKi   = Math.floor(this._ki * this.interestRate * pushMult);
+    const flat         = 5;
+    const subtotal     = flat + handKi + earthKiBonus + interestKi;
+    const total        = applyHook('modifyKiReward', subtotal, subtotal, {
+      cardsInHand, baseKi: flat, handKi, earthKiBonus, interestKi,
+    });
+    const hookDelta    = total - subtotal;
+    return {
+      total,
+      breakdown: {
+        flat, handKi, earthKi: earthKiBonus, interest: interestKi,
+        hookDelta, pushFailed, cardsInHand, piggyStacks, piggyMult,
+      },
+    };
   }
 
   // ── Interest system ────────────────────────────────────────────────────────
@@ -970,9 +1258,9 @@ class RunManager {
   /** Base interest rate applied at the start of each round. */
   get interestRate() {
     let rate = 0.10;
-    const bondsCount = this._spirits.filter(s => s.id === 'econ_bonds').length;
-    rate += Math.min(bondsCount * 0.05, 0.25);
-    if (this._spirits.some(s => s.id === 'econ_ingot'))  rate += this._ki * 0.0001;
+    const bondsCount = this.countStackedById('econ_bonds');
+    rate += bondsCount * 0.05;
+    if (this._allSpirits.some(s => s.id === 'econ_ingot'))  rate += this._ki * 0.0001;
     return applyHook('modifyInterestRate', rate, rate);
   }
 
@@ -985,28 +1273,6 @@ class RunManager {
     const interest = Math.floor(this._ki * this.interestRate);
     this._ki += interest;
     return interest;
-  }
-
-  // ── Yaku upgrades ──────────────────────────────────────────────────────────
-
-  /** Spread copy of the current yaku upgrade levels. */
-  get yakuUpgrades() { return { ...this._yakuUpgrades }; }
-
-  /**
-   * Purchase one level of a yaku upgrade. Costs 5 ki.
-   * @param {'kasu'|'tanzaku'|'tane'|'hikari'} yakuId
-   * @throws {Error} if not enough ki or unknown yakuId.
-   */
-  buyYakuUpgrade(yakuId) {
-    if (!(yakuId in this._yakuUpgrades)) {
-      throw new Error(`Unknown yaku upgrade id: ${yakuId}`);
-    }
-    const cost = this.getEffectiveCost(5);
-    if (this._ki < cost) {
-      throw new Error('Not enough ki to buy a yaku upgrade (costs 5).');
-    }
-    this._ki -= cost;
-    this._yakuUpgrades[yakuId]++;
   }
 
   // ── Persistent deck ────────────────────────────────────────────────────────
@@ -1079,7 +1345,7 @@ class RunManager {
    * @param {object} card - The card being destroyed
    */
   _fireCardDestroyedEvent(card) {
-    for (const spirit of this._spirits) {
+    for (const spirit of this._allSpirits) {
       const effect = SpiritEffects.get(spirit.id);
       if (effect?.onCardDestroyed) {
         effect.onCardDestroyed({ card, spirit, run: this });
@@ -1111,9 +1377,9 @@ class RunManager {
 
   /** sym_badger: notify that a consumable was used. */
   _notifyBadger() {
-    for (const spirit of this._spirits) {
-      if (spirit.id === 'sym_badger' && spirit.state) {
-        spirit.state.consumablesUsed += (spirit.stackCount ?? 1);
+    for (const spirit of this._allSpirits) {
+      if (spirit.id === 'sym_badger') {
+        incrementPerElement(spirit, 'consumablesUsed', 1);
       }
     }
   }
@@ -1140,8 +1406,8 @@ class RunManager {
     this._deck.push(newCard);
     logger.logCardAdded(newCard.name ?? newCard.id, 'shop purchase');
     // engine_palace: increment counter when a card is added to the deck.
-    for (const spirit of this._spirits) {
-      if (spirit.id === 'engine_palace' && spirit.state) spirit.state.cardsAdded++;
+    for (const spirit of this._allSpirits) {
+      if (spirit.id === 'engine_palace') incrementPerElement(spirit, 'cardsAdded', 1);
     }
     return { success: true, card: newCard };
   }
@@ -1232,7 +1498,7 @@ class RunManager {
    * @param {string[]} cardIds
    */
   applyChakraRoot(cardIds) {
-    if (cardIds.length > 3) throw new Error('Root Chakra can toggle up to 3 cards');
+    if (cardIds.length > 3) return { success: false, reason: 'Root Chakra can toggle up to 3 cards' };
     for (const id of cardIds) {
       const card = this._deck.find(c => c.id === id);
       if (!card) continue;
@@ -1240,6 +1506,7 @@ class RunManager {
       card.rootConverted = true;
     }
     this._notifyBadger();
+    return { success: true };
   }
 
   /**
@@ -1250,7 +1517,7 @@ class RunManager {
    * @param {string[]} cardIds
    */
   applyChakraSacral(cardIds) {
-    if (cardIds.length > 3) throw new Error('Sacral Chakra can advance up to 3 cards');
+    if (cardIds.length > 3) return { success: false, reason: 'Sacral Chakra can advance up to 3 cards' };
     for (const id of cardIds) {
       const card = this._deck.find(c => c.id === id);
       if (!card) continue;
@@ -1278,6 +1545,7 @@ class RunManager {
       card.sacralConverted = true;
     }
     this._notifyBadger();
+    return { success: true };
   }
 
   /**
@@ -1286,7 +1554,7 @@ class RunManager {
    * @param {string[]} cardIds
    */
   applyChakraSolarPlexus(cardIds) {
-    if (cardIds.length > 2) throw new Error('Solar Plexus Chakra can cycle up to 2 cards');
+    if (cardIds.length > 2) return { success: false, reason: 'Solar Plexus Chakra can cycle up to 2 cards' };
     const CYCLE      = { plain: 'ribbon', ribbon: 'animal', animal: 'bright', bright: 'plain' };
     const POINTS     = { plain: 3, ribbon: 10, animal: 12, bright: 20 };
     const TYPE_NAMES = { bright: 'Bright', animal: 'Animal', ribbon: 'Ribbon', plain: 'Plain' };
@@ -1300,6 +1568,7 @@ class RunManager {
       card.solarPlexusConverted = true;
     }
     this._notifyBadger();
+    return { success: true };
   }
 
   /**
@@ -1311,6 +1580,9 @@ class RunManager {
   applyChakraHeart(cardId) {
     const card = this._deck.find(c => c.id === cardId);
     if (!card) return { success: false, reason: 'Card not found' };
+    if (card.edition) {
+      return { success: false, reason: 'Card already has an edition', existingEdition: card.edition };
+    }
     const roll   = Math.random();
     card.edition = roll < 0.6 ? 'gold' : roll < 0.9 ? 'crystal' : 'ghost';
     this._notifyBadger();
@@ -1334,11 +1606,11 @@ class RunManager {
     };
     this._deck.push(newCard);
     // engine_palace: increment counter when a card is added to the deck.
-    for (const spirit of this._spirits) {
-      if (spirit.id === 'engine_palace' && spirit.state) spirit.state.cardsAdded++;
+    for (const spirit of this._allSpirits) {
+      if (spirit.id === 'engine_palace') incrementPerElement(spirit, 'cardsAdded', 1);
     }
     this._notifyBadger();
-    return { success: true };
+    return { success: true, newCard };
   }
 
   /**
@@ -1346,9 +1618,9 @@ class RunManager {
    * @param {string[]} cardIds
    */
   applyChakraThirdEye(cardIds) {
-    if (cardIds.length > 2) throw new Error('Third Eye Chakra can delete up to 2 cards');
-    this._deck = this._deck.filter(c => !cardIds.includes(c.id));
-    this._notifyBadger();
+    if (cardIds.length > 2) return { success: false, reason: 'Third Eye Chakra can delete up to 2 cards' };
+    for (const id of cardIds) this.deleteCard(id);
+    return { success: true };
   }
 
   /**
@@ -1363,24 +1635,19 @@ class RunManager {
     const source = this._deck.find(c => c.id === sourceId);
     const target = this._deck.find(c => c.id === targetId);
     if (!source || !target) return { success: false, reason: 'Card not found' };
-    const savedId          = target.id;
-    const savedEnhancement = target.enhancement;
-    const savedRibbonStamp = target.ribbonStamp;
-    const savedEdition     = target.edition;
-    target.month     = source.month;
-    target.monthName = source.monthName;
-    target.type      = source.type;
-    target.points    = source.points;
-    target.name      = source.name;
-    target.vertical  = source.vertical;
-    target.temporal  = source.temporal;
-    target.id        = savedId;
-    if (savedEnhancement !== undefined) target.enhancement = savedEnhancement;
-    else                                delete target.enhancement;
-    if (savedRibbonStamp !== undefined) target.ribbonStamp = savedRibbonStamp;
-    else                                delete target.ribbonStamp;
-    if (savedEdition !== undefined)     target.edition     = savedEdition;
-    else                                delete target.edition;
+    if (source.id === target.id) return { success: false, reason: 'Source and target must be different' };
+
+    const savedId = target.id;
+
+    // Clear all properties so no stale state persists from the old identity.
+    for (const key of Object.keys(target)) delete target[key];
+
+    // Deep-clone source and assign all properties (identity, enhancement,
+    // stamps, editions, mutations, conversion flags — no whitelist needed).
+    Object.assign(target, JSON.parse(JSON.stringify(source)));
+
+    target.id = savedId;
+    target.baseImageId = source.baseImageId ?? source.id;
     target.crownConverted = true;
     this._notifyBadger();
     return { success: true };
@@ -1403,17 +1670,11 @@ class RunManager {
     const cost = this.getEffectiveCost(stampDef.cost);
     if (this._ki < cost) return { success: false, reason: 'Not enough ki' };
     this._ki -= cost;
-    card.ribbonStamp = stampId;
-    logger.logCardStamped(card.name ?? card.id, stampId);
+    const resultStampId = mixStamps(card.ribbonStamp, stampId);
+    card.ribbonStamp = resultStampId;
+    logger.logCardStamped(card.name ?? card.id, resultStampId);
     this._notifyBadger();
     return { success: true };
-  }
-
-  /**
-   * @deprecated Use applyStamp instead.
-   */
-  applyRibbonStamp(cardId, stampId) {
-    return this.applyStamp(cardId, stampId);
   }
 
   // ── Wu Xing enhancements ───────────────────────────────────────────────────
@@ -1512,13 +1773,19 @@ class RunManager {
   }
 
   /**
-   * Generate a random consumable from the full pool (Three Marks + Wu Xing)
-   * and add it to the consumable inventory if space is available.
+   * Generate a random consumable from the full pool (Wu Xing, Zodiac, Chakra,
+   * primary stamps) and add it to the consumable inventory if space is available.
+   * Excludes alchemicals (earned/bought, not generated).
    * @returns {object|null}  The consumable added, or null if inventory was full.
    */
   generateRandomConsumable() {
     if (!this.canAddConsumable) return null;
-    const pool = [...WUXING_CONSUMABLES];
+    const pool = [
+      ...WUXING_CONSUMABLES,
+      ...ZODIAC_CONSUMABLES,
+      ...CHAKRA_TOOLS,
+      ...PRIMARY_STAMPS,
+    ];
     const def  = pool[Math.floor(Math.random() * pool.length)];
     const cons = { id: def.id, name: def.name, description: def.description, category: def.category };
     this._consumables.push(cons);
@@ -1527,25 +1794,52 @@ class RunManager {
 
   // ── Snapshot ───────────────────────────────────────────────────────────────
 
-  /**
-   * Plain-object snapshot for save states or debug logging.
-   * @returns {object}
-   */
-  toSnapshot() {
-    return {
-      ki:           this._ki,
-      round:        this._round,
-      totalScore:   this._totalScore,
-      styleBase:    this._styleBase,
-      spirits:      [...this._spirits],
-      consumables:  [...this._consumables],
-      yakuUpgrades: { ...this._yakuUpgrades },
-      deck:         JSON.parse(JSON.stringify(this._deck)),
-      flow:         this._flow,
-      runOver:      this._runOver,
-      runWon:       this._runWon,
-    };
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Returns the effective power level of a spirit.
+ * Regulars: stackCount. Negatives: powerLevel (defaults to 1 for legacy data).
+ */
+export function effectivePower(spirit) {
+  if (spirit.isNegative) return spirit.powerLevel ?? 1;
+  return spirit.stackCount ?? 1;
+}
+
+/**
+ * Look up the multiplier for a given push resolution depth and outcome.
+ * Extrapolates linearly for depths beyond the table.
+ * @param {number} depth   Resolution depth (0+)
+ * @param {string} outcome 'success' or 'failure'
+ * @returns {number}
+ */
+export function getPushMultiplier(depth, outcome) {
+  // Compute base multiplier from curve or extrapolation.
+  let baseMult;
+  const entry = RunManager.PUSH_CURVE[depth];
+  if (entry && entry[outcome] !== undefined) {
+    baseMult = entry[outcome];
+  } else if (outcome === 'success') {
+    baseMult = 2.00 + 0.50 * (depth - 4);
+  } else if (outcome === 'failure') {
+    baseMult = Math.max(0.05, 0.50 - 0.15 * (depth - 4));
+  } else {
+    return 1.0;
   }
+
+  // Apply hexagram amplifier hook.
+  const hookName = outcome === 'success' ? 'pushCurveSuccessAmplifier' : 'pushCurveFailureAmplifier';
+  let amplifier = applyHook(hookName, 1.0, 1.0);
+
+  // Capstone Time: amplify successes 1.5×, dampen failures 0.5×.
+  const hasTime = run._legendarySpirits?.some(s => s.id === 'capstone_time') ?? false;
+  if (hasTime) {
+    amplifier *= (outcome === 'success' ? 1.5 : 0.5);
+  }
+
+  // Apply amplifier as delta-from-neutral scaling.
+  return 1.0 + (baseMult - 1.0) * amplifier;
 }
 
 // ── Singleton export ──────────────────────────────────────────────────────────
@@ -1555,6 +1849,12 @@ class RunManager {
 const run = new RunManager();
 export { RunManager };
 export default run;
+
+// ── Debug hook (dev only — remove in Phase 4 cleanup) ────────────────────────
+// Exposes the active run singleton on window for browser console diagnostics.
+if (typeof window !== 'undefined') {
+  window.__run = run;
+}
 
 
 // Dev-only: expose for browser console testing

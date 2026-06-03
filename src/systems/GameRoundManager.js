@@ -53,7 +53,7 @@ import ScoringEngine from "./ScoringEngine.js";
 import ConsumableEffects from "./ConsumableEffects.js";
 import StyleEngine      from "./StyleEngine.js";
 import SpiritEffects    from "./SpiritEffects.js";
-import run, { RunManager } from "./RunManager.js";
+import run, { RunManager, effectivePower, incrementPerElement, ACCUMULATOR_SPIRIT_IDS, getPushMultiplier } from "./RunManager.js";
 import { getActiveEffect, applyHook,
   getFireFlatPoints, getFireBreakChance, getWaterMult,
   getMetalHeldMult, getMeteoriteJackpotChance,
@@ -99,7 +99,7 @@ export default class GameRoundManager {
      * was absent OR its bonus grew by >0.3.
      * @type {Map<string, number>}
      */
-    this._yakuBeforeTurn = new Map();
+    this._yakuBeforeTurn = new Set();
 
     /** 1-based turn counter, incremented after each complete turn. */
     this._turn = 0;
@@ -144,7 +144,7 @@ export default class GameRoundManager {
     /**
      * Running total of base capture points earned this round.
      * Incremented immediately whenever cards are captured (both phases).
-     * Full-month captures (4 cards at once) earn a +5 bonus on top of card values.
+     * Cards are worth their face `points` value (bright=20, animal=12, ribbon=10, plain=3).
      */
     this._basePoints = 0;
 
@@ -162,13 +162,8 @@ export default class GameRoundManager {
 
     /** Number of times the player has pushed this round. */
     this._pushCount = 0;
-
-    /**
-     * Style Base snapshot for this round — copied from run.styleBase at round
-     * start via setStyleBase().  Updated by recordStyleHand() when the player
-     * makes a resonance play.  Used to compute Flow at round end.
-     */
-    this._styleBase = 1.0;
+    /** Successful push depth (commitment-based curve index). */
+    this._pushDepth = 0;
 
     /**
      * True when the round would normally end (hand empty or plays exhausted)
@@ -191,13 +186,6 @@ export default class GameRoundManager {
      * @type {{ id: string, name: string, bonus: number }[]}
      */
     this._lastStyleCombos = [];
-
-    /**
-     * Active spirit loadout for this round — used by ScoringEngine to run
-     * spirit scoring hooks.  Set via setSpirits() before startRound().
-     * @type {object[]}
-     */
-    this._spirits = [];
 
     /** Scoring step callback — set by GameScene via setScoringStepCallback(). */
     this._onScoringStep = null;
@@ -224,6 +212,8 @@ export default class GameRoundManager {
   get basePoints()     { return this._basePoints; }
   /** Number of times the player has pushed this round. */
   get pushCount()      { return this._pushCount; }
+  /** Successful push depth (commitment-based curve index). */
+  get pushDepth()      { return this._pushDepth; }
   /**
    * Cards auto-captured at round start due to a natural full month in hand.
    * Each element is an array of 4 cards (one group per captured month).
@@ -292,9 +282,6 @@ export default class GameRoundManager {
     return combos;
   }
 
-  /** Total style bonus accumulated from combos triggered so far this round. */
-  get roundStyleTotal() { return this._style.getRoundStyleTotal(); }
-
   /** Ki gained from Earth enhancements at the start of this round (0 if none). */
   get lastEarthKiGain() { return this._lastEarthKiGain ?? 0; }
   /** Ki gained from base interest at the start of this round (0 if none). */
@@ -323,51 +310,8 @@ export default class GameRoundManager {
    * Set the active spirit loadout for scoring.  Call before startRound().
    * @param {object[]} spirits  Spirit objects from RunManager.spirits.
    */
-  setSpirits(spirits) { this._spirits = [...spirits]; }
-
-  /**
-   * Set the Style Base for this round.  Call before startRound() with the
-   * run's current styleBase so scoring uses the up-to-date value.
-   * @param {number} styleBase
-   */
-  setStyleBase(styleBase) { this._styleBase = styleBase; }
 
   setScoringStepCallback(fn) { this._onScoringStep = fn; }
-
-  /**
-   * Record a resonance (style) hand — increments the round's Style Base by 0.1.
-   * Also call run.accumulateStyle() from the game scene so the RunManager
-   * stays in sync for cross-round decay.
-   * @returns {number} The updated styleBase.
-   */
-  recordStyleHand() {
-    this._styleBase += 0.1;
-    return this._styleBase;
-  }
-
-  /**
-   * Live scoring snapshot — evaluates the current capture pile and returns
-   * the full picture needed to render the score HUD.
-   *
-   * Push Factor shown here is the optimistic value (assumes no failure).
-   *
-   * @returns {{ allYaku, totalMultiplier, pushFactor, styleBase,
-   *             flow, basePoints, finalScore }}
-   */
-  getCurrentScoring() {
-    // Live estimate: assume best-case (no pending failure) for HUD display.
-    const pushFactor = Math.min(1.5, 1.0 + this._pushCount * 0.1);
-    const flow       = Math.max(1.0, this._styleBase * pushFactor);
-    const sc = this._scoring.calculateFinalScore(this._capture.getAll(), this._spirits, flow, run.yakuUpgrades);
-    return {
-      ...sc,
-      allYaku:         sc.yakuList,
-      totalMultiplier: sc.yakuMult,
-      basePoints:      sc.boostedBasePoints,
-      pushFactor,
-      styleBase:       this._styleBase,
-    };
-  }
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -383,8 +327,7 @@ export default class GameRoundManager {
    * @returns {this} for chaining
    */
   startRound() {
-    // ── Base interest (10% of ki balance) ────────────────────────────────
-    this._lastInterestGain = run.applyInterest();
+    // Interest moved to round-end (computed inside calculateKiReward).
 
     // Earth ki bonus moves to round end — see _computeEarthKiBonus().
     this._lastEarthKiGain = 0;
@@ -395,7 +338,7 @@ export default class GameRoundManager {
     this._capture.clear();
 
     this._phase              = "idle";
-    this._yakuBeforeTurn     = new Map();
+    this._yakuBeforeTurn     = new Set();
     this._turn               = 0;
     this._lastDeckCard       = null;
     this._discardCount       = 0;
@@ -408,13 +351,14 @@ export default class GameRoundManager {
     this._atRiskScore              = 0;
     this._pushPenaltyActive        = false;
     this._pushCount                = 0;
+    this._pushDepth                = 0;
     this._bullseyeInventory        = { bright: 0, animal: 0, ribbon: 0, plain: 0 };
     this._roundEndingAfterDecision = false;
     this._dogProtection            = false;
     this._pigDoubleKi              = false;
-    this._rabbitActive             = false;
     this._goatActive               = false;
     this._tigerPushActive          = false;
+    this._roosterBonusThisRound    = 0;
     this._snakeThresholdMods       = {};
     this._lastStyleCombos          = [];
     this._nextDeckFlip             = null;
@@ -426,53 +370,37 @@ export default class GameRoundManager {
     const _hexEffect = getActiveEffect();
     if (_hexEffect?.onRoundStart) _hexEffect.onRoundStart(this);
 
-    // ── Symbiont per-round resets ─────────────────────────────────────────
-    for (const spirit of this._spirits) {
+    // ── Symbiont per-round resets (includes negatives) ────────────────────
+    for (const spirit of run.allSpirits) {
       if (spirit.id === 'sym_osprey'  && spirit.state) spirit.state.flipsUsedThisRound = 0;
-      // sym_cuckoo_egg: countdown — hatch when it reaches 0.
-      if (spirit.id === 'sym_cuckoo_egg' && spirit.state) {
-        spirit.state.roundsRemaining--;
-        if (spirit.state.roundsRemaining <= 0) {
-          const fusions = SPIRIT_CATALOG.filter(s => s.tier === 2);
-          const target  = fusions[Math.floor(Math.random() * fusions.length)];
-          if (target) {
-            spirit.id    = target.id;
-            spirit.name  = target.name;
-            spirit.state = null;
-          }
-        }
-      }
+      if (spirit.id === 'game_catcher' && spirit.state) spirit.state.catchesUsedThisRound = 0;
     }
+
+    // ── Spirit round-start hooks ──────────────────────────────────────────
+    this._fireSpiritHook('onRoundStart');
 
     // ── Scoring state ─────────────────────────────────────────────────────
     this._runningScore     = 0;
     this._cumulativePoints = 0;  // capstone_nature: carries across captures
     this._scoringEvents    = [];
     this._eventCount       = 0;
+    this._captureEventCount = 0;
     this._spentCardIds     = new Set();
-
-    // Reset per-round engine spirit state.
-    for (const spirit of this._spirits) {
-      if (spirit.id === 'engine_radiance') spirit.state = null;
-      if (spirit.id === 'engine_banner')   spirit.state = null;
-    }
 
     // ── Empty-slot play tracking (for Fix D/E capture rules) ─────────────
     this._lastHandPlayToEmptySlot = null;
 
     // Blessing patron bonuses.
-    const _fieldSlotBonus   = run.countBlessingsByEffect('plus_field_slot');
     const _handSizeBonus    = run.countBlessingsByEffect('plus_hand_size');
     const _dealCountBonus   = run.countBlessingsByEffect('plus_deal_count');
 
-    // Field slot count: hexagram, Blessings, and Amber may adjust from base.
-    const _amberMod = run._permanentFieldSlotMod ?? 0;
-    const _fieldBase = Math.max(1, FieldManager.MAX_SLOTS + _fieldSlotBonus + _amberMod);
-    this._field.setMaxSlots(applyHook('modifyFieldSlots', _fieldBase, _fieldBase));
+    // Field slot count: hexagram, Blessings, Amber, and Rooster may adjust from base.
+    this._roosterBonusThisRound = 0;
+    this._recomputeFieldSlots();
     this._field.setCaptureRule(applyHook('overridesCaptureRule', 'month'));
 
     // Gankyil legendary: auto-capture at 3-stack instead of 4-stack.
-    this._field.autoCaptureThreshold = this._spirits.some(s => s.id === 'legend_gankyil') ? 3 : 4;
+    this._field.autoCaptureThreshold = run.activeSpirits.some(s => s.id === 'legend_gankyil') ? 3 : 4;
 
     const _baseHandSize   = applyHook('modifyHandSize', GameRoundManager.HAND_SIZE + _handSizeBonus, GameRoundManager.HAND_SIZE + _handSizeBonus);
     this._hand.maxSize    = _baseHandSize;
@@ -489,7 +417,7 @@ export default class GameRoundManager {
       this._hand.getAll(), this._field.getAll(),
       this._lastEarthKiGain ?? 0, run.ki, run.getDeck().length
     );
-    logger.logSpiritLoadout(this._spirits);
+    logger.logSpiritLoadout(run.spirits, run.negativeSpirits, run.legendarySpirits);
 
     // Peek at next deck card if reveal hexagram is active.
     this._peekNextDeckFlip();
@@ -515,20 +443,40 @@ export default class GameRoundManager {
 
     if (this._onScoringStep) this._onScoringStep({ type: 'capture_start' });
 
+    const _fieldSpirits = run.scoringSpirits;
     let points = 0;
     let mult   = 1.0;
+    const _bd = { cards: [], heldEffects: [], engines: [] };
 
+    // ── Per-card scoring (enhancements + editions + hex + spirit onCardScored) ──
     for (const card of fieldCards) {
+      const _cb = {
+        cardName: card.name ?? card.id,
+        meta: `${card.type}, month ${card.month}`,
+        basePoints: getCardPoints(card),
+        contributions: [],
+        totalCardPts: 0,
+      };
       let cardPts = getCardPoints(card);
       const enh = card.enhancement;
-      if (enh?.element === 'fire')  cardPts += getFireFlatPoints(enh.tier);
-      if (enh?.element === 'water') {
-        cardPts = Math.round(cardPts * getWaterMult(enh.tier, enh.depLevel ?? 0));
+      if (enh?.element === 'fire') {
+        const _fp = getFireFlatPoints(enh.tier);
+        cardPts += _fp;
+        _cb.contributions.push({ source: `${enh.tier} Fire`, addPoints: _fp });
       }
-      if (enh?.element === 'wood') mult *= getWoodScoringMult(enh.tier);
-      if (card.edition === 'gold')    cardPts += 20;
-      if (card.edition === 'crystal') mult    += 5;
-      if (card.edition === 'ghost')   mult    *= 1.5;
+      if (enh?.element === 'water') {
+        const _wm = getWaterMult(enh.tier, enh.depLevel ?? 0);
+        mult *= _wm;
+        _cb.contributions.push({ source: `${enh.tier} Water (dep ${enh.depLevel ?? 0})`, multiplyMult: _wm });
+      }
+      if (enh?.element === 'wood') {
+        const _wdm = getWoodScoringMult(enh.tier);
+        mult *= _wdm;
+        _cb.contributions.push({ source: `${enh.tier} Wood`, multiplyMult: _wdm });
+      }
+      if (card.edition === 'gold')    { cardPts += 20; _cb.contributions.push({ source: 'Gold edition', addPoints: 20 }); }
+      if (card.edition === 'crystal') { mult += 5;     _cb.contributions.push({ source: 'Crystal edition', addMult: 5 }); }
+      if (card.edition === 'ghost')   { mult *= 1.5;   _cb.contributions.push({ source: 'Ghost edition', multiplyMult: 1.5 }); }
 
       const _hexMod = getActiveEffect();
       if (_hexMod?.onCardScored) {
@@ -537,18 +485,71 @@ export default class GameRoundManager {
           if (mod.addPoints    !== undefined) cardPts += mod.addPoints;
           if (mod.addMult      !== undefined) mult    += mod.addMult;
           if (mod.multiplyMult !== undefined) mult    *= mod.multiplyMult;
+          _cb.contributions.push({
+            source: `hexagram ${run.getHexagram()?.englishName ?? 'hex'}`,
+            addPoints: mod.addPoints ?? 0, addMult: mod.addMult ?? 0, multiplyMult: mod.multiplyMult ?? 1,
+          });
+        }
+      }
+
+      for (const spirit of _fieldSpirits) {
+        const effect = SpiritEffects.get(spirit.id);
+        if (!effect?.onCardScored) continue;
+        const count = ACCUMULATOR_SPIRIT_IDS.has(spirit.id) ? 1 : effectivePower(spirit);
+        const r = effect.onCardScored({ card, spirit, spirits: _fieldSpirits });
+        if (r) {
+          if (r.addPoints)    cardPts += r.addPoints    * count;
+          if (r.addMult)      mult    += r.addMult      * count;
+          if (r.multiplyMult) mult    *= r.multiplyMult * count;
+          _cb.contributions.push({
+            source: `${spirit.name}${count > 1 ? ` \xD7${count}` : ''}`,
+            addPoints: (r.addPoints ?? 0) * count, addMult: (r.addMult ?? 0) * count,
+            multiplyMult: r.multiplyMult ?? 1,
+          });
         }
       }
 
       points += cardPts;
+      _cb.totalCardPts = cardPts;
+      _bd.cards.push(_cb);
       if (this._onScoringStep) {
         this._onScoringStep({ type: 'card_points', card, cardPts, points, mult });
       }
     }
 
+    // ── Engine spirits (applyEngine — per scoring event) ──
+    for (const spirit of _fieldSpirits) {
+      const effect = SpiritEffects.get(spirit.id);
+      if (!effect?.applyEngine) continue;
+      const r = effect.applyEngine({ spirit, mult, points, spirits: _fieldSpirits, cards: fieldCards });
+      if (r) {
+        if (r.addPoints)    points += r.addPoints;
+        if (r.addMult)      mult   += r.addMult;
+        if (r.multiplyMult) mult   *= r.multiplyMult;
+        _bd.engines.push({
+          source: `${spirit.name} (stack ${effectivePower(spirit)})`,
+          addPoints: r.addPoints ?? 0, addMult: r.addMult ?? 0, multiplyMult: r.multiplyMult ?? 1,
+        });
+      }
+    }
+
     const flow = run.flow;
-    const fieldScore = Math.round(points * mult * flow);
+    const _hexCompute = getActiveEffect();
+    const fieldScore = _hexCompute?.computeFinalScore
+      ? _hexCompute.computeFinalScore(points, mult, flow)
+      : Math.round(points * mult * flow);
     this._runningScore += fieldScore;
+
+    // ── Field scoring log (parity with capture scoring) ──
+    const _captureNum = ++this._captureEventCount;
+    logger.logCaptureScoring({
+      captureNumber: _captureNum, turn: this._turn, phase: 'field_end',
+      cardBreakdowns: _bd.cards,
+      captureLevel: { heldEffects: _bd.heldEffects, engineSpirits: _bd.engines },
+      totalPoints: points, totalMult: mult, flow,
+      captureScore: fieldScore, runningRoundTotal: this._runningScore,
+      customFormula: _hexCompute?.computeFinalScore ? 'hex computeFinalScore' : null,
+    });
 
     if (this._onScoringStep) {
       this._onScoringStep({
@@ -620,10 +621,10 @@ export default class GameRoundManager {
     // Remove all played cards from hand.
     this._hand.removeMany(cardIds);
 
-    // sym_ants: +0.5 additive mult per card played (permanent).
-    for (const spirit of this._spirits) {
-      if (spirit.id === 'sym_ants' && spirit.state) {
-        spirit.state.totalPlayed = (spirit.state.totalPlayed ?? 0) + cardIds.length;
+    // sym_ants: state counts cards played; stack multiplier applied in engine output.
+    for (const spirit of run.allSpirits) {
+      if (spirit.id === 'sym_ants') {
+        incrementPerElement(spirit, 'totalPlayed', cardIds.length);
       }
     }
 
@@ -640,8 +641,8 @@ export default class GameRoundManager {
     if (this._playsThisTurn === 0) {
       const _snapThresholds = this._getCaptureThresholds();
       const _snapCards = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
-      this._yakuBeforeTurn = new Map(
-        this._scoring.evaluate(_snapCards, run.yakuUpgrades, _snapThresholds).map(y => [y.name, y.bonus])
+      this._yakuBeforeTurn = new Set(
+        this._scoring.evaluate(_snapCards, _snapThresholds).map(y => y.name)
       );
       this._discardedThisTurn = [];
     }
@@ -649,9 +650,9 @@ export default class GameRoundManager {
     const handResult = this._field.playHandCards(cards, targetMonth);
     // engine_moths: Wood (Leaf or Silk) field slot creation.
     if (handResult.woodSlotCreated) {
-      for (const spirit of this._spirits) {
-        if (spirit.id === 'engine_moths' && spirit.state) {
-          spirit.state.t1Procs += (spirit.stackCount ?? 1);
+      for (const spirit of run.activeSpirits) {
+        if (spirit.id === 'engine_moths') {
+          incrementPerElement(spirit, 't1Procs', 1);
         }
       }
     }
@@ -664,17 +665,17 @@ export default class GameRoundManager {
         this._discardedThisTurn.push(card);
         this._allDiscards.push(card);
         this._discardCount++;
-        // econ_recycling: +5 ki per field-full discard.
-        if (this._spirits.some(s => s.id === 'econ_recycling')) run.addKi(5);
+        // econ_recycling: +5 ki per stack per field-full discard.
+        const recyclingStacks1 = run.countStackedById('econ_recycling');
+        if (recyclingStacks1 > 0) run.addKi(5 * recyclingStacks1, 'recycling_overflow');
         // engine_ship: +0.3 mult-mult per card discarded (permanent).
-        for (const spirit of this._spirits) {
-          if (spirit.id === 'engine_ship' && spirit.state) {
-            spirit.state.cardsDiscarded += (spirit.stackCount ?? 1);
+        for (const spirit of run.activeSpirits) {
+          if (spirit.id === 'engine_ship') {
+            incrementPerElement(spirit, 'cardsDiscarded', 1);
           }
         }
-        // Stamp discard-trigger effects.
-        if (card.ribbonStamp === 'stamp_blue') run.generateRandomConsumable();
-        if (card.ribbonStamp === 'stamp_green') run.addKi(8);
+        // Stamp discard-trigger effects (Option C shuffle).
+        this._dispatchStampDiscardEffects(card);
       }
     }
 
@@ -709,7 +710,7 @@ export default class GameRoundManager {
    * Must be called after playHandCard().
    *
    * @returns {{ status: string, newYaku: object[], allYaku: object[],
-   *             yakuPoints: number, turn: number, deckCard: object|null,
+   *             turn: number, deckCard: object|null,
    *             discarded: object[], roundDiscardCount: number }}
    * @throws {Error} if called outside the 'awaiting_deck' phase
    */
@@ -735,24 +736,19 @@ export default class GameRoundManager {
       throw new Error(`bankScore() called while phase is "${this._phase}".`);
     }
 
-    // Push success: player pushed at least once and is now banking after a yaku.
-    if (this._pushCount > 0) {
-      run.onPushSuccess();
-      // engine_northern_lion: gain a free reroll on push success.
-      for (const spirit of this._spirits) {
-        if (spirit.id === 'engine_northern_lion' && spirit.state) {
-          spirit.state.freeRerolls += (spirit.stackCount ?? 1);
-        }
-      }
-    }
+    // Apply bank resolution multiplier (depth 0 = 1.0, no-op).
+    run.onBank(this);
+    // Hexagram onBank hook (e.g. push_ki_swing bank cost).
+    const _hexBank = getActiveEffect();
+    if (_hexBank?.onBank) _hexBank.onBank(run);
 
     // engine_lincoln: +0.1 additive mult per bank (permanent).
-    for (const spirit of this._spirits) {
-      if (spirit.id === 'engine_lincoln' && spirit.state) spirit.state.banks++;
+    for (const spirit of run.activeSpirits) {
+      if (spirit.id === 'engine_lincoln') incrementPerElement(spirit, 'banks', 1);
     }
 
     // Decay spirits: lose value at round end.
-    for (const spirit of this._spirits) {
+    for (const spirit of run.activeSpirits) {
       if (spirit.id === 'decay_persimmon' && spirit.state) {
         spirit.state.remaining = Math.max(0, spirit.state.remaining - 3);
       }
@@ -761,35 +757,42 @@ export default class GameRoundManager {
       }
     }
 
+    // sym_snails: track unplayed cards remaining at bank.
+    this._trackSnailsUnplayed();
+
     // Score field cards if score_field_at_round_end is active.
     this._scoreFieldCards();
 
     // Flow decay — applied every round after push resolution.
     run.applyFlowDecay();
-    logger._log(`Flow decay: ×${RunManager.FLOW_DECAY_RATE} → Flow is now ×${run.flow.toFixed(2)}`);
 
     const flow = run.flow;
-    const sc = this._scoring.calculateFinalScore(
-      this._capture.getAll(), this._spirits, 1.0, run.yakuUpgrades, true
-    );
-    this._applyPostRoundEnhancements(this._capture.getAll(), sc.metalConsumableCount);
+    this._applyPostRoundEnhancements(this._capture.getAll());
     logger.logRoundEnd(
-      { finalScore: this._runningScore, basePoints: this._runningScore,
-        boostedBasePoints: this._runningScore, yakuList: [], yakuMult: 1.0,
-        additiveMult: 0, multMult: 1.0, flow,
-        pointBoost: 1.0, rawBasePoints: this._runningScore },
+      { finalScore: this._runningScore, basePoints: this._runningScore, flow },
       run.threshold, this._runningScore >= run.threshold,
-      this._capture.getAll(), this._styleBase,
+      this._capture.getAll(),
       this._style.getTriggeredCombos(), this._lastEnhancementEvents ?? []
     );
     this._roundEndingAfterDecision = false;
-    // sym_crow: generate a random consumable at round end per crow copy.
-    const crowCountBank = this._spirits.filter(s => s.id === 'sym_crow').length;
-    for (let i = 0; i < crowCountBank; i++) {
-      if (run.canAddConsumable) run.generateRandomConsumable();
+    // sym_crow: generate a random consumable at round end per crow stack.
+    const crowStacksBank = run.countStackedById('sym_crow');
+    if (crowStacksBank > 0) {
+      console.log(`[CROW BANK] Trigger fired. Stacks: ${crowStacksBank}, canAddConsumable: ${run.canAddConsumable}, inventory: ${run._consumables.length}/${run.maxConsumableSlots}`);
+      let blockedBank = 0;
+      for (let i = 0; i < crowStacksBank; i++) {
+        if (run.canAddConsumable) {
+          const generated = run.generateRandomConsumable();
+          console.log(`[CROW BANK] Generated:`, generated?.name ?? '(null)');
+        } else {
+          blockedBank++;
+        }
+      }
+      if (blockedBank > 0) console.log(`[CROW BANK] ${blockedBank} consumable(s) blocked (inventory full)`);
     }
     const _hexEffectBank = getActiveEffect();
     if (_hexEffectBank?.onRoundEnd) _hexEffectBank.onRoundEnd(this);
+    this._fireSpiritHook('onRoundEnd');
     this._phase = "round_over";
     return {
       status:          "banked",
@@ -798,21 +801,12 @@ export default class GameRoundManager {
       captureEvents:   [...this._scoringEvents],
       newYaku:         [],
       allYaku:         [],
-      totalMultiplier: 1.0,
       basePoints:      this._runningScore,
-      boostedBasePoints: this._runningScore,
-      yakuMult:        1.0,
-      effectiveMult:   1.0,
-      additiveMult:    0,
-      multMult:        1.0,
       flow,
-      pushEscalation:  1.0,
-      pointBoost:      1.0,
-      rawBasePoints:   this._runningScore,
       pushFactor:      1.0,
-      styleBase:       this._styleBase,
       penaltyApplied:  false,
       pushCount:       this._pushCount,
+      pushDepth:       this._pushDepth,
       pigDoubleKi:     this._pigDoubleKi,
       turn:            this._turn,
       deckCard:        this._lastDeckCard,
@@ -850,17 +844,20 @@ export default class GameRoundManager {
     const dealCount = this._getNextPushDealCount();
     const handCount = Math.min(dealCount, this._deck.drawPileSize, this._hand.availableSlots);
     if (handCount > 0) this._hand.add(this._deck.draw(handCount));
+    this._peekNextDeckFlip();
     // Re-snapshot yaku using only unspent cards so spent yaku can re-trigger.
     const unspentAfterPush = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
-    this._yakuBeforeTurn = new Map(
-      this._scoring.evaluate(unspentAfterPush, run.yakuUpgrades, this._getCaptureThresholds())
-        .map(y => [y.name, y.bonus])
+    this._yakuBeforeTurn = new Set(
+      this._scoring.evaluate(unspentAfterPush, this._getCaptureThresholds())
+        .map(y => y.name)
     );
     this._phase = "idle";
+    // Preview: if the next yaku succeeds we'll bank at depth+1; if it fails, depth+1 failure.
+    const nextDepth = this._pushDepth + 1;
     return {
       failedPushFactor: 1.0,
-      failedFlow:       run.flow * 0.9,  // flow if push fails
-      successFlow:      run.flow * 1.1,  // flow if push succeeds
+      failedFlow:       run.flow * getPushMultiplier(nextDepth, 'failure'),
+      successFlow:      run.flow * getPushMultiplier(nextDepth, 'success'),
       dealCount:        handCount,
     };
   }
@@ -892,9 +889,9 @@ export default class GameRoundManager {
     const result = effect.execute({ roundManager: this, params });
     // sym_badger: count zodiac/consumable activations.
     if (result.success !== false) {
-      for (const spirit of this._spirits) {
-        if (spirit.id === 'sym_badger' && spirit.state) {
-          spirit.state.consumablesUsed += (spirit.stackCount ?? 1);
+      for (const spirit of run.activeSpirits) {
+        if (spirit.id === 'sym_badger') {
+          incrementPerElement(spirit, 'consumablesUsed', 1);
         }
       }
     }
@@ -912,9 +909,8 @@ export default class GameRoundManager {
    * Called once by bankScore() or _finalizeTurn() when the round actually ends.
    *
    * @param {object[]} capturedCards
-   * @param {number}   metalConsumableCount  Number of Metal consumable procs.
    */
-  _applyPostRoundEnhancements(capturedCards, metalConsumableCount = 0) {
+  _applyPostRoundEnhancements(capturedCards) {
     const events = [];
     for (const card of capturedCards) {
       if (card.enhancement?.element === 'water') {
@@ -922,10 +918,10 @@ export default class GameRoundManager {
         card.enhancement.depLevel = (card.enhancement.depLevel ?? 0) + 1;
         events.push(`${card.id} Water dep → level ${card.enhancement.depLevel}`);
         // engine_glacier: tier-aware depreciation tracking.
-        for (const spirit of this._spirits) {
-          if (spirit.id === 'engine_glacier' && spirit.state) {
-            if (tier === 'base')     spirit.state.t1Procs += (spirit.stackCount ?? 1);
-            if (tier === 'upgraded') spirit.state.t2Procs += (spirit.stackCount ?? 1);
+        for (const spirit of run.activeSpirits) {
+          if (spirit.id === 'engine_glacier') {
+            if (tier === 'base')     incrementPerElement(spirit, 't1Procs', 1);
+            if (tier === 'upgraded') incrementPerElement(spirit, 't2Procs', 1);
           }
         }
       }
@@ -934,10 +930,10 @@ export default class GameRoundManager {
         const breakChance = getFireBreakChance(tier);
         if (rollProbability(breakChance, 'fire_break')) {
           // engine_carbon: tier-aware break tracking (read tier before destruction).
-          for (const spirit of this._spirits) {
-            if (spirit.id === 'engine_carbon' && spirit.state) {
-              if (tier === 'base')     spirit.state.t1Procs += (spirit.stackCount ?? 1);
-              if (tier === 'upgraded') spirit.state.t2Procs += (spirit.stackCount ?? 1);
+          for (const spirit of run.activeSpirits) {
+            if (spirit.id === 'engine_carbon') {
+              if (tier === 'base')     incrementPerElement(spirit, 't1Procs', 1);
+              if (tier === 'upgraded') incrementPerElement(spirit, 't2Procs', 1);
             }
           }
           run.deleteCard(card.id);
@@ -945,11 +941,6 @@ export default class GameRoundManager {
           events.push(`${card.id} Fire BROKE — card destroyed`);
         }
       }
-    }
-    // Generate any Metal-procced consumables.
-    for (let i = 0; i < metalConsumableCount; i++) {
-      run.generateRandomConsumable();
-      events.push('Metal proc → free consumable generated');
     }
     this._lastEnhancementEvents = events;
   }
@@ -987,23 +978,18 @@ export default class GameRoundManager {
    * @returns {number}
    */
   _computeEarthKiBonus() {
-    // engine_applause: retrigger held-in-hand Earth interest N extra times.
-    const _applauseCount = this._spirits
-      .filter(s => s.id === 'engine_applause')
-      .reduce((sum, s) => sum + (s.stackCount ?? 1), 0);
-    const _heldTriggers = 1 + _applauseCount;
     let rate = 0;
-    for (let _ht = 0; _ht < _heldTriggers; _ht++) {
-      for (const card of this._hand.getAll()) {
-        if (card.enhancement?.element === 'earth') {
-          rate += getEarthInterestRate(card.enhancement.tier);
-          // engine_fossil: tier-aware Earth interest proc tracking.
-          for (const spirit of this._spirits) {
-            if (spirit.id === 'engine_fossil' && spirit.state) {
-              const tier = card.enhancement.tier;
-              if (tier === 'base')     spirit.state.t1Procs += (spirit.stackCount ?? 1);
-              if (tier === 'upgraded') spirit.state.t2Procs += (spirit.stackCount ?? 1);
-            }
+    for (const card of this._hand.getAll()) {
+      if (card.enhancement?.element !== 'earth') continue;
+      const _heldTriggers = 1 + this._computeRetriggerCount(card, 'held_in_hand');
+      for (let _ht = 0; _ht < _heldTriggers; _ht++) {
+        rate += getEarthInterestRate(card.enhancement.tier);
+        // engine_fossil: tier-aware Earth interest proc tracking.
+        for (const spirit of run.activeSpirits) {
+          if (spirit.id === 'engine_fossil') {
+            const tier = card.enhancement.tier;
+            if (tier === 'base')     incrementPerElement(spirit, 't1Procs', 1);
+            if (tier === 'upgraded') incrementPerElement(spirit, 't2Procs', 1);
           }
         }
       }
@@ -1047,21 +1033,6 @@ export default class GameRoundManager {
 
   // ── Snapshot ───────────────────────────────────────────────────────────────
 
-  /**
-   * Plain-object snapshot of the full round state.
-   * @returns {object}
-   */
-  toSnapshot() {
-    return {
-      phase:    this._phase,
-      turn:     this._turn,
-      deckSize: this._deck.drawPileSize,
-      hand:     this._hand.toSnapshot(),
-      field:    this._field.toSnapshot(),
-      capture:  this._capture.toSnapshot(),
-    };
-  }
-
   // ── Private helpers ────────────────────────────────────────────────────────
 
   /**
@@ -1087,8 +1058,7 @@ export default class GameRoundManager {
   /**
    * Add captured cards to the capture pile and accumulate base points.
    * Cards are worth their face `points` value (bright=20, animal=12,
-   * ribbon=10, plain=3).  A full-month capture (exactly 4 cards) earns a
-   * +5 bonus on top.
+   * ribbon=10, plain=3).
    *
    * @param {object[]} cards
    */
@@ -1096,11 +1066,99 @@ export default class GameRoundManager {
   _trackSnailsUnplayed() {
     const handCount = this._hand.getAll().length;
     if (handCount === 0) return;
-    for (const spirit of this._spirits) {
-      if (spirit.id === 'sym_snails' && spirit.state) {
-        spirit.state.totalUnplayed += handCount;
+    for (const spirit of run.allSpirits) {
+      if (spirit.id === 'sym_snails') {
+        incrementPerElement(spirit, 'totalUnplayed', handCount);
       }
     }
+  }
+
+  /**
+   * Recompute and apply the field's max slot count from all active modifiers:
+   * MAX_SLOTS base + blessing bonus + Amber permanent mod + Rooster in-round bonus,
+   * then the hexagram modifyFieldSlots hook on top.
+   */
+  _recomputeFieldSlots() {
+    const _fieldSlotBonus = run.countBlessingsByEffect('plus_field_slot');
+    const _amberMod = run._permanentFieldSlotMod ?? 0;
+    const _roosterBonus = this._roosterBonusThisRound ?? 0;
+    const _fieldBase = Math.max(1,
+      FieldManager.MAX_SLOTS + _fieldSlotBonus + _amberMod + _roosterBonus
+    );
+    this._field.setMaxSlots(applyHook('modifyFieldSlots', _fieldBase, _fieldBase));
+  }
+
+  /**
+   * Universal retrigger count for a card under a specific trigger type.
+   * Combines stamp-driven (white/gray — universal) with spirit-driven retriggers.
+   * @param {object} card
+   * @param {string} triggerType  'scoring' | 'held_in_hand' | 'capture' | 'discard' | 'yaku'
+   * @returns {number} Additional retriggers (total fires = 1 + this).
+   */
+  _computeRetriggerCount(card, triggerType, isFirstCardOfCapture = false) {
+    let count = 0;
+    if (card.ribbonStamp === 'stamp_white') count += 1;
+    if (card.ribbonStamp === 'stamp_gray')  count += 3;
+    for (const spirit of run.allSpirits) {
+      const effect = SpiritEffects.get(spirit.id);
+      if (effect?.getRetriggerCount) {
+        count += effect.getRetriggerCount({
+          card, spirit, spirits: run.activeSpirits, triggerType, isFirstCardOfCapture,
+        });
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Fire a named lifecycle hook for every equipped spirit whose effect implements it.
+   * @param {string} hookName  e.g. 'onRoundStart', 'onRoundEnd'
+   */
+  _fireSpiritHook(hookName) {
+    for (const spirit of run.allSpirits) {
+      const effect = SpiritEffects.get(spirit.id);
+      if (effect?.[hookName]) {
+        effect[hookName]({ spirit, spirits: run.activeSpirits, run, roundManager: this });
+      }
+    }
+  }
+
+  /**
+   * Dispatch a card's discard-trigger stamp effects with retrigger awareness.
+   * Blue → consumable, Green → +3 ki, Purple/Black/Gray → draw +1.
+   * @param {object} card  The discarded card.
+   */
+  _dispatchStampDiscardEffects(card) {
+    if (!card.ribbonStamp) return;
+    const stamp = card.ribbonStamp;
+    const fireCons = stamp === 'stamp_blue';
+    const fireKi   = stamp === 'stamp_green';
+    const fireDraw = stamp === 'stamp_purple' || stamp === 'stamp_black' || stamp === 'stamp_gray';
+    if (!fireCons && !fireKi && !fireDraw) return;
+    const fireCount = 1 + this._computeRetriggerCount(card, 'discard');
+    for (let rt = 0; rt < fireCount; rt++) {
+      if (fireCons) run.generateRandomConsumable();
+      if (fireKi) run.addKi(3, `${stamp}_discard`);
+      if (fireDraw) {
+        const drawN = Math.min(1, this._deck.drawPileSize);
+        if (drawN > 0) this._hand.add(this._deck.draw(drawN));
+      }
+    }
+  }
+
+  /**
+   * Check if hand is empty and trigger round-end transition if so.
+   * Used by consumables that may empty the hand (Monkey, Horse with empty deck).
+   * @returns {boolean} True if round was ended.
+   */
+  _checkRoundEndOnEmptyHand() {
+    if (this._hand.getAll().length > 0) return false;
+    if (this._phase === 'round_over') return false;
+    const _hexEffect = getActiveEffect();
+    if (_hexEffect?.onRoundEnd) _hexEffect.onRoundEnd(this);
+    this._fireSpiritHook('onRoundEnd');
+    this._phase = 'round_over';
+    return true;
   }
 
   /**
@@ -1110,20 +1168,31 @@ export default class GameRoundManager {
    * @returns {string} The flip result string ('field_discard' or 'catcher').
    */
   _handleFieldDiscard(card) {
-    if (this._spirits.some(s => s.id === 'game_catcher') && this._hand.availableSlots > 0) {
-      this._hand.add([card]);
-      return 'catcher';
+    const catcherSpirits = run.allSpirits.filter(s => s.id === 'game_catcher');
+    const catcherMax = run.countStackedById('game_catcher');
+    if (catcherMax > 0 && this._hand.availableSlots > 0) {
+      const used = catcherSpirits[0]?.state?.catchesUsedThisRound ?? 0;
+      if (used < catcherMax) {
+        for (const c of catcherSpirits) {
+          if (c.state) c.state.catchesUsedThisRound = used + 1;
+        }
+        this._hand.add([card]);
+        return 'catcher';
+      }
     }
     this._discardedThisTurn.push(card);
     this._allDiscards.push(card);
     this._discardCount++;
-    if (this._spirits.some(s => s.id === 'econ_recycling')) run.addKi(5);
+    const recyclingStacks = run.countStackedById('econ_recycling');
+    if (recyclingStacks > 0) run.addKi(5 * recyclingStacks, 'recycling_discard');
     // engine_ship: +0.3 mult-mult per card discarded (permanent).
-    for (const spirit of this._spirits) {
-      if (spirit.id === 'engine_ship' && spirit.state) {
-        spirit.state.cardsDiscarded += (spirit.stackCount ?? 1);
+    for (const spirit of run.activeSpirits) {
+      if (spirit.id === 'engine_ship') {
+        incrementPerElement(spirit, 'cardsDiscarded', 1);
       }
     }
+    // Stamp discard-trigger effects.
+    this._dispatchStampDiscardEffects(card);
     return 'field_discard';
   }
 
@@ -1137,18 +1206,15 @@ export default class GameRoundManager {
         s && s.state !== 'pending' && this._field.matchesSlot(card, s)
       );
       if (!hasMatch) {
-        this._discardedThisTurn.push(card);
-        this._allDiscards.push(card);
-        this._discardCount++;
-        return { captured: null, discarded: false };
+        return { captured: null, discarded: true };
       }
     }
     const result = this._field.addFlippedCard(card);
     // engine_moths: Wood (Leaf or Silk) field slot creation.
     if (result.woodSlotCreated) {
-      for (const spirit of this._spirits) {
-        if (spirit.id === 'engine_moths' && spirit.state) {
-          spirit.state.t1Procs += (spirit.stackCount ?? 1);
+      for (const spirit of run.activeSpirits) {
+        if (spirit.id === 'engine_moths') {
+          incrementPerElement(spirit, 't1Procs', 1);
         }
       }
     }
@@ -1160,12 +1226,11 @@ export default class GameRoundManager {
 
     this._capture.add(cards);
     this._basePoints += cards.reduce((sum, c) => sum + getCardPoints(c), 0);
-    if (cards.length === 4) this._basePoints += 5;   // full-month bonus
 
     // score_field_at_round_end: captures add to pile but don't score.
     if (applyHook('disableCaptureScoring', false)) {
       run.onCardsCaptured(cards);
-      if (this._goatActive) run.addKi(cards.length);
+      if (this._goatActive) run.addKi(cards.length, 'goat_capture');
       logger.logCapture(cards, 'capture');
       const newCombos = this._style.checkCombos(this._capture.getAll());
       if (newCombos.length > 0) this._onStyleCombos(newCombos);
@@ -1177,44 +1242,52 @@ export default class GameRoundManager {
     }
 
     {
+      // Cache spirit arrays for this capture (same object references as _allSpirits).
+      const _activeSpirits  = run.activeSpirits;
+      const _scoringSpirits = run.scoringSpirits;
+
       // Reset Golden Toad per-capture application counter.
-      for (const spirit of this._spirits) {
+      for (const spirit of _activeSpirits) {
         if (spirit.id === 'engine_golden_toad') spirit._captureAppliedCount = 0;
       }
 
       // ── Capstone flags ──────────────────────────────────────────────────────
-      const _yinYangActive  = this._spirits.some(s => s.id === 'capstone_yinyang');
-      const _universeActive = this._spirits.some(s => s.id === 'capstone_universe');
-      const _natureActive   = this._spirits.some(s => s.id === 'capstone_nature');
+      const _yinYangActive  = _activeSpirits.some(s => s.id === 'capstone_yinyang');
+      const _universeActive = _activeSpirits.some(s => s.id === 'capstone_universe');
+      const _natureActive   = _activeSpirits.some(s => s.id === 'capstone_nature');
       const _yinYangTriggers = _yinYangActive ? 2 : 1;
 
       // ── Phase 1: Process each card through spirits left-to-right ──────────
       let points = _natureActive ? this._cumulativePoints : 0;
       let mult   = 1.0;
 
+      // ── Scoring breakdown tracking (purely additive telemetry) ─────────
+      const _captureNum = ++this._captureEventCount;
+      const _bd = { cards: [], heldEffects: [], engines: [] };
+
       // Metal enhancement: mult from cards held in HAND during this capture.
       // Earth enhancement: mult from earth cards held in HAND during this capture.
-      // engine_applause: retrigger held-in-hand effects N extra times.
-      const _applauseCount = this._spirits
-        .filter(s => s.id === 'engine_applause')
-        .reduce((sum, s) => sum + (s.stackCount ?? 1), 0);
-      const _heldTriggers = 1 + _applauseCount;
-      for (let _ht = 0; _ht < _heldTriggers; _ht++) {
-        for (const handCard of this._hand.getAll()) {
+      for (const handCard of this._hand.getAll()) {
+        const _heldTriggers = 1 + this._computeRetriggerCount(handCard, 'held_in_hand');
+        for (let _ht = 0; _ht < _heldTriggers; _ht++) {
           const henh = handCard.enhancement;
           if (henh?.element === 'metal') {
-            mult *= getMetalHeldMult(henh.tier);
+            const _mMult = getMetalHeldMult(henh.tier);
+            mult *= _mMult;
+            if (_ht === 0) _bd.heldEffects.push({ source: `${henh.tier === 'upgraded' ? 'Meteorite' : 'Iron'} (${handCard.name})`, multiplyMult: _mMult });
             if (henh.tier === 'upgraded' && rollProbability(getMeteoriteJackpotChance(), 'meteorite_jackpot')) {
-              run.addKi(30);
+              run.addKi(30, 'meteorite_jackpot');
               // engine_velocity: +t2Procs per Meteorite jackpot.
-              for (const spirit of this._spirits) {
-                if (spirit.id === 'engine_velocity' && spirit.state) {
-                  spirit.state.t2Procs += (spirit.stackCount ?? 1);
+              for (const spirit of _activeSpirits) {
+                if (spirit.id === 'engine_velocity') {
+                  incrementPerElement(spirit, 't2Procs', 1);
                 }
               }
             }
           } else if (henh?.element === 'earth') {
-            mult *= getEarthHeldMult(henh.tier);
+            const _eMult = getEarthHeldMult(henh.tier);
+            mult *= _eMult;
+            if (_ht === 0) _bd.heldEffects.push({ source: `${henh.tier === 'upgraded' ? 'Pottery' : 'Clay'} (${handCard.name})`, multiplyMult: _eMult });
           }
         }
       }
@@ -1222,22 +1295,41 @@ export default class GameRoundManager {
       for (const card of cards) {
         const enh = card.enhancement;
 
+        // ── Per-card breakdown tracking ──
+        const _cb = {
+          cardName: card.name ?? card.id,
+          meta: `${card.type}, month ${card.month}`,
+          basePoints: getCardPoints(card),
+          contributions: [],
+          totalCardPts: 0,
+        };
+
         // Base points (includes persistent mutations) + Fire additive.
         let cardPts = getCardPoints(card);
-        if (enh?.element === 'fire')  cardPts += getFireFlatPoints(enh.tier);
+        if (enh?.element === 'fire') {
+          const _firePts = getFireFlatPoints(enh.tier);
+          cardPts += _firePts;
+          _cb.contributions.push({ source: `${enh.tier} Fire`, addPoints: _firePts });
+        }
 
-        // Water mult (Snow/Ice) — applied after Fire additive.
+        // Water mult (Snow/Ice) — applied to capture-level mult.
         if (enh?.element === 'water') {
-          cardPts = Math.round(cardPts * getWaterMult(enh.tier, enh.depLevel ?? 0));
+          const _wMult = getWaterMult(enh.tier, enh.depLevel ?? 0);
+          mult *= _wMult;
+          _cb.contributions.push({ source: `${enh.tier} Water (dep ${enh.depLevel ?? 0})`, multiplyMult: _wMult });
         }
 
         // Wood scoring mult — applied to the per-capture multiplier.
-        if (enh?.element === 'wood') mult *= getWoodScoringMult(enh.tier);
+        if (enh?.element === 'wood') {
+          const _woodM = getWoodScoringMult(enh.tier);
+          mult *= _woodM;
+          _cb.contributions.push({ source: `${enh.tier} Wood`, multiplyMult: _woodM });
+        }
 
         // Edition bonuses — applied before spirit effects.
-        if (card.edition === 'gold')    cardPts += 20;
-        if (card.edition === 'crystal') mult    += 5;
-        if (card.edition === 'ghost')   mult    *= 1.5;
+        if (card.edition === 'gold')    { cardPts += 20;   _cb.contributions.push({ source: 'Gold edition', addPoints: 20 }); }
+        if (card.edition === 'crystal') { mult    += 5;    _cb.contributions.push({ source: 'Crystal edition', addMult: 5 }); }
+        if (card.edition === 'ghost')   { mult    *= 1.5;  _cb.contributions.push({ source: 'Ghost edition', multiplyMult: 1.5 }); }
 
         // Hexagram onCardScored modifier — applied after editions, before spirits.
         // prevMult is saved so the animation event can show what the hexagram changed.
@@ -1253,6 +1345,13 @@ export default class GameRoundManager {
               if (mod.addMult      !== undefined) mult    += mod.addMult;
               if (mod.multiplyMult !== undefined) mult    *= mod.multiplyMult;
               _hexCardMod = mod;
+              const _hexName = run.getHexagram()?.englishName ?? 'hexagram';
+              _cb.contributions.push({
+                source: `hexagram ${_hexName}`,
+                addPoints: mod.addPoints ?? 0,
+                addMult: mod.addMult ?? 0,
+                multiplyMult: mod.multiplyMult ?? 1,
+              });
             }
           }
         }
@@ -1281,19 +1380,16 @@ export default class GameRoundManager {
         }
 
         // Per-card spirit effects + engine state updates.
-        const allScoringSpirits = [
-          ...this._spirits,
-          ...run.negativeSpirits,
-        ];
         // four_spirits_fire_twice: onCardScored fires twice per card.
         const _spiritFireCount = applyHook('shouldSpiritsFireTwice', false, false) ? 2 : 1;
         for (let _sf = 0; _sf < _spiritFireCount; _sf++) {
-          for (const spirit of allScoringSpirits) {
+          for (const spirit of _scoringSpirits) {
             const effect = SpiritEffects.get(spirit.id);
             if (!effect?.onCardScored) continue;
-            const count = spirit.stackCount ?? 1;
+            // Accumulators handle stack scaling internally; non-accumulators use count multiplier.
+            const count = ACCUMULATOR_SPIRIT_IDS.has(spirit.id) ? 1 : effectivePower(spirit);
             for (let _yy = 0; _yy < _yinYangTriggers; _yy++) {
-              const r = effect.onCardScored({ card, spirit, spirits: this._spirits });
+              const r = effect.onCardScored({ card, spirit, spirits: _activeSpirits });
               if (r) {
                 const prevPts  = points;
                 const prevMult = mult;
@@ -1315,40 +1411,43 @@ export default class GameRoundManager {
                     points, mult, prevPts, prevMult,
                   });
                 }
+                _cb.contributions.push({
+                  source: `spirit ${spirit.name} (power ${effectivePower(spirit)})`,
+                  addPoints: r.addPoints ? r.addPoints * count : 0,
+                  addMult: r.addMult ? r.addMult * count : 0,
+                  multiplyMult: r.multiplyMult ? r.multiplyMult * count : 1,
+                });
               }
             }
           }
         }
-        // Engine state (onCardSeen) fires once per stack; Yin-Yang doubles.
-        for (const spirit of allScoringSpirits) {
+        // Engine state (onCardSeen): accumulators fire once per event; others fire per stack.
+        for (const spirit of _scoringSpirits) {
           const effect = SpiritEffects.get(spirit.id);
           if (!effect?.onCardSeen) continue;
-          const count = spirit.stackCount ?? 1;
-          const prevState = JSON.stringify(spirit.state);
+          const count = ACCUMULATOR_SPIRIT_IDS.has(spirit.id) ? 1 : effectivePower(spirit);
+          const prevState = JSON.stringify(spirit.state ?? spirit.elements);
           for (let copy = 0; copy < count * _yinYangTriggers; copy++) {
-            effect.onCardSeen({ card, spirit, spirits: this._spirits });
+            effect.onCardSeen({ card, spirit, spirits: _activeSpirits });
           }
           if (this._onScoringStep && JSON.stringify(spirit.state) !== prevState) {
             this._onScoringStep({ type: 'engine_state_update', spirit, card });
           }
         }
+
+        _cb.totalCardPts = cardPts;
+        _bd.cards.push(_cb);
       }
 
       // ── Phase 1.5: Retriggers ──────────────────────────────────────────────
-      const allRetriggerSpirits = [...this._spirits, ...run.negativeSpirits];
-      for (const card of cards) {
-        let retriggerCount = 0;
-        for (const spirit of allRetriggerSpirits) {
-          const effect = SpiritEffects.get(spirit.id);
-          if (effect?.getRetriggerCount) {
-            retriggerCount += effect.getRetriggerCount({ card, spirit, spirits: this._spirits });
-          }
-        }
+      for (let _ci = 0; _ci < cards.length; _ci++) {
+        const card = cards[_ci];
+        const retriggerCount = this._computeRetriggerCount(card, 'capture', _ci === 0);
         for (let rt = 0; rt < retriggerCount; rt++) {
           const enh = card.enhancement;
           let cardPts = getCardPoints(card);
           if (enh?.element === 'fire')  cardPts += getFireFlatPoints(enh.tier);
-          if (enh?.element === 'water') cardPts = Math.round(cardPts * getWaterMult(enh.tier, enh.depLevel ?? 0));
+          if (enh?.element === 'water') mult *= getWaterMult(enh.tier, enh.depLevel ?? 0);
           if (enh?.element === 'wood')  mult *= getWoodScoringMult(enh.tier);
           if (card.edition === 'gold')    cardPts += 20;
           if (card.edition === 'crystal') mult    += 5;
@@ -1359,11 +1458,11 @@ export default class GameRoundManager {
             this._onScoringStep({ type: 'retrigger', card, cardPts, points, mult, triggerIndex: rt + 1 });
           }
 
-          for (const spirit of allRetriggerSpirits) {
+          for (const spirit of run.allSpirits) {
             const effect = SpiritEffects.get(spirit.id);
             if (!effect?.onCardScored) continue;
-            const count = spirit.stackCount ?? 1;
-            const r = effect.onCardScored({ card, spirit, spirits: this._spirits });
+            const count = ACCUMULATOR_SPIRIT_IDS.has(spirit.id) ? 1 : effectivePower(spirit);
+            const r = effect.onCardScored({ card, spirit, spirits: _activeSpirits });
             if (r) {
               const prevPts  = points;
               const prevMult = mult;
@@ -1385,22 +1484,21 @@ export default class GameRoundManager {
       }
 
       if (cards.length === 4) {
-        points += 5; // full-month bonus
         // engine_missing_number: increment counter on 4-stack scored.
-        for (const spirit of this._spirits) {
-          if (spirit.id === 'engine_missing_number' && spirit.state) {
-            spirit.state.totalStacks += (spirit.stackCount ?? 1);
+        for (const spirit of _activeSpirits) {
+          if (spirit.id === 'engine_missing_number') {
+            incrementPerElement(spirit, 'totalStacks', 1);
           }
         }
       }
 
       // ── Phase 2: Apply engine spirits in slot order ────────────────────────
-      const allEngineSpirits = [...this._spirits, ...run.negativeSpirits];
+      const allEngineSpirits = run.allSpirits;
       for (const spirit of allEngineSpirits) {
         const effect = SpiritEffects.get(spirit.id);
         if (!effect?.applyEngine) continue;
         for (let _yy = 0; _yy < _yinYangTriggers; _yy++) {
-          const r = effect.applyEngine({ spirit, mult, points, spirits: this._spirits, cards });
+          const r = effect.applyEngine({ spirit, mult, points, spirits: _activeSpirits, cards });
           if (r) {
             const prevPts  = points;
             const prevMult = mult;
@@ -1420,6 +1518,12 @@ export default class GameRoundManager {
                 points, mult, prevPts, prevMult,
               });
             }
+            _bd.engines.push({
+              source: `${spirit.name} (stack ${effectivePower(spirit)})`,
+              addPoints: r.addPoints ?? 0,
+              addMult: r.addMult ?? 0,
+              multiplyMult: r.multiplyMult ?? 1,
+            });
           }
         }
       }
@@ -1434,6 +1538,21 @@ export default class GameRoundManager {
         : Math.round(points * mult * flow);
       this._runningScore += captureScore;
 
+      // ── Emit granular scoring log ──
+      logger.logCaptureScoring({
+        captureNumber: _captureNum,
+        turn: this._turn,
+        phase: this._phase,
+        cardBreakdowns: _bd.cards,
+        captureLevel: { heldEffects: _bd.heldEffects, engineSpirits: _bd.engines },
+        totalPoints: points,
+        totalMult: mult,
+        flow,
+        captureScore,
+        runningRoundTotal: this._runningScore,
+        customFormula: _hexCompute?.computeFinalScore ? (run.getHexagram()?.effect ?? null) : null,
+      });
+
       if (this._onScoringStep) {
         this._onScoringStep({
           type: 'capture_complete', points, mult, flow, captureScore,
@@ -1447,7 +1566,7 @@ export default class GameRoundManager {
       });
 
       // util_glory: draw 2 cards on any bright capture.
-      for (const spirit of this._spirits) {
+      for (const spirit of _activeSpirits) {
         if (spirit.id === 'util_glory') {
           const brightCount = cards.filter(c => c.type === 'bright').length;
           if (brightCount > 0) {
@@ -1460,128 +1579,32 @@ export default class GameRoundManager {
         }
       }
 
-      // util_irrigation: +10 pts per plain captured.
-      for (const spirit of this._spirits) {
-        if (spirit.id === 'util_irrigation' && spirit.state) {
-          const plainCount = cards.filter(c => c.type === 'plain').length;
-          if (plainCount > 0) {
-            const bonus = plainCount * 10;
-            spirit.state.irrigationBonus += bonus;
-            this._runningScore += bonus;
-          }
-        }
-      }
-
-      // Stamp captured-trigger effects.
-      for (const card of cards) {
+      // Stamp captured-trigger effects (Option C shuffle).
+      for (let _si = 0; _si < cards.length; _si++) {
+        const card = cards[_si];
         if (!card.ribbonStamp) continue;
         const stamp = card.ribbonStamp;
-
-        if (stamp === 'stamp_yellow') {
-          run.addKi(3);
-        }
-
-        if (stamp === 'stamp_white' || stamp === 'stamp_gray') {
-          // White: 1 extra retrigger (card scores twice total).
-          // Gray:  3 extra retriggers (card scores four times total).
-          // Each retrigger re-runs the full per-card scoring pipeline.
-          // Depreciation/break/jackpot rolls are NOT re-rolled (use current state only).
-          // TODO: when Applause spirit is added, held-card retriggers will be handled there.
-          const retriggerCount = stamp === 'stamp_gray' ? 3 : 1;
-          const rEnh = card.enhancement;
-          for (let rt = 0; rt < retriggerCount; rt++) {
-            // Base + Fire additive (includes persistent mutations)
-            let rPts = getCardPoints(card);
-            if (rEnh?.element === 'fire')  rPts += getFireFlatPoints(rEnh.tier);
-            // Water mult — use current depLevel; do NOT increment it
-            if (rEnh?.element === 'water') {
-              rPts = Math.round(rPts * getWaterMult(rEnh.tier, rEnh.depLevel ?? 0));
-            }
-            let rMult = 1.0;
-            // Edition bonuses
-            if (card.edition === 'gold')    rPts  += 20;
-            if (card.edition === 'crystal') rMult += 5;
-            if (card.edition === 'ghost')   rMult *= 1.5;
-            // Hexagram onCardScored modifier — mirrors main capture path
-            {
-              const _hexRt = getActiveEffect();
-              if (_hexRt?.onCardScored) {
-                const mod = _hexRt.onCardScored(card, { currentPoints: rPts, currentMult: rMult });
-                if (mod) {
-                  if (mod.addPoints    !== undefined) rPts  += mod.addPoints;
-                  if (mod.addMult      !== undefined) rMult += mod.addMult;
-                  if (mod.multiplyMult !== undefined) rMult *= mod.multiplyMult;
-                }
-              }
-            }
-            // Metal from hand — each Iron/Meteorite in hand contributes mult (no jackpot re-roll)
-            for (const handCard of this._hand.getAll()) {
-              const henh = handCard.enhancement;
-              if (henh?.element === 'metal') rMult *= getMetalHeldMult(henh.tier);
-            }
-            // Per-card spirit effects
-            for (const spirit of this._spirits) {
-              const effect = SpiritEffects.get(spirit.id);
-              if (!effect) continue;
-              if (effect.onCardScored) {
-                const r = effect.onCardScored({ card, spirit, spirits: this._spirits });
-                if (r) {
-                  if (r.addPoints)    rPts  += r.addPoints;
-                  if (r.addMult)      rMult += r.addMult;
-                  if (r.multiplyMult) rMult *= r.multiplyMult;
-                }
-              }
-            }
-            // Engine spirits
-            for (const spirit of this._spirits) {
-              const effect = SpiritEffects.get(spirit.id);
-              if (!effect?.applyEngine) continue;
-              const r = effect.applyEngine({ spirit, mult: rMult, points: rPts, spirits: this._spirits });
-              if (r) {
-                if (r.addPoints)    rPts  += r.addPoints;
-                if (r.addMult)      rMult += r.addMult;
-                if (r.multiplyMult) rMult *= r.multiplyMult;
-              }
-            }
-            const _hexRtCompute = getActiveEffect();
-            const retriggerScore = _hexRtCompute?.computeFinalScore
-              ? _hexRtCompute.computeFinalScore(rPts, rMult, run.flow)
-              : Math.round(rPts * rMult * run.flow);
-            this._runningScore  += retriggerScore;
-            this._scoringEvents.push({
-              type: 'retrigger', cards: [card], card, retriggerScore, runningTotal: this._runningScore,
-            });
+        const fireKi    = stamp === 'stamp_yellow';
+        const fireDraw  = stamp === 'stamp_orange';
+        const fireCons  = stamp === 'stamp_green' || stamp === 'stamp_black' || stamp === 'stamp_gray';
+        if (!fireKi && !fireDraw && !fireCons) continue;
+        const fireCount = 1 + this._computeRetriggerCount(card, 'capture', _si === 0);
+        for (let rt = 0; rt < fireCount; rt++) {
+          if (fireKi) run.addKi(3, `${stamp}_capture`);
+          if (fireDraw) {
+            const drawN = Math.min(1, this._deck.drawPileSize);
+            if (drawN > 0) this._hand.add(this._deck.draw(drawN));
           }
-        }
-
-        if (stamp === 'stamp_orange') {
-          const drawN = Math.min(1, this._deck.drawPileSize);
-          if (drawN > 0) this._hand.add(this._deck.draw(drawN));
-          run.addKi(3);
-        }
-
-        if (stamp === 'stamp_black') {
-          const drawN = Math.min(1, this._deck.drawPileSize);
-          if (drawN > 0) this._hand.add(this._deck.draw(drawN));
-          run.generateRandomConsumable();
-          run.addKi(3);
+          if (fireCons) run.generateRandomConsumable();
         }
       }
     }
 
     run.onCardsCaptured(cards);
 
-    // sym_ducks: double multValue on deck-flip pair capture.
-    if (this._inDeckPhase && cards.length === 2) {
-      for (const spirit of this._spirits) {
-        if (spirit.id === 'sym_ducks' && spirit.state) {
-          spirit.state.multValue = (spirit.state.multValue ?? 1) * 2;
-        }
-      }
-    }
 
     // sym_caterpillar: eat leaf-enhanced cards (Wood element).
-    for (const spirit of this._spirits) {
+    for (const spirit of run.activeSpirits) {
       if (spirit.id === 'sym_caterpillar' && spirit.state) {
         for (const card of cards) {
           if (card.enhancement?.element === 'wood') {
@@ -1592,13 +1615,10 @@ export default class GameRoundManager {
               const others = run.spirits.filter(s => s.id !== 'sym_caterpillar' && s.id !== 'sym_cuckoo_egg');
               if (others.length > 0) {
                 const target = others[Math.floor(Math.random() * others.length)];
-                const idx = run.spirits.findIndex(s => s.id === 'sym_caterpillar');
-                if (idx >= 0) {
-                  const copy = JSON.parse(JSON.stringify(target));
-                  copy.name += ' (Moth)';
-                  copy.metamorphosed = true;
-                  run.spirits[idx] = copy;
-                }
+                const copy = JSON.parse(JSON.stringify(target));
+                copy.name += ' (Moth)';
+                copy.metamorphosed = true;
+                run.replaceSpiritObj(spirit, copy);
               }
             }
           }
@@ -1606,41 +1626,45 @@ export default class GameRoundManager {
       }
     }
 
-    // util_symbiosis: generate symbiont spirit(s) on animal capture.
-    // N stacks generate up to N different symbionts per animal capture.
-    const symbiosisCount = this._spirits.filter(s => s.id === 'util_symbiosis').length;
-    if (symbiosisCount > 0) {
+    // util_symbiosis: capturing an animal summons its corresponding symbiont
+    // at a stack count equal to Symbiosis's stack count. Excess stacks
+    // (over 3) cascade into Negative copies via addSymbiontSpirit.
+    const symbiosisStacks = run.countStackedById('util_symbiosis');
+    if (symbiosisStacks > 0) {
       for (const card of cards) {
-        if (card.type === 'animal') {
-          // Build pool of valid symbiont IDs for this animal (not already equipped).
-          const primaryId = ANIMAL_SYMBIONT_MAP[card.id];
-          if (!primaryId) continue;
-          // Collect all possible symbiont IDs, starting with the primary one.
-          const allSymbiontIds = Object.values(ANIMAL_SYMBIONT_MAP);
-          const candidates = allSymbiontIds.filter(
-            sid => !run.spirits.some(s => s.id === sid)
-          );
-          // Primary goes first if available; then fill with random others.
-          const ordered = [];
-          if (candidates.includes(primaryId)) {
-            ordered.push(primaryId);
+        if (card.type !== 'animal') continue;
+        const symbiontId = ANIMAL_SYMBIONT_MAP[card.id];
+        if (!symbiontId) continue;
+        const symDef = getSpiritDef(symbiontId);
+        if (!symDef) continue;
+        // Increment pre-existing Algae elements BEFORE the summon fires, so
+        // the witnessing event is captured into aggregation if transcendence
+        // fires inside addSymbiontSpirit. Only pre-summon elements are bumped.
+        const algaeSnap = run.allSpirits
+          .filter(s => s.id === 'sym_algae')
+          .map(s => ({ spirit: s, preCount: s.elements?.length ?? 0 }));
+        for (const snap of algaeSnap) {
+          if (snap.spirit.isNegative) {
+            incrementPerElement(snap.spirit, 'summonCount', symbiosisStacks);
+          } else if (snap.spirit.elements) {
+            for (let i = 0; i < snap.preCount; i++) {
+              snap.spirit.elements[i].summonCount =
+                (snap.spirit.elements[i].summonCount ?? 0) + symbiosisStacks;
+            }
           }
-          const others = candidates.filter(sid => sid !== primaryId)
-            .sort(() => Math.random() - 0.5);
-          ordered.push(...others);
-          // Summon up to symbiosisCount different symbionts.
-          let summoned = 0;
-          for (const sid of ordered) {
-            if (summoned >= symbiosisCount) break;
-            if (!run.canAddSpirit) break;
-            const symDef = getSpiritDef(sid);
-            if (symDef) {
-              run.addSymbiontSpirit(symDef);
-              summoned++;
-              // sym_algae: increment on summon.
-              for (const spirit of run.spirits) {
-                if (spirit.id === 'sym_algae' && spirit.state) {
-                  spirit.state.summonCount = (spirit.state.summonCount ?? 0) + 1;
+        }
+        const result = run.addSymbiontSpirit(symDef, symbiosisStacks);
+        // Roll back pre-increment if summon failed (slots full + no negatives).
+        if (!result.success || result.result === 'failed') {
+          for (const snap of algaeSnap) {
+            if (!run.allSpirits.includes(snap.spirit)) continue;
+            if (snap.spirit.isNegative && snap.spirit.state) {
+              snap.spirit.state.newEvents = Math.max(0, (snap.spirit.state.newEvents ?? 0) - symbiosisStacks);
+            } else if (snap.spirit.elements) {
+              for (let i = 0; i < snap.preCount; i++) {
+                if (snap.spirit.elements[i]) {
+                  snap.spirit.elements[i].summonCount =
+                    Math.max(0, (snap.spirit.elements[i].summonCount ?? 0) - symbiosisStacks);
                 }
               }
             }
@@ -1650,7 +1674,7 @@ export default class GameRoundManager {
     }
 
     // Goat consumable: +1 ki per card captured.
-    if (this._goatActive) run.addKi(cards.length);
+    if (this._goatActive) run.addKi(cards.length, 'goat_capture');
 
     logger.logCapture(cards, 'capture');
 
@@ -1660,7 +1684,7 @@ export default class GameRoundManager {
       this._onStyleCombos(newCombos);
     }
 
-    // Hexagram onCaptureComplete hook (e.g. no_banking_ki_plus_capture: +1 ki per capture).
+    // Hexagram onCaptureComplete hook (e.g. no_hand_ki_plus_capture: +3 ki per capture).
     const _hexCapture = getActiveEffect();
     if (_hexCapture?.onCaptureComplete) {
       _hexCapture.onCaptureComplete({ run, capturedCards: cards });
@@ -1680,9 +1704,19 @@ export default class GameRoundManager {
     }
     this._lastStyleCombos = combos;
     logger.logStyleCombos(combos);
-    // sym_magpie: +3 ki per style combo triggered.
-    if (combos.length > 0 && this._spirits.some(s => s.id === 'sym_magpie')) {
-      run.addKi(3 * combos.length);
+    // Per-combo ki bonus chained through spirits in slot order.
+    const allSpirits = run.allSpirits;
+    for (const combo of combos) {
+      let ki = 1; // base style ki per combo
+      ki = applyHook('modifyStyleKi', ki, ki); // hexagram hook (style_ki_double / style_flow_double)
+      for (const spirit of allSpirits) {
+        const effect = SpiritEffects.get(spirit.id);
+        if (effect?.applyKiBonus) {
+          ki = effect.applyKiBonus({ ki, spirit });
+        }
+      }
+      const finalKi = Math.round(ki);
+      if (finalKi > 0) run.addKi(finalKi, `style combo: ${combo.name}`);
     }
   }
 
@@ -1703,9 +1737,9 @@ export default class GameRoundManager {
    * Called once per stranding event prevented.
    */
   _creditMothsT2() {
-    for (const spirit of this._spirits) {
-      if (spirit.id === 'engine_moths' && spirit.state) {
-        spirit.state.t2Procs += (spirit.stackCount ?? 1);
+    for (const spirit of run.activeSpirits) {
+      if (spirit.id === 'engine_moths') {
+        incrementPerElement(spirit, 't2Procs', 1);
       }
     }
   }
@@ -1733,9 +1767,9 @@ export default class GameRoundManager {
     const deckCard = this._deck.draw(1)[0];
     this._lastDeckCard = deckCard;
 
-    // sym_osprey: first N deck flips go to hand instead of field.
-    const ospreySpirits = this._spirits.filter(s => s.id === 'sym_osprey');
-    const ospreyMax = ospreySpirits.length;
+    // sym_osprey: first N deck flips go to hand instead of field (N = total stacks).
+    const ospreySpirits = run.allSpirits.filter(s => s.id === 'sym_osprey');
+    const ospreyMax = run.countStackedById('sym_osprey');
     if (ospreyMax > 0) {
       const used = ospreySpirits[0]?.state?.flipsUsedThisRound ?? 0;
       if (used < ospreyMax && this._hand.getAll().length < (this._handSizeCap ?? 99)) {
@@ -1749,6 +1783,13 @@ export default class GameRoundManager {
         if (pending0) {
           const captured = this._field.capturePendingMatch();
           if (captured.length > 0) this._addCapture(captured);
+        }
+        // Fix E fallback: 2 hand cards played to empty slot form a 'normal' slot
+        // that should self-capture regardless of the intercepted card's month.
+        if (this._lastHandPlayToEmptySlot?.cards.length === 2) {
+          const handCards = this._lastHandPlayToEmptySlot.cards;
+          for (const hc of handCards) this._field.removeCardById(hc.id);
+          this._addCapture(handCards);
         }
         return this._finalizeTurn();
       }
@@ -1786,10 +1827,10 @@ export default class GameRoundManager {
             _flipCaptures = captured;
           } else {
             _flipResult = 'strand';
-            // sym_ducks: halve multValue on strand (floor at 1).
-            for (const spirit of this._spirits) {
+            // sym_ducks: -1 multValue on strand (floor at 0).
+            for (const spirit of run.activeSpirits) {
               if (spirit.id === 'sym_ducks' && spirit.state) {
-                spirit.state.multValue = Math.max(1, (spirit.state.multValue ?? 1) / 2);
+                spirit.state.multValue = Math.max(0, (spirit.state.multValue ?? 0) - 1);
               }
             }
           }
@@ -1839,6 +1880,12 @@ export default class GameRoundManager {
         const handCard = this._lastHandPlayToEmptySlot.cards[0];
         this._field.removeCardById(handCard.id);
         this._addCapture([handCard, deckCard]);
+        // sym_ducks: +1 multValue when a deck-flip matches a single played card.
+        for (const spirit of run.activeSpirits) {
+          if (spirit.id === 'sym_ducks' && spirit.state) {
+            spirit.state.multValue = (spirit.state.multValue ?? 0) + 1;
+          }
+        }
         _flipResult   = 'capture';
         _flipCaptures = [handCard, deckCard];
       // Fix E: 2 hand cards played to empty slot + flip is different month → capture the pair.
@@ -1908,38 +1955,46 @@ export default class GameRoundManager {
     this._capture.recordTurn();
 
     const _yakuThresholds = this._getCaptureThresholds();
-    const yakuForDiff = this._scoring.evaluate(this._capture.getAll(), run.yakuUpgrades, _yakuThresholds);
+    const yakuForDiff = this._scoring.evaluate(this._capture.getAll(), _yakuThresholds);
 
     {
       // Diff against unspent cards only — spent cards must not re-trigger yaku.
       const unspentForDiff = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
-      const yakuFromUnspent = this._scoring.evaluate(unspentForDiff, run.yakuUpgrades, this._getCaptureThresholds());
+      const yakuFromUnspent = this._scoring.evaluate(unspentForDiff, this._getCaptureThresholds());
 
-      const newYaku = yakuFromUnspent.filter(y => {
-        const prev = this._yakuBeforeTurn.get(y.name);
-        return prev === undefined || y.bonus - prev > 0.3;
-      });
+      const newYaku = yakuFromUnspent.filter(y => !this._yakuBeforeTurn.has(y.name));
       const _disablesYaku = applyHook('disablesYaku', false);
       if (_disablesYaku) newYaku.length = 0;
-      this._yakuBeforeTurn = new Map(yakuFromUnspent.map(y => [y.name, y.bonus]));
+      this._yakuBeforeTurn = new Set(yakuFromUnspent.map(y => y.name));
       logger.logYakuState(yakuFromUnspent, newYaku);
       for (const y of newYaku) {
         logger.logYakuAchieved(y.name, y.count, y.threshold);
       }
 
-      if (newYaku.length > 0) this._pushPenaltyActive = false;
+      const pushSucceeded = this._pushPenaltyActive && newYaku.length > 0;
+      if (pushSucceeded) {
+        this._pushPenaltyActive = false;
+        run.onPushSuccess(this);  // increments _pushDepth
+        for (const spirit of run.activeSpirits) {
+          if (spirit.id === 'engine_northern_lion') {
+            incrementPerElement(spirit, 'pushesWitnessed', 1);
+          }
+        }
+      } else if (newYaku.length > 0) {
+        this._pushPenaltyActive = false;
+      }
 
       // econ_reward: gain 10% of current ki per stack on each push success.
       if (newYaku.length > 0 && this._pushCount > 0) {
         let totalRewardStacks = 0;
-        for (const spirit of this._spirits) {
+        for (const spirit of run.activeSpirits) {
           if (spirit.id === 'econ_reward') {
-            totalRewardStacks += (spirit.stackCount ?? 1);
+            totalRewardStacks += effectivePower(spirit);
           }
         }
         if (totalRewardStacks > 0) {
           const bonus = Math.floor(run.ki * 0.10 * totalRewardStacks);
-          if (bonus > 0) run.addKi(bonus);
+          if (bonus > 0) run.addKi(bonus, 'reward_push');
         }
       }
 
@@ -1949,9 +2004,9 @@ export default class GameRoundManager {
         if (rank) this._bullseyeInventory[rank]++;
       }
       while (BULLSEYE_RANKS.every(r => this._bullseyeInventory[r] >= 1)) {
-        for (const spirit of this._spirits) {
-          if (spirit.id === 'engine_bullseye' && spirit.state) {
-            spirit.state.qualifiedCount += (spirit.stackCount ?? 1);
+        for (const spirit of run.activeSpirits) {
+          if (spirit.id === 'engine_bullseye') {
+            incrementPerElement(spirit, 'qualifiedCount', 1);
           }
         }
         for (const r of BULLSEYE_RANKS) this._bullseyeInventory[r]--;
@@ -1965,21 +2020,31 @@ export default class GameRoundManager {
           const yakuCards = this._selectAdditiveYakuCards(yaku.name, unspent);
           for (const card of yakuCards) {
             this._spentCardIds.add(card.id);
-            // Stamp yaku-trigger effects.
-            if (card.ribbonStamp === 'stamp_red') {
-              const drawN = Math.min(1, this._deck.drawPileSize);
-              if (drawN > 0) this._hand.add(this._deck.draw(drawN));
-            }
-            if (card.ribbonStamp === 'stamp_purple') {
-              run.generateRandomConsumable();
+            // Stamp yaku-trigger effects (Option C shuffle).
+            if (card.ribbonStamp) {
+              const stamp = card.ribbonStamp;
+              const fireDraw = stamp === 'stamp_red';
+              const fireKi   = stamp === 'stamp_orange' || stamp === 'stamp_black' || stamp === 'stamp_gray';
+              const fireCons = stamp === 'stamp_purple';
+              if (fireDraw || fireKi || fireCons) {
+                const fireCount = 1 + this._computeRetriggerCount(card, 'yaku');
+                for (let rt = 0; rt < fireCount; rt++) {
+                  if (fireDraw) {
+                    const drawN = Math.min(1, this._deck.drawPileSize);
+                    if (drawN > 0) this._hand.add(this._deck.draw(drawN));
+                  }
+                  if (fireKi) run.addKi(3, `${stamp}_yaku`);
+                  if (fireCons) run.generateRandomConsumable();
+                }
+              }
             }
           }
         }
         // Update snapshot to post-spend state so same yaku can't re-trigger next turn.
         const unspentAfterSpend = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
-        this._yakuBeforeTurn = new Map(
-          this._scoring.evaluate(unspentAfterSpend, run.yakuUpgrades, this._getCaptureThresholds())
-            .map(y => [y.name, y.bonus])
+        this._yakuBeforeTurn = new Set(
+          this._scoring.evaluate(unspentAfterSpend, this._getCaptureThresholds())
+            .map(y => y.name)
         );
       }
 
@@ -1987,26 +2052,36 @@ export default class GameRoundManager {
       const roundOver = this._hand.isEmpty();
       const penaltyApplied = roundOver && this._pushPenaltyActive && !this._dogProtection;
       if (roundOver) this._trackSnailsUnplayed();
-      // sym_crow: generate a random consumable at round end per crow copy.
+      // sym_crow: generate a random consumable at round end per crow stack.
       if (roundOver) {
-        const crowCount = this._spirits.filter(s => s.id === 'sym_crow').length;
-        for (let i = 0; i < crowCount; i++) {
-          if (run.canAddConsumable) run.generateRandomConsumable();
+        const crowStacks = run.countStackedById('sym_crow');
+        if (crowStacks > 0) {
+          console.log(`[CROW ROUNDEND] Trigger fired. Stacks: ${crowStacks}, canAddConsumable: ${run.canAddConsumable}, inventory: ${run._consumables.length}/${run.maxConsumableSlots}`);
+          let blockedRE = 0;
+          for (let i = 0; i < crowStacks; i++) {
+            if (run.canAddConsumable) {
+              const generated = run.generateRandomConsumable();
+              console.log(`[CROW ROUNDEND] Generated:`, generated?.name ?? '(null)');
+            } else {
+              blockedRE++;
+            }
+          }
+          if (blockedRE > 0) console.log(`[CROW ROUNDEND] ${blockedRE} consumable(s) blocked (inventory full)`);
         }
       }
 
       if (roundOver && penaltyApplied) {
         // Push failure: reduce flow for future rounds but keep this round's score.
-        run.onPushFailure();
+        run.onPushFailure(this);
         // engine_napoleon: +0.2 additive mult per push failure (permanent).
-        for (const spirit of this._spirits) {
-          if (spirit.id === 'engine_napoleon' && spirit.state) spirit.state.pushFails++;
+        for (const spirit of run.activeSpirits) {
+          if (spirit.id === 'engine_napoleon') incrementPerElement(spirit, 'pushFails', 1);
         }
       }
 
       // Decay spirits: lose value at round end (natural round-over path).
       if (roundOver) {
-        for (const spirit of this._spirits) {
+        for (const spirit of run.activeSpirits) {
           if (spirit.id === 'decay_persimmon' && spirit.state) {
             spirit.state.remaining = Math.max(0, spirit.state.remaining - 3);
           }
@@ -2020,8 +2095,10 @@ export default class GameRoundManager {
       const flow           = run.flow;
 
       const _forceAutoBank = !_disablesYaku && newYaku.length > 0 && applyHook('forceAutoBankOnYaku', false);
+      const tigerTriggered = this._tigerPushActive && newYaku.length === 0;
+      if (tigerTriggered) this._tigerPushActive = false; // consume one-shot flag
 
-      if (newYaku.length > 0 && !_forceAutoBank) {
+      if ((newYaku.length > 0 && !_forceAutoBank) || tigerTriggered) {
         this._roundEndingAfterDecision = roundOver;
         this._phase = "yaku_decision";
       } else if (roundOver || _forceAutoBank) {
@@ -2029,23 +2106,17 @@ export default class GameRoundManager {
         this._scoreFieldCards();
         // Flow decay — applied every round after push resolution.
         run.applyFlowDecay();
-        logger._log(`Flow decay: ×${RunManager.FLOW_DECAY_RATE} → Flow is now ×${run.flow.toFixed(2)}`);
-
-        const sc = this._scoring.calculateFinalScore(
-          this._capture.getAll(), this._spirits, 1.0, run.yakuUpgrades, true
-        );
-        this._applyPostRoundEnhancements(this._capture.getAll(), sc.metalConsumableCount);
+    
+        this._applyPostRoundEnhancements(this._capture.getAll());
         logger.logRoundEnd(
-          { finalScore: this._runningScore, basePoints: this._runningScore,
-            boostedBasePoints: this._runningScore, yakuList: [], yakuMult: 1.0,
-            additiveMult: 0, multMult: 1.0, flow: run.flow,
-            pointBoost: 1.0, rawBasePoints: this._runningScore },
+          { finalScore: this._runningScore, basePoints: this._runningScore, flow: run.flow },
           run.threshold, this._runningScore >= run.threshold,
-          this._capture.getAll(), this._styleBase,
+          this._capture.getAll(),
           this._style.getTriggeredCombos(), this._lastEnhancementEvents ?? []
         );
         const _hexEffectFin = getActiveEffect();
         if (_hexEffectFin?.onRoundEnd) _hexEffectFin.onRoundEnd(this);
+        this._fireSpiritHook('onRoundEnd');
         this._phase = "round_over";
       } else if (_disablesYaku) {
         // Yaku disabled — offer free bank/continue each turn
@@ -2055,7 +2126,7 @@ export default class GameRoundManager {
       }
 
       const status = _forceAutoBank ? "round_over"
-                   : newYaku.length > 0 ? "yaku_decision"
+                   : (newYaku.length > 0 || tigerTriggered) ? "yaku_decision"
                    : roundOver ? "round_over"
                    : _disablesYaku ? "yaku_decision" : "ok";
 
@@ -2066,28 +2137,21 @@ export default class GameRoundManager {
         status,
         newYaku,
         yakuDisabled:     !!_disablesYaku,
+        tigerPush:        !!tigerTriggered,
         nextDeckFlip:     this._nextDeckFlip,
         captureEvents:    [...this._scoringEvents],
         runningScore:     this._runningScore,
         allYaku:          yakuForDiff,
-        totalMultiplier:  1.0,
         basePoints:       this._runningScore,
-        boostedBasePoints: this._runningScore,
         finalScore:       this._runningScore,
-        yakuMult:         1.0,
-        effectiveMult:    1.0,
-        additiveMult:     0,
-        multMult:         1.0,
         flow,
         pushEscalation,
-        pointBoost:       1.0,
-        rawBasePoints:    this._runningScore,
         pushFactor:       1.0,
-        styleBase:        this._styleBase,
         penaltyApplied,
         pushCount:        this._pushCount,
+        pushDepth:        this._pushDepth,
         pigDoubleKi:      this._pigDoubleKi,
-        nextFailFlow:     Math.max(1.0, this._styleBase),
+        nextFailFlow:     1.0,
         turn:             this._turn,
         deckCard:         this._lastDeckCard,
         discarded:        [...this._discardedThisTurn],

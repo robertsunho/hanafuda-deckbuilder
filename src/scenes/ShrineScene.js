@@ -5,11 +5,10 @@
 //   Top bar         [y 0–120]   spirits (y=62) + consumables (y=62) + info panel
 //   4 Quadrants     TL/TR [y 145–305]  BL/BR [y 385–545]
 //   Center gap      [y 305–385]  purchase button + reroll
-//   Fusion section  [y 555+]     Sacred Grove only
 //   Continue btn    [y 690]
 // ─────────────────────────────────────────────────────────────────────────────
 
-import run, { RunManager }                      from '../systems/RunManager.js';
+import run, { RunManager, aggregateNumericState } from '../systems/RunManager.js';
 import { SPIRIT_CATALOG, getSpiritDef }         from '../data/spirits.js';
 import { getAvailableFusions }                  from '../data/fusionRecipes.js';
 import { CHAKRA_TOOLS,
@@ -21,7 +20,13 @@ import { ZODIAC_CONSUMABLES }                  from '../data/zodiacConsumables.j
 import { generateShopCards }                   from '../data/shopCards.js';
 import logger                                   from '../systems/GameplayLogger.js';
 import { applyHook }                            from '../systems/HexagramEffects.js';
+import { getHexagram }                          from '../data/hexagrams.js';
+import { getSpiritContrib, getElementContrib }   from './shared/spiritTooltip.js';
 import { getCardPoints }                        from '../systems/CardMutations.js';
+import { SPIRIT_FAN_LEFT, SPIRIT_FAN_W, SPIRIT_W as _SW,
+         SPIRIT_IDEAL_GAP,
+         LEGENDARY_FAN_LEFT, LEGENDARY_FAN_W, LEGENDARY_IDEAL_GAP,
+         computeFanPositions }                  from './shared/SpiritLayout.js';
 
 /** Resolve card → Phaser texture key (handles hex-duplicate suffix). */
 function _tex(card) { return card.baseImageId ?? card.id; }
@@ -44,9 +49,8 @@ const CHANNEL_BADGE = {
 // ── Layout constants ──────────────────────────────────────────────────────────
 const BTN_Y = 690;
 
-// Spirit row — matches GameScene exactly
-const SPIRIT_GAP     = 76;
-const SPIRIT_START_X = 220;
+// Spirit row
+const SPIRIT_GAP     = 76;   // used by consumable spacing
 const SPIRIT_Y       = 62;
 const SPIRIT_W       = 64;
 const SPIRIT_H       = 104;
@@ -84,7 +88,6 @@ const Q_BL = { x: SHOP_CX - CENTER_GAP / 2 - QUAD_W, y: SHOP_CY + VERT_GAP / 2  
 const Q_BR = { x: SHOP_CX + CENTER_GAP / 2,           y: SHOP_CY + VERT_GAP / 2         }; // 680, 385
 
 // Below bottom quads (385 + 160 = 545), +10 gap
-const FUSION_Y = SHOP_CY + VERT_GAP / 2 + QUAD_H + 10; // 555
 
 // Shop item card size
 const SHOP_CARD_W = 88;
@@ -118,9 +121,10 @@ export class ShrineScene extends Phaser.Scene {
     pad(this._cardOfferings);
     pad(this._zodiacOfferings);
 
-    this._confirmObjs  = [];
-    this._shopTooltip  = null;
-    this._selectedItem = null;
+    this._confirmObjs      = [];
+    this._shopTooltip      = null;
+    this._selectedItem     = null;
+    this._expandedShrine   = null;
     this._rerollCount  = 0;
     this._rerollCost   = run.getEffectiveCost(applyHook('modifyRerollCost', 3, 3, this._rerollCount));
     this._buildUI();
@@ -132,9 +136,7 @@ export class ShrineScene extends Phaser.Scene {
     const pool = SPIRIT_CATALOG.filter(s => {
       if (s.tier !== 1) return false;
       if (s.legendary) return false;  // legendaries offered separately
-      const existing = run.spirits.find(r => r.id === s.id && !r.isNegative);
-      const hasNeg   = run.negativeSpirits.some(r => r.id === s.id);
-      return !(existing && (existing.stackCount ?? 1) >= 3 && hasNeg);
+      return true;
     });
 
     const offerings = [];
@@ -155,7 +157,8 @@ export class ShrineScene extends Phaser.Scene {
 
   _pickRandomLegendary() {
     const ownedIds = new Set(run.legendarySpirits.map(s => s.id));
-    const available = SPIRIT_CATALOG.filter(s => s.legendary && !ownedIds.has(s.id));
+    // Capstones are Pearl-only, never shop-offered.
+    const available = SPIRIT_CATALOG.filter(s => s.legendary && !s.capstone && !ownedIds.has(s.id));
     if (available.length === 0) return null;
     return available[Math.floor(Math.random() * available.length)];
   }
@@ -187,6 +190,7 @@ export class ShrineScene extends Phaser.Scene {
   // ── UI construction ───────────────────────────────────────────────────────
 
   _buildUI() {
+    this._expandedShrine = null;
     this.children.removeAll(true);
     this._confirmObjs = [];
     this._shopTooltip = null;
@@ -206,11 +210,6 @@ export class ShrineScene extends Phaser.Scene {
 
     this._drawCentralButtons();
 
-    if (this._isGrove) {
-      const fusionH = BTN_Y - 38 - FUSION_Y;
-      this._drawFusionSection(SHOP_CX, FUSION_Y, fusionH);
-    }
-
     this._drawContinueButton();
   }
 
@@ -222,176 +221,323 @@ export class ShrineScene extends Phaser.Scene {
 
   // ── Left info panel ────────────────────────────────────────────────────────
 
+  /** Render a small hexagram symbol (6 bars) from a lines[] array. */
+  _renderHexagramSymbol(centerX, topY, lines, color = 0xccddee) {
+    const objs = [];
+    const W = 20, H = 2, SP = 4, GAP = 6;
+    for (let i = 5; i >= 0; i--) {
+      const y = topY + (5 - i) * (H + SP);
+      if (lines[i] === 1) {
+        objs.push(this.add.rectangle(centerX, y, W, H, color));
+      } else {
+        const hw = (W - GAP) / 2;
+        objs.push(this.add.rectangle(centerX - GAP / 2 - hw / 2, y, hw, H, color));
+        objs.push(this.add.rectangle(centerX + GAP / 2 + hw / 2, y, hw, H, color));
+      }
+    }
+    return objs;
+  }
+
   _drawInfoPanel() {
-    let y = INFO_TOP_Y;
-    this.add.text(INFO_X, y, `Act ${run.act}  R${run.round}/36`, {
-      fontSize: '13px', color: '#8899aa',
-    });
-    y += 20;
-    this.add.text(INFO_X, y, `Ki: ${run.ki}`, {
-      fontSize: '13px', color: '#ffee88',
-    });
-    y += 28;
+    const BOX_W = 149, BOX_X = INFO_X - 4, BOX_PAD = 6;
+
+    // ─── Section 1: Run state ───────────────────────────────────────────
+    const B1_Y = INFO_TOP_Y, B1_H = 110;
+    let ry = B1_Y + BOX_PAD;
+    const hex = run.hexagramId ? getHexagram(run.hexagramId) : null;
+    if (hex) {
+      this.add.text(INFO_X, ry, `Hex ${String(hex.number).padStart(2, '0')}`, { fontSize: '13px', color: '#bbccdd' });
+      const tooltipText = this.add.text(0, 0,
+        `${hex.chineseCharacter} ${hex.chineseName} (${hex.englishName})\n\n${hex.description}`, {
+        fontSize: '11px', color: '#ddeeff', backgroundColor: '#0a1018',
+        stroke: '#000000', strokeThickness: 2,
+        padding: { x: 8, y: 6 }, wordWrap: { width: 280 }, lineSpacing: 2,
+      }).setVisible(false).setDepth(100);
+      const hitTarget = this.add.rectangle(BOX_X, ry - 2, BOX_W, 18, 0x000000, 0)
+        .setOrigin(0, 0).setInteractive({ useHandCursor: false });
+      hitTarget.on('pointerover', () => tooltipText.setPosition(BOX_X + BOX_W + 8, ry - 4).setVisible(true));
+      hitTarget.on('pointerout', () => tooltipText.setVisible(false));
+    }
+    ry += 20;
+    this.add.text(INFO_X, ry, `Act ${run.act}  R${run.round}/36`, { fontSize: '13px', color: '#8899aa' }); ry += 20;
+    this.add.text(INFO_X, ry, `Ki: ${run.ki}`, { fontSize: '13px', color: '#ffee88' }); ry += 20;
+    this.add.text(INFO_X, ry, `Interest: ${(run.interestRate * 100).toFixed(0)}%`, { fontSize: '13px', color: '#88ccaa' }); ry += 20;
+    this.add.text(INFO_X, ry, `Target: ${run.threshold}`, { fontSize: '13px', color: '#cc8866' });
+
+    // ─── Section 2: Activity context (shrine name) ──────────────────────
+    const B2_Y = B1_Y + B1_H + 6;
     const shopTitle  = this._isGrove ? 'Sacred Grove' : 'Wayside Shrine';
     const titleColor = this._isGrove ? '#ffcc44' : '#e8c96a';
-    this.add.text(INFO_X, y, shopTitle, {
+    this.add.text(INFO_X, B2_Y + BOX_PAD, shopTitle, {
       fontSize: '14px', color: titleColor, fontStyle: 'bold',
-      wordWrap: { width: 155 },
-    });
-    y += 28;
-    this.add.rectangle(INFO_X + 72, y, 144, 1, 0x2a3a50);
-    y += 8;
-    this.add.text(INFO_X, y, `Target: ${run.threshold}`, {
-      fontSize: '13px', color: '#cc8866',
+      wordWrap: { width: 140 },
     });
   }
 
-  // ── Persistent spirit row (matches GameScene position/style) ───────────────
+  // ── Persistent spirit row (fan layout matching GameScene) ───────────────────
 
   _drawPersistentSpirits() {
-    const spirits   = run.spirits;
+    this._collapseShrineStack();
+
+    const allFan    = run.allSpirits;
+    const regulars  = run.spirits;
     const fusionIds = this._isGrove
-      ? getAvailableFusions(spirits.map(s => s.id)).flatMap(r => r.input)
+      ? getAvailableFusions(regulars.map(s => s.id)).flatMap(r => r.input)
       : [];
 
-    const spiritSlotCount = run.spiritSlots;
-    for (let i = 0; i < spiritSlotCount; i++) {
-      const spirit = spirits[i];
-      const x = SPIRIT_START_X + i * SPIRIT_GAP;
-      const y = SPIRIT_Y;
+    // ── Spirit fan ────────────────────────────────────────────────────────
+    if (allFan.length > 0) {
+      const positions = computeFanPositions(
+        allFan.length, SPIRIT_FAN_W, SPIRIT_W, SPIRIT_IDEAL_GAP
+      );
 
-      if (!spirit) {
-        this._addRoundedRect(x, y, SPIRIT_W, SPIRIT_H, 6, 0x0a1628, 1, 0x1e2d40);
-        continue;
-      }
+      for (let i = 0; i < allFan.length; i++) {
+        const spirit = allFan[i];
+        const isNeg  = !!spirit.isNegative;
+        const x      = SPIRIT_FAN_LEFT + positions[i];
+        const y      = SPIRIT_Y;
+        const depth  = i + 1;
 
-      const rarityCol = RARITY_COLOR[spirit.rarity] ?? RARITY_COLOR.common;
-      this._addRoundedRect(x, y, SPIRIT_W, SPIRIT_H, 6, 0x0d1b2a, 1, rarityCol);
-      this.add.rectangle(x - SPIRIT_W / 2 + 2, y, 4, SPIRIT_H - 4, rarityCol);
+        const rarityCol = RARITY_COLOR[spirit.rarity] ?? RARITY_COLOR.common;
+        const borderCol = isNeg ? 0xaa44cc : rarityCol;
+        const bgCol     = isNeg ? 0x1a0d2a : 0x0d1b2a;
+        const nameCol   = isNeg ? '#ddaaff' : '#cce0ff';
 
-      this.add.text(x, y, spirit.name, {
-        fontSize: '9px', color: '#cce0ff',
-        wordWrap: { width: SPIRIT_W - 8 }, align: 'center',
-      }).setOrigin(0.5);
+        this._addRoundedRect(x, y, SPIRIT_W, SPIRIT_H, 6, bgCol, 1, borderCol)
+          .setDepth(depth);
+        this.add.rectangle(x - SPIRIT_W / 2 + 2, y, 4, SPIRIT_H - 4,
+          isNeg ? 0xaa44cc : rarityCol).setDepth(depth + 0.05);
 
-      const stackCount = spirit.stackCount ?? 1;
-      if (stackCount > 1) {
-        this.add.text(x + SPIRIT_W / 2 - 3, y - SPIRIT_H / 2 + 3, `\xD7${stackCount}`, {
-          fontSize: '10px', color: '#ffee66', fontStyle: 'bold',
-          stroke: '#000000', strokeThickness: 2,
-        }).setOrigin(1, 0).setDepth(10);
-      }
+        this.add.text(x, y, spirit.name, {
+          fontSize: '9px', color: nameCol,
+          wordWrap: { width: SPIRIT_W - 8 }, align: 'center',
+        }).setOrigin(0.5).setDepth(depth + 0.1);
 
-      // Fusion glow at Sacred Grove
-      if (fusionIds.includes(spirit.id)) {
-        this.add.rectangle(x, y, SPIRIT_W + 4, SPIRIT_H + 4, 0x000000, 0)
-          .setStrokeStyle(2, 0xffcc44);
-      }
-
-      // Hover tooltip
-      const tip = this.add.text(x, y + SPIRIT_H / 2 + 4,
-        getSpiritDef(spirit.id)?.description ?? spirit.name,
-        {
-          fontSize: '10px', color: '#e8e8e8',
-          backgroundColor: '#0a0f1e',
-          padding: { x: 6, y: 4 },
-          wordWrap: { width: 180 },
+        const displayPower = isNeg ? (spirit.powerLevel ?? 1) : (spirit.stackCount ?? 1);
+        const showBadge   = isNeg ? true : displayPower > 1;
+        if (showBadge) {
+          const badgeColor = isNeg ? '#ddaaff' : '#ffee66';
+          this.add.text(x + SPIRIT_W / 2 - 3, y - SPIRIT_H / 2 + 3, `\xD7${displayPower}`, {
+            fontSize: '10px', color: badgeColor, fontStyle: 'bold',
+            stroke: '#000000', strokeThickness: 2,
+          }).setOrigin(1, 0).setDepth(depth + 0.2);
         }
-      ).setOrigin(0.5, 0).setDepth(62).setVisible(false);
 
-      const hit = this.add.rectangle(x, y, SPIRIT_W, SPIRIT_H, 0x000000, 0)
-        .setInteractive({ useHandCursor: false }).setDepth(5);
-      hit.on('pointerover', () => tip.setVisible(true));
-      hit.on('pointerout',  () => tip.setVisible(false));
+        if (isNeg) {
+          const badgeY = showBadge ? y - SPIRIT_H / 2 + 16 : y - SPIRIT_H / 2 + 3;
+          this.add.text(x + SPIRIT_W / 2 - 3, badgeY, '\u2205', {
+            fontSize: '9px', color: '#5588aa',
+          }).setOrigin(1, 0).setDepth(depth + 0.3);
+        }
 
-      // Release ×
-      const rel = this.add.text(x + SPIRIT_W / 2 - 5, y - SPIRIT_H / 2 + 5, '\u00D7', {
-        fontSize: '11px', color: '#774444',
-      }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(12);
-      rel.on('pointerover', () => rel.setColor('#ff6666'));
-      rel.on('pointerout',  () => rel.setColor('#774444'));
-      rel.on('pointerdown', () => this._confirmRelease(i, spirit));
+        // Fusion glow at Sacred Grove
+        if (!isNeg && fusionIds.includes(spirit.id)) {
+          this.add.rectangle(x, y, SPIRIT_W + 4, SPIRIT_H + 4, 0x000000, 0)
+            .setStrokeStyle(2, 0xffcc44).setDepth(depth + 0.4);
+        }
+
+        // Tooltip — full content with live contribution (matches GameScene)
+        const desc    = getSpiritDef(spirit.id)?.description ?? spirit.name;
+        const contrib = getSpiritContrib(spirit);
+        const negSuffix = isNeg ? '\n\nNegative copy (zero-slot, base effect)' : '';
+        const tipText = contrib ? contrib + negSuffix : desc + negSuffix;
+        const tip = this.add.text(x, y + SPIRIT_H / 2 + 4, tipText, {
+            fontSize: '10px', color: '#e8e8e8',
+            backgroundColor: '#0a0f1e',
+            padding: { x: 6, y: 4 },
+            wordWrap: { width: 180 },
+          }
+        ).setOrigin(0.5, 0).setDepth(62).setVisible(false);
+
+        const hit = this.add.rectangle(x, y, SPIRIT_W, SPIRIT_H, 0x000000, 0)
+          .setInteractive({ useHandCursor: true }).setDepth(depth + 0.5);
+        hit.on('pointerover', () => {
+          if (!this._expandedShrine) tip.setVisible(true);
+        });
+        hit.on('pointerout', () => tip.setVisible(false));
+
+        // Click to expand
+        const _idx = i;
+        hit.on('pointerdown', () => this._expandShrineSpirit(spirit, _idx));
+      }
     }
 
-    // Negative spirits (smaller, to the right)
-    const neg = run.negativeSpirits;
-    const NW  = Math.round(SPIRIT_W * 0.72);
-    const NH  = Math.round(SPIRIT_H * 0.65);
-    const NX0 = SPIRIT_START_X + spiritSlotCount * SPIRIT_GAP;
-    for (let i = 0; i < neg.length; i++) {
-      const ns = neg[i];
-      const nx = NX0 + i * (NW + 6);
-      this._addRoundedRect(nx, SPIRIT_Y, NW, NH, 4, 0x0a1628, 0.7, 0x2a3a4a);
-      this.add.text(nx, SPIRIT_Y, ns.name, {
-        fontSize: '8px', color: '#667788',
-        wordWrap: { width: NW - 6 }, align: 'center',
-      }).setOrigin(0.5).setDepth(5);
-      this.add.text(nx + NW / 2 - 3, SPIRIT_Y - NH / 2 + 2, '\u2205', {
-        fontSize: '9px', color: '#5588aa',
-      }).setOrigin(1, 0).setDepth(10);
-    }
+    // ── Rotated "SPIRITS X/Y" label ────────────────────────────────────
+    this.add.text(SPIRIT_FAN_LEFT - 10, SPIRIT_Y,
+      `SPIRITS ${regulars.length}/${run.spiritSlots}`, {
+        fontSize: '10px', color: '#556677',
+      }).setOrigin(0.5, 0.5).setRotation(-Math.PI / 2).setDepth(1);
 
-    // Legendary spirit slots (right of negatives)
+    // ── Legendary spirit fan ────────────────────────────────────────────
     const legSpirits = run.legendarySpirits;
     const legSlots   = run.maxLegendarySlots;
-    const LEG_GAP    = SPIRIT_W + 12;
-    const LEG_X0     = NX0 + neg.length * (NW + 6) + (neg.length > 0 ? 12 : 0);
-    for (let i = 0; i < legSlots; i++) {
-      const ls = legSpirits[i];
-      const lx = LEG_X0 + i * LEG_GAP;
-      if (!ls) {
-        this._addRoundedRect(lx, SPIRIT_Y, SPIRIT_W, SPIRIT_H, 6, 0x1a1a0a, 1, 0x4a4a1a);
-        this.add.text(lx, SPIRIT_Y + SPIRIT_H / 2 - 6, 'L', {
-          fontSize: '8px', color: '#6a6a3a',
+
+    // Rotated "LEGENDARIES X/Y" label
+    this.add.text(LEGENDARY_FAN_LEFT - 10, SPIRIT_Y,
+      `LEGENDARIES ${legSpirits.length}/${legSlots}`, {
+        fontSize: '10px', color: '#556677',
+      }).setOrigin(0.5, 0.5).setRotation(-Math.PI / 2).setDepth(1);
+
+    if (legSpirits.length > 0) {
+      const legPositions = computeFanPositions(
+        legSpirits.length, LEGENDARY_FAN_W, SPIRIT_W, LEGENDARY_IDEAL_GAP
+      );
+      for (let i = 0; i < legSpirits.length; i++) {
+        const ls = legSpirits[i];
+        const lx = LEGENDARY_FAN_LEFT + legPositions[i];
+
+        const legCol = RARITY_COLOR.legendary;
+        this._addRoundedRect(lx, SPIRIT_Y, SPIRIT_W, SPIRIT_H, 6, 0x1a1a0a, 1, legCol);
+        this.add.rectangle(lx - SPIRIT_W / 2 + 2, SPIRIT_Y, 4, SPIRIT_H - 4, legCol);
+        this.add.text(lx, SPIRIT_Y, ls.name, {
+          fontSize: '9px', color: '#ffee88',
+          wordWrap: { width: SPIRIT_W - 8 }, align: 'center',
         }).setOrigin(0.5);
-        continue;
+        const legDesc    = getSpiritDef(ls.id)?.description ?? ls.name;
+        const legContrib = getSpiritContrib(ls);
+        const legTip = this.add.text(lx, SPIRIT_Y + SPIRIT_H / 2 + 4,
+          legContrib ? legContrib : legDesc,
+          {
+            fontSize: '10px', color: '#e8e8e8',
+            backgroundColor: '#0a0f1e',
+            padding: { x: 6, y: 4 },
+            wordWrap: { width: 180 },
+          }
+        ).setOrigin(0.5, 0).setDepth(62).setVisible(false);
+        const legHit = this.add.rectangle(lx, SPIRIT_Y, SPIRIT_W, SPIRIT_H, 0x000000, 0)
+          .setInteractive({ useHandCursor: false }).setDepth(5);
+        legHit.on('pointerover', () => legTip.setVisible(true));
+        legHit.on('pointerout',  () => legTip.setVisible(false));
+        const legSell = this.add.text(lx + SPIRIT_W / 2 - 5, SPIRIT_Y - SPIRIT_H / 2 + 5, '\u00D7', {
+          fontSize: '11px', color: '#774444',
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(12);
+        legSell.on('pointerover', () => legSell.setColor('#ff6666'));
+        legSell.on('pointerout',  () => legSell.setColor('#774444'));
+        legSell.on('pointerdown', () => {
+          run.sellLegendarySpirit(i);
+          this._buildUI();
+        });
       }
-      const legCol = RARITY_COLOR.legendary;
-      this._addRoundedRect(lx, SPIRIT_Y, SPIRIT_W, SPIRIT_H, 6, 0x1a1a0a, 1, legCol);
-      this.add.rectangle(lx - SPIRIT_W / 2 + 2, SPIRIT_Y, 4, SPIRIT_H - 4, legCol);
-      this.add.text(lx, SPIRIT_Y, ls.name, {
-        fontSize: '9px', color: '#ffee88',
-        wordWrap: { width: SPIRIT_W - 8 }, align: 'center',
-      }).setOrigin(0.5);
-      const legTip = this.add.text(lx, SPIRIT_Y + SPIRIT_H / 2 + 4,
-        getSpiritDef(ls.id)?.description ?? ls.name,
-        {
-          fontSize: '10px', color: '#e8e8e8',
-          backgroundColor: '#0a0f1e',
-          padding: { x: 6, y: 4 },
-          wordWrap: { width: 180 },
-        }
-      ).setOrigin(0.5, 0).setDepth(62).setVisible(false);
-      const legHit = this.add.rectangle(lx, SPIRIT_Y, SPIRIT_W, SPIRIT_H, 0x000000, 0)
-        .setInteractive({ useHandCursor: false }).setDepth(5);
-      legHit.on('pointerover', () => legTip.setVisible(true));
-      legHit.on('pointerout',  () => legTip.setVisible(false));
-      // Sell button
-      const legSell = this.add.text(lx + SPIRIT_W / 2 - 5, SPIRIT_Y - SPIRIT_H / 2 + 5, '\u00D7', {
-        fontSize: '11px', color: '#774444',
-      }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(12);
-      legSell.on('pointerover', () => legSell.setColor('#ff6666'));
-      legSell.on('pointerout',  () => legSell.setColor('#774444'));
-      legSell.on('pointerdown', () => {
-        run.sellLegendarySpirit(i);
-        this._buildUI();
-      });
     }
+  }
+
+  // ── Spirit expansion in shrine ─────────────────────────────────────────────
+
+  _expandShrineSpirit(spirit, displayIndex) {
+    if (this._expandedShrine && this._expandedShrine.displayIndex === displayIndex) {
+      this._collapseShrineStack();
+      return;
+    }
+    this._collapseShrineStack();
+
+    const allFan    = run.allSpirits;
+    const positions = computeFanPositions(allFan.length, SPIRIT_FAN_W, SPIRIT_W, SPIRIT_IDEAL_GAP);
+    if (displayIndex >= positions.length) return;
+
+    const isNeg   = !!spirit.isNegative;
+    const sourceX = SPIRIT_FAN_LEFT + positions[displayIndex];
+
+    this._expandedShrine = { displayIndex, spirit, objs: [] };
+    const push = obj => { this._expandedShrine.objs.push(obj); return obj; };
+
+    // Blocker
+    push(this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.15)
+      .setDepth(89).setInteractive());
+    this._expandedShrine.objs[0].on('pointerdown', () => this._collapseShrineStack());
+
+    // Sell button on source card (top-right corner) — sells whole stack
+    const cost = getSpiritDef(spirit.id)?.cost ?? spirit.cost ?? 0;
+    const mult = spirit.isNegative ? (spirit.powerLevel ?? 1) : (spirit.stackCount ?? 1);
+    const refund = isNeg
+      ? Math.floor(cost * 0.5 * mult)
+      : Math.floor(cost / 2 * mult);
+    const sellBtn = push(this.add.text(
+      sourceX + SPIRIT_W / 2 - 4, SPIRIT_Y - SPIRIT_H / 2 + 4,
+      `Sell \u00A5${refund}`, {
+        fontSize: '9px', color: '#ffaa44', fontStyle: 'bold',
+        backgroundColor: '#3a2010', padding: { x: 3, y: 1 },
+      }).setOrigin(1, 0).setDepth(95)
+      .setInteractive({ useHandCursor: true }));
+
+    sellBtn.on('pointerdown', (pointer, lx, ly, event) => {
+      event.stopPropagation();
+      run.removeSpirit(displayIndex);
+      run.addKi(refund, `sold ${spirit.name}${isNeg ? ' (negative)' : ''}`);
+      logger.logSpiritSold(spirit.name, refund, displayIndex);
+      this._collapseShrineStack();
+      this._buildUI();
+    });
+
+    // Negatives are singletons — no peek cards
+    if (isNeg) return;
+
+    // Source card element-0 tooltip (F3.5)
+    const srcTipText = getElementContrib(spirit, 0);
+    if (srcTipText) {
+      const srcTip = push(this.add.text(sourceX, SPIRIT_Y + SPIRIT_H / 2 + 4, srcTipText, {
+        fontSize: '10px', color: '#e8e8e8', backgroundColor: '#0a0f1e',
+        padding: { x: 6, y: 4 }, wordWrap: { width: 180 },
+      }).setOrigin(0.5, 0).setDepth(96).setVisible(false));
+      const srcHit = push(this.add.rectangle(sourceX, SPIRIT_Y, SPIRIT_W, SPIRIT_H, 0x000000, 0)
+        .setInteractive({ useHandCursor: false }).setDepth(95));
+      srcHit.on('pointerover', () => srcTip.setVisible(true));
+      srcHit.on('pointerout',  () => srcTip.setVisible(false));
+    }
+
+    // Peek cards for ×2..×N below source (F3.5)
+    const stackCount = spirit.stackCount ?? 1;
+    const PEEK_OFFSET = SPIRIT_H + 6;
+    for (let q = 2; q <= stackCount; q++) {
+      const peekY = SPIRIT_Y + (q - 1) * PEEK_OFFSET;
+      const depth = 90 + q;
+      const rarCol = RARITY_COLOR[spirit.rarity] ?? RARITY_COLOR.common;
+      const peekCard = push(this._addRoundedRect(sourceX, peekY, SPIRIT_W, SPIRIT_H, 6, 0x0d1b2a, 1, rarCol, 2)
+        .setDepth(depth));
+      peekCard.setInteractive(
+        new Phaser.Geom.Rectangle(sourceX - SPIRIT_W / 2, peekY - SPIRIT_H / 2, SPIRIT_W, SPIRIT_H),
+        Phaser.Geom.Rectangle.Contains
+      );
+      push(this.add.text(sourceX - SPIRIT_W / 2 + 6, peekY - SPIRIT_H / 2 + 4, `\xD7${q}`, {
+        fontSize: '10px', color: '#ffee66', fontStyle: 'bold',
+        stroke: '#000000', strokeThickness: 2,
+      }).setOrigin(0, 0).setDepth(depth + 0.1));
+      push(this.add.text(sourceX, peekY - 6, spirit.name, {
+        fontSize: '9px', color: '#cce0ff',
+        wordWrap: { width: SPIRIT_W - 12 }, align: 'center',
+      }).setOrigin(0.5).setDepth(depth + 0.1));
+
+      // Per-element tooltip
+      const elTipText = getElementContrib(spirit, q - 1);
+      if (elTipText) {
+        const elTip = push(this.add.text(sourceX, peekY + SPIRIT_H / 2 + 4, elTipText, {
+          fontSize: '10px', color: '#e8e8e8', backgroundColor: '#0a0f1e',
+          padding: { x: 6, y: 4 }, wordWrap: { width: 180 },
+        }).setOrigin(0.5, 0).setDepth(depth + 1).setVisible(false));
+        peekCard.on('pointerover', () => elTip.setVisible(true));
+        peekCard.on('pointerout',  () => elTip.setVisible(false));
+      }
+    }
+  }
+
+  _collapseShrineStack() {
+    if (!this._expandedShrine) return;
+    for (const obj of this._expandedShrine.objs) obj.destroy();
+    this._expandedShrine = null;
   }
 
   // ── Persistent consumable slots (matches GameScene position/style) ──────────
 
   _drawPersistentConsumables() {
     const maxSlots = run.maxConsumableSlots;
-    // Empty slot backgrounds
-    for (let i = 0; i < maxSlots; i++) {
-      this._addRoundedRect(
-        CONS_BASE_X + i * CONS_FAN_X, CONS_BASE_Y,
-        CONS_CARD_W, CONS_CARD_H, 6, 0x080e18, 0.8, 0x1e2d40
-      );
-    }
-    // Filled cards
+
+    // ── Rotated "CONSUMABLES X/Y" label ─────────────────────────────────
     const consumables = run.consumables;
+    this.add.text(CONS_BASE_X - CONS_CARD_W / 2 - 10, CONS_BASE_Y,
+      `CONSUMABLES ${consumables.length}/${maxSlots}`, {
+        fontSize: '10px', color: '#556677',
+      }).setOrigin(0.5, 0.5).setRotation(-Math.PI / 2).setDepth(1);
+
+    // Filled cards
     for (let i = 0; i < consumables.length; i++) {
       const cons = consumables[i];
       const x    = CONS_BASE_X + i * CONS_FAN_X;
@@ -419,6 +565,20 @@ export class ShrineScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: false }).setDepth(i + 3);
       hit.on('pointerover', () => tip.setVisible(true));
       hit.on('pointerout',  () => tip.setVisible(false));
+
+      // Sell button (non-negative consumables only)
+      if (!cons.isNegative) {
+        const sellBtn = this.add.text(x + CONS_CARD_W / 2 - 2, y - CONS_CARD_H / 2 + 2, 'Sell', {
+          fontSize: '8px', color: '#ffaa44', fontStyle: 'bold',
+          backgroundColor: '#3a2010', padding: { x: 3, y: 1 },
+        }).setOrigin(1, 0).setDepth(i + 4)
+          .setInteractive({ useHandCursor: true });
+        sellBtn.on('pointerdown', (pointer, lx, ly, event) => {
+          event.stopPropagation();
+          run.sellConsumable(i);
+          this._buildUI();
+        });
+      }
     }
   }
 
@@ -718,6 +878,7 @@ export class ShrineScene extends Phaser.Scene {
         pBtn.on('pointerout',  () => pBtn.setFillStyle(btnBg));
         pBtn.on('pointerdown', () => {
           const s = this._selectedItem;
+          if (!s) return;
           this._selectedItem = null;
           this._buyItem(s.offering, s.category, s.index, s.offeringsArray);
         });
@@ -732,9 +893,20 @@ export class ShrineScene extends Phaser.Scene {
     }
 
     // ── Reroll button — always visible at fixed Y below purchase ──────────────
-    // engine_northern_lion: check for free rerolls.
-    const _lionFree = run.spirits
-      .reduce((sum, s) => sum + (s.id === 'engine_northern_lion' ? (s.state?.freeRerolls ?? 0) : 0), 0);
+    // engine_northern_lion: check for free rerolls (earned via pushes minus used).
+    const _lionFree = run.allSpirits
+      .filter(s => s.id === 'engine_northern_lion')
+      .reduce((sum, s) => {
+        let earned;
+        if (s.isNegative) {
+          earned = (s.state?.preTranscendTotal ?? 0) +
+                   (s.state?.newEvents ?? 0) * 1 * (s.powerLevel ?? 1);
+        } else {
+          earned = aggregateNumericState(s, 'pushesWitnessed');
+        }
+        const used = s._rerollsUsed ?? 0;
+        return sum + Math.max(0, earned - used);
+      }, 0);
     const canReroll = run.ki >= this._rerollCost;
     const canAnyReroll = canReroll || _lionFree > 0;
     const bg  = canAnyReroll ? 0x1a2a4a : 0x0e1520;
@@ -751,10 +923,18 @@ export class ShrineScene extends Phaser.Scene {
       rBtn.on('pointerout',  () => rBtn.setFillStyle(bg));
       rBtn.on('pointerdown', () => {
         if (_lionFree > 0) {
-          // Consume one free reroll from the first lion that has one.
-          for (const lion of run.spirits) {
-            if (lion.id === 'engine_northern_lion' && (lion.state?.freeRerolls ?? 0) > 0) {
-              lion.state.freeRerolls--;
+          // Consume one free reroll from the first lion that has available.
+          for (const lion of run.allSpirits) {
+            if (lion.id !== 'engine_northern_lion') continue;
+            let earned;
+            if (lion.isNegative) {
+              earned = (lion.state?.preTranscendTotal ?? 0) +
+                       (lion.state?.newEvents ?? 0) * 1 * (lion.powerLevel ?? 1);
+            } else {
+              earned = aggregateNumericState(lion, 'pushesWitnessed');
+            }
+            if (earned - (lion._rerollsUsed ?? 0) > 0) {
+              lion._rerollsUsed = (lion._rerollsUsed ?? 0) + 1;
               break;
             }
           }
@@ -863,9 +1043,8 @@ export class ShrineScene extends Phaser.Scene {
   _getItemCost(offering, category) {
     if (!offering) return 0;
     let base;
-    if (category === 'spirit' && offering.legendary) base = RunManager.LEGENDARY_PURCHASE_COST;
-    else base = category === 'card' ? this._price(offering.price) : this._price(offering.cost ?? 0);
-    return run.getEffectiveCost(base);
+    if (category === 'spirit' && offering.legendary) return run.getEffectiveCost(RunManager.LEGENDARY_PURCHASE_COST);
+    return category === 'card' ? run.getEffectiveCost(offering.price) : run.getEffectiveCost(offering.cost ?? 0);
   }
 
   _canBuyItem(offering, category) {
@@ -900,9 +1079,7 @@ export class ShrineScene extends Phaser.Scene {
         }
         const result = run.buySpirit(offering);
         if (result.success) {
-          const discount = offering.cost - this._price(offering.cost);
-          if (discount > 0) run.addKi(discount);
-          logger.logShopPurchase('spirit', offering.name, this._price(offering.cost));
+          logger.logShopPurchase('spirit', offering.name, run.getEffectiveCost(offering.cost));
           if ((result.result ?? '') === 'transcended') {
             logger.logShopPurchase('spirit_transcend', offering.name, 0);
           }
@@ -913,36 +1090,36 @@ export class ShrineScene extends Phaser.Scene {
       }
 
       case 'deckfix': {
-        const cost = this._price(offering.cost);
-        if (offering.category === 'alchemical') {
-          run.spendKi(cost);
-          logger.logShopPurchase('alchemical', offering.name, cost);
-          offeringsArray[index] = null;
-          this._activateAlchemical(offering);
+        const cost = run.getEffectiveCost(offering.cost);
+        if (run.ki < cost) break;
+        if (!run.canAddConsumable) {
+          this._setStatus?.('Consumable inventory full.');
           break;
         }
-        if (offering.id.startsWith('chakra_')) {
-          run.spendKi(cost);
-          logger.logShopPurchase('chakra', offering.name, cost);
-          offeringsArray[index] = null;
-          this._showChakraOverlay(offering);
-        } else if (offering.id.startsWith('practice_')) {
-          // Legacy Four Practices — keep routing for backward compat.
-          run.spendKi(cost);
-          logger.logShopPurchase('practice', offering.name, cost);
-          offeringsArray[index] = null;
-          this._showPracticeOverlay(offering);
-        } else if (offering.id.startsWith('element_')) {
-          offeringsArray[index] = null;
-          this._buyConsumable(offering);
-        } else {
-          this._showStampCardSelector(offering, () => { offeringsArray[index] = null; });
-        }
+        run.spendKi(cost);
+        // All deckfix items (chakras, stamps, alchemicals, wu xing) go to inventory.
+        // Determine category for dispatch routing in GameScene.
+        let cat = offering.category ?? 'stamp';
+        if (offering.id.startsWith('chakra_'))  cat = 'chakra';
+        if (offering.id.startsWith('element_')) cat = 'wuxing';
+        if (offering.id.startsWith('stamp_'))   cat = 'stamp';
+        run.addConsumable({
+          id: offering.id, name: offering.name,
+          description: offering.description, category: cat,
+          // Carry extra fields needed for in-round activation
+          maxTargets: offering.maxTargets,
+          cost: offering.cost,
+          element: offering.element,
+          tier: offering.tier,
+        });
+        logger.logShopPurchase('deckfix', offering.name, cost);
+        offeringsArray[index] = null;
+        this._buildUI();
         break;
       }
 
       case 'card': {
-        const cost   = this._price(offering.price);
+        const cost   = run.getEffectiveCost(offering.price);
         const result = run.buyCard(offering.card, cost);
         if (result.success) {
           logger.logShopPurchase('card', offering.card.name ?? offering.card.id, cost);
@@ -955,8 +1132,6 @@ export class ShrineScene extends Phaser.Scene {
       case 'zodiac': {
         const result = run.buyConsumable(offering.id);
         if (result.success) {
-          const discount = offering.cost - this._price(offering.cost);
-          if (discount > 0) run.addKi(discount);
           logger.logConsumableUse(offering.name, 'purchased');
           offeringsArray[index] = null;
           this._buildUI();
@@ -1086,11 +1261,20 @@ export class ShrineScene extends Phaser.Scene {
       this._confirmObjs = [];
       this._buildUI();
     };
+    let errorMsg = '';
     const render = () => {
+      const instr = errorMsg
+        ? errorMsg
+        : 'Select 1 card to receive a random edition (Gold/Crystal/Ghost).';
+      const eligibleCards = run.getDeck().filter(c => !c.edition);
+      if (eligibleCards.length === 0) {
+        refund();
+        return;
+      }
       this._buildPracticeGrid({
         title:       `Heart Chakra  (${def.cost} ki paid)`,
-        instruction: 'Select 1 card to receive a random edition (Gold/Crystal/Ghost).',
-        cards:       run.getDeck(),
+        instruction: instr,
+        cards:       eligibleCards,
         selectedIds: new Set(),
         onSelect: (card) => {
           const result = run.applyChakraHeart(card.id);
@@ -1099,6 +1283,9 @@ export class ShrineScene extends Phaser.Scene {
             for (const o of this._confirmObjs) o.destroy();
             this._confirmObjs = [];
             this._buildUI();
+          } else if (result.existingEdition) {
+            errorMsg = `Already has ${result.existingEdition} edition \u2014 pick another card.`;
+            render();
           }
         },
         onCancel: refund,
@@ -1427,15 +1614,15 @@ export class ShrineScene extends Phaser.Scene {
 
   // ── Buy consumable → use-or-carry ─────────────────────────────────────────
 
-  _buyConsumable(markDef) {
-    const pCost = run.getEffectiveCost(this._price(markDef.cost));
+  _buyConsumable(consumableDef) {
+    const pCost = run.getEffectiveCost(consumableDef.cost);
     if (run.ki < pCost) return;
     run.spendKi(pCost);
-    logger.logShopPurchase('consumable', markDef.name, pCost);
-    this._showUseOrCarryChoice(markDef);
+    logger.logShopPurchase('consumable', consumableDef.name, pCost);
+    this._showUseOrCarryChoice(consumableDef);
   }
 
-  _showUseOrCarryChoice(markDef) {
+  _showUseOrCarryChoice(consumableDef) {
     for (const o of this._confirmObjs) o.destroy();
     this._confirmObjs = [];
 
@@ -1445,7 +1632,7 @@ export class ShrineScene extends Phaser.Scene {
 
     push(this.add.rectangle(cx, cy, 380, 220, 0x040810, 0.97)
       .setStrokeStyle(2, 0x2a5a88).setDepth(55));
-    push(this.add.text(cx, cy - 80, markDef.name, {
+    push(this.add.text(cx, cy - 80, consumableDef.name, {
       fontSize: '17px', color: '#88ddff', stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(55));
     push(this.add.text(cx, cy - 52, 'How would you like to use this?', {
@@ -1459,7 +1646,7 @@ export class ShrineScene extends Phaser.Scene {
     useBtn.on('pointerdown', () => {
       for (const o of this._confirmObjs) o.destroy();
       this._confirmObjs = [];
-      this._showBoosterPack(markDef);
+      this._showBoosterPack(consumableDef);
     });
     push(this.add.text(cx, cy - 8, 'Use Now  (pick from 8 cards)', {
       fontSize: '12px', color: '#88ddff',
@@ -1475,9 +1662,9 @@ export class ShrineScene extends Phaser.Scene {
       carryBtn.on('pointerout',  () => carryBtn.setFillStyle(0x1a3a1a));
       carryBtn.on('pointerdown', () => {
         try {
-          run.addConsumable({ id: markDef.id, name: markDef.name,
-            description: markDef.description, category: markDef.category });
-          logger.logConsumableUse(markDef.name, 'carried into round');
+          run.addConsumable({ id: consumableDef.id, name: consumableDef.name,
+            description: consumableDef.description, category: consumableDef.category });
+          logger.logConsumableUse(consumableDef.name, 'carried into round');
         } catch (e) { console.warn('[ShrineScene] addConsumable:', e.message); }
         for (const o of this._confirmObjs) o.destroy();
         this._confirmObjs = [];
@@ -1494,7 +1681,7 @@ export class ShrineScene extends Phaser.Scene {
     cancelBtn.on('pointerover', () => cancelBtn.setFillStyle(0x4a2a2a));
     cancelBtn.on('pointerout',  () => cancelBtn.setFillStyle(0x2a1a1a));
     cancelBtn.on('pointerdown', () => {
-      run.addKi(markDef.cost);
+      run.addKi(consumableDef.cost);
       for (const o of this._confirmObjs) o.destroy();
       this._confirmObjs = [];
       this._buildUI();
@@ -1504,7 +1691,7 @@ export class ShrineScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(56));
   }
 
-  _showBoosterPack(markDef) {
+  _showBoosterPack(consumableDef) {
     for (const o of this._confirmObjs) o.destroy();
     this._confirmObjs = [];
 
@@ -1518,7 +1705,7 @@ export class ShrineScene extends Phaser.Scene {
 
     push(this.add.rectangle(cx, cy, W, H, 0x040810, 0.97)
       .setStrokeStyle(2, 0x2a5a88).setDepth(50));
-    push(this.add.text(cx, cy - H / 2 + 14, `${markDef.name} — Select a Card`, {
+    push(this.add.text(cx, cy - H / 2 + 14, `${consumableDef.name} — Select a Card`, {
       fontSize: '18px', color: '#88ddff', stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(50));
 
@@ -1527,10 +1714,7 @@ export class ShrineScene extends Phaser.Scene {
       earth: 'Clay (ki interest)', metal: 'Iron (proc chance)',
     };
     let instruction = 'Select a card.';
-    if (markDef.id === 'mark_impermanence')       instruction = 'Click a card to promote it.';
-    else if (markDef.id === 'mark_nonbeing')       instruction = 'Click a card to permanently remove it.';
-    else if (markDef.id === 'mark_transcendence')  instruction = 'Click the SOURCE card (it will be replaced).';
-    else if (markDef.id.startsWith('element_'))   instruction = `Apply ${ELEMENT_NAMES[markDef.element] ?? markDef.name}.`;
+    if (consumableDef.id.startsWith('element_'))   instruction = `Apply ${ELEMENT_NAMES[consumableDef.element] ?? consumableDef.name}.`;
 
     push(this.add.text(cx, cy - H / 2 + 36, instruction, {
       fontSize: '12px', color: '#557799',
@@ -1544,8 +1728,6 @@ export class ShrineScene extends Phaser.Scene {
     const gridW    = perRow * CW + (perRow - 1) * GAP;
     const gridStartX = cx - gridW / 2 + CW / 2;
     const gridStartY = cy - 60;
-
-    let transcendSource = null;
 
     for (let i = 0; i < preview.length; i++) {
       const card = preview[i];
@@ -1565,40 +1747,14 @@ export class ShrineScene extends Phaser.Scene {
 
       spr.setInteractive({ useHandCursor: true });
       spr.on('pointerover', () => spr.setTint(0xaaddff));
-      spr.on('pointerout',  () => {
-        if (transcendSource && transcendSource.id === card.id) return;
-        spr.clearTint();
-      });
+      spr.on('pointerout',  () => spr.clearTint());
       spr.on('pointerdown', () => {
         const close = () => {
           for (const o of this._confirmObjs) o.destroy();
           this._confirmObjs = [];
         };
-        if (markDef.id === 'mark_impermanence') {
-          run.promoteCard(card.id);
-          logger.logConsumableUse(markDef.name, `promoted ${card.id} at shop`);
-          close(); this._buildUI();
-        } else if (markDef.id === 'mark_nonbeing') {
-          run.deleteCard(card.id);
-          logger.logConsumableUse(markDef.name, `deleted ${card.id} at shop`);
-          close(); this._buildUI();
-        } else if (markDef.id === 'mark_transcendence') {
-          if (!transcendSource) {
-            transcendSource = card;
-            spr.setTint(0xffcc44);
-            for (const o of this._confirmObjs) { if (o._isTargetInstruction) o.destroy(); }
-            const instr = push(this.add.text(cx, cy - H / 2 + 36,
-              `Source: ${card.name}. Now click the TARGET card.`,
-              { fontSize: '12px', color: '#ffcc44' }
-            ).setOrigin(0.5).setDepth(51));
-            instr._isTargetInstruction = true;
-          } else {
-            run.transcendCard(transcendSource.id, card.id);
-            logger.logConsumableUse(markDef.name, `${transcendSource.id} → ${card.id} at shop`);
-            close(); this._buildUI();
-          }
-        } else if (markDef.id.startsWith('element_')) {
-          const element = markDef.element ?? markDef.id.replace('element_', '');
+        if (consumableDef.id.startsWith('element_')) {
+          const element = consumableDef.element ?? consumableDef.id.replace('element_', '');
           const result  = run.applyElement(card.id, element);
           if (result.action === 'stripped' && result.returnedConsumable) {
             const rd = getElementDef(result.returnedConsumable);
@@ -1607,7 +1763,7 @@ export class ShrineScene extends Phaser.Scene {
               catch (_) {}
             }
           }
-          logger.logConsumableUse(markDef.name, `${result.action} on ${card.id} at shop`);
+          logger.logConsumableUse(consumableDef.name, `${result.action} on ${card.id} at shop`);
           close(); this._buildUI();
         }
       });
@@ -1618,7 +1774,7 @@ export class ShrineScene extends Phaser.Scene {
     cancelBtn.on('pointerover', () => cancelBtn.setFillStyle(0x4a2a2a));
     cancelBtn.on('pointerout',  () => cancelBtn.setFillStyle(0x2a1a1a));
     cancelBtn.on('pointerdown', () => {
-      run.addKi(markDef.cost);
+      run.addKi(consumableDef.cost);
       for (const o of this._confirmObjs) o.destroy();
       this._confirmObjs = [];
       this._buildUI();
@@ -1687,8 +1843,6 @@ export class ShrineScene extends Phaser.Scene {
         spr.on('pointerdown', () => {
           const result = run.applyStamp(card.id, stampDef.id);
           if (result.success) {
-            const discount = stampDef.cost - this._price(stampDef.cost);
-            if (discount > 0) run.addKi(discount);
             logger.logConsumableUse(stampDef.name, `stamped ${card.id}`);
             if (onSuccess) onSuccess();
             for (const o of this._confirmObjs) o.destroy();
@@ -1710,115 +1864,6 @@ export class ShrineScene extends Phaser.Scene {
     push(this.add.text(cx, cy + H / 2 - 30, 'Cancel', {
       fontSize: '13px', color: '#ffaaaa',
     }).setOrigin(0.5).setDepth(51));
-  }
-
-  // ── Fusion Ritual (Sacred Grove only) ─────────────────────────────────────
-
-  _drawFusionSection(cx, topY, height) {
-    this.add.text(cx, topY + 4, 'Fusion Ritual', {
-      fontSize: '15px', color: '#ffcc44',
-    }).setOrigin(0.5, 0);
-    this.add.text(cx, topY + 24, 'Combine two spirits into something greater', {
-      fontSize: '10px', color: '#886644',
-    }).setOrigin(0.5, 0);
-
-    const panelPadTop = 42;
-    const panelPadBot = 8;
-    const panelH      = height - panelPadTop - panelPadBot;
-    const panelCY     = topY + panelPadTop + panelH / 2;
-
-    this.add.rectangle(cx, panelCY, 570, panelH, 0x4a3a1a, 0.2)
-      .setStrokeStyle(1, 0x665533);
-
-    const availableFusions = getAvailableFusions(run.spirits.map(s => s.id));
-
-    if (availableFusions.length === 0) {
-      this.add.text(cx, panelCY, 'No compatible spirit pairs equipped', {
-        fontSize: '12px', color: '#665533', fontStyle: 'italic',
-      }).setOrigin(0.5);
-      return;
-    }
-
-    let y = topY + panelPadTop + 10;
-    for (const recipe of availableFusions) {
-      const nameA     = run.spirits.find(s => s.id === recipe.input[0])?.name ?? recipe.input[0];
-      const nameB     = run.spirits.find(s => s.id === recipe.input[1])?.name ?? recipe.input[1];
-      const outputDef = getSpiritDef(recipe.output);
-
-      this.add.text(cx, y,
-        `${nameA} + ${nameB}  \u2192  ${outputDef?.name ?? recipe.output}`,
-        { fontSize: '12px', color: '#ddbb88' }
-      ).setOrigin(0.5, 0);
-      y += 18;
-
-      this.add.text(cx, y, outputDef?.description ?? '', {
-        fontSize: '10px', color: '#997755',
-        wordWrap: { width: 530 }, align: 'center',
-      }).setOrigin(0.5, 0);
-      y += 22;
-
-      const fuseBtn = this.add.rectangle(cx, y + 11, 90, 22, 0x6a4a1a)
-        .setStrokeStyle(1, 0xccaa44).setInteractive({ useHandCursor: true });
-      fuseBtn.on('pointerover', () => fuseBtn.setFillStyle(0x8a6a2a));
-      fuseBtn.on('pointerout',  () => fuseBtn.setFillStyle(0x6a4a1a));
-      fuseBtn.on('pointerdown', () => this._showFusionConfirm(recipe));
-      this.add.text(cx, y + 11, 'Fuse', { fontSize: '12px', color: '#ffdd88' }).setOrigin(0.5);
-      y += 40;
-    }
-  }
-
-  _showFusionConfirm(recipe) {
-    for (const o of this._confirmObjs) o.destroy();
-    this._confirmObjs = [];
-
-    const cx        = 640, cy = 360;
-    const nameA     = run.spirits.find(s => s.id === recipe.input[0])?.name ?? recipe.input[0];
-    const nameB     = run.spirits.find(s => s.id === recipe.input[1])?.name ?? recipe.input[1];
-    const outputDef = getSpiritDef(recipe.output);
-    const push      = obj => { this._confirmObjs.push(obj); return obj; };
-
-    push(this.add.rectangle(cx, cy, 500, 196, 0x0a1628, 0.97)
-      .setStrokeStyle(2, 0xaa8833).setDepth(50));
-    push(this.add.text(cx, cy - 80, 'Fusion Ritual', {
-      fontSize: '18px', color: '#ffcc44', stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(50));
-    push(this.add.text(cx, cy - 46,
-      `Fuse ${nameA} + ${nameB}\ninto ${outputDef?.name ?? recipe.output}?\n\nThis cannot be undone.`,
-      { fontSize: '13px', color: '#ccbbaa', align: 'center' }
-    ).setOrigin(0.5).setDepth(50));
-
-    const confirmBtn = push(this.add.rectangle(cx - 72, cy + 66, 118, 30, 0x6a4a1a)
-      .setStrokeStyle(1, 0xccaa44).setInteractive({ useHandCursor: true }).setDepth(50));
-    confirmBtn.on('pointerover', () => confirmBtn.setFillStyle(0x9a7a2a));
-    confirmBtn.on('pointerout',  () => confirmBtn.setFillStyle(0x6a4a1a));
-    confirmBtn.on('pointerdown', () => this._executeFusion(recipe));
-    push(this.add.text(cx - 72, cy + 66, 'Confirm', {
-      fontSize: '13px', color: '#ffdd88',
-    }).setOrigin(0.5).setDepth(50));
-
-    const cancelBtn = push(this.add.rectangle(cx + 72, cy + 66, 118, 30, 0x1a2a3a)
-      .setStrokeStyle(1, 0x446688).setInteractive({ useHandCursor: true }).setDepth(50));
-    cancelBtn.on('pointerover', () => cancelBtn.setFillStyle(0x2a3a5a));
-    cancelBtn.on('pointerout',  () => cancelBtn.setFillStyle(0x1a2a3a));
-    cancelBtn.on('pointerdown', () => {
-      for (const o of this._confirmObjs) o.destroy();
-      this._confirmObjs = [];
-    });
-    push(this.add.text(cx + 72, cy + 66, 'Cancel', {
-      fontSize: '13px', color: '#8899aa',
-    }).setOrigin(0.5).setDepth(50));
-  }
-
-  _executeFusion(recipe) {
-    const nameA  = run.spirits.find(s => s.id === recipe.input[0])?.name ?? recipe.input[0];
-    const nameB  = run.spirits.find(s => s.id === recipe.input[1])?.name ?? recipe.input[1];
-    const result = run.fuseSpirits(recipe.input[0], recipe.input[1]);
-    if (!result.success) return;
-    logger.logShopFusion(nameA, nameB, result.fusedSpirit.name);
-    const itemCount = this._isGrove ? 4 : 2;
-    this._spiritOfferings = this._generateSpiritOfferings(itemCount);
-    while (this._spiritOfferings.length < itemCount) this._spiritOfferings.push(null);
-    this._buildUI();
   }
 
   // ── Continue button ────────────────────────────────────────────────────────
@@ -1849,15 +1894,6 @@ export class ShrineScene extends Phaser.Scene {
     this.add.text(640, BTN_Y, label, {
       fontSize: '16px', color: '#ffffff', stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5);
-  }
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  _price(base) {
-    const couponCount = run.spirits.filter(s => s.id === 'econ_coupon').length;
-    const discount = Math.min(couponCount * 0.15, 0.45);
-    let price = couponCount > 0 ? Math.ceil(base * (1 - discount)) : base;
-    return applyHook('modifyShopPrice', price, price);
   }
 
   // ── Alchemical consumable activation ──────────────────────────────────────
@@ -1977,7 +2013,7 @@ export class ShrineScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(56));
     cancelBtn.on('pointerdown', () => {
       // Refund ki since alchemical wasn't consumed.
-      run.addKi(this._price(alchDef.cost));
+      run.addKi(run.getEffectiveCost(alchDef.cost));
       for (const o of this._confirmObjs) o.destroy();
       this._confirmObjs = [];
       this._buildUI();

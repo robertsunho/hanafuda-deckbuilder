@@ -1,4 +1,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
+// Spirit hook interface (F2.1.b)
+//
+// Lifecycle hooks fire at specific game events. All receive:
+//   { spirit, spirits, run, roundManager }
+//
+//   onRoundStart(ctx)  — after state reset, before scoring state init
+//   onRoundEnd(ctx)    — at round-over (both bank and natural end)
+//
+// Hooks fire once per equipped spirit instance (regular + Negative).
+// Use effectivePower(spirit) inside for per-stack scaling.
+// ─────────────────────────────────────────────────────────────────────────────
+//
 // SpiritEffects — per-card spirit scoring registry
 //
 // New interface (three optional hooks per spirit):
@@ -25,7 +37,8 @@
 // All factory functions skip them so they can't trigger seasonal/axis spirit effects.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import run from './RunManager.js';
+import run, { effectivePower, aggregateNumericState, aggregateArrayLength,
+               incrementPerElement, addUniqueToElements } from './RunManager.js';
 import { addCardBonusPoints } from './CardMutations.js';
 import { getStampDef } from '../data/stamps.js';
 
@@ -178,12 +191,118 @@ function _getMirrorTarget(mirrorSpirit, allSpirits) {
   return null;
 }
 
+/** Scale engine/scoring output by stack count N. addMult/addPoints linear; multiplyMult compounds. */
+function _scaleEngineOutput(result, n) {
+  const scaled = { ...result };
+  if (typeof scaled.addMult === 'number')      scaled.addMult      = scaled.addMult * n;
+  if (typeof scaled.addPoints === 'number')    scaled.addPoints    = scaled.addPoints * n;
+  if (typeof scaled.multiplyMult === 'number') scaled.multiplyMult = Math.pow(scaled.multiplyMult, n);
+  return scaled;
+}
+
 /** Count cards with no modifications (no enhancement, stamp, edition, promotion). */
 function _countUnalteredCards(deck) {
   return deck.filter(c =>
     !c.enhancement && !c.ribbonStamp && !c.edition && !c.promotionProgress
   ).length;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEGATIVE_SNAPSHOT — per-spirit transcendence state capture (F2.5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function snapshotCat1Linear(spirit, powerLevel, key, scaling, mode) {
+  const elements = spirit.elements.slice(0, powerLevel);
+  const aggregate = elements.reduce((s, el) => s + (el[key] ?? 0), 0);
+  const oldest = elements[0]?.[key] ?? 0;
+  const base = mode === 'addMult' ? 0 : 1;
+  const preTranscendTotal = base + aggregate * scaling;
+  return { preTranscendTotal, oldestAtTranscend: oldest, newEvents: 0, key };
+}
+
+function snapshotCat1Dual(spirit, powerLevel, key1, scaling1, key2, scaling2, mode) {
+  const elements = spirit.elements.slice(0, powerLevel);
+  const agg1 = elements.reduce((s, el) => s + (el[key1] ?? 0), 0);
+  const agg2 = elements.reduce((s, el) => s + (el[key2] ?? 0), 0);
+  const oldest1 = elements[0]?.[key1] ?? 0;
+  const oldest2 = elements[0]?.[key2] ?? 0;
+  const base = mode === 'addMult' ? 0 : 1;
+  const preTranscendTotal = base + (agg1 * scaling1 + agg2 * scaling2);
+  return {
+    preTranscendTotal, oldestAtTranscend: oldest1 + oldest2,
+    newEvents1: 0, newEvents2: 0,
+    key1, scaling1, key2, scaling2,
+  };
+}
+
+function snapshotCat1Exponential(spirit, powerLevel, key) {
+  const elements = spirit.elements.slice(0, powerLevel);
+  const aggregate = elements.reduce((s, el) => s + (el[key] ?? 0), 0);
+  const oldest = elements[0]?.[key] ?? 0;
+  const K = key.charAt(0).toUpperCase() + key.slice(1);
+  return {
+    [`${key}AtTranscend`]: aggregate,
+    [`oldest${K}AtTranscend`]: oldest,
+    [`new${K}`]: 0,
+  };
+}
+
+function snapshotArraysFromElements(spirit, powerLevel, key) {
+  const elements = spirit.elements.slice(0, powerLevel);
+  const arrays = elements.map(el => [...(el[key] ?? [])]);
+  return { [key]: arrays };
+}
+
+function snapshotCat5Maturation(spirit, powerLevel, numKey, denomDefault) {
+  const elements = spirit.elements.slice(0, powerLevel);
+  const numerator = elements.reduce((s, el) => s + (el[numKey] ?? 0), 0);
+  const denominator = powerLevel * denomDefault;
+  return { numerator, denominator };
+}
+
+export const NEGATIVE_SNAPSHOT = {
+  // Cat 1 linear: additive-mult
+  sym_ants:              (s, p) => snapshotCat1Linear(s, p, 'totalPlayed',      0.5,  'addMult'),
+  sym_snails:            (s, p) => snapshotCat1Linear(s, p, 'totalUnplayed',    1,    'addMult'),
+  sym_badger:            (s, p) => snapshotCat1Linear(s, p, 'consumablesUsed',  1,    'addMult'),
+  engine_devotion:       (s, p) => snapshotCat1Linear(s, p, 'totalScored',      4,    'addMult'),
+  engine_habitat:        (s, p) => snapshotCat1Linear(s, p, 'totalScored',      2.5,  'addMult'),
+  engine_ceremony:       (s, p) => snapshotCat1Linear(s, p, 'totalScored',      2,    'addMult'),
+  engine_agriculture:    (s, p) => snapshotCat1Linear(s, p, 'totalScored',      1,    'addMult'),
+  engine_lincoln:        (s, p) => snapshotCat1Linear(s, p, 'banks',            0.1,  'addMult'),
+  engine_napoleon:       (s, p) => snapshotCat1Linear(s, p, 'pushFails',        0.2,  'addMult'),
+  engine_missing_number: (s, p) => snapshotCat1Linear(s, p, 'totalStacks',      5,    'addMult'),
+  engine_northern_lion:  (s, p) => snapshotCat1Linear(s, p, 'pushesWitnessed',  1,    'addMult'),
+
+  // Cat 1 linear: mult-mult
+  sym_algae:             (s, p) => snapshotCat1Linear(s, p, 'summonCount',     0.1,  'multiplyMult'),
+  engine_palace:         (s, p) => snapshotCat1Linear(s, p, 'cardsAdded',      0.5,  'multiplyMult'),
+  engine_ship:           (s, p) => snapshotCat1Linear(s, p, 'cardsDiscarded',  0.3,  'multiplyMult'),
+  engine_kintaro:        (s, p) => snapshotCat1Linear(s, p, 'goldsConsumed',   0.1,  'multiplyMult'),
+  engine_bullseye:       (s, p) => snapshotCat1Linear(s, p, 'qualifiedCount',  1.0,  'multiplyMult'),
+  legend_wuji:           (s, p) => snapshotCat1Linear(s, p, 'destroyed',       0.3,  'multiplyMult'),
+
+  // Cat 1 dual-key
+  engine_glacier:  (s, p) => snapshotCat1Dual(s, p, 't1Procs', 0.2, 't2Procs', 0.4, 'multiplyMult'),
+  engine_carbon:   (s, p) => snapshotCat1Dual(s, p, 't1Procs', 0.5, 't2Procs', 1.0, 'multiplyMult'),
+  engine_fossil:   (s, p) => snapshotCat1Dual(s, p, 't1Procs', 0.1, 't2Procs', 0.3, 'multiplyMult'),
+  engine_moths:    (s, p) => snapshotCat1Dual(s, p, 't1Procs', 0.3, 't2Procs', 0.6, 'multiplyMult'),
+
+  // Cat 1' exponential
+  engine_velocity: (s, p) => snapshotCat1Exponential(s, p, 't2Procs'),
+
+  // Cat 2 uniqueness
+  engine_wildlife: (s, p) => snapshotArraysFromElements(s, p, 'seenAnimals'),
+  engine_plenty:   (s, p) => snapshotArraysFromElements(s, p, 'seenPlains'),
+
+  // Cat 4 reset-uniqueness (post-Phase B array keys)
+  engine_radiance: (s, p) => snapshotArraysFromElements(s, p, 'seenBrights'),
+  engine_banner:   (s, p) => snapshotArraysFromElements(s, p, 'seenRibbons'),
+
+  // Cat 5 maturation
+  util_past_life:  (s, p) => snapshotCat5Maturation(s, p, 'roundsHeld', 3),
+  sym_cuckoo_egg:  (s, p) => snapshotCat5Maturation(s, p, 'roundsHeld', 3),
+};
 
 // ── Spirit effect registry ────────────────────────────────────────────────────
 
@@ -268,20 +387,30 @@ const _effects = {
   // Per-round engines: state is reset each round in GameRoundManager.startRound().
 
   /**
-   * Radiance: ×2.0 per bright card seen in the current round (exponential).
-   * Tracks brights via onCardSeen; applies in Phase 2.
+   * Radiance: ×(1 + n×2) per unique bright seen this round.
+   * Per-element seenBrights arrays; reset at round end via onRoundEnd hook.
    */
   engine_radiance: {
     onCardSeen({ card, spirit }) {
-      if (card.type === 'bright') {
-        if (!spirit.state) spirit.state = { count: 0 };
-        spirit.state.count = (spirit.state.count ?? 0) + 1;
-      }
+      if (card.type === 'bright') addUniqueToElements(spirit, 'seenBrights', card.id);
     },
     applyEngine({ spirit }) {
-      const n = spirit.state?.count ?? 0;
-      if (n === 0) return null;
-      return { multiplyMult: Math.pow(2.0, n) };
+      if (spirit.isNegative) {
+        const arrays = spirit.state?.seenBrights ?? [];
+        const sumLengths = arrays.reduce((s, arr) => s + (arr?.length ?? 0), 0);
+        return sumLengths === 0 ? null : { multiplyMult: 1 + sumLengths * 2 };
+      }
+      const n = aggregateArrayLength(spirit, 'seenBrights');
+      return n === 0 ? null : { multiplyMult: 1 + n * 2 };
+    },
+    onRoundEnd({ spirit }) {
+      if (spirit.isNegative) {
+        if (Array.isArray(spirit.state?.seenBrights)) {
+          for (const arr of spirit.state.seenBrights) arr.length = 0;
+        }
+      } else if (spirit.elements) {
+        for (const el of spirit.elements) el.seenBrights = [];
+      }
     },
   },
 
@@ -292,27 +421,41 @@ const _effects = {
    */
   engine_wildlife: {
     applyEngine({ spirit }) {
-      const n = spirit.state?.seenAnimals?.length ?? 0;
-      if (n === 0) return null;
-      return { multiplyMult: 1.0 + n * 0.5 };
+      if (spirit.isNegative) {
+        const arrays = spirit.state?.seenAnimals ?? [];
+        const sumLengths = arrays.reduce((s, arr) => s + (arr?.length ?? 0), 0);
+        return sumLengths === 0 ? null : { multiplyMult: 1.0 + sumLengths * 0.5 };
+      }
+      const n = aggregateArrayLength(spirit, 'seenAnimals');
+      return n === 0 ? null : { multiplyMult: 1.0 + n * 0.5 };
     },
   },
 
   /**
-   * Banner: +1.0 mult per ribbon card seen in the current round.
-   * State is reset each round in GameRoundManager.startRound().
+   * Banner: ×(1 + n) per unique ribbon seen this round.
+   * Per-element seenRibbons arrays; reset at round end via onRoundEnd hook.
    */
   engine_banner: {
     onCardSeen({ card, spirit }) {
-      if (card.type === 'ribbon') {
-        if (!spirit.state) spirit.state = { count: 0 };
-        spirit.state.count = (spirit.state.count ?? 0) + 1;
-      }
+      if (card.type === 'ribbon') addUniqueToElements(spirit, 'seenRibbons', card.id);
     },
     applyEngine({ spirit }) {
-      const n = spirit.state?.count ?? 0;
-      if (n === 0) return null;
-      return { multiplyMult: 1.0 + n };
+      if (spirit.isNegative) {
+        const arrays = spirit.state?.seenRibbons ?? [];
+        const sumLengths = arrays.reduce((s, arr) => s + (arr?.length ?? 0), 0);
+        return sumLengths === 0 ? null : { multiplyMult: 1 + sumLengths };
+      }
+      const n = aggregateArrayLength(spirit, 'seenRibbons');
+      return n === 0 ? null : { multiplyMult: 1 + n };
+    },
+    onRoundEnd({ spirit }) {
+      if (spirit.isNegative) {
+        if (Array.isArray(spirit.state?.seenRibbons)) {
+          for (const arr of spirit.state.seenRibbons) arr.length = 0;
+        }
+      } else if (spirit.elements) {
+        for (const el of spirit.elements) el.seenRibbons = [];
+      }
     },
   },
 
@@ -323,9 +466,13 @@ const _effects = {
    */
   engine_plenty: {
     applyEngine({ spirit }) {
-      const n = spirit.state?.seenPlains?.length ?? 0;
-      if (n === 0) return null;
-      return { multiplyMult: 1.0 + n * 0.1 };
+      if (spirit.isNegative) {
+        const arrays = spirit.state?.seenPlains ?? [];
+        const sumLengths = arrays.reduce((s, arr) => s + (arr?.length ?? 0), 0);
+        return sumLengths === 0 ? null : { multiplyMult: 1.0 + sumLengths * 0.1 };
+      }
+      const n = aggregateArrayLength(spirit, 'seenPlains');
+      return n === 0 ? null : { multiplyMult: 1.0 + n * 0.1 };
     },
   },
 
@@ -339,7 +486,7 @@ const _effects = {
       if (card.type !== 'ribbon') return null;
       const stampId = RIBBON_STAMP_MAP[card.id];
       if (!stampId) return null;
-      const stacks = spirit.stackCount ?? 1;
+      const stacks = effectivePower(spirit);
       const available = run.maxConsumableSlots - run.consumables.length;
       const toGen = Math.min(stacks, available);
       for (let i = 0; i < toGen; i++) {
@@ -349,22 +496,46 @@ const _effects = {
       return null;
     },
   },
-  util_irrigation: {},  // plain captured → +10 pts to running score
 
   // ── Economy Spirits ────────────────────────────────────────────────────────
 
   econ_bonds:        {},  // +5% interest (stacks to +25%) — RunManager.interestRate
   econ_ingot:        {},  // +0.01% interest per ki — RunManager.interestRate
-  econ_grace:        {},  // ×2/×3/×4 style combo ki (additive stacking)
+  econ_grace: {
+    // mid-round: multiplies running ki by (1 + stacks) on each style combo
+    applyKiBonus({ ki, spirit }) {
+      const stacks = effectivePower(spirit);
+      return ki * (1 + stacks);
+    },
+  },
   econ_recycling:    {},  // +5 ki per overflow discard
   econ_lucky_charm:  {},  // probability modifier — handled in RNGHook.js
   econ_reward:       {},  // push-success ki bonus — handled in GameRoundManager
   econ_piggybank:    {},  // ×2/×3/×4 hand ki (additive stacking)
   econ_coupon:       {},  // 15% shop discount (stacks to 45%)
-  econ_replica:      {},
+  econ_replica: {
+    onRoundStart({ spirit, run: r }) {
+      if (r._consumables.length === 0) return;
+      const picked = r._consumables[Math.floor(Math.random() * r._consumables.length)];
+      const count = effectivePower(spirit);
+      for (let i = 0; i < count; i++) {
+        if (!r.canAddConsumable) break;
+        r.addConsumable({
+          id: picked.id, name: picked.name, description: picked.description,
+          category: picked.category, sellPriceBonus: 0,
+        });
+      }
+    },
+  },
   econ_print:        {},
 
-  econ_collector:    {},
+  econ_collector: {
+    onRoundEnd({ spirit, run: r }) {
+      const bonus = effectivePower(spirit);
+      for (const s of r.allSpirits) s.sellPriceBonus = (s.sellPriceBonus ?? 0) + bonus;
+      for (const c of r._consumables) c.sellPriceBonus = (c.sellPriceBonus ?? 0) + bonus;
+    },
+  },
 
   // ── Gameplay Spirits ───────────────────────────────────────────────────────
 
@@ -376,7 +547,10 @@ const _effects = {
         if (!target) return null;
         const fx = _effects[target.id];
         if (!fx?.onCardScored) return null;
-        return fx.onCardScored({ card, spirit: target, spirits });
+        const result = fx.onCardScored({ card, spirit: target, spirits });
+        if (!result) return null;
+        const n = effectivePower(spirit);
+        return n <= 1 ? result : _scaleEngineOutput(result, n);
       });
     },
     onCardSeen({ card, spirit, spirits }) {
@@ -394,20 +568,29 @@ const _effects = {
         if (!target) return null;
         const fx = _effects[target.id];
         if (!fx?.applyEngine) return null;
-        return fx.applyEngine({ spirit: target, spirits, mult, points, cards });
+        const result = fx.applyEngine({ spirit: target, spirits, mult, points, cards });
+        if (!result) return null;
+        const n = effectivePower(spirit);
+        return n <= 1 ? result : _scaleEngineOutput(result, n);
       });
     },
-    getRetriggerCount({ card, spirit, spirits }) {
+    getRetriggerCount({ card, spirit, spirits, triggerType }) {
       return _evaluateWithGuard(spirit, () => {
         const target = _getMirrorTarget(spirit, spirits ?? []);
         if (!target) return 0;
         const fx = _effects[target.id];
         if (!fx?.getRetriggerCount) return 0;
-        return fx.getRetriggerCount({ card, spirit: target, spirits });
+        return fx.getRetriggerCount({ card, spirit: target, spirits, triggerType });
       }) ?? 0;
     },
   },
-  game_echo:     {},
+  game_echo: {
+    getRetriggerCount({ spirit, triggerType, isFirstCardOfCapture }) {
+      if (triggerType !== 'capture') return 0;
+      if (!isFirstCardOfCapture) return 0;
+      return 2 * effectivePower(spirit);
+    },
+  },
 
   // ── Meta Spirits ─────────────────────────────────────────────────────────
 
@@ -420,7 +603,10 @@ const _effects = {
         if (!target) return null;
         const fx = _effects[target.id];
         if (!fx?.onCardScored) return null;
-        return fx.onCardScored({ card, spirit: target, spirits });
+        const result = fx.onCardScored({ card, spirit: target, spirits });
+        if (!result) return null;
+        const n = effectivePower(spirit);
+        return n <= 1 ? result : _scaleEngineOutput(result, n);
       });
     },
     onCardSeen({ card, spirit, spirits }) {
@@ -438,16 +624,19 @@ const _effects = {
         if (!target) return null;
         const fx = _effects[target.id];
         if (!fx?.applyEngine) return null;
-        return fx.applyEngine({ spirit: target, spirits, mult, points, cards });
+        const result = fx.applyEngine({ spirit: target, spirits, mult, points, cards });
+        if (!result) return null;
+        const n = effectivePower(spirit);
+        return n <= 1 ? result : _scaleEngineOutput(result, n);
       });
     },
-    getRetriggerCount({ card, spirit, spirits }) {
+    getRetriggerCount({ card, spirit, spirits, triggerType }) {
       return _evaluateWithGuard(spirit, () => {
         const target = _getMemoryTarget(spirit, spirits ?? []);
         if (!target) return 0;
         const fx = _effects[target.id];
         if (!fx?.getRetriggerCount) return 0;
-        return fx.getRetriggerCount({ card, spirit: target, spirits });
+        return fx.getRetriggerCount({ card, spirit: target, spirits, triggerType });
       }) ?? 0;
     },
   },
@@ -460,38 +649,56 @@ const _effects = {
 
   sym_algae: {
     applyEngine({ spirit }) {
-      const m = 1.0 + (spirit.state?.summonCount ?? 0) * 0.1;
-      if (m === 1.0) return null;
-      return { multiplyMult: m };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * 0.1 * (spirit.powerLevel ?? 1);
+        return t <= 1 ? null : { multiplyMult: t };
+      }
+      const total = aggregateNumericState(spirit, 'summonCount');
+      return total === 0 ? null : { multiplyMult: 1 + total * 0.1 };
     },
   },
 
   sym_ants: {
     applyEngine({ spirit }) {
-      const add = spirit.state?.totalPlayed ?? 0;
-      if (add === 0) return null;
-      return { addMult: add * 0.5 };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 0.5 * (spirit.powerLevel ?? 1);
+        return t === 0 ? null : { addMult: t };
+      }
+      const total = aggregateNumericState(spirit, 'totalPlayed');
+      return total === 0 ? null : { addMult: total * 0.5 };
     },
   },
 
   sym_crow:   {},  // consumable generation at round end
 
   sym_ducks: {
+    // Non-accumulator: net (deck-flip matches - strands) as multValue.
     applyEngine({ spirit }) {
-      const add = spirit.state?.multValue ?? 1;
-      return { addMult: add };
+      const v = spirit.state?.multValue ?? 0;
+      if (v === 0) return null;
+      const stacks = effectivePower(spirit);
+      return { multiplyMult: 1 + v * 0.2 * stacks };
     },
   },
 
   sym_snails: {
     applyEngine({ spirit }) {
-      const add = spirit.state?.totalUnplayed ?? 0;
-      if (add === 0) return null;
-      return { addMult: add };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 1 * (spirit.powerLevel ?? 1);
+        return t === 0 ? null : { addMult: t };
+      }
+      const total = aggregateNumericState(spirit, 'totalUnplayed');
+      return total === 0 ? null : { addMult: total * 1 };
     },
   },
 
-  sym_magpie: {},  // +3 ki per style combo
+  sym_magpie: {
+    // mid-round: +3 ki additive per stack on each style combo
+    applyKiBonus({ ki, spirit }) {
+      const stacks = effectivePower(spirit);
+      return ki + (3 * stacks);
+    },
+  },
   sym_osprey: {},  // first N deck flips go to hand
 
   sym_wolf: {
@@ -502,7 +709,7 @@ const _effects = {
   },
 
   sym_garden: {
-    applyEngine() {
+    applyEngine({ spirit }) {
       const deck = run.getDeck();
       const sigs = new Set();
       for (const card of deck) {
@@ -514,15 +721,19 @@ const _effects = {
       }
       const n = sigs.size;
       if (n === 0) return null;
-      return { addMult: n * 0.2 };
+      const scaling = effectivePower(spirit);
+      return { addMult: n * 0.2 * scaling };
     },
   },
 
   sym_badger: {
     applyEngine({ spirit }) {
-      const n = spirit.state?.consumablesUsed ?? 0;
-      if (n === 0) return null;
-      return { addMult: n };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 1 * (spirit.powerLevel ?? 1);
+        return t === 0 ? null : { addMult: t };
+      }
+      const n = aggregateNumericState(spirit, 'consumablesUsed');
+      return n === 0 ? null : { addMult: n * 1 };
     },
   },
 
@@ -531,34 +742,46 @@ const _effects = {
   // ×2.0 spirits = powerful; ×1.5 = moderate.  Slot ordering matters.
 
   cross_yang: {
+    // Yang: Air ×2.0, Day ×2.0. Compounds: Air+Day cards score ×4.0.
     onCardScored({ card }) {
       if (card.enhancement?.element === 'fire') return null;
-      if (card.vertical === 'air' || card.temporal === 'day') return { multiplyMult: 2.0 };
-      return null;
+      let mult = 1.0;
+      if (card.vertical === 'air')  mult *= 2.0;
+      if (card.temporal === 'day')  mult *= 2.0;
+      return mult !== 1.0 ? { multiplyMult: mult } : null;
     },
   },
 
   cross_yin: {
+    // Yin: Land ×2.0, Night ×2.0. Compounds: Land+Night cards score ×4.0.
     onCardScored({ card }) {
       if (card.enhancement?.element === 'fire') return null;
-      if (card.vertical === 'land' || card.temporal === 'night') return { multiplyMult: 2.0 };
-      return null;
+      let mult = 1.0;
+      if (card.vertical === 'land')  mult *= 2.0;
+      if (card.temporal === 'night') mult *= 2.0;
+      return mult !== 1.0 ? { multiplyMult: mult } : null;
     },
   },
 
   cross_space: {
+    // Space: Air ×2.0, Night ×2.0. Compounds: Air+Night cards score ×4.0.
     onCardScored({ card }) {
       if (card.enhancement?.element === 'fire') return null;
-      if (card.vertical === 'air' || card.temporal === 'night') return { multiplyMult: 2.0 };
-      return null;
+      let mult = 1.0;
+      if (card.vertical === 'air')   mult *= 2.0;
+      if (card.temporal === 'night') mult *= 2.0;
+      return mult !== 1.0 ? { multiplyMult: mult } : null;
     },
   },
 
   cross_energy: {
+    // Energy: Land ×2.0, Day ×2.0. Compounds: Land+Day cards score ×4.0.
     onCardScored({ card }) {
       if (card.enhancement?.element === 'fire') return null;
-      if (card.vertical === 'land' || card.temporal === 'day') return { multiplyMult: 2.0 };
-      return null;
+      let mult = 1.0;
+      if (card.vertical === 'land')  mult *= 2.0;
+      if (card.temporal === 'day')   mult *= 2.0;
+      return mult !== 1.0 ? { multiplyMult: mult } : null;
     },
   },
 
@@ -610,33 +833,48 @@ const _effects = {
 
   engine_glacier: {
     applyEngine({ spirit }) {
-      const t1 = spirit.state?.t1Procs ?? 0;
-      const t2 = spirit.state?.t2Procs ?? 0;
-      const total = t1 * 0.2 + t2 * 0.4;
-      if (total === 0) return null;
-      return { multiplyMult: 1 + total };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 1) +
+                  (spirit.state?.newEvents1 ?? 0) * 0.2 * (spirit.powerLevel ?? 1) +
+                  (spirit.state?.newEvents2 ?? 0) * 0.4 * (spirit.powerLevel ?? 1);
+        return t <= 1 ? null : { multiplyMult: t };
+      }
+      const t1 = aggregateNumericState(spirit, 't1Procs');
+      const t2 = aggregateNumericState(spirit, 't2Procs');
+      return (t1 === 0 && t2 === 0) ? null : { multiplyMult: 1 + (t1 * 0.2 + t2 * 0.4) };
     },
   },
 
   engine_carbon: {
     applyEngine({ spirit }) {
-      const t1 = spirit.state?.t1Procs ?? 0;
-      const t2 = spirit.state?.t2Procs ?? 0;
-      const total = t1 * 0.5 + t2 * 1.0;
-      if (total === 0) return null;
-      return { multiplyMult: 1 + total };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 1) +
+                  (spirit.state?.newEvents1 ?? 0) * 0.5 * (spirit.powerLevel ?? 1) +
+                  (spirit.state?.newEvents2 ?? 0) * 1.0 * (spirit.powerLevel ?? 1);
+        return t <= 1 ? null : { multiplyMult: t };
+      }
+      const t1 = aggregateNumericState(spirit, 't1Procs');
+      const t2 = aggregateNumericState(spirit, 't2Procs');
+      return (t1 === 0 && t2 === 0) ? null : { multiplyMult: 1 + (t1 * 0.5 + t2 * 1.0) };
     },
   },
 
   engine_velocity: {
     applyEngine({ spirit }) {
-      // Tier 1: live count of base Iron cards in deck.
       const ironCount = run.getDeck().filter(c =>
         c.enhancement?.element === 'metal' && c.enhancement?.tier === 'base'
       ).length;
-      // Tier 2: multiplicative compounding per Meteorite jackpot.
-      const t2 = spirit.state?.t2Procs ?? 0;
-      const t1Mult = ironCount * 0.1;
+      if (spirit.isNegative) {
+        const effectiveT2 = (spirit.state?.t2ProcsAtTranscend ?? 0) +
+                            (spirit.state?.newT2Procs ?? 0) * (spirit.powerLevel ?? 1);
+        const t1Mult = ironCount * 0.1 * (spirit.powerLevel ?? 1);
+        const t2Mult = Math.pow(1.5, effectiveT2);
+        if (t1Mult === 0 && effectiveT2 === 0) return null;
+        return { multiplyMult: (1 + t1Mult) * t2Mult };
+      }
+      const t2 = aggregateNumericState(spirit, 't2Procs');
+      const scaling = effectivePower(spirit);
+      const t1Mult = ironCount * 0.1 * scaling;
       const t2Mult = Math.pow(1.5, t2);
       if (t1Mult === 0 && t2 === 0) return null;
       return { multiplyMult: (1 + t1Mult) * t2Mult };
@@ -645,21 +883,29 @@ const _effects = {
 
   engine_fossil: {
     applyEngine({ spirit }) {
-      const t1 = spirit.state?.t1Procs ?? 0;
-      const t2 = spirit.state?.t2Procs ?? 0;
-      const total = t1 * 0.1 + t2 * 0.3;
-      if (total === 0) return null;
-      return { multiplyMult: 1 + total };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 1) +
+                  (spirit.state?.newEvents1 ?? 0) * 0.1 * (spirit.powerLevel ?? 1) +
+                  (spirit.state?.newEvents2 ?? 0) * 0.3 * (spirit.powerLevel ?? 1);
+        return t <= 1 ? null : { multiplyMult: t };
+      }
+      const t1 = aggregateNumericState(spirit, 't1Procs');
+      const t2 = aggregateNumericState(spirit, 't2Procs');
+      return (t1 === 0 && t2 === 0) ? null : { multiplyMult: 1 + (t1 * 0.1 + t2 * 0.3) };
     },
   },
 
   engine_moths: {
     applyEngine({ spirit }) {
-      const t1 = spirit.state?.t1Procs ?? 0;
-      const t2 = spirit.state?.t2Procs ?? 0;  // 0 until Silk wired (PostD-2)
-      const total = t1 * 0.3 + t2 * 0.6;
-      if (total === 0) return null;
-      return { multiplyMult: 1 + total };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 1) +
+                  (spirit.state?.newEvents1 ?? 0) * 0.3 * (spirit.powerLevel ?? 1) +
+                  (spirit.state?.newEvents2 ?? 0) * 0.6 * (spirit.powerLevel ?? 1);
+        return t <= 1 ? null : { multiplyMult: t };
+      }
+      const t1 = aggregateNumericState(spirit, 't1Procs');
+      const t2 = aggregateNumericState(spirit, 't2Procs');
+      return (t1 === 0 && t2 === 0) ? null : { multiplyMult: 1 + (t1 * 0.3 + t2 * 0.6) };
     },
   },
 
@@ -671,57 +917,57 @@ const _effects = {
 
   engine_devotion: {
     onCardSeen({ card, spirit }) {
-      if (card.type === 'bright') {
-        if (!spirit.state) spirit.state = { totalScored: 0 };
-        spirit.state.totalScored++;
-      }
+      if (card.type === 'bright') incrementPerElement(spirit, 'totalScored', 1);
     },
     applyEngine({ spirit }) {
-      const n = spirit.state?.totalScored ?? 0;
-      if (n === 0) return null;
-      return { addMult: n * 4 };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 4 * (spirit.powerLevel ?? 1);
+        return t === 0 ? null : { addMult: t };
+      }
+      const n = aggregateNumericState(spirit, 'totalScored');
+      return n === 0 ? null : { addMult: n * 4 };
     },
   },
 
   engine_habitat: {
     onCardSeen({ card, spirit }) {
-      if (card.type === 'animal') {
-        if (!spirit.state) spirit.state = { totalScored: 0 };
-        spirit.state.totalScored++;
-      }
+      if (card.type === 'animal') incrementPerElement(spirit, 'totalScored', 1);
     },
     applyEngine({ spirit }) {
-      const n = spirit.state?.totalScored ?? 0;
-      if (n === 0) return null;
-      return { addMult: n * 2.5 };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 2.5 * (spirit.powerLevel ?? 1);
+        return t === 0 ? null : { addMult: t };
+      }
+      const n = aggregateNumericState(spirit, 'totalScored');
+      return n === 0 ? null : { addMult: n * 2.5 };
     },
   },
 
   engine_ceremony: {
     onCardSeen({ card, spirit }) {
-      if (card.type === 'ribbon') {
-        if (!spirit.state) spirit.state = { totalScored: 0 };
-        spirit.state.totalScored++;
-      }
+      if (card.type === 'ribbon') incrementPerElement(spirit, 'totalScored', 1);
     },
     applyEngine({ spirit }) {
-      const n = spirit.state?.totalScored ?? 0;
-      if (n === 0) return null;
-      return { addMult: n * 2 };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 2 * (spirit.powerLevel ?? 1);
+        return t === 0 ? null : { addMult: t };
+      }
+      const n = aggregateNumericState(spirit, 'totalScored');
+      return n === 0 ? null : { addMult: n * 2 };
     },
   },
 
   engine_agriculture: {
     onCardSeen({ card, spirit }) {
-      if (card.type === 'plain') {
-        if (!spirit.state) spirit.state = { totalScored: 0 };
-        spirit.state.totalScored++;
-      }
+      if (card.type === 'plain') incrementPerElement(spirit, 'totalScored', 1);
     },
     applyEngine({ spirit }) {
-      const n = spirit.state?.totalScored ?? 0;
-      if (n === 0) return null;
-      return { addMult: n * 1 };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 1 * (spirit.powerLevel ?? 1);
+        return t === 0 ? null : { addMult: t };
+      }
+      const n = aggregateNumericState(spirit, 'totalScored');
+      return n === 0 ? null : { addMult: n * 1 };
     },
   },
 
@@ -735,7 +981,7 @@ const _effects = {
       const hasAir  = cards.some(c => c.enhancement?.element !== 'fire' && c.vertical === 'air');
       const hasLand = cards.some(c => c.enhancement?.element !== 'fire' && c.vertical === 'land');
       if (!hasAir || !hasLand) return null;
-      return { multiplyMult: Math.pow(2.0, spirit.stackCount ?? 1) };
+      return { multiplyMult: Math.pow(2.0, effectivePower(spirit)) };
     },
   },
 
@@ -745,7 +991,7 @@ const _effects = {
       const hasDay   = cards.some(c => c.enhancement?.element !== 'fire' && c.temporal === 'day');
       const hasNight = cards.some(c => c.enhancement?.element !== 'fire' && c.temporal === 'night');
       if (!hasDay || !hasNight) return null;
-      return { multiplyMult: Math.pow(2.0, spirit.stackCount ?? 1) };
+      return { multiplyMult: Math.pow(2.0, effectivePower(spirit)) };
     },
   },
 
@@ -755,7 +1001,7 @@ const _effects = {
       const ranks = new Set(cards.map(c => c.type));
       const n = ranks.size;
       if (n === 0) return null;
-      const stacks = spirit.stackCount ?? 1;
+      const stacks = effectivePower(spirit);
       return { multiplyMult: Math.pow(1.5, n * stacks) };
     },
   },
@@ -765,17 +1011,23 @@ const _effects = {
 
   engine_lincoln: {
     applyEngine({ spirit }) {
-      const n = spirit.state?.banks ?? 0;
-      if (n === 0) return null;
-      return { addMult: n * 0.1 };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 0.1 * (spirit.powerLevel ?? 1);
+        return t === 0 ? null : { addMult: t };
+      }
+      const n = aggregateNumericState(spirit, 'banks');
+      return n === 0 ? null : { addMult: n * 0.1 };
     },
   },
 
   engine_napoleon: {
     applyEngine({ spirit }) {
-      const n = spirit.state?.pushFails ?? 0;
-      if (n === 0) return null;
-      return { addMult: n * 0.2 };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 0.2 * (spirit.powerLevel ?? 1);
+        return t === 0 ? null : { addMult: t };
+      }
+      const n = aggregateNumericState(spirit, 'pushFails');
+      return n === 0 ? null : { addMult: n * 0.2 };
     },
   },
 
@@ -783,46 +1035,54 @@ const _effects = {
   // Strong initial bonus that decreases each round. State decremented at round end.
 
   decay_persimmon: {
+    // state.remaining decays 3/round; stack multiplier on output only.
     applyEngine({ spirit }) {
       const n = spirit.state?.remaining ?? 0;
       if (n === 0) return null;
-      return { addMult: n };
+      const stacks = effectivePower(spirit);
+      return { addMult: n * stacks };
     },
   },
 
   decay_pear: {
+    // state.remaining decays 5/round; stack multiplier on output only.
     applyEngine({ spirit }) {
       const n = spirit.state?.remaining ?? 0;
       if (n === 0) return null;
-      return { addPoints: n };
+      const stacks = effectivePower(spirit);
+      return { addPoints: n * stacks };
     },
   },
 
   // ── Rank Retrigger Spirits ───────────────────────────────────────────────
-  // getRetriggerCount: returns extra triggers for a matching card.
-  // Called by Phase 1.5 in _addCapture; the card fully re-scores.
+  // getRetriggerCount: returns extra triggers for a matching card + trigger type.
+  // triggerType: 'capture' (scoring math + capture-trigger stamps), 'held_in_hand', 'discard', 'yaku'
 
   retrigger_rainbow: {
-    getRetriggerCount({ card, spirit }) {
-      return card.type === 'bright' ? (spirit.stackCount ?? 1) : 0;
+    getRetriggerCount({ card, spirit, triggerType }) {
+      if (triggerType !== 'capture') return 0;
+      return card.type === 'bright' ? effectivePower(spirit) : 0;
     },
   },
 
   retrigger_family: {
-    getRetriggerCount({ card, spirit }) {
-      return card.type === 'animal' ? (spirit.stackCount ?? 1) : 0;
+    getRetriggerCount({ card, spirit, triggerType }) {
+      if (triggerType !== 'capture') return 0;
+      return card.type === 'animal' ? effectivePower(spirit) : 0;
     },
   },
 
   retrigger_wish: {
-    getRetriggerCount({ card, spirit }) {
-      return card.type === 'ribbon' ? (spirit.stackCount ?? 1) : 0;
+    getRetriggerCount({ card, spirit, triggerType }) {
+      if (triggerType !== 'capture') return 0;
+      return card.type === 'ribbon' ? effectivePower(spirit) : 0;
     },
   },
 
   retrigger_dew: {
-    getRetriggerCount({ card, spirit }) {
-      return card.type === 'plain' ? (spirit.stackCount ?? 1) : 0;
+    getRetriggerCount({ card, spirit, triggerType }) {
+      if (triggerType !== 'capture') return 0;
+      return card.type === 'plain' ? effectivePower(spirit) : 0;
     },
   },
 
@@ -830,32 +1090,41 @@ const _effects = {
 
   engine_missing_number: {
     applyEngine({ spirit }) {
-      const n = spirit.state?.totalStacks ?? 0;
-      if (n === 0) return null;
-      return { addMult: n * 5 };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 5 * (spirit.powerLevel ?? 1);
+        return t === 0 ? null : { addMult: t };
+      }
+      const n = aggregateNumericState(spirit, 'totalStacks');
+      return n === 0 ? null : { addMult: n * 5 };
     },
   },
 
   engine_palace: {
     applyEngine({ spirit }) {
-      const n = spirit.state?.cardsAdded ?? 0;
-      if (n === 0) return null;
-      return { multiplyMult: 1 + n * 0.5 };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * 0.5 * (spirit.powerLevel ?? 1);
+        return t <= 1 ? null : { multiplyMult: t };
+      }
+      const n = aggregateNumericState(spirit, 'cardsAdded');
+      return n === 0 ? null : { multiplyMult: 1 + n * 0.5 };
     },
   },
 
   engine_ship: {
     applyEngine({ spirit }) {
-      const n = spirit.state?.cardsDiscarded ?? 0;
-      if (n === 0) return null;
-      return { multiplyMult: 1 + n * 0.3 };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * 0.3 * (spirit.powerLevel ?? 1);
+        return t <= 1 ? null : { multiplyMult: t };
+      }
+      const n = aggregateNumericState(spirit, 'cardsDiscarded');
+      return n === 0 ? null : { multiplyMult: 1 + n * 0.3 };
     },
   },
 
   engine_surplus: {
     applyEngine({ spirit }) {
       const ki = run.ki;
-      const stacks = spirit.stackCount ?? 1;
+      const stacks = effectivePower(spirit);
       const bonus = Math.floor(ki / 3) * stacks;
       if (bonus === 0) return null;
       return { addMult: bonus };
@@ -868,21 +1137,24 @@ const _effects = {
     onCardScored({ card, spirit }) {
       if (card.edition === 'gold') {
         card.edition = null;  // consume the Gold edition
-        spirit.state.goldsConsumed += (spirit.stackCount ?? 1);
+        incrementPerElement(spirit, 'goldsConsumed', 1);
       }
       return null;
     },
     applyEngine({ spirit }) {
-      const consumed = spirit.state?.goldsConsumed ?? 0;
-      if (consumed === 0) return null;
-      return { multiplyMult: 1 + consumed * 0.1 };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * 0.1 * (spirit.powerLevel ?? 1);
+        return t <= 1 ? null : { multiplyMult: t };
+      }
+      const consumed = aggregateNumericState(spirit, 'goldsConsumed');
+      return consumed === 0 ? null : { multiplyMult: 1 + consumed * 0.1 };
     },
   },
 
   engine_golden_toad: {
     onCardScored({ card, spirit }) {
       spirit._captureAppliedCount = spirit._captureAppliedCount ?? 0;
-      const maxApplications = spirit.stackCount ?? 1;
+      const maxApplications = effectivePower(spirit);
       if (spirit._captureAppliedCount >= maxApplications) return null;
       if (!card.edition) {
         card.edition = 'gold';
@@ -892,11 +1164,12 @@ const _effects = {
     },
   },
 
-  engine_irrigation: {
+  util_irrigation: {
     onCardScored({ card, spirit }) {
       if (card.type === 'plain') {
-        addCardBonusPoints(card, 3 * (spirit.stackCount ?? 1));
-        return { addPoints: 3 };
+        const bonus = 3 * effectivePower(spirit);
+        addCardBonusPoints(card, bonus);
+        return { addPoints: bonus };
       }
       return null;
     },
@@ -904,13 +1177,21 @@ const _effects = {
 
   engine_bullseye: {
     applyEngine({ spirit }) {
-      const count = spirit.state?.qualifiedCount ?? 0;
-      if (count === 0) return null;
-      return { multiplyMult: 1 + count * 1.0 };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * 1.0 * (spirit.powerLevel ?? 1);
+        return t <= 1 ? null : { multiplyMult: t };
+      }
+      const count = aggregateNumericState(spirit, 'qualifiedCount');
+      return count === 0 ? null : { multiplyMult: 1 + count * 1.0 };
     },
   },
 
-  engine_applause: {},  // retrigger handled inline at held-in-hand proc sites
+  engine_applause: {
+    getRetriggerCount({ spirit, triggerType }) {
+      if (triggerType !== 'held_in_hand') return 0;
+      return effectivePower(spirit);
+    },
+  },
 
   // ── Unique Legendary ────────────────────────────────────────────────────
 
@@ -920,19 +1201,22 @@ const _effects = {
 
   legend_wuji: {
     onCardDestroyed({ spirit }) {
-      spirit.state.destroyed += (spirit.stackCount ?? 1);
+      incrementPerElement(spirit, 'destroyed', 1);
     },
     applyEngine({ spirit }) {
-      const destroyed = spirit.state?.destroyed ?? 0;
-      if (destroyed === 0) return null;
-      return { multiplyMult: 1 + destroyed * 0.3 };
+      if (spirit.isNegative) {
+        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * 0.3 * (spirit.powerLevel ?? 1);
+        return t <= 1 ? null : { multiplyMult: t };
+      }
+      const destroyed = aggregateNumericState(spirit, 'destroyed');
+      return destroyed === 0 ? null : { multiplyMult: 1 + destroyed * 0.3 };
     },
   },
 
   legend_dao: {
     applyEngine({ spirit }) {
       const n = _countUnalteredCards(run.getDeck());
-      const stacks = spirit.stackCount ?? 1;
+      const stacks = effectivePower(spirit);
       if (n === 0) return null;
       return { multiplyMult: 1 + n * 0.1 * stacks };
     },
@@ -940,14 +1224,14 @@ const _effects = {
 
   legend_chi: {
     applyEngine({ spirit }) {
-      const stacks = spirit.stackCount ?? 1;
+      const stacks = effectivePower(spirit);
       return { multiplyMult: run.flow * stacks };
     },
   },
 
   legend_tengu: {
     applyEngine({ spirit }) {
-      const stacks = spirit.stackCount ?? 1;
+      const stacks = effectivePower(spirit);
       const spiritCount = run.spirits.length + run.negativeSpirits.length;
       if (spiritCount === 0) return null;
       return { multiplyMult: 1 + 0.3 * spiritCount * stacks };
@@ -958,7 +1242,7 @@ const _effects = {
 
   legend_feng_shui: {
     applyEngine({ spirit }) {
-      const stacks = spirit.stackCount ?? 1;
+      const stacks = effectivePower(spirit);
       const fengShuiSlotCount = run.spirits.filter(s => s.id === 'legend_feng_shui').length;
       const occupiedNonFengShui = run.spirits.length - fengShuiSlotCount;
       const emptySlots = run.spiritSlots - occupiedNonFengShui;

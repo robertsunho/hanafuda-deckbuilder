@@ -1,8 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// consumables.js — Deck modification tools
+// consumables.js — Deck modification tools + Wu Xing elements
 //
-// Chakra Tools: shop-only instant-apply deck tools (replace Four Practices).
-// Three Marks: kept for backward compatibility with any save state.
+// Chakra Tools: shop-only instant-apply deck tools.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Primary deck tool set. Shop-only, instant-apply. All cost 4 ki. */
@@ -34,7 +33,7 @@ export const CHAKRA_TOOLS = [
   {
     id:          'chakra_heart',
     name:        'Heart Chakra',
-    description: 'Apply a random edition to 1 card (60% Gold +20pts / 30% Crystal +5×mult / 10% Ghost ×1.5 mult).',
+    description: 'Apply a random edition to 1 card (60% Gold +20pts / 30% Crystal +5 additive mult / 10% Ghost \xD71.5 mult).',
     cost:        4,
     maxTargets:  1,
     category:    'chakra',
@@ -58,80 +57,12 @@ export const CHAKRA_TOOLS = [
   {
     id:          'chakra_crown',
     name:        'Crown Chakra',
-    description: 'Copy the identity (month/type/name) of one card onto another, preserving its enhancements.',
+    description: 'Copy all attributes (rank, month, axes, enhancement, stamp, edition) of one card onto another. The target becomes an exact duplicate of the source.',
     cost:        4,
     maxTargets:  2,
     category:    'chakra',
   },
 ];
-
-/** @deprecated — kept for backward compatibility; use CHAKRA_TOOLS instead. */
-export const FOUR_PRACTICES = [
-  {
-    id:          'practice_path',
-    name:        'Path',
-    description: 'Change up to 4 cards to a target card\'s month.',
-    cost:        6,
-    maxTargets:  4,
-    category:    'four_practices',
-  },
-  {
-    id:          'practice_fasting',
-    name:        'Fasting',
-    description: 'Promote the type of up to 3 cards (plain→ribbon→animal→bright).',
-    cost:        6,
-    maxTargets:  3,
-    category:    'four_practices',
-  },
-  {
-    id:          'practice_mind',
-    name:        'Mind',
-    description: 'Delete up to 2 cards from your deck permanently.',
-    cost:        5,
-    maxTargets:  2,
-    category:    'four_practices',
-  },
-  {
-    id:          'practice_tree',
-    name:        'Tree',
-    description: 'Transform one card into an exact copy of a target card.',
-    cost:        7,
-    maxTargets:  1,
-    category:    'four_practices',
-  },
-];
-
-/** @deprecated — kept for backward compatibility with any save state. */
-export const THREE_MARKS = [
-  {
-    id:          'mark_impermanence',
-    name:        'Impermanence',
-    description: 'Promote one card to the next card type in its month.',
-    cost:        5,
-    category:    'three_marks',
-  },
-  {
-    id:          'mark_nonbeing',
-    name:        'Non-being',
-    description: 'Remove one card permanently from your deck.',
-    cost:        5,
-    category:    'three_marks',
-  },
-  {
-    id:          'mark_transcendence',
-    name:        'Transcendence',
-    description: 'Copy all properties from a target card onto a source card.',
-    cost:        5,
-    category:    'three_marks',
-  },
-];
-
-/**
- * Look up a mark definition by its id.
- * @param {string} id
- * @returns {object|undefined}
- */
-export const getMarkDef = (id) => THREE_MARKS.find(m => m.id === id);
 
 // ── Wu Xing element consumables ───────────────────────────────────────────────
 //
@@ -145,7 +76,7 @@ export const WUXING_CONSUMABLES = [
   {
     id:          'element_water',
     name:        'Water',
-    description: 'Apply Snow (2× pts, depreciates). Metal upgrades Snow→Ice (4×). Earth destroys.',
+    description: 'Apply Snow (\u00D72 capture mult, depreciates per use). Metal upgrades Snow\u2192Ice (\u00D74). Earth destroys.',
     cost:        5,
     category:    'wuxing',
     element:     'water',
@@ -153,7 +84,7 @@ export const WUXING_CONSUMABLES = [
   {
     id:          'element_wood',
     name:        'Wood',
-    description: 'Apply Leaf (bypasses field slot limit). Water upgrades Leaf→Silk (immune to stranding).',
+    description: 'Apply Leaf (bypasses field slot limit). Water upgrades Leaf\u2192Silk (immune to stranding). Metal destroys.',
     cost:        5,
     category:    'wuxing',
     element:     'wood',
@@ -161,7 +92,7 @@ export const WUXING_CONSUMABLES = [
   {
     id:          'element_fire',
     name:        'Fire',
-    description: 'Apply Ember (wildcard 30 pts, all yaku, 20% break). Wood upgrades Ember→Charcoal (100 pts, 10% break).',
+    description: 'Apply Ember (wildcard 30 pts, all yaku, 20% break). Wood upgrades Ember\u2192Charcoal (100 pts, 10% break). Water destroys.',
     cost:        5,
     category:    'wuxing',
     element:     'fire',
@@ -169,7 +100,7 @@ export const WUXING_CONSUMABLES = [
   {
     id:          'element_earth',
     name:        'Earth',
-    description: 'Apply Clay (10% ki/round interest). Fire upgrades Clay→Pottery (20% ki/round).',
+    description: 'Apply Clay (10% ki/round interest when held in hand). Fire upgrades Clay\u2192Pottery (20% ki/round). Wood destroys.',
     cost:        5,
     category:    'wuxing',
     element:     'earth',
@@ -177,7 +108,7 @@ export const WUXING_CONSUMABLES = [
   {
     id:          'element_metal',
     name:        'Metal',
-    description: 'Apply Iron (×1.5 mult when captured, 5% jackpot +30 ki). Earth upgrades Iron→Meteorite (×3.0 mult).',
+    description: 'Apply Iron (\xD71.5 mult when held in hand during scoring, 5% jackpot +30 ki). Earth upgrades Iron\u2192Meteorite (\xD73.0 mult). Fire destroys.',
     cost:        5,
     category:    'wuxing',
     element:     'metal',
@@ -190,3 +121,17 @@ export const WUXING_CONSUMABLES = [
  * @returns {object|undefined}
  */
 export const getElementDef = (id) => WUXING_CONSUMABLES.find(c => c.id === id);
+
+// ── Alchemical Consumables ──────────────────────────────────────────────────
+
+export const ALCHEMICAL_CONSUMABLES = [
+  { id: 'alch_cinnabar', name: 'Cinnabar', description: 'Fuse 2 selected spirits into a Tier 2 or Tier 3 fusion.', cost: 30, category: 'alchemical' },
+  { id: 'alch_mercury',  name: 'Mercury',  description: 'De-fuse a Tier 2/3 fusion into its 2 ingredients. Requires 2 open spirit slots.', cost: 20, category: 'alchemical' },
+  { id: 'alch_jade',     name: 'Jade',     description: 'Add 1 stack to a selected spirit (max 3).', cost: 15, category: 'alchemical' },
+  { id: 'alch_sulfur',   name: 'Sulfur',   description: 'Duplicate a random occupied slot, then clear another random occupied slot.', cost: 25, category: 'alchemical' },
+  { id: 'alch_amber',    name: 'Amber',    description: 'Transcend any spirit (creates a Negative copy preserving stack power). Cost: -1 permanent field slot.', cost: 35, category: 'alchemical' },
+  { id: 'alch_lead',     name: 'Lead',     description: 'Summon a random Rare spirit. Cost: half your current ki.', cost: 20, category: 'alchemical' },
+  { id: 'alch_pearl',    name: 'Pearl',    description: 'Fuse 2 Tier 3 cross-fusions into a Tier 4 Capstone (Legendary slot). Components preserved.', cost: 50, category: 'alchemical' },
+];
+
+export const getAlchemicalDef = (id) => ALCHEMICAL_CONSUMABLES.find(c => c.id === id);

@@ -7,68 +7,20 @@
 //     params        Optional caller-supplied data (e.g. chosen card ids).
 //     result        { success: boolean, message?: string, [extra]? }
 //
-// Implemented consumables (4 legacy + 12 zodiac):
-//   Horse   — gain one extra play this round
-//   Dog     — nullify push penalty for this round
-//   Pig     — double ki earned from this round
-//   Rooster — reveal all draw-pile cards whose month appears on the field
-//   Zodiac  — 12 tactical items (rat, ox, tiger, rabbit, dragon, snake,
-//              horse2, goat, monkey, rooster2, dog2, pig2)
+// Implemented consumables (13 zodiac):
+//   Zodiac — 13 tactical items (rat, ox, tiger, rabbit, dragon, snake,
+//            horse, goat, monkey, rooster, dog, pig, cat)
 //
-// Three Marks consumables (mark_impermanence, mark_nonbeing, mark_transcendence)
-// are handled directly in GameScene and ShrineScene, not here.
+// Card-targeting consumables (Wu Xing elements) are handled directly in
+// GameScene and ShrineScene via the _cardTargetMode system, not here.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import run from './RunManager.js';
-import { getSpiritDef } from '../data/spirits.js';
+import run, { incrementPerElement } from './RunManager.js';
+import { getSpiritDef, SPIRIT_CATALOG } from '../data/spirits.js';
+import { findFusionRecipe, findFusionRecipeByResult } from '../data/fusionRecipes.js';
+import FieldManager from './FieldManager.js';
 
 const _effects = {
-
-  // ── Legacy consumables ────────────────────────────────────────────────────
-
-  consumable_horse: {
-    /** Gain one extra play this round. */
-    execute({ roundManager }) {
-      roundManager._playsRemaining += 1;
-      return { success: true, message: '+1 play granted.' };
-    },
-  },
-
-  consumable_dog: {
-    /** Nullify the push penalty for this round. */
-    execute({ roundManager }) {
-      roundManager._dogProtection = true;
-      return { success: true, message: 'Push penalty nullified.' };
-    },
-  },
-
-  consumable_pig: {
-    /** Double ki earned from this round. */
-    execute({ roundManager }) {
-      roundManager._pigDoubleKi = true;
-      return { success: true, message: 'Ki reward will be doubled.' };
-    },
-  },
-
-  consumable_rooster: {
-    /**
-     * Reveal all draw-pile cards whose month matches any field slot.
-     * Returns { success, message, revealedCards: object[] }.
-     */
-    execute({ roundManager }) {
-      const fieldMonths = new Set(
-        roundManager.field.getSlots()
-          .filter(Boolean)
-          .map(slot => slot.month)
-      );
-      const revealedCards = roundManager.deck.drawPile
-        .filter(c => fieldMonths.has(c.month));
-      const msg = revealedCards.length > 0
-        ? `Revealed ${revealedCards.length} matching card(s) in the deck.`
-        : 'No matching cards in the deck.';
-      return { success: true, message: msg, revealedCards };
-    },
-  },
 
   // ── Zodiac consumables ────────────────────────────────────────────────────
 
@@ -92,7 +44,7 @@ const _effects = {
       if (params?.slotIndex == null) {
         return { success: false, needsTarget: 'slot' };
       }
-      const cards = roundManager.field.clearSlot(params.slotIndex);
+      const cards = roundManager._field.clearSlot(params.slotIndex);
       if (!cards) return { success: false, message: 'Slot is empty.' };
       // Cleared cards go to the discard pile.
       roundManager._allDiscards.push(...cards);
@@ -111,8 +63,7 @@ const _effects = {
   zodiac_rabbit: {
     /** Remove push penalty for this round. */
     execute({ roundManager }) {
-      roundManager._rabbitActive = true;
-      roundManager._dogProtection = true;  // reuse dog protection flag
+      roundManager._dogProtection = true;
       return { success: true, message: 'Rabbit: push penalty removed.' };
     },
   },
@@ -121,7 +72,7 @@ const _effects = {
     /** Ki lottery: gain 0–30 ki (random). */
     execute() {
       const gain = Math.floor(Math.random() * 31);
-      run.addKi(gain);
+      run.addKi(gain, 'dragon_lottery');
       return { success: true, message: `Dragon lottery: +${gain} ki!`, kiGained: gain };
     },
   },
@@ -143,17 +94,37 @@ const _effects = {
   },
 
   zodiac_horse: {
-    /** Discard your hand and draw 8 fresh cards. */
+    /** Discard your hand and draw an equal number of fresh cards. */
     execute({ roundManager }) {
       const oldHand = roundManager._hand.getAll();
+      const handSize = oldHand.length;
+
+      // Push to discard pile, then clear hand BEFORE stamp dispatch
+      // so stamp draw effects fire onto the empty hand.
       roundManager._allDiscards.push(...oldHand);
       roundManager._hand.clear();
-      const drawCount = Math.min(8, roundManager.deck.drawPileSize);
+
+      // engine_ship + stamp dispatch per discarded card.
+      for (const card of oldHand) {
+        for (const spirit of run.activeSpirits) {
+          if (spirit.id === 'engine_ship') {
+            incrementPerElement(spirit, 'cardsDiscarded', 1);
+          }
+        }
+        roundManager._dispatchStampDiscardEffects(card);
+      }
+
+      // Refill to original hand size (or deck size if smaller).
+      const drawCount = Math.min(handSize, roundManager.deck.drawPileSize);
       if (drawCount > 0) {
         const drawn = roundManager.deck.draw(drawCount);
         roundManager._hand.add(drawn);
       }
-      return { success: true, message: `Horse: hand refreshed (${drawCount} new cards).` };
+
+      if (roundManager._checkRoundEndOnEmptyHand()) {
+        return { success: true, message: 'Horse: deck exhausted, round ended.' };
+      }
+      return { success: true, message: `Horse: hand refreshed (${drawCount} drawn).` };
     },
   },
 
@@ -174,12 +145,11 @@ const _effects = {
       if (params?.slotIndex == null) {
         return { success: false, needsTarget: 'slot' };
       }
-      const cards = roundManager.field.clearSlot(params.slotIndex);
+      const cards = roundManager._field.clearSlot(params.slotIndex);
       if (!cards || cards.length === 0) return { success: false, message: 'Slot is empty.' };
 
-      // Add cards to capture pile.
-      roundManager._capture.add(cards);
-      run.onCardsCaptured(cards);
+      // Route through full scoring pipeline.
+      roundManager._addCapture(cards);
 
       // Discard equal number from hand (oldest first).
       const handCards = roundManager._hand.getAll();
@@ -187,6 +157,10 @@ const _effects = {
       const toDiscard = handCards.slice(0, discardCount);
       for (const c of toDiscard) roundManager._hand.remove(c.id);
       roundManager._allDiscards.push(...toDiscard);
+      for (const card of toDiscard) roundManager._dispatchStampDiscardEffects(card);
+
+      // Empty-hand check — Monkey may have spent the player's last cards.
+      roundManager._checkRoundEndOnEmptyHand();
 
       return {
         success: true,
@@ -198,10 +172,11 @@ const _effects = {
   },
 
   zodiac_rooster: {
-    /** Open a 9th field slot for this round. */
+    /** +1 field slot for this round (stackable, resets at round end). */
     execute({ roundManager }) {
-      roundManager.field.setMaxSlots(9);
-      return { success: true, message: 'Rooster: 9th field slot opened.' };
+      roundManager._roosterBonusThisRound += 1;
+      roundManager._recomputeFieldSlots();
+      return { success: true, message: 'Rooster: +1 field slot this round.' };
     },
   },
 
@@ -220,22 +195,25 @@ const _effects = {
   zodiac_pig: {
     /** +10 ki immediately. */
     execute() {
-      run.addKi(10);
+      run.addKi(10, 'pig_zodiac');
       return { success: true, message: '+10 ki.' };
     },
   },
 
   zodiac_cat: {
-    /** Summon a random Tier 1 Foundation spirit to an open slot. */
+    /** Summon a random Common spirit to an open slot. Excludes symbionts. */
     execute() {
-      const TIER1_FOUNDATION_IDS = [
-        'spring_pollen', 'summer_heat', 'autumn_harvest', 'winter_cold',
-        'spring_bees',   'summer_humidity', 'autumn_leaves', 'winter_aridity',
-        'air_clouds',    'land_soil',    'day_light',     'night_dark',
-        'air_wind',      'land_rock',    'day_movement',  'night_stillness',
-        'rank_shine',    'rank_oxygen',  'rank_poem',     'rank_salt',
-      ];
-      const id = TIER1_FOUNDATION_IDS[Math.floor(Math.random() * TIER1_FOUNDATION_IDS.length)];
+      const COMMON_POOL = SPIRIT_CATALOG
+        .filter(s => s.rarity === 'common')
+        .filter(s => s.channel !== 'symbiont' && s.category !== 'symbiont')
+        .map(s => s.id);
+      let id;
+      if (run._forceCatTarget) {
+        id = run._forceCatTarget;
+        run._forceCatTarget = null;
+      } else {
+        id = COMMON_POOL[Math.floor(Math.random() * COMMON_POOL.length)];
+      }
       const spiritDef = getSpiritDef(id);
       if (!spiritDef) return { success: false, message: 'Spirit definition not found.' };
       const result = run.summonSpirit(id);
@@ -243,6 +221,193 @@ const _effects = {
         return { success: true, message: `Cat summoned ${spiritDef.name}.`, spiritId: id };
       }
       return { success: false, message: result.reason ?? 'Could not summon spirit.' };
+    },
+  },
+
+  // ── Alchemical Consumables ──────────────────────────────────────────────────
+
+  alch_cinnabar: {
+    requiresInput: true,
+    inputType: 'spirit_pair',
+    execute({ params }) {
+      const { spiritIndices } = params ?? {};
+      if (!spiritIndices || spiritIndices.length !== 2) return { success: false, message: 'Select 2 spirits' };
+      const spirits = run.spirits;
+      const a = spirits[spiritIndices[0]];
+      const b = spirits[spiritIndices[1]];
+      if (!a || !b) return { success: false, message: 'Invalid selection' };
+      const recipe = findFusionRecipe(a.id, b.id);
+      if (!recipe) return { success: false, message: 'Selected spirits cannot be fused' };
+      const fusionDef = getSpiritDef(recipe.output);
+      if (!fusionDef || (fusionDef.tier !== 2 && fusionDef.tier !== 3)) {
+        return { success: false, message: 'Selected spirits cannot be fused into Tier 2/3' };
+      }
+      const fusionStacks = Math.min(a.stackCount ?? 1, b.stackCount ?? 1);
+      a.stackCount = (a.stackCount ?? 1) - fusionStacks;
+      b.stackCount = (b.stackCount ?? 1) - fusionStacks;
+      if (a.elements) for (let i = 0; i < fusionStacks && a.elements.length > 0; i++) a.elements.pop();
+      if (b.elements) for (let i = 0; i < fusionStacks && b.elements.length > 0; i++) b.elements.pop();
+      const freed = (a.stackCount <= 0 ? 1 : 0) + (b.stackCount <= 0 ? 1 : 0);
+      const slotsAfter = (run.spiritSlots - spirits.length) + freed;
+      if (slotsAfter < 1) {
+        a.stackCount += fusionStacks; b.stackCount += fusionStacks;
+        return { success: false, message: 'No spirit slot for fusion result' };
+      }
+      run.removeZeroStackSpirits();
+      const acq = run._acquireSpiritStack(fusionDef, fusionStacks);
+      if (!acq.success) return { success: false, message: acq.reason ?? 'Could not acquire fusion' };
+      return { success: true, message: `Fused into ${fusionDef.name}!` };
+    },
+  },
+
+  alch_mercury: {
+    requiresInput: true,
+    inputType: 'spirit_single_fusion',
+    execute({ params }) {
+      const { spiritIndex } = params ?? {};
+      const fusion = run.spirits[spiritIndex];
+      if (!fusion) return { success: false };
+      const fusionDef = getSpiritDef(fusion.id);
+      if (!fusionDef || (fusionDef.tier !== 2 && fusionDef.tier !== 3)) {
+        return { success: false, message: 'Mercury only works on Tier 2/3 fusions' };
+      }
+      const recipe = findFusionRecipeByResult(fusion.id);
+      if (!recipe) return { success: false, message: 'No defusion recipe found' };
+      const freed = (fusion.stackCount ?? 1) === 1 ? 1 : 0;
+      const openSlots = (run.spiritSlots - run.spirits.length) + freed;
+      const hasExistingA = run.spirits.some(s => s.id === recipe.input[0] && !s.isNegative);
+      const hasExistingB = run.spirits.some(s => s.id === recipe.input[1] && !s.isNegative);
+      const newSlotsNeeded = (hasExistingA ? 0 : 1) + (hasExistingB ? 0 : 1);
+      if (newSlotsNeeded > openSlots) {
+        return { success: false, message: newSlotsNeeded === 1 ? 'Need 1 open spirit slot' : 'Need 2 open spirit slots' };
+      }
+      fusion.stackCount = (fusion.stackCount ?? 1) - 1;
+      if (fusion.elements && fusion.elements.length > 0) fusion.elements.pop();
+      if (fusion.stackCount <= 0) run.removeSpiritObj(fusion);
+      const defA = getSpiritDef(recipe.input[0]);
+      const defB = getSpiritDef(recipe.input[1]);
+      if (defA) run._acquireSpiritStack(defA, 1);
+      if (defB) run._acquireSpiritStack(defB, 1);
+      return { success: true, message: `De-fused into ${defA?.name} + ${defB?.name}` };
+    },
+  },
+
+  alch_jade: {
+    requiresInput: true,
+    inputType: 'spirit_single_stackable',
+    execute({ params }) {
+      const { spiritIndex } = params ?? {};
+      const target = run.spirits[spiritIndex];
+      if (!target) return { success: false };
+      if ((target.stackCount ?? 1) >= 3) return { success: false, message: 'Already at max stack' };
+      const targetDef = getSpiritDef(target.id) ?? target;
+      const result = run._acquireSpiritStack(targetDef, 1);
+      if (!result.success) return { success: false, message: result.reason ?? 'Could not add stack' };
+      return { success: true, message: `${target.name} +1 stack` };
+    },
+  },
+
+  alch_sulfur: {
+    requiresInput: false,
+    execute() {
+      const spirits = run.allSpirits;
+      if (spirits.length === 0) return { success: false, message: 'No spirits to duplicate' };
+      const dupIdx = Math.floor(Math.random() * spirits.length);
+      const dupTarget = spirits[dupIdx];
+      let clearIdx = null;
+      if (spirits.length > 1) {
+        do { clearIdx = Math.floor(Math.random() * spirits.length); }
+        while (clearIdx === dupIdx);
+      }
+      const slotsAfter = (run.spiritSlots - spirits.length) + (clearIdx !== null ? 1 : 0);
+      if (slotsAfter < 1) return { success: false, message: 'No slot for duplicate' };
+
+      // Clear chosen victim first to free its slot.
+      if (clearIdx !== null) {
+        run.removeSpiritObj(spirits[clearIdx]);
+      }
+
+      // Negative targets: direct-create parallel entry (negatives don't stack-merge).
+      if (dupTarget.isNegative) {
+        run.addSpiritDirect({
+          id: dupTarget.id, name: dupTarget.name,
+          stackCount: 1, isNegative: true,
+          powerLevel: dupTarget.powerLevel,
+          state: dupTarget.state ? JSON.parse(JSON.stringify(dupTarget.state)) : undefined,
+          acquiredRound: run._round ?? 0,
+        });
+        return { success: true, message: `Duplicated ${dupTarget.name}` };
+      }
+
+      // Regular target: route through helper for stack merging + cascade transcendence.
+      const dupCount = dupTarget.stackCount ?? 1;
+      const targetDef = getSpiritDef(dupTarget.id) ?? dupTarget;
+      const result = run._acquireSpiritStack(targetDef, dupCount);
+      if (!result.success) return { success: false, message: result.reason ?? 'Could not duplicate' };
+      return { success: true, message: `Duplicated ${dupTarget.name}` };
+    },
+  },
+
+  alch_amber: {
+    requiresInput: true,
+    inputType: 'spirit_single_transcendable',
+    execute({ roundManager, params }) {
+      const { spiritIndex } = params ?? {};
+      const target = run.spirits[spiritIndex];
+      if (!target) return { success: false };
+      const mod = run._permanentFieldSlotMod ?? 0;
+      if (FieldManager.MAX_SLOTS + mod - 1 < 1) return { success: false, message: 'Cannot reduce field slots below 1' };
+      const snapshotPower = target.stackCount ?? 1;
+      const inheritedState = target.state ?? null;
+      run.removeSpiritObj(target);
+      run.addSpiritDirect({ id: target.id, name: target.name, isNegative: true, stackCount: 1, powerLevel: snapshotPower, state: inheritedState });
+      run._permanentFieldSlotMod = mod - 1;
+      if (roundManager) roundManager._recomputeFieldSlots();
+      return { success: true, message: `${target.name} transcended! Field -1 slot.` };
+    },
+  },
+
+  alch_lead: {
+    requiresInput: false,
+    execute() {
+      if (!run.canAddSpirit) return { success: false, message: 'No spirit slot available' };
+      const available = SPIRIT_CATALOG.filter(s => s.rarity === 'rare');
+      if (available.length === 0) return { success: false, message: 'No Rare spirits available' };
+      const pick = available[Math.floor(Math.random() * available.length)];
+      run._addPastLifeCopy(pick);
+      run._ki = Math.floor(run._ki / 2);
+      return { success: true, message: `Summoned ${pick.name}! Ki halved.` };
+    },
+  },
+
+  alch_pearl: {
+    requiresInput: true,
+    inputType: 'spirit_pair_tier3',
+    execute({ params }) {
+      const { spiritIndices } = params ?? {};
+      if (!spiritIndices || spiritIndices.length !== 2) return { success: false };
+      const spirits = run.spirits;
+      const a = spirits[spiritIndices[0]];
+      const b = spirits[spiritIndices[1]];
+      if (!a || !b) return { success: false };
+      const defA = getSpiritDef(a.id);
+      const defB = getSpiritDef(b.id);
+      if (!defA || defA.tier !== 3 || !defB || defB.tier !== 3) {
+        return { success: false, message: 'Pearl requires 2 Tier 3 cross-fusions' };
+      }
+      const recipe = findFusionRecipe(a.id, b.id);
+      if (!recipe) return { success: false, message: 'No Capstone recipe for these fusions' };
+      const capstoneDef = getSpiritDef(recipe.output);
+      if (!capstoneDef?.capstone) return { success: false, message: 'Recipe does not produce a Capstone' };
+      if (!run.canAddLegendary) return { success: false, message: 'No Legendary slot available' };
+      // Consume inputs (decrement stackCount + pop element; remove if zero).
+      a.stackCount = (a.stackCount ?? 1) - 1;
+      b.stackCount = (b.stackCount ?? 1) - 1;
+      if (a.elements && a.elements.length > 0) a.elements.pop();
+      if (b.elements && b.elements.length > 0) b.elements.pop();
+      run.removeZeroStackSpirits();
+      run.addLegendarySpirit(capstoneDef);
+      return { success: true, message: `Created ${capstoneDef.name}!` };
     },
   },
 };

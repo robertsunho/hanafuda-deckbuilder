@@ -20,8 +20,8 @@
 //   modifyCardsDealt(baseCount, phase) → modifiedCount
 //     phase: 'initial' | 'push1' | 'push2' | 'push3plus'
 //
-//   modifyPushSuccess(baseMultiplier) → modifiedMultiplier   (default: 1.1)
-//   modifyPushFailure(baseMultiplier) → modifiedMultiplier   (default: 0.9)
+//   pushCurveSuccessAmplifier(baseAmp) → modifiedAmp   (default: 1.0)
+//   pushCurveFailureAmplifier(baseAmp) → modifiedAmp   (default: 1.0)
 //   modifyFlowDecay(baseMultiplier) → modifiedMultiplier     (default: 0.95)
 //   modifyInitialFlow(baseFlow) → modifiedFlow
 //
@@ -45,6 +45,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import run from './RunManager.js';
+import { cards as ALL_CARDS_WITH_SPEC } from '../data/cards.js';
 
 // ── Deck composition helpers ──────────────────────────────────────────────────
 
@@ -59,14 +60,14 @@ function shuffleArray(arr) {
 // ── Seasonal helpers ──────────────────────────────────────────────────────────
 
 /**
- * Traditional hanafuda seasons (by month 1–12).
- * Spring = Jan–Mar, Summer = Apr–Jun, Autumn = Jul–Sep, Winter = Oct–Dec.
+ * Hanafuda seasons aligned with design doc and spirit-side definitions.
+ * Spring = Mar-May, Summer = Jun-Aug, Autumn = Sep-Nov, Winter = Dec-Feb.
  */
 function getSeason(month) {
-  if (month <= 3) return 'spring';
-  if (month <= 6) return 'summer';
-  if (month <= 9) return 'autumn';
-  return 'winter';
+  if (month >= 3 && month <= 5)  return 'spring';
+  if (month >= 6 && month <= 8)  return 'summer';
+  if (month >= 9 && month <= 11) return 'autumn';
+  return 'winter';  // Dec, Jan, Feb
 }
 
 // ── Effect registry ───────────────────────────────────────────────────────────
@@ -86,7 +87,7 @@ export const HEXAGRAM_EFFECTS = {
   boost_air: {
     onCardScored(card) {
       if (card.vertical === 'air')  return { multiplyMult: 1.5 };
-      if (card.vertical === 'land') return { multiplyMult: 0.5 };
+      if (card.vertical === 'land') return { multiplyMult: 0.75 };
       return null;
     },
   },
@@ -94,7 +95,7 @@ export const HEXAGRAM_EFFECTS = {
   boost_land: {
     onCardScored(card) {
       if (card.vertical === 'land') return { multiplyMult: 1.5 };
-      if (card.vertical === 'air')  return { multiplyMult: 0.5 };
+      if (card.vertical === 'air')  return { multiplyMult: 0.75 };
       return null;
     },
   },
@@ -102,7 +103,7 @@ export const HEXAGRAM_EFFECTS = {
   boost_day: {
     onCardScored(card) {
       if (card.temporal === 'day')   return { multiplyMult: 1.5 };
-      if (card.temporal === 'night') return { multiplyMult: 0.5 };
+      if (card.temporal === 'night') return { multiplyMult: 0.75 };
       return null;
     },
   },
@@ -110,59 +111,61 @@ export const HEXAGRAM_EFFECTS = {
   boost_night: {
     onCardScored(card) {
       if (card.temporal === 'night') return { multiplyMult: 1.5 };
-      if (card.temporal === 'day')   return { multiplyMult: 0.5 };
+      if (card.temporal === 'day')   return { multiplyMult: 0.75 };
       return null;
     },
   },
 
   // ── Combined axis boosts (4) ──────────────────────────────────────────────
-  // Each targets the INTERSECTION of two axes.  Cards that hit both axes of the
-  // boosted quadrant are boosted; cards that hit both axes of the opposite
-  // quadrant are debuffed.  Cards in the other two quadrants are unaffected.
+  // OR-logic compounding: each axis is evaluated independently and stacked
+  // multiplicatively.  A card matching both buff axes: ×2.25; both debuff
+  // axes: ×0.5625; mixed (one buff + one debuff): ×1.125.
 
   boost_yang: {
-    // Yang = Air ∩ Day (months 3 Mar, 6 Jun)
-    // Opposite = Yin = Land ∩ Night (months 1 Jan, 10 Oct)
+    // Yang: Air ×1.5, Day ×1.5; Land ×0.75, Night ×0.75
     onCardScored(card) {
-      const isYang = card.vertical === 'air'  && card.temporal === 'day';
-      const isYin  = card.vertical === 'land' && card.temporal === 'night';
-      if (isYang) return { multiplyMult: 1.5 };
-      if (isYin)  return { multiplyMult: 0.5 };
-      return null;
+      let mult = 1.0;
+      if (card.vertical === 'air')   mult *= 1.5;
+      if (card.vertical === 'land')  mult *= 0.75;
+      if (card.temporal === 'day')   mult *= 1.5;
+      if (card.temporal === 'night') mult *= 0.75;
+      return mult !== 1.0 ? { multiplyMult: mult } : null;
     },
   },
 
   boost_yin: {
-    // Yin = Land ∩ Night; opposite = Yang = Air ∩ Day
+    // Yin: Land ×1.5, Night ×1.5; Air ×0.75, Day ×0.75
     onCardScored(card) {
-      const isYin  = card.vertical === 'land' && card.temporal === 'night';
-      const isYang = card.vertical === 'air'  && card.temporal === 'day';
-      if (isYin)  return { multiplyMult: 1.5 };
-      if (isYang) return { multiplyMult: 0.5 };
-      return null;
+      let mult = 1.0;
+      if (card.vertical === 'land')  mult *= 1.5;
+      if (card.vertical === 'air')   mult *= 0.75;
+      if (card.temporal === 'night') mult *= 1.5;
+      if (card.temporal === 'day')   mult *= 0.75;
+      return mult !== 1.0 ? { multiplyMult: mult } : null;
     },
   },
 
   boost_space: {
-    // Space = Air ∩ Night (months 9 Sep, 12 Dec)
-    // Opposite = Energy = Land ∩ Day (months 4 Apr, 7 Jul)
+    // Space: Air ×1.5, Night ×1.5; Land ×0.75, Day ×0.75
     onCardScored(card) {
-      const isSpace  = card.vertical === 'air'  && card.temporal === 'night';
-      const isEnergy = card.vertical === 'land' && card.temporal === 'day';
-      if (isSpace)  return { multiplyMult: 1.5 };
-      if (isEnergy) return { multiplyMult: 0.5 };
-      return null;
+      let mult = 1.0;
+      if (card.vertical === 'air')   mult *= 1.5;
+      if (card.vertical === 'land')  mult *= 0.75;
+      if (card.temporal === 'night') mult *= 1.5;
+      if (card.temporal === 'day')   mult *= 0.75;
+      return mult !== 1.0 ? { multiplyMult: mult } : null;
     },
   },
 
   boost_energy: {
-    // Energy = Land ∩ Day; opposite = Space = Air ∩ Night
+    // Energy: Land ×1.5, Day ×1.5; Air ×0.75, Night ×0.75
     onCardScored(card) {
-      const isEnergy = card.vertical === 'land' && card.temporal === 'day';
-      const isSpace  = card.vertical === 'air'  && card.temporal === 'night';
-      if (isEnergy) return { multiplyMult: 1.5 };
-      if (isSpace)  return { multiplyMult: 0.5 };
-      return null;
+      let mult = 1.0;
+      if (card.vertical === 'land')  mult *= 1.5;
+      if (card.vertical === 'air')   mult *= 0.75;
+      if (card.temporal === 'day')   mult *= 1.5;
+      if (card.temporal === 'night') mult *= 0.75;
+      return mult !== 1.0 ? { multiplyMult: mult } : null;
     },
   },
 
@@ -213,13 +216,13 @@ export const HEXAGRAM_EFFECTS = {
   },
 
   // ── Individual seasonal boosts (4) ────────────────────────────────────────
-  // Each season boosts itself and debuffs the next season in the cycle.
+  // Each season boosts itself and debuffs its opposite season.
 
   boost_spring: {
     onCardScored(card) {
       const s = getSeason(card.month);
-      if (s === 'spring') return { multiplyMult: 2.5 };
-      if (s === 'summer') return { multiplyMult: 0.5 };
+      if (s === 'spring') return { multiplyMult: 2.0 };
+      if (s === 'autumn') return { multiplyMult: 0.5 };
       return null;
     },
   },
@@ -227,8 +230,8 @@ export const HEXAGRAM_EFFECTS = {
   boost_summer: {
     onCardScored(card) {
       const s = getSeason(card.month);
-      if (s === 'summer') return { multiplyMult: 2.5 };
-      if (s === 'autumn') return { multiplyMult: 0.5 };
+      if (s === 'summer') return { multiplyMult: 2.0 };
+      if (s === 'winter') return { multiplyMult: 0.5 };
       return null;
     },
   },
@@ -236,8 +239,8 @@ export const HEXAGRAM_EFFECTS = {
   boost_autumn: {
     onCardScored(card) {
       const s = getSeason(card.month);
-      if (s === 'autumn') return { multiplyMult: 2.5 };
-      if (s === 'winter') return { multiplyMult: 0.5 };
+      if (s === 'autumn') return { multiplyMult: 2.0 };
+      if (s === 'spring') return { multiplyMult: 0.5 };
       return null;
     },
   },
@@ -245,72 +248,61 @@ export const HEXAGRAM_EFFECTS = {
   boost_winter: {
     onCardScored(card) {
       const s = getSeason(card.month);
-      if (s === 'winter') return { multiplyMult: 2.5 };
-      if (s === 'spring') return { multiplyMult: 0.5 };
+      if (s === 'winter') return { multiplyMult: 2.0 };
+      if (s === 'summer') return { multiplyMult: 0.5 };
       return null;
     },
   },
 
   // ── Rank boosts (4) ───────────────────────────────────────────────────────
-  // Each rank boost raises that rank's yaku threshold by 1 (harder to trigger)
-  // while making its cards more valuable.
+  // Each rank boost amplifies its named rank and debuffs a cross-paired rank.
+  // Buff scales inversely with rank rarity; debuff strength scales inversely
+  // with the debuff target's deck count.
 
   boost_brights: {
     onCardScored(card) {
-      if (card.type === 'bright') return { multiplyMult: 2.0 };
+      if (card.type === 'bright') return { multiplyMult: 1.5 };
+      if (card.type === 'plain')  return { multiplyMult: 0.9 };
       return null;
-    },
-    modifyYakuThreshold(yakuName, baseThreshold) {
-      if (yakuName === 'hikari') return baseThreshold + 1;
-      return baseThreshold;
     },
   },
 
   boost_animals: {
     onCardScored(card) {
-      if (card.type === 'animal') return { multiplyMult: 1.5 };
+      if (card.type === 'animal') return { multiplyMult: 2.0 };
+      if (card.type === 'bright') return { multiplyMult: 0.5 };
       return null;
-    },
-    modifyYakuThreshold(yakuName, baseThreshold) {
-      if (yakuName === 'tane') return baseThreshold + 1;
-      return baseThreshold;
     },
   },
 
   boost_ribbons: {
     onCardScored(card) {
-      if (card.type === 'ribbon') return { multiplyMult: 1.3 };
+      if (card.type === 'ribbon') return { multiplyMult: 2.0 };
+      if (card.type === 'animal') return { multiplyMult: 0.7 };
       return null;
-    },
-    modifyYakuThreshold(yakuName, baseThreshold) {
-      if (yakuName === 'tanzaku') return baseThreshold + 1;
-      return baseThreshold;
     },
   },
 
   boost_plains: {
     onCardScored(card) {
-      if (card.type === 'plain') return { multiplyMult: 1.2 };
+      if (card.type === 'plain')  return { multiplyMult: 3.0 };
+      if (card.type === 'ribbon') return { multiplyMult: 0.7 };
       return null;
-    },
-    modifyYakuThreshold(yakuName, baseThreshold) {
-      if (yakuName === 'kasu') return baseThreshold + 1;
-      return baseThreshold;
     },
   },
 
   // ── Flow variants (2) ─────────────────────────────────────────────────────
 
   volatile_flow: {
-    modifyPushSuccess: () => 1.2,
-    modifyPushFailure: () => 0.7,
-    modifyFlowDecay:   () => 0.85,
+    pushCurveSuccessAmplifier: () => 1.5,
+    pushCurveFailureAmplifier: () => 1.5,
+    modifyFlowDecay:           () => 0.85,
   },
 
   stable_flow: {
-    modifyPushSuccess: () => 1.05,
-    modifyPushFailure: () => 0.95,
-    modifyFlowDecay:   () => 0.98,
+    pushCurveSuccessAmplifier: () => 0.5,
+    pushCurveFailureAmplifier: () => 0.5,
+    modifyFlowDecay:           () => 0.98,
   },
 
   // ── Style combo variants (2) ──────────────────────────────────────────────
@@ -341,21 +333,22 @@ export const HEXAGRAM_EFFECTS = {
 
   one_yaku_disabled: {
     onRunStart(runManager) {
-      runManager._hexagramState = { disabledYakuIndex: 0, disabledYakuThisRound: null };
+      runManager._hexagramState = { lastDisabledYaku: null, disabledYakuThisRound: null };
     },
     onRoundStart() {
       const YAKU = ['kasu', 'tanzaku', 'tane', 'hikari'];
       if (!run._hexagramState) {
-        run._hexagramState = { disabledYakuIndex: 0, disabledYakuThisRound: null };
+        run._hexagramState = { lastDisabledYaku: null, disabledYakuThisRound: null };
       }
       const state = run._hexagramState;
-      state.disabledYakuThisRound = YAKU[state.disabledYakuIndex % 4];
-      state.disabledYakuIndex++;
+      const candidates = YAKU.filter(y => y !== state.lastDisabledYaku);
+      state.disabledYakuThisRound = candidates[Math.floor(Math.random() * candidates.length)];
+      state.lastDisabledYaku = state.disabledYakuThisRound;
     },
     modifyYakuThreshold(yakuName, baseThreshold) {
       const disabled = run._hexagramState?.disabledYakuThisRound;
       if (yakuName === disabled) return Infinity;
-      return baseThreshold - 1;
+      return baseThreshold;
     },
   },
 
@@ -364,37 +357,41 @@ export const HEXAGRAM_EFFECTS = {
   // ──────────────────────────────────────────────────────────────────────────
 
   // ── Wu Xing cycle boosts (5) ──────────────────────────────────────────────
-  // Each element boosts its own enhancement and weakens the element it destroys
-  // in the destructive cycle (Wood→Earth, Earth→Water, Water→Fire, Fire→Metal,
-  // Metal→Wood).
+  // Each element boosts its own enhancement and weakens its predator
+  // (the element that destroys it in the destructive cycle):
+  //   boost_wood  → weakens Metal  (Metal destroys Wood)
+  //   boost_fire  → weakens Water  (Water destroys Fire)
+  //   boost_earth → weakens Wood   (Wood destroys Earth)
+  //   boost_metal → weakens Fire   (Fire destroys Metal)
+  //   boost_water → weakens Earth  (Earth destroys Water)
 
   boost_wood: {
-    modifyFirePoints:      (tier) => tier === 'upgraded' ? 50  : 15,
-    modifyFireBreakChance: (tier) => tier === 'upgraded' ? 0.20 : 0.40,
-    modifyWoodScoring:     (tier) => tier === 'upgraded' ? 1.5  : 1.3,
-  },
-
-  boost_fire: {
-    modifyFirePoints:      (tier) => tier === 'upgraded' ? 200 : 60,
-    modifyFireBreakChance: (tier) => tier === 'upgraded' ? 0.05 : 0.10,
-    modifyEarthInterest:   (tier) => tier === 'upgraded' ? 0.10 : 0.05,
-  },
-
-  boost_earth: {
-    modifyEarthHeld:        (tier) => tier === 'upgraded' ? 1.5  : 1.2,
+    modifyWoodScoring:      (tier) => tier === 'upgraded' ? 1.5  : 1.3,
     modifyMetalHeldMult:    (tier) => tier === 'upgraded' ? 2.5  : 1.25,
     modifyMeteoriteJackpot: ()     => 0.02,
   },
 
-  boost_metal: {
-    modifyMetalHeldMult:     (tier) => tier === 'upgraded' ? 3.5  : 1.75,
-    modifyMeteoriteJackpot:  ()     => 0.15,
+  boost_fire: {
+    modifyFirePoints:        (tier) => tier === 'upgraded' ? 200 : 60,
+    modifyFireBreakChance:   (tier) => tier === 'upgraded' ? 0.05 : 0.10,
     modifyWaterDepreciation: (tier) => tier === 'upgraded' ? 0.7  : 0.4,
+  },
+
+  boost_earth: {
+    modifyEarthHeld:    (tier) => tier === 'upgraded' ? 1.5  : 1.2,
+    modifyWoodScoring:  (tier) => tier === 'upgraded' ? 0.5  : 0.7,
+  },
+
+  boost_metal: {
+    modifyMetalHeldMult:    (tier) => tier === 'upgraded' ? 3.5  : 1.75,
+    modifyMeteoriteJackpot: ()     => 0.15,
+    modifyFirePoints:       (tier) => tier === 'upgraded' ? 50  : 15,
+    modifyFireBreakChance:  (tier) => tier === 'upgraded' ? 0.20 : 0.40,
   },
 
   boost_water: {
     modifyWaterDepreciation: (tier) => tier === 'upgraded' ? 0.3  : 0.15,
-    modifyWoodScoring:       (tier) => tier === 'upgraded' ? 0.5  : 0.7,
+    modifyEarthInterest:     (tier) => tier === 'upgraded' ? 0.10 : 0.05,
   },
 
   // ── Field/hand modifier effects (4) ──────────────────────────────────────
@@ -439,148 +436,98 @@ export const HEXAGRAM_EFFECTS = {
   eight_spirits_graduated_tax: {
     modifySpiritSlots: () => 8,
     onRoundEnd() {
-      const spiritCount = run.spirits.length;
-      const TAX_BY_COUNT = { 5: 1, 6: 3, 7: 6, 8: 10 };
-      const totalTax = TAX_BY_COUNT[spiritCount] ?? 0;
-      if (totalTax > 0) run.spendKi(Math.min(totalTax, run.ki));
+      const spiritCount = run.scoringSpirits.length;
+      const excess = Math.max(0, spiritCount - 4);
+      const tax = excess * 3;
+      if (tax > 0) run.spendKi(Math.min(tax, run.ki));
     },
   },
 
   // ── Phase 3C — Deck composition modifiers ────────────────────────────────
 
-  no_brights_plain_threshold_minus: {
-    modifyDeck(cards) {
-      return cards.filter(c => c.type !== 'bright');
-    },
-    modifyYakuThreshold(yakuName, base) {
-      if (yakuName === 'kasu') return base - 1;
-      return base;
+  bright_and_plains: {
+    modifyDeck() {
+      const deck = [];
+      for (let month = 1; month <= 12; month++) {
+        const bright = ALL_CARDS_WITH_SPEC.find(c => c.month === month && c.type === 'bright');
+        if (bright) deck.push(bright);
+        const plains = ALL_CARDS_WITH_SPEC.filter(c => c.month === month && c.type === 'plain');
+        if (plains[0]) deck.push(plains[0]);
+        if (plains[1]) deck.push(plains[1], plains[1]);
+      }
+      return deck;
     },
   },
 
-  deck_36_field_plus: {
-    modifyDeck(cards) {
-      const modified = [...cards];
+  deck_36: {
+    modifyDeck() {
+      const deck = [];
       for (let month = 1; month <= 12; month++) {
-        const idx = modified.findIndex(c => c.month === month && c.type === 'plain');
-        if (idx >= 0) modified.splice(idx, 1);
+        const bright = ALL_CARDS_WITH_SPEC.find(c => c.month === month && c.type === 'bright');
+        const animal = ALL_CARDS_WITH_SPEC.find(c => c.month === month && c.type === 'animal');
+        const ribbon = ALL_CARDS_WITH_SPEC.find(c => c.month === month && c.type === 'ribbon');
+        if (bright) deck.push(bright);
+        if (animal) deck.push(animal);
+        if (ribbon) deck.push(ribbon);
       }
-      return modified;
+      return deck;
     },
     modifyFieldSlots: (base) => base + 1,
   },
 
-  deck_60_hand_plus: {
-    modifyDeck(cards) {
-      const modified = [...cards];
+  deck_60: {
+    modifyDeck() {
+      const deck = [];
       for (let month = 1; month <= 12; month++) {
-        const plain = cards.find(c => c.month === month && c.type === 'plain');
-        if (plain) {
-          modified.push({
-            ...JSON.parse(JSON.stringify(plain)),
-            id: plain.id + '_guan_duplicate',
-            baseImageId: plain.id,
-            hexDuplicate: true,
-          });
-        }
+        const bright = ALL_CARDS_WITH_SPEC.find(c => c.month === month && c.type === 'bright');
+        const animal = ALL_CARDS_WITH_SPEC.find(c => c.month === month && c.type === 'animal');
+        const ribbon = ALL_CARDS_WITH_SPEC.find(c => c.month === month && c.type === 'ribbon');
+        const plains = ALL_CARDS_WITH_SPEC.filter(c => c.month === month && c.type === 'plain');
+        if (bright) deck.push(bright);
+        if (animal) deck.push(animal);
+        if (ribbon) deck.push(ribbon);
+        deck.push(...plains.slice(0, 2));
       }
-      return modified;
+      return deck;
     },
     modifyHandSize: (base) => base + 1,
   },
 
-  no_plains_double_others: {
-    modifyDeck(cards) {
-      const nonPlains = cards.filter(c => c.type !== 'plain');
-      const modified = [];
-      for (const card of nonPlains) {
-        modified.push(card);
-        modified.push({
-          ...JSON.parse(JSON.stringify(card)),
-          id: card.id + '_bo_duplicate',
-          baseImageId: card.id,
-          hexDuplicate: true,
-        });
+  all_plains_doubled: {
+    modifyDeck() {
+      const deck = [];
+      for (let month = 1; month <= 12; month++) {
+        const plains = ALL_CARDS_WITH_SPEC.filter(c => c.month === month && c.type === 'plain');
+        if (plains[0]) deck.push(plains[0], plains[0]);
+        if (plains[1]) deck.push(plains[1], plains[1]);
       }
-      return modified;
+      return deck;
     },
   },
 
   animal_deck: {
-    modifyDeck(cards) {
-      const rankOrder = { bright: 4, animal: 3, ribbon: 2, plain: 1 };
-      const modified  = [];
-
+    modifyDeck() {
+      const deck = [];
       for (let month = 1; month <= 12; month++) {
-        const monthCards = cards.filter(c => c.month === month);
-        const animal = monthCards.find(c => c.type === 'animal');
-
-        if (!animal) {
-          // No base animal this month — leave untouched
-          modified.push(...monthCards);
-          continue;
-        }
-
-        const nonAnimals = monthCards
-          .filter(c => c.type !== 'animal')
-          .sort((a, b) => rankOrder[b.type] - rankOrder[a.type]);
-
-        if (nonAnimals.length === 0) { modified.push(...monthCards); continue; }
-
-        const toReplace = nonAnimals[0].id;
-        for (const card of monthCards) {
-          if (card.id === toReplace) {
-            modified.push({
-              ...JSON.parse(JSON.stringify(animal)),
-              id: `${animal.id}_sui_dup`,
-              baseImageId: animal.id,
-              hexDuplicate: true,
-            });
-          } else {
-            modified.push(card);
-          }
-        }
+        const animal = ALL_CARDS_WITH_SPEC.find(c => c.month === month && c.type === 'animal');
+        if (animal) deck.push(animal, animal);
+        const plains = ALL_CARDS_WITH_SPEC.filter(c => c.month === month && c.type === 'plain');
+        deck.push(...plains.slice(0, 2));
       }
-      return modified;
+      return deck;
     },
   },
 
   ribbon_deck: {
-    modifyDeck(cards) {
-      const rankOrder = { bright: 4, animal: 3, ribbon: 2, plain: 1 };
-      const modified  = [];
-
+    modifyDeck() {
+      const deck = [];
       for (let month = 1; month <= 12; month++) {
-        const monthCards = cards.filter(c => c.month === month);
-        const ribbon = monthCards.find(c => c.type === 'ribbon');
-
-        if (!ribbon) {
-          // No base ribbon this month — leave untouched
-          modified.push(...monthCards);
-          continue;
-        }
-
-        const nonRibbons = monthCards
-          .filter(c => c.type !== 'ribbon')
-          .sort((a, b) => rankOrder[b.type] - rankOrder[a.type]);
-
-        if (nonRibbons.length === 0) { modified.push(...monthCards); continue; }
-
-        const toReplace = nonRibbons[0].id;
-        for (const card of monthCards) {
-          if (card.id === toReplace) {
-            modified.push({
-              ...JSON.parse(JSON.stringify(ribbon)),
-              id: `${ribbon.id}_xian_dup`,
-              baseImageId: ribbon.id,
-              hexDuplicate: true,
-            });
-          } else {
-            modified.push(card);
-          }
-        }
+        const ribbon = ALL_CARDS_WITH_SPEC.find(c => c.month === month && c.type === 'ribbon');
+        if (ribbon) deck.push(ribbon, ribbon);
+        const plains = ALL_CARDS_WITH_SPEC.filter(c => c.month === month && c.type === 'plain');
+        deck.push(...plains.slice(0, 2));
       }
-      return modified;
+      return deck;
     },
   },
 
@@ -670,20 +617,22 @@ export const HEXAGRAM_EFFECTS = {
     modifyShopPrice: (basePrice) => Math.ceil(basePrice * 0.75),
   },
 
-  no_banking_ki_plus_capture: {
-    modifyKiReward:     () => 0,
-    modifyInterestRate: () => 0,
+  no_hand_ki_plus_capture: {
+    modifyHandKi: () => 0,
     onCaptureComplete({ run: r }) {
-      r.addKi(1);
+      r.addKi(3, 'hex_capture_bonus');
     },
   },
 
   push_ki_swing: {
     onPushSuccess(r) {
-      r.addKi(10);
+      r.addKi(10, 'hex_push_ki_success');
     },
     onPushFailure(r) {
       r.spendKi(Math.min(10, r.ki));
+    },
+    onBank(r) {
+      r.spendKi(Math.min(5, r.ki));
     },
   },
 
@@ -702,6 +651,7 @@ export const HEXAGRAM_EFFECTS = {
   },
   yaku_ends_round: {
     forceAutoBankOnYaku: () => true,
+    modifyFlowDecay: () => 1.0,
   },
   play_two_cards: {
     modifyPlaysPerTurn: () => 2,
@@ -764,7 +714,7 @@ export function getActiveEffect() {
  *
  * @example
  *   const slots = applyHook('modifyFieldSlots', MAX_FIELD_SLOTS);
- *   const mult  = applyHook('modifyPushSuccess', 1.1);
+ *   const amp   = applyHook('pushCurveSuccessAmplifier', 1.0);
  */
 export function applyHook(hookName, fallback, ...args) {
   const effect = getActiveEffect();

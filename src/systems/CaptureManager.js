@@ -15,7 +15,7 @@
 //   const capture = new CaptureManager();
 //   capture.add([fieldCard, playedCard]);          // typical pair capture
 //   const yaku  = capture.evaluateYaku();          // all matched yaku
-//   const score = capture.yakuPoints();            // sum of yaku points
+//   const n = capture.yakuCount();                  // number of met yaku thresholds
 //   capture.clear();                               // reset for next round
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -233,12 +233,11 @@ export default class CaptureManager {
   }
 
   /**
-   * Compound multiplier from all matched yaku (product of every yaku's multiplier).
-   * Returns 1.0 when no yaku are active.
+   * Number of yaku thresholds currently met.
    * @returns {number}
    */
-  yakuPoints() {
-    return _engine.calculateTotalMultiplier(_engine.evaluate(this.getAll()));
+  yakuCount() {
+    return _engine.evaluate(this.getAll()).length;
   }
 
   /**
@@ -272,17 +271,4 @@ export default class CaptureManager {
 
   // ── Snapshot ───────────────────────────────────────────────────────────────
 
-  /**
-   * Plain-object snapshot — for serialisation, save states, or debug logging.
-   * @returns {{ cards: object[], yaku: object[], yakuPoints: number, rawCardPoints: number, log: object[] }}
-   */
-  toSnapshot() {
-    return {
-      cards:          this.getAll(),
-      yaku:           this.evaluateYaku(),
-      yakuPoints:     this.yakuPoints(),
-      rawCardPoints:  this.rawCardPoints(),
-      log:            this.log,
-    };
-  }
 }

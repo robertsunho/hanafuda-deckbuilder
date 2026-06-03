@@ -236,7 +236,11 @@ export default class FieldManager {
    */
   playHandCards(cards, targetMonth = null) {
     const month         = targetMonth ?? cards[0].month;
-    const matchingSlots = this._getMatchingSlots(cards[0]);
+    // When targetMonth is explicit (Fire wild), match only slots at that month
+    // — do not auto-merge with the card's own-month slot.
+    const matchingSlots = targetMonth !== null
+      ? this._slots.filter(s => s !== null && s.month === targetMonth)
+      : this._getMatchingSlots(cards[0]);
 
     if (matchingSlots.length === 0) {
       const idx = this._firstEmptyIndex();
@@ -435,19 +439,6 @@ export default class FieldManager {
     const cards = [...slot.cards];
     this._slots[index] = null;
     return cards;
-  }
-
-  // ── Snapshot ───────────────────────────────────────────────────────────────
-
-  /** Plain-object snapshot for serialisation / debug logging. */
-  toSnapshot() {
-    return {
-      slots: this._slots.map(s => s ? ({
-        month: s.month,
-        state: s.state,
-        cards: [...s.cards],
-      }) : null),
-    };
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────

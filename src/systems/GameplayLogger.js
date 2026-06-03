@@ -79,20 +79,38 @@ class GameplayLogger {
    * Log the spirit loadout at the start of each round.
    * @param {object[]} spirits — array of spirit objects
    */
-  logSpiritLoadout(spirits) {
-    if (spirits.length === 0) {
+  logHexagramAssignment(hexagram) {
+    if (!hexagram) { this._log('Hexagram: (none)'); return; }
+    this._log(`Hexagram: ${hexagram.englishName} (${hexagram.chineseCharacter} ${hexagram.chineseName}) [${hexagram.id}]`);
+    this._log(`  ${hexagram.description}`);
+  }
+
+  logSpiritLoadout(spirits, negatives = [], legendaries = []) {
+    if (spirits.length === 0 && negatives.length === 0 && legendaries.length === 0) {
       this._log('Spirits: (none)');
       return;
     }
-    const lines = spirits.map(s => {
-      let detail = s.name;
-      if (s.state) {
-        if (s.state.plainsCaptured !== undefined) detail += ` [plains: ${s.state.plainsCaptured}]`;
-        if (s.state.seenAnimals) detail += ` [unique animals: ${s.state.seenAnimals.length}]`;
+    const fmt = (s) => {
+      let d = s.name;
+      if (s.stackCount > 1) d += ` \xD7${s.stackCount}`;
+      if (s.isNegative && s.powerLevel) d += ` (neg p${s.powerLevel})`;
+      if (s.elements && s.elements.length > 0) d += ` [el:${s.elements.length}]`;
+      else if (s.state) {
+        const bits = [];
+        for (const [k, v] of Object.entries(s.state)) {
+          if (v === null || v === undefined) continue;
+          if (Array.isArray(v)) bits.push(`${k}:${v.length}`);
+          else if (typeof v !== 'object') bits.push(`${k}:${v}`);
+        }
+        if (bits.length > 0) d += ` [${bits.join(', ')}]`;
       }
-      return detail;
-    });
-    this._log(`Spirits: ${lines.join(' | ')}`);
+      return d;
+    };
+    const parts = [];
+    if (spirits.length > 0)     parts.push(`Regular: ${spirits.map(fmt).join(' | ')}`);
+    if (negatives.length > 0)   parts.push(`Negative: ${negatives.map(fmt).join(' | ')}`);
+    if (legendaries.length > 0) parts.push(`Legendary: ${legendaries.map(fmt).join(' | ')}`);
+    this._log(`Spirits: ${parts.join(' || ')}`);
   }
 
   // ── Player actions ─────────────────────────────────────────────────────
@@ -139,7 +157,7 @@ class GameplayLogger {
    */
   logYakuState(yakuList, newYaku) {
     if (yakuList.length === 0) return;
-    const yakuStr = yakuList.map(y => `${y.name} +${y.bonus.toFixed(1)} (${y.count}/${y.threshold})`).join(', ');
+    const yakuStr = yakuList.map(y => `${y.name} (${y.count}/${y.threshold})`).join(', ');
     this._log(`  YAKU: ${yakuStr}`);
     if (newYaku && newYaku.length > 0) {
       this._log(`  ► NEW YAKU: ${newYaku.map(y => y.name).join(', ')} → Bank/Push triggered`);
@@ -178,11 +196,10 @@ class GameplayLogger {
    * @param {number} threshold
    * @param {boolean} cleared
    * @param {object[]} capturedCards — full capture pile
-   * @param {number} styleBase — Style Base after this round's combos
    * @param {object[]} triggeredCombos — style combos triggered this round
    * @param {string[]} enhancementEvents — any enhancement post-round events (breaks, etc.)
    */
-  logRoundEnd(scoring, threshold, cleared, capturedCards, styleBase, triggeredCombos, enhancementEvents) {
+  logRoundEnd(scoring, threshold, cleared, capturedCards, triggeredCombos, enhancementEvents) {
     this._log('');
     this._log(`  ── Round ${this._currentRound} Scoring ──`);
     this._log(`  Captured: ${capturedCards.length} cards`);
@@ -196,13 +213,8 @@ class GameplayLogger {
     this._log(`  Types: ${types.bright}B ${types.animal}A ${types.ribbon}R ${types.plain}P` +
       (types.fire > 0 ? ` ${types.fire}F(wildcard)` : ''));
 
-    // Scoring channels
     this._log(`  Base points: ${scoring.basePoints ?? '?'}`);
-    if (scoring.pointBoostDetail) this._log(`  Point boosts: ${scoring.pointBoostDetail}`);
-    this._log(`  Yaku mult: ${scoring.yakuMult?.toFixed(2) ?? '?'}`);
-    if (scoring.additiveMult) this._log(`  Additive mult: +${scoring.additiveMult.toFixed(2)}`);
-    if (scoring.multMult && scoring.multMult !== 1) this._log(`  Mult-mult: ×${scoring.multMult.toFixed(2)}`);
-    this._log(`  Flow: ×${scoring.flow?.toFixed(2) ?? '?'} (Style Base: ${styleBase.toFixed(2)})`);
+    this._log(`  Flow: ×${scoring.flow?.toFixed(2) ?? '?'}`);
     this._log(`  FINAL SCORE: ${scoring.finalScore}`);
     this._log(`  Threshold: ${threshold} — ${cleared ? '✓ CLEARED' : '✗ FAILED'}`);
 
@@ -259,16 +271,6 @@ class GameplayLogger {
         if (s.state?.seenAnimals) detail += ` [animals: ${s.state.seenAnimals.length}/9]`;
         return detail;
       }).join(', ')}`);
-    }
-
-    // Yaku upgrades
-    if (runState.yakuUpgrades) {
-      const ups = runState.yakuUpgrades;
-      const upgradeStr = Object.entries(ups)
-        .filter(([, v]) => v > 0)
-        .map(([k, v]) => `${k}: ${v}×(+0.2)`)
-        .join(', ');
-      if (upgradeStr) this._log(`Yaku upgrades: ${upgradeStr}`);
     }
 
     // Deck state
@@ -333,10 +335,17 @@ class GameplayLogger {
 
   // ── Flow changes ────────────────────────────────────────────────────────
 
-  logFlowChange(oldValue, newValue, reason) {
-    const delta = (newValue - oldValue).toFixed(3);
-    const sign = parseFloat(delta) >= 0 ? '+' : '';
-    this._log(`  [FLOW] ${oldValue.toFixed(3)} → ${newValue.toFixed(3)} (${sign}${delta}, ${reason})`);
+  logFlowChange(oldValue, newValue, reason, operation = 'multiplicative') {
+    let suffix;
+    if (operation === 'additive') {
+      const delta = (newValue - oldValue).toFixed(3);
+      const sign = parseFloat(delta) >= 0 ? '+' : '';
+      suffix = `${sign}${delta}`;
+    } else {
+      const multiplier = oldValue !== 0 ? (newValue / oldValue).toFixed(3) : 'n/a';
+      suffix = `\xD7${multiplier}`;
+    }
+    this._log(`  [FLOW] ${oldValue.toFixed(3)} → ${newValue.toFixed(3)} (${suffix}, ${reason})`);
   }
 
   // ── Shop offerings ──────────────────────────────────────────────────────
@@ -385,10 +394,79 @@ class GameplayLogger {
     this._log(`  [YAKU ACHIEVED] ${yakuName}: ${count} captured (threshold ${threshold})`);
   }
 
-  // ── Style hand ──────────────────────────────────────────────────────────
+  // ── Granular capture scoring ──────────────────────────────────────────
 
-  logStyleHandAchieved(comboName) {
-    this._log(`  [STYLE HAND] ${comboName}`);
+  /**
+   * Log a capture scoring event with full per-card and capture-level breakdown.
+   */
+  logCaptureScoring(data) {
+    this._log('');
+    this._log('\u2500'.repeat(54));
+    this._log(`CAPTURE #${data.captureNumber} \u2014 Turn ${data.turn}, Phase: ${data.phase}`);
+    this._log('\u2500'.repeat(54));
+
+    this._log(`Cards captured (${data.cardBreakdowns.length}):`);
+    for (const cb of data.cardBreakdowns) {
+      this._log(`  \u2022 ${cb.cardName} (${cb.meta})`);
+      this._log(`      base points: ${cb.basePoints}`);
+      for (const c of cb.contributions) {
+        this._log(`      + ${c.source}: ${this._fmtContrib(c)}`);
+      }
+      this._log(`      card contribution: ${cb.totalCardPts} pts`);
+    }
+
+    this._log('');
+    this._log('Capture-level:');
+    if (data.captureLevel.heldEffects.length === 0) {
+      this._log('  Held-in-hand: (none)');
+    } else {
+      this._log('  Held-in-hand:');
+      for (const h of data.captureLevel.heldEffects) {
+        this._log(`    \u2022 ${h.source}: ${this._fmtContrib(h)}`);
+      }
+    }
+    if (data.captureLevel.engineSpirits.length === 0) {
+      this._log('  Engine spirits: (none)');
+    } else {
+      this._log('  Engine spirits:');
+      for (const e of data.captureLevel.engineSpirits) {
+        this._log(`    \u2022 ${e.source}: ${this._fmtContrib(e)}`);
+      }
+    }
+
+    this._log('');
+    this._log('Scoring math:');
+    this._log(`  points: ${data.totalPoints}`);
+    this._log(`  mult: ${data.totalMult.toFixed(2)}`);
+    this._log(`  flow: ${data.flow.toFixed(2)}`);
+    this._log(`  custom formula: ${data.customFormula || '(none \u2014 standard pts \u00D7 mult \u00D7 flow)'}`);
+    this._log(`  FINAL: ${data.captureScore.toLocaleString()}`);
+    this._log('');
+    this._log(`Running round total: ${data.runningRoundTotal.toLocaleString()}`);
+    this._log('\u2500'.repeat(54));
+  }
+
+  /**
+   * Log a stamp retrigger scoring event.
+   */
+  logRetriggerScoring(data) {
+    this._log('');
+    this._log(`\u2500\u2500 Retrigger (${data.stampType} on ${data.cardName}) \u2500\u2500`);
+    this._log(`  base points: ${data.basePoints}`);
+    for (const c of data.contributions) {
+      this._log(`  + ${c.source}: ${this._fmtContrib(c)}`);
+    }
+    this._log(`  retrigger pts: ${data.retriggerPts}, mult: ${data.retriggerMult.toFixed(2)}`);
+    this._log(`  score: ${data.retriggerScore.toLocaleString()}`);
+    this._log(`  Running round total: ${data.runningRoundTotal.toLocaleString()}`);
+  }
+
+  _fmtContrib(c) {
+    const parts = [];
+    if (c.addPoints)    parts.push(`+${c.addPoints} pts`);
+    if (c.addMult)      parts.push(`+${c.addMult} mult`);
+    if (c.multiplyMult && c.multiplyMult !== 1) parts.push(`\u00D7${c.multiplyMult} mult`);
+    return parts.join(', ') || '(no effect)';
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────

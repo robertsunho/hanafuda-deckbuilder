@@ -281,13 +281,5 @@ export default class HandManager {
   /**
    * A plain-object snapshot of hand state — useful for serialisation,
    * logging, or passing to the ScoringEngine.
-   *
-   * @returns {{ cards: object[], selectedIds: string[] }}
    */
-  toSnapshot() {
-    return {
-      cards: this.getAll(),
-      selectedIds: [...this._selected],
-    };
-  }
 }

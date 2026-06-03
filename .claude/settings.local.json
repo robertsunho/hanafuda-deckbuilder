@@ -13,7 +13,26 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(tail:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(python3:*)",
+      "Bash(npm run:*)",
+      "Bash(npx vite:*)",
+      "Bash(claude mcp:*)",
+      "Bash(code:*)",
+      "mcp__aseprite__create_canvas",
+      "mcp__aseprite__fill_area",
+      "mcp__aseprite__draw_rectangle",
+      "mcp__aseprite__draw_circle",
+      "mcp__aseprite__draw_line",
+      "mcp__aseprite__draw_pixels",
+      "mcp__aseprite__export_sprite",
+      "Bash(ls:*)",
+      "Bash(grep -r \"TODO\\\\|FIXME\\\\|HACK\\\\|WIP\" /c/Users/rober/hanafuda-deckbuilder/src --include=*.js)",
+      "Bash(findstr /N \"FLIP_X\\\\|FLIP_Y\\\\|_deckSprite\\\\|CARD_SCALE\" src/scenes/GameScene.js)",
+      "Bash(findstr /N \"_renderAll\\\\|_deckSprite\\\\|_deckCountText\\\\|TINT_DISCARD\" src/scenes/GameScene.js)",
+      "Bash(xargs grep:*)",
+      "Bash(grep:*)",
+      "Bash(per stack\" — old pushOn\\(\\) effect removed:*)"
     ]
   }
 }

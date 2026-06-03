@@ -4,9 +4,9 @@
 // Each recipe: { input: [idA, idB], output: fusedId }
 // Input order does not matter — helpers sort before comparing.
 //
-// Fusion is only available at the Sacred Grove.  No ki cost — the cost was
-// acquiring both input spirits.  The two input spirits are consumed and
-// replaced by one fused spirit, freeing one spirit slot.
+// Fusion happens via alchemical consumables (Cinnabar for T2/T3, Pearl for T4).
+// Both alchemicals consume the input spirits. To preserve components, stack
+// them first via Jade, Mirror, or Memory before fusing.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const FUSION_RECIPES = [
@@ -65,4 +65,13 @@ export function getAvailableFusions(equippedSpiritIds) {
   return FUSION_RECIPES.filter(recipe =>
     recipe.input.every(id => equippedSpiritIds.includes(id))
   );
+}
+
+/**
+ * Reverse lookup: find the recipe that produces a given fusion spirit.
+ * @param {string} resultId  The fusion spirit ID to look up.
+ * @returns {object|undefined}  { input: [idA, idB], output: resultId }
+ */
+export function findFusionRecipeByResult(resultId) {
+  return FUSION_RECIPES.find(recipe => recipe.output === resultId);
 }

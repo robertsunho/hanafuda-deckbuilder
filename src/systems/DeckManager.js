@@ -161,6 +161,17 @@ export default class DeckManager {
   }
 
   /**
+   * Insert a card at a random position in the draw pile.
+   * @param {object} card
+   * @returns {this} for chaining
+   */
+  insertIntoDrawPile(card) {
+    const pos = Math.floor(Math.random() * (this._drawPile.length + 1));
+    this._drawPile.splice(pos, 0, card);
+    return this;
+  }
+
+  /**
    * Return true when the draw pile is empty.
    * @returns {boolean}
    */
