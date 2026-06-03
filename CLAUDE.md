@@ -50,7 +50,7 @@ If you find spirit/consumable logic in a "manager" file or in a scene file, that
 ## Working principles
 
 ### Recon before edit
-Before modifying existing code, read the relevant code first. Run focused regex searches; view the surrounding context; identify exact line numbers and method names. The audit underlying the current plan can be stale; never trust descriptions of code over the code itself.
+Before modifying existing code, read the relevant code first. Run focused regex searches; view the surrounding context; identify exact line numbers and method names. The audit underlying the current plan can be stale; never trust descriptions of code over the code itself. The technique: fetch the file, regex-search for the key symbols with matchAll, print surrounding context with file offsets to locate exact line numbers and current signatures. This surfaces dead code and silent fixes the plan won't know about.
 
 ### Smallest defensible fix
 One bug, one fix. Don't refactor adjacent code. Don't generalize the fix. Don't bundle unrelated cleanups. Each is a separate task with its own scope.
@@ -100,6 +100,10 @@ When working with Robert:
 3. **Ship smallest defensible fix.** Resist scope expansion.
 4. **Run `npx vite build`.** Confirm success before declaring done.
 5. **Status report at the end.** Brief summary of what changed and any concerns.
+
+## Commit discipline
+
+After each change lands and the build is clean, commit and push immediately so the remote stays a faithful mirror of the working tree. Tag commit messages with the plan task ID (e.g. F4.16: move _fireCuckooHatch from RunManager to SpiritEffects). This keeps GitHub current for recon between tasks and builds a readable Phase 4 audit trail.
 
 ## When you find new conventions that should live here
 
