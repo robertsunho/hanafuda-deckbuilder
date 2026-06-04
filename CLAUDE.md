@@ -42,10 +42,21 @@ If you find spirit/consumable logic in a "manager" file or in a scene file, that
 
 ## Reference docs
 
-- **Authoritative design:** `DESIGN_DOC_V5.md` (note: some discrepancies with code; see `DESIGN_DOC_PATCHES.md` for the active reconciliation worklist)
-- **Phase plan and task tracking:** `OVERHAUL_PLAN.md`
-- **Decision history:** `DECISIONS_LOG.md`
-- **Architecture catalogue (Phase 4 deliverable):** `ARCHITECTURE.md` if/when created — until then, recon the codebase
+All documentation lives under `/docs/`. Two tiers:
+
+- **`/docs/process/`** — LIVING references, consulted and updated as work proceeds.
+- **`/docs/archive/`** — HISTORICAL, point-in-time records. Read for context; do NOT edit.
+
+Key docs:
+- **Authoritative design:** `/docs/DESIGN_DOC_V5.md` (note: some discrepancies with code; see `/docs/process/DESIGN_DOC_PATCHES.md` for the active reconciliation worklist)
+- **Phase plan and task tracking:** `/docs/process/OVERHAUL_PLAN.md`
+- **Decision history:** `/docs/process/DECISIONS_LOG.md`
+- **Working patterns:** `/docs/process/PHASE_3_LESSONS.md`
+- **Workflow/infrastructure rationale:** `/docs/process/INFRASTRUCTURE_DECISIONS.md`
+- **Prior recon (verify against current code; may be stale):** `/docs/archive/investigations/`
+- **Architecture catalogue (Phase 4 deliverable):** `/docs/process/ARCHITECTURE.md` if/when created — until then, recon the codebase
+
+When adding a doc: living/updated → `process/`; immutable snapshot → `archive/`. Don't edit archived files; if their findings are stale, re-recon fresh rather than amending the old record.
 
 ## Working principles
 
