@@ -6,6 +6,7 @@
 //
 //   onRoundStart(ctx)  — after state reset, before scoring state init
 //   onRoundEnd(ctx)    — at round-over (both bank and natural end)
+//   onBank(ctx)        — at explicit bank only (NOT natural/forced/consumable round-end)
 //
 // Hooks fire once per equipped spirit instance (regular + Negative).
 // Use effectivePower(spirit) inside for per-stack scaling.
@@ -1035,6 +1036,13 @@ const _effects = {
       }
       const n = aggregateNumericState(spirit, 'banks');
       return n === 0 ? null : { addMult: n * 0.1 };
+    },
+    // Migrated from GRM bankScore inline block (F4.18b #3).
+    // Fires ONLY on explicit bank (via _fireSpiritHook('onBank') in bankScore).
+    // NOTE: description says "bank without pushing" but current behavior increments on
+    //   every bank regardless of push. Preserved as-is; reconcile separately (see ledger).
+    onBank({ spirit }) {
+      incrementPerElement(spirit, 'banks', 1);
     },
   },
 

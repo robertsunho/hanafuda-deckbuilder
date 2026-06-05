@@ -742,10 +742,8 @@ export default class GameRoundManager {
     const _hexBank = getActiveEffect();
     if (_hexBank?.onBank) _hexBank.onBank(run);
 
-    // engine_lincoln: +0.1 additive mult per bank (permanent).
-    for (const spirit of run.activeSpirits) {
-      if (spirit.id === 'engine_lincoln') incrementPerElement(spirit, 'banks', 1);
-    }
+    // Spirit onBank hooks (engine_lincoln bank counter, etc.).
+    this._fireSpiritHook('onBank');
 
     // sym_snails: track unplayed cards remaining at bank.
     this._trackSnailsUnplayed();
