@@ -677,7 +677,17 @@ const _effects = {
     },
   },
 
-  sym_crow:   {},  // consumable generation at round end
+  sym_crow: {
+    // Migrated from GRM bankScore + _finalizeTurn inline blocks (F4.18b campaign step 1).
+    // Generates one random consumable per Crow stack at round end, respecting inventory slots.
+    // NOTE: now also fires on the consumable-empty-hand round-end path (was a bug omission).
+    onRoundEnd({ run: r }) {
+      const stacks = r.countStackedById('sym_crow');
+      for (let i = 0; i < stacks; i++) {
+        if (r.canAddConsumable) r.generateRandomConsumable();
+      }
+    },
+  },
 
   sym_ducks: {
     // Non-accumulator: net (deck-flip matches - strands) as multValue.

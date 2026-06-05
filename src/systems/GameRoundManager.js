@@ -775,21 +775,6 @@ export default class GameRoundManager {
       this._style.getTriggeredCombos(), this._lastEnhancementEvents ?? []
     );
     this._roundEndingAfterDecision = false;
-    // sym_crow: generate a random consumable at round end per crow stack.
-    const crowStacksBank = run.countStackedById('sym_crow');
-    if (crowStacksBank > 0) {
-      console.log(`[CROW BANK] Trigger fired. Stacks: ${crowStacksBank}, canAddConsumable: ${run.canAddConsumable}, inventory: ${run._consumables.length}/${run.maxConsumableSlots}`);
-      let blockedBank = 0;
-      for (let i = 0; i < crowStacksBank; i++) {
-        if (run.canAddConsumable) {
-          const generated = run.generateRandomConsumable();
-          console.log(`[CROW BANK] Generated:`, generated?.name ?? '(null)');
-        } else {
-          blockedBank++;
-        }
-      }
-      if (blockedBank > 0) console.log(`[CROW BANK] ${blockedBank} consumable(s) blocked (inventory full)`);
-    }
     const _hexEffectBank = getActiveEffect();
     if (_hexEffectBank?.onRoundEnd) _hexEffectBank.onRoundEnd(this);
     this._fireSpiritHook('onRoundEnd');
@@ -2054,23 +2039,6 @@ export default class GameRoundManager {
       const roundOver = this._hand.isEmpty();
       const penaltyApplied = roundOver && this._pushPenaltyActive && !this._dogProtection;
       if (roundOver) this._trackSnailsUnplayed();
-      // sym_crow: generate a random consumable at round end per crow stack.
-      if (roundOver) {
-        const crowStacks = run.countStackedById('sym_crow');
-        if (crowStacks > 0) {
-          console.log(`[CROW ROUNDEND] Trigger fired. Stacks: ${crowStacks}, canAddConsumable: ${run.canAddConsumable}, inventory: ${run._consumables.length}/${run.maxConsumableSlots}`);
-          let blockedRE = 0;
-          for (let i = 0; i < crowStacks; i++) {
-            if (run.canAddConsumable) {
-              const generated = run.generateRandomConsumable();
-              console.log(`[CROW ROUNDEND] Generated:`, generated?.name ?? '(null)');
-            } else {
-              blockedRE++;
-            }
-          }
-          if (blockedRE > 0) console.log(`[CROW ROUNDEND] ${blockedRE} consumable(s) blocked (inventory full)`);
-        }
-      }
 
       if (roundOver && penaltyApplied) {
         // Push failure: reduce flow for future rounds but keep this round's score.

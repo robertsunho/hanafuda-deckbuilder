@@ -44,6 +44,34 @@ export function makeRound({ spiritIds = [], spirits = [], deckCardIds }) {
   return { grm, run };
 }
 
+/**
+ * Drive a round to natural completion by playing all hand cards in order.
+ * Each card is played to the field (no month-targeting), then the deck phase runs.
+ * Stops when the phase transitions to 'round_over' or 'yaku_decision'.
+ * If a yaku decision occurs, banks immediately to end the round.
+ * @param {GameRoundManager} grm
+ */
+export function playRoundToEnd(grm) {
+  const MAX_TURNS = 50; // safety limit
+  for (let t = 0; t < MAX_TURNS; t++) {
+    if (grm.phase === 'round_over') return;
+    if (grm.phase === 'yaku_decision') {
+      grm.bankScore();
+      return;
+    }
+    const hand = grm.hand.getAll();
+    if (hand.length === 0) return;
+    grm.playHandCards([hand[0].id]);
+    if (grm.phase === 'awaiting_deck') {
+      const result = grm.playDeckPhase();
+      if (result.status === 'yaku_decision') {
+        grm.bankScore();
+        return;
+      }
+    }
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ASSERTION GUIDANCE (read before writing a new test):
 //
