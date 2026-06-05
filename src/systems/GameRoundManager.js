@@ -1565,16 +1565,18 @@ export default class GameRoundManager {
         captureScore, runningTotal: this._runningScore,
       });
 
-      // util_glory: draw 2 cards on any bright capture.
+      // ── Post-capture spirit effects (return-intent hooks) ──────────────────
       for (const spirit of _activeSpirits) {
-        if (spirit.id === 'util_glory') {
-          const brightCount = cards.filter(c => c.type === 'bright').length;
-          if (brightCount > 0) {
-            const drawN = Math.min(2, this._deck.drawPileSize);
-            const drawn = drawN > 0 ? this._deck.draw(drawN) : [];
-            if (drawn.length > 0) this._hand.add(drawn);
-            if (drawn.length > 0)
-              this._scoringEvents.push({ type: 'glory_draw', count: drawn.length });
+        const effect = SpiritEffects.get(spirit.id);
+        if (!effect?.onCaptureComplete) continue;
+        const intent = effect.onCaptureComplete({ cards, spirit, run });
+        if (!intent) continue;
+        if (intent.draw > 0) {
+          const drawN = Math.min(intent.draw, this._deck.drawPileSize);
+          const drawn = drawN > 0 ? this._deck.draw(drawN) : [];
+          if (drawn.length > 0) {
+            this._hand.add(drawn);
+            this._scoringEvents.push({ type: 'glory_draw', count: drawn.length });
           }
         }
       }

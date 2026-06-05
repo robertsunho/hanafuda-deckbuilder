@@ -479,7 +479,15 @@ const _effects = {
   // ── Rank Utility Spirits ──────────────────────────────────────────────────
   // Event-triggered effects handled in GameRoundManager._addCapture().
 
-  util_glory:      {},  // bright captured → draw 2 cards
+  util_glory: {
+    // Migrated from GRM._addCapture (F4.20 #1). Returns a draw intent; GRM executes.
+    // TODO(F4.x): tooltip renders draws*stacks but effect draws flat 2 — reconcile (see triage).
+    onCaptureComplete({ cards }) {
+      const brightCount = cards.filter(c => c.type === 'bright').length;
+      if (brightCount === 0) return null;
+      return { draw: 2 };   // flat 2 — preserves current behavior exactly (NOT 2×stacks)
+    },
+  },
   util_symbiosis:  {},  // animal captured → summon symbiont
   util_festival: {
     onCardScored({ card, spirit }) {
