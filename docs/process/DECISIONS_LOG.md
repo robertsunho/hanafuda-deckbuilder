@@ -3416,3 +3416,105 @@ and the reference share a backbone, which is the source of the apparent contradi
   (spiritTooltip 30-case switch), F4.21/F4.28 (dual spirit-init paths in RunManager)
 - 3 import cycles (RunManager↔HexagramEffects, RunManager↔SpiritEffects, transitive via
   ScoringEngine) → note for F4.29 (hook-firing centralization) / general structural awareness
+
+---
+
+## D-F4.20-TIER2 — Tier 2 spirit-logic migration kicked off; triage ledger + Glory shipped (2026-06-05)
+
+**Status:** IN PROGRESS. Migration #1 (Glory) CLOSED-VERIFIED. Triage ledger banked.
+
+**Context:** Phase 4 Tier 2 ("put things where they belong") migrates self-contained,
+event-triggered spirit logic out of GameRoundManager/RunManager into SpiritEffects.js.
+Scoping was done via a full triage of the 23 empty `{}` stubs + Section 7 inline seepage
+sites from the F4.24a inventory, read against live source.
+
+**Triage outcome (see `F4.16_F4.20_triage_ledger.md`):**
+- Bucket A (MIGRATE — self-contained, event-triggered): 9 spirits.
+- Bucket B (DOCUMENT-ONLY — formula term / structural; upgrade comment, don't move code): 6,
+  passing all three bucket-B conditions (term in a core-owned formula; lifting requires new
+  indirection; clearer left in place). Almost entirely the economy-interest cluster
+  (econ_bonds/ingot/piggybank/coupon) + the two structural legendaries (gankyil/waidan).
+- Bucket T (HAS ITS OWN TASK): Past Life + Cuckoo Egg → F4.27; capstones → scoring-loop;
+  util_symbiosis → F4.20 but flagged highest-risk, do LAST.
+- Bucket N: Wu Xing trackers → F4.38; counter spirits → second migration wave.
+
+**Key architectural decision — the return-intent hook pattern (Option 1):**
+Spirit effects that mutate GRM-owned objects (deck, hand, ki) do NOT receive a handle to
+those objects. Instead the spirit hook RETURNS A DECLARATIVE INTENT and GRM EXECUTES it.
+Mirrors the existing `onCardScored` pattern (spirit returns `{ addMult }`, GRM applies).
+Rationale: keeps mechanism ownership with the core system, keeps SpiritEffects declarative,
+does not deepen the RunManager import cycle. This is the template for ALL bucket-A migrations
+(`onCaptureComplete` returns `{ draw }`; future hooks add `{ addKi }`, `{ captureToHand }`,
+etc. to the same GRM-side dispatcher loop). Chosen over passing the round handle into the
+hook (Option 2), which would deepen coupling and break the return-intent precedent.
+
+**Migration #1 — util_glory (F4.20 #1): CLOSED-VERIFIED.**
+- Added `onCaptureComplete({ cards, spirit, run })` return-intent spirit hook + a generic
+  post-capture dispatcher in `GameRoundManager._addCapture` (replaces the inline id-checked
+  Glory loop). Glory returns `{ draw: 2 }` on bright capture.
+- BEHAVIOR PRESERVED EXACTLY: draws a flat 2, NOT 2×stacks. (The inline code drew flat 2;
+  tooltip renders draws×stacks — a pre-existing discrepancy, flagged with a TODO in code,
+  NOT resolved in this migration. Reconcile later — see ledger / F4.x.)
+- Commit 441b52e. Two-file diff (SpiritEffects.js, GameRoundManager.js). Build green.
+- Verified in-game by Robert (2026-06-05): bright capture draws 2; empty-deck draws 0 with
+  no error; **2-stack Glory still draws flat 2, not 4** (the behavior-preservation check).
+
+**First-wave execution order (next migrations, all reuse the return-intent pattern):**
+1. ~~util_glory → onCaptureComplete~~ ✅ DONE
+2. sym_crow → onRoundEnd (also eliminates the bank-vs-finalizeTurn duplication, Obs §8)
+3. econ_reward → onPushSuccess (spirit-side mirror of existing hexagram hook)
+4. sym_ants → onCardPlayed (new hook in playHandCards)
+5. discard cluster: econ_recycling + engine_ship + game_catcher → onFieldDiscard
+   (may return `{ consumed }`; coordinate with F4.17 — this hook IS F4.17 groundwork)
+6. document-only sweep for bucket B + bucket-T document-only items (comment upgrades, zero
+   behavior change)
+Deferred to own tasks/waves: util_symbiosis (last, highest-risk), Past Life/Cuckoo Egg
+(F4.27), Wu Xing trackers (F4.38), counter-spirit second wave.
+
+---
+
+## D-TEST-HARNESS — Headless test harness adopted: Vitest + makeRound() helper (2026-06-05)
+
+**Status:** DECIDED + SHIPPED 2026-06-05.
+
+**Context:** Phase 4 Tier 2 migrations need automated regression tests. Manual in-game
+verification is slow and fragile — each migration requires rolling the shop for a specific
+spirit, hand-engineering in-round conditions, and eyeballing outcomes. A headless harness
+that drives the engine under Node would let each migration ship with an automated test that
+runs in seconds.
+
+**Recon verdict: GREEN.** The entire `src/systems/` + `src/data/` import graph is
+browser-free at module top level. `GameRoundManager` and `RunManager` import and construct
+cleanly under plain Node with zero shimming. The two `window.__run` assignments in
+RunManager are guarded by `typeof window !== 'undefined'`; the `navigator.clipboard` call in
+GameplayLogger is inside a method (never called at import time). No `src/systems/` or
+`src/data/` file imports Phaser or touches the DOM.
+
+**Decision:**
+- **Runner:** Vitest (dev dependency). Shares Vite's ESM resolution, near-zero config,
+  auto-discovers `test/**/*.test.js`. No `vitest.config.js` needed.
+- **Production seams:** ZERO. No changes to any `src/**` file. The engine is testable as-is.
+- **Deterministic deck:** `Math.random` is stubbed via `vi.spyOn(Math, 'random')` during
+  `startRound()` so the Fisher-Yates shuffle is a no-op and the deal order matches the
+  `deckCardIds` array exactly. The stub is restored before the round is driven so in-round
+  randomness (procs, break rolls) behaves normally.
+- **Test isolation:** `run.reset()` between tests (the RunManager singleton is shared mutable
+  state; `reset()` fully clears all run state).
+
+**Helper: `test/helpers.js` → `makeRound({ spiritIds?, spirits?, deckCardIds })`**
+Sets up `run` with the requested spirits, seeds the canonical deck in exact order, constructs
+a `GameRoundManager`, drives `startRound()` with deterministic shuffle, returns `{ grm, run }`.
+Tests then call `grm.playHandCards()` / `grm.playDeckPhase()` and assert on public getters
+(`grm.deck.drawPileSize`, `grm.scoringEvents`, `grm.capture.getAll()`, etc.).
+
+**Assertion convention:** Do NOT assert on `grm.hand.size` to measure a spirit's draw effect
+(hand size is net of draws + plays + yaku-spends + hand-size cap — too many systems touch it).
+DO assert on the SPECIFIC scoring event the effect emits (`glory_draw`, etc.) plus the
+resource it DIRECTLY moves (deck size delta).
+
+**Shipped:** commit c4fee6b. Files: `test/helpers.js`, `test/glory.test.js` (3 cases),
+`package.json` (scripts + vitest dep). All 3 Glory regression tests pass (346ms). Case 3
+(2-stack Glory draws flat 2, NOT 4) is the behavior-preservation check.
+
+**Going forward:** every Tier-2 migration ships with a regression test using `makeRound()`.
+The test is part of the migration's "done" criteria, not a separate task.
