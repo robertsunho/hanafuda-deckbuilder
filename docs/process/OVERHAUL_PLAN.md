@@ -3612,6 +3612,17 @@ The per-element approach has architectural symmetry with the existing per-elemen
 
 ### F4.24: Codebase architecture catalogue — hook + helper reference in Design Doc (added 2026-05-15 from Phase 2C hex_52 patch insight)
 
+> **⚠ ORDERING UPDATE (2026-06-04): F4.24 reframed into recurring diagnostic
+> checkpoints (F4.24a) + a terminal prescriptive `ARCHITECTURE.md` (F4.24b).**
+> The scheduling guidance further down this entry (late Phase 4 / early Phase 5)
+> applies to **F4.24b only** — the prescriptive reference written against the
+> stabilized end-state. The diagnostic enumeration (F4.24a) runs EARLY and
+> REPEATEDLY: once at Phase 4 start (done — `F4.24_inventory_pass1.md`) and again
+> at the end of major architectural chunks (end of Tier 2, end of Tier 3, etc.),
+> each as a disposable delta-against-prior snapshot. Container decision resolved:
+> separate `/docs/ARCHITECTURE.md`, not a DESIGN_DOC_V5 section. Full rationale:
+> see `DECISIONS_LOG.md` → D-F4.24-ORDERING.
+
 **Background:** During Phase 2C hex_52 verification, Robert's flow-decay-prevention patch initially proposed a multi-file approach (gate decay at GRM callsites). Recon revealed that `applyFlowDecay` already integrates a `modifyFlowDecay` hook — the patch became a single-line addition to `HexagramEffects.js`.
 
 This is a recurring pattern throughout Phase 2 work:

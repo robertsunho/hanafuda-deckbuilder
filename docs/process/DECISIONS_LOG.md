@@ -3319,3 +3319,100 @@ These are tracked under F4.23 and will be resolved when the three sale paths are
 
 **F2.1 audit officially closed 2026-05-15.** All findings either shipped, deferred to Phase 4/5, or retracted. Phase 2B continues with F2.1 work concluded.
 
+
+---
+
+## D-F4.24-ORDERING — F4.24 ordering fork resolved: diagnostic audit vs. terminal reference (2026-06-04)
+
+**Status:** DECIDED 2026-06-04 (first Phase 4 work session).
+
+**Context:** Phase 4 Tier 1 opened with F4.24 (architecture catalogue). On reading the
+two planning documents together, a direct contradiction surfaced:
+
+- **`PHASE_4_TASK_ORDERING.md`** places F4.24 as **T1.a — the first task**, on a
+  map-first thesis: "establish the structural map other tasks migrate INTO" so every
+  downstream consolidation has a documented target and the reinvention risk is lowest.
+- **`OVERHAUL_PLAN.md`'s F4.24 entry** schedules it **late Phase 4 / early Phase 5**, on a
+  map-last thesis: "Running F4.24 BEFORE Phase 4 cleanup would mean documenting tech debt;
+  running it AFTER produces the canonical reference."
+
+Both positions are defensible and point opposite directions. The fork is real, not a
+wording slip.
+
+**Root insight (Robert, 2026-06-04):** The two docs aren't describing the same task. The
+mechanical step (exhaustively enumerate the codebase) is identical, but it serves two
+*different documents with different purposes*:
+
+- A **diagnostic map** — "here is everything, including everything wrong with it." Its value
+  is as a worklist and a reinvention-guard *during* the migrations. Section 7 (spirit-logic
+  seepage) and Section 8 (observations) are punch-list items, not reference content.
+- A **prescriptive map** — "here is how the architecture works and how to build on it." Its
+  value is onboarding and drift-prevention, and it can only be written against a *stable*
+  structure.
+
+The original F4.24 meant the prescriptive map. What we ran on 2026-06-04 was the diagnostic
+map. They share a backbone (file manifest, hook tables, dependency graph), which is why
+running the enumeration once up front pulls double duty: it feeds the migrations now AND
+seeds the prescriptive doc later. The original task spec didn't anticipate that the audit
+and the reference share a backbone, which is the source of the apparent contradiction.
+
+**Decision — F4.24 is reframed into three roles for one mechanical sweep:**
+
+1. **F4.24a — Diagnostic checkpoints (RECURRING).** Read-only enumeration sweeps run by
+   Claude Code. Run at:
+   - Phase 4 start (DONE — shipped as `docs/process/F4.24_inventory_pass1.md`, 2026-06-04)
+   - The end of major architectural chunks (end of Tier 2, end of Tier 3, and any other
+     point where a fresh structural view is warranted before the next wave builds on it).
+   Each checkpoint is a **disposable snapshot**. Its job is to (a) surface the current
+   worklist and (b) verify the prior chunk's consolidation actually landed where intended.
+   Shrinkage of Section 7 (seepage) and Section 8 (observations) across successive snapshots
+   IS the Phase 4 progress metric.
+
+2. **F4.24b — Prescriptive reference (TERMINAL).** The `docs/ARCHITECTURE.md` companion doc
+   (separate from DESIGN_DOC_V5.md — see below). Written ONCE, late Phase 4 / early Phase 5,
+   against the stabilized end-state. Contains the org map, hook reference, helper reference,
+   "if you need X, use Y" recipes, state-model narrative, and anti-patterns. Does NOT contain
+   diagnostic punch-list content.
+
+3. **Shared backbone.** The file manifest, hook tables, and dependency graph that every
+   checkpoint regenerates and that ultimately carry into F4.24b. Only the seepage/observations
+   sections get "consumed" by the migration work and drop out of the final reference.
+
+**Refinements:**
+
+- **Container decision:** `ARCHITECTURE.md` as a separate `/docs/` companion doc, NOT a new
+  section in DESIGN_DOC_V5.md. Rationale: it's a developer-facing implementation map (different
+  audience and different churn cadence from the design doc), and keeping it separate avoids
+  bloating the very doc F4.14 is working to make trustworthy. (Resolves the open
+  "main-doc-section vs companion-doc" question in F4.24's spec and in DESIGN_DOC_PATCHES DP-61.)
+
+- **Diff-against-prior-snapshot:** Each recurring checkpoint after Pass 1 should be reported as
+  a DELTA against the previous `F4.24_inventory_passN.md`, not read fresh. The valuable output
+  of the Tier-2-end sweep is "here are the seepage sites that REMAIN and the new ones the
+  migration INTRODUCED" — not the full list re-printed. Checkpoint prompts will instruct
+  Claude Code to compare against the prior snapshot and report what changed.
+
+- **Staleness is expected, not a defect.** Pass 1 is a 2026-06-04 snapshot; its `file:line`
+  references go stale the moment Tier 2 starts relocating logic. This is fine — a diagnostic
+  map is meant to be consumed and discarded as work proceeds. We do NOT treat Pass 1 as a
+  living reference to keep current. The *living* reference is the terminal `ARCHITECTURE.md`.
+
+**Cross-references:**
+- `PHASE_4_TASK_ORDERING.md` T1.a (map-first thesis — satisfied by the Pass 1 diagnostic)
+- `OVERHAUL_PLAN.md` F4.24 (map-last thesis — satisfied by terminal F4.24b)
+- `DESIGN_DOC_PATCHES.md` DP-61 (container question — resolved: companion doc)
+- `F4.24_inventory_pass1.md` (the Pass 1 diagnostic snapshot)
+
+**Worklist seeded by Pass 1 (for downstream tasks):**
+- Section 7 seepage table → F4.16 / F4.20 migration surface (broader than OVERHAUL_PLAN's
+  original ~14-stub list; includes engine_glacier/carbon/fossil tier tracking, sym_ducks
+  multValue, sym_ants/engine_moths/engine_palace counters, decay_* decrements, etc.)
+- 23 empty `{}` stubs → split into migratable (econ_*, util_glory, util_symbiosis) vs.
+  structurally-bound (capstone_*, legend_gankyil, legend_waidan); both outcomes documented
+  in F4.24b
+- Section 8 observations → F4.7 (dead `modifyInitialFlow` hook + incomplete hook header),
+  F4.34 (vestigial SNOW_MULT/ICE_MULT exports), F4.1 (crash-on-run test-run.js), F4.17/F4.18
+  (duplicated discard/decay/crow logic across bank vs finalizeTurn), F4.37/F4.36
+  (spiritTooltip 30-case switch), F4.21/F4.28 (dual spirit-init paths in RunManager)
+- 3 import cycles (RunManager↔HexagramEffects, RunManager↔SpiritEffects, transitive via
+  ScoringEngine) → note for F4.29 (hook-firing centralization) / general structural awareness
