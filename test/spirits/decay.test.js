@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeRound, playRoundToEnd } from '../helpers.js';
-import run from '../../src/systems/RunManager.js';
+import { makeRound, playRoundToEnd, equipSpiritWithState } from '../helpers.js';
 
 // Deck that triggers Hikari yaku (bright capture) so bankScore() is reachable.
 const YAKU_DECK = [
@@ -30,18 +29,10 @@ const EMPTY_DECK_FOR_HORSE = [
   'december_plain_1', 'december_plain_2', 'january_plain_2', 'february_plain_2',
 ];
 
-/** Helper: equip a decay spirit with a known starting remaining value. */
-function equipDecay(id, remaining) {
-  const spirit = run.allSpirits.find(s => s.id === id);
-  if (!spirit) throw new Error(`Spirit ${id} not found after makeRound`);
-  spirit.state = { remaining };
-  return spirit;
-}
-
 describe('decay_persimmon — onRoundEnd decrement (F4.18b #2)', () => {
   it('decrements by 3 on bank (exactly once)', () => {
     const { grm } = makeRound({ spiritIds: ['decay_persimmon'], deckCardIds: YAKU_DECK });
-    const spirit = equipDecay('decay_persimmon', 100);
+    const spirit = equipSpiritWithState('decay_persimmon', { state: { remaining: 100 } });
 
     grm.playHandCards(['january_plain_1']);
     grm.playDeckPhase();
@@ -53,7 +44,7 @@ describe('decay_persimmon — onRoundEnd decrement (F4.18b #2)', () => {
 
   it('decrements by 3 on natural round-over (exactly once)', () => {
     const { grm } = makeRound({ spiritIds: ['decay_persimmon'], deckCardIds: ALL_PLAINS_DECK });
-    const spirit = equipDecay('decay_persimmon', 100);
+    const spirit = equipSpiritWithState('decay_persimmon', { state: { remaining: 100 } });
 
     playRoundToEnd(grm);
     expect(grm.phase).toBe('round_over');
@@ -63,7 +54,7 @@ describe('decay_persimmon — onRoundEnd decrement (F4.18b #2)', () => {
 
   it('floors at 0 (does not go negative)', () => {
     const { grm } = makeRound({ spiritIds: ['decay_persimmon'], deckCardIds: YAKU_DECK });
-    const spirit = equipDecay('decay_persimmon', 2);
+    const spirit = equipSpiritWithState('decay_persimmon', { state: { remaining: 2 } });
 
     grm.playHandCards(['january_plain_1']);
     grm.playDeckPhase();
@@ -74,7 +65,7 @@ describe('decay_persimmon — onRoundEnd decrement (F4.18b #2)', () => {
 
   it('decrements on consumable-empty-hand path 1D (bug fix)', () => {
     const { grm } = makeRound({ spiritIds: ['decay_persimmon'], deckCardIds: EMPTY_DECK_FOR_HORSE });
-    const spirit = equipDecay('decay_persimmon', 100);
+    const spirit = equipSpiritWithState('decay_persimmon', { state: { remaining: 100 } });
 
     grm.useConsumable({ id: 'zodiac_horse', name: 'Horse' });
     expect(grm.phase).toBe('round_over');
@@ -85,7 +76,7 @@ describe('decay_persimmon — onRoundEnd decrement (F4.18b #2)', () => {
 describe('decay_pear — onRoundEnd decrement (F4.18b #2)', () => {
   it('decrements by 5 on bank (exactly once)', () => {
     const { grm } = makeRound({ spiritIds: ['decay_pear'], deckCardIds: YAKU_DECK });
-    const spirit = equipDecay('decay_pear', 100);
+    const spirit = equipSpiritWithState('decay_pear', { state: { remaining: 100 } });
 
     grm.playHandCards(['january_plain_1']);
     grm.playDeckPhase();
@@ -96,7 +87,7 @@ describe('decay_pear — onRoundEnd decrement (F4.18b #2)', () => {
 
   it('floors at 0', () => {
     const { grm } = makeRound({ spiritIds: ['decay_pear'], deckCardIds: YAKU_DECK });
-    const spirit = equipDecay('decay_pear', 3);
+    const spirit = equipSpiritWithState('decay_pear', { state: { remaining: 3 } });
 
     grm.playHandCards(['january_plain_1']);
     grm.playDeckPhase();

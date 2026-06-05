@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeRound, playRoundToEnd } from '../helpers.js';
-import run from '../../src/systems/RunManager.js';
+import { makeRound, playRoundToEnd, equipSpiritWithState } from '../helpers.js';
 import { aggregateNumericState } from '../../src/systems/RunManager.js';
 
 // Deck that triggers Hikari yaku (bright capture) so bankScore() is reachable.
@@ -31,14 +30,6 @@ const EMPTY_DECK_FOR_HORSE = [
   'december_plain_1', 'december_plain_2', 'january_plain_2', 'february_plain_2',
 ];
 
-/** Helper: get Lincoln spirit + initialize accumulator elements if needed. */
-function getLincoln() {
-  const spirit = run.allSpirits.find(s => s.id === 'engine_lincoln');
-  if (!spirit) throw new Error('engine_lincoln not found');
-  if (!spirit.elements) spirit.elements = [{ banks: 0 }];
-  return spirit;
-}
-
 function getBanks(spirit) {
   return aggregateNumericState(spirit, 'banks');
 }
@@ -46,7 +37,7 @@ function getBanks(spirit) {
 describe('engine_lincoln — onBank increment (F4.18b #3, bank-only)', () => {
   it('increments banks counter on explicit bank', () => {
     const { grm } = makeRound({ spiritIds: ['engine_lincoln'], deckCardIds: YAKU_DECK });
-    const spirit = getLincoln();
+    const spirit = equipSpiritWithState('engine_lincoln', { elements: [{ banks: 0 }] });
     expect(getBanks(spirit)).toBe(0);
 
     grm.playHandCards(['january_plain_1']);
@@ -59,7 +50,7 @@ describe('engine_lincoln — onBank increment (F4.18b #3, bank-only)', () => {
 
   it('does NOT increment on natural round-over (no bank)', () => {
     const { grm } = makeRound({ spiritIds: ['engine_lincoln'], deckCardIds: ALL_PLAINS_DECK });
-    const spirit = getLincoln();
+    const spirit = equipSpiritWithState('engine_lincoln', { elements: [{ banks: 0 }] });
     expect(getBanks(spirit)).toBe(0);
 
     // Drive manually to avoid playRoundToEnd's auto-bank on yaku_decision.
@@ -83,7 +74,7 @@ describe('engine_lincoln — onBank increment (F4.18b #3, bank-only)', () => {
 
   it('does NOT increment on consumable-path 1D round-end', () => {
     const { grm } = makeRound({ spiritIds: ['engine_lincoln'], deckCardIds: EMPTY_DECK_FOR_HORSE });
-    const spirit = getLincoln();
+    const spirit = equipSpiritWithState('engine_lincoln', { elements: [{ banks: 0 }] });
     expect(getBanks(spirit)).toBe(0);
 
     grm.useConsumable({ id: 'zodiac_horse', name: 'Horse' });
@@ -110,7 +101,7 @@ describe('engine_lincoln — onBank increment (F4.18b #3, bank-only)', () => {
     ];
 
     const { grm } = makeRound({ spiritIds: ['engine_lincoln'], deckCardIds: pushDeck });
-    const spirit = getLincoln();
+    const spirit = equipSpiritWithState('engine_lincoln', { elements: [{ banks: 0 }] });
 
     // First: capture bright → Hikari yaku
     grm.playHandCards(['january_plain_1']);

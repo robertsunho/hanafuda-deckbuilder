@@ -2031,10 +2031,8 @@ export default class GameRoundManager {
       if (roundOver && penaltyApplied) {
         // Push failure: reduce flow for future rounds but keep this round's score.
         run.onPushFailure(this);
-        // engine_napoleon: +0.2 additive mult per push failure (permanent).
-        for (const spirit of run.activeSpirits) {
-          if (spirit.id === 'engine_napoleon') incrementPerElement(spirit, 'pushFails', 1);
-        }
+        // Spirit onPushFailure hooks (engine_napoleon push-fail counter, etc.).
+        this._fireSpiritHook('onPushFailure');
       }
 
       const pushEscalation = 1.0; // removed — no longer used

@@ -72,6 +72,25 @@ export function playRoundToEnd(grm) {
   }
 }
 
+/**
+ * Initialize a spirit's state or elements for testing.
+ * `addSpirit` does NOT run the production init paths (_initSpiritState /
+ * _initSpiritElements), so tests must seed state explicitly.
+ *
+ * @param {string} id  Spirit id (must already be equipped via makeRound's spiritIds).
+ * @param {object} [opts]
+ * @param {object} [opts.state]     Sets spirit.state = {...} (for simple-state spirits like decay).
+ * @param {object[]} [opts.elements] Sets spirit.elements = [...] (for accumulator spirits).
+ * @returns {object} the live spirit object
+ */
+export function equipSpiritWithState(id, { state, elements } = {}) {
+  const spirit = run.allSpirits.find(s => s.id === id);
+  if (!spirit) throw new Error(`Spirit ${id} not equipped (add it via makeRound spiritIds)`);
+  if (state)    spirit.state = state;
+  if (elements) spirit.elements = elements;
+  return spirit;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ASSERTION GUIDANCE (read before writing a new test):
 //

@@ -7,6 +7,7 @@
 //   onRoundStart(ctx)  — after state reset, before scoring state init
 //   onRoundEnd(ctx)    — at round-over (both bank and natural end)
 //   onBank(ctx)        — at explicit bank only (NOT natural/forced/consumable round-end)
+//   onPushFailure(ctx) — at natural round-over with active push penalty only
 //
 // Hooks fire once per equipped spirit instance (regular + Negative).
 // Use effectivePower(spirit) inside for per-stack scaling.
@@ -1054,6 +1055,12 @@ const _effects = {
       }
       const n = aggregateNumericState(spirit, 'pushFails');
       return n === 0 ? null : { addMult: n * 0.2 };
+    },
+    // Migrated from GRM _finalizeTurn push-failure block (F4.18b #4).
+    // Fires ONLY on natural round-over with active push penalty
+    // (via _fireSpiritHook('onPushFailure') in the push-failure branch).
+    onPushFailure({ spirit }) {
+      incrementPerElement(spirit, 'pushFails', 1);
     },
   },
 
