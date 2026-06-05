@@ -735,58 +735,7 @@ export default class GameRoundManager {
     if (this._phase !== "yaku_decision") {
       throw new Error(`bankScore() called while phase is "${this._phase}".`);
     }
-
-    // Apply bank resolution multiplier (depth 0 = 1.0, no-op).
-    run.onBank(this);
-    // Hexagram onBank hook (e.g. push_ki_swing bank cost).
-    const _hexBank = getActiveEffect();
-    if (_hexBank?.onBank) _hexBank.onBank(run);
-
-    // Spirit onBank hooks (engine_lincoln bank counter, etc.).
-    this._fireSpiritHook('onBank');
-
-    // sym_snails: track unplayed cards remaining at bank.
-    this._trackSnailsUnplayed();
-
-    // Score field cards if score_field_at_round_end is active.
-    this._scoreFieldCards();
-
-    // Flow decay — applied every round after push resolution.
-    run.applyFlowDecay();
-
-    const flow = run.flow;
-    this._applyPostRoundEnhancements(this._capture.getAll());
-    logger.logRoundEnd(
-      { finalScore: this._runningScore, basePoints: this._runningScore, flow },
-      run.threshold, this._runningScore >= run.threshold,
-      this._capture.getAll(),
-      this._style.getTriggeredCombos(), this._lastEnhancementEvents ?? []
-    );
-    this._roundEndingAfterDecision = false;
-    const _hexEffectBank = getActiveEffect();
-    if (_hexEffectBank?.onRoundEnd) _hexEffectBank.onRoundEnd(this);
-    this._fireSpiritHook('onRoundEnd');
-    this._phase = "round_over";
-    return {
-      status:          "banked",
-      finalScore:      this._runningScore,
-      runningScore:    this._runningScore,
-      captureEvents:   [...this._scoringEvents],
-      newYaku:         [],
-      allYaku:         [],
-      basePoints:      this._runningScore,
-      flow,
-      pushFactor:      1.0,
-      penaltyApplied:  false,
-      pushCount:       this._pushCount,
-      pushDepth:       this._pushDepth,
-      pigDoubleKi:     this._pigDoubleKi,
-      turn:            this._turn,
-      deckCard:        this._lastDeckCard,
-      cardsInHand:     this._hand.getAll().length,
-      styleCombos:     this._style.getTriggeredCombos().length,
-      earthKiBonus:    this._computeEarthKiBonus(),
-    };
+    return this._endRound('banked');
   }
 
   /**
@@ -1120,6 +1069,87 @@ export default class GameRoundManager {
   }
 
   /**
+   * Unified round-end teardown. All four round-end triggers route through here.
+   * Steps 1–4 of the F4.18b campaign migrated inline tenants (crow, decay,
+   * lincoln, napoleon) into hooks; this step collapses the four duplicate
+   * teardown sequences into one.
+   *
+   * @param {'banked'|'natural'|'forced_auto_bank'|'consumable_empty_hand'} trigger
+   * @param {object} [ctx]  Contextual data from the caller.
+   * @param {boolean} [ctx.penaltyApplied=false]  True when push penalty is active (natural path).
+   * @returns {object} Unified round-end result object.
+   */
+  _endRound(trigger, ctx = {}) {
+    // ── Trigger-specific prologue ─────────────────────────────────────
+    if (trigger === 'banked') {
+      run.onBank(this);
+      const _hexBank = getActiveEffect();
+      if (_hexBank?.onBank) _hexBank.onBank(run);
+      this._fireSpiritHook('onBank');
+    }
+    if (trigger === 'natural' && this._pushPenaltyActive && !this._dogProtection) {
+      run.onPushFailure(this);
+      this._fireSpiritHook('onPushFailure');
+    }
+
+    // ── Shared core teardown (runs for ALL triggers, including 1D) ────
+    // Order matches bankScore's canonical sequence (the most-exercised path).
+    this._trackSnailsUnplayed();
+    this._scoreFieldCards();
+    run.applyFlowDecay();
+    const flow = run.flow;   // POST-decay capture
+    this._applyPostRoundEnhancements(this._capture.getAll());
+    logger.logRoundEnd(
+      { finalScore: this._runningScore, basePoints: this._runningScore, flow },
+      run.threshold, this._runningScore >= run.threshold,
+      this._capture.getAll(),
+      this._style.getTriggeredCombos(), this._lastEnhancementEvents ?? []
+    );
+    this._roundEndingAfterDecision = false;
+    const _hexEnd = getActiveEffect();
+    if (_hexEnd?.onRoundEnd) _hexEnd.onRoundEnd(this);
+    this._fireSpiritHook('onRoundEnd');
+    this._phase = "round_over";
+
+    return this._buildRoundEndResult(trigger, flow, ctx);
+  }
+
+  /**
+   * Build the unified round-end return object. Superset of fields consumed by
+   * GameScene's _showEndScreen and _handleResult.
+   * @param {string} trigger
+   * @param {number} flow  Post-decay flow value.
+   * @param {object} ctx   Contextual data (penaltyApplied, newYaku, etc.).
+   */
+  _buildRoundEndResult(trigger, flow, ctx = {}) {
+    return {
+      status:           trigger === 'banked' ? 'banked' : 'round_over',
+      finalScore:       this._runningScore,
+      runningScore:     this._runningScore,
+      basePoints:       this._runningScore,
+      captureEvents:    [...this._scoringEvents],
+      newYaku:          ctx.newYaku ?? [],
+      allYaku:          ctx.allYaku ?? [],
+      yakuDisabled:     ctx.yakuDisabled ?? false,
+      tigerPush:        ctx.tigerPush ?? false,
+      nextDeckFlip:     this._nextDeckFlip,
+      flow,
+      pushFactor:       1.0,
+      penaltyApplied:   ctx.penaltyApplied ?? false,
+      pushCount:        this._pushCount,
+      pushDepth:        this._pushDepth,
+      pigDoubleKi:      this._pigDoubleKi,
+      turn:             this._turn,
+      deckCard:         this._lastDeckCard,
+      discarded:        [...this._discardedThisTurn],
+      roundDiscardCount: this._discardCount,
+      cardsInHand:      this._hand.getAll().length,
+      styleCombos:      this._style.getTriggeredCombos().length,
+      earthKiBonus:     this._computeEarthKiBonus(),
+    };
+  }
+
+  /**
    * Check if hand is empty and trigger round-end transition if so.
    * Used by consumables that may empty the hand (Monkey, Horse with empty deck).
    * @returns {boolean} True if round was ended.
@@ -1127,10 +1157,7 @@ export default class GameRoundManager {
   _checkRoundEndOnEmptyHand() {
     if (this._hand.getAll().length > 0) return false;
     if (this._phase === 'round_over') return false;
-    const _hexEffect = getActiveEffect();
-    if (_hexEffect?.onRoundEnd) _hexEffect.onRoundEnd(this);
-    this._fireSpiritHook('onRoundEnd');
-    this._phase = 'round_over';
+    this._endRound('consumable_empty_hand');
     return true;
   }
 
@@ -2026,17 +2053,6 @@ export default class GameRoundManager {
       // Round ends when hand is empty (no play counter in capture mode).
       const roundOver = this._hand.isEmpty();
       const penaltyApplied = roundOver && this._pushPenaltyActive && !this._dogProtection;
-      if (roundOver) this._trackSnailsUnplayed();
-
-      if (roundOver && penaltyApplied) {
-        // Push failure: reduce flow for future rounds but keep this round's score.
-        run.onPushFailure(this);
-        // Spirit onPushFailure hooks (engine_napoleon push-fail counter, etc.).
-        this._fireSpiritHook('onPushFailure');
-      }
-
-      const pushEscalation = 1.0; // removed — no longer used
-      const flow           = run.flow;
 
       const _forceAutoBank = !_disablesYaku && newYaku.length > 0 && applyHook('forceAutoBankOnYaku', false);
       const tigerTriggered = this._tigerPushActive && newYaku.length === 0;
@@ -2046,22 +2062,9 @@ export default class GameRoundManager {
         this._roundEndingAfterDecision = roundOver;
         this._phase = "yaku_decision";
       } else if (roundOver || _forceAutoBank) {
-        // Score field cards if score_field_at_round_end is active.
-        this._scoreFieldCards();
-        // Flow decay — applied every round after push resolution.
-        run.applyFlowDecay();
-    
-        this._applyPostRoundEnhancements(this._capture.getAll());
-        logger.logRoundEnd(
-          { finalScore: this._runningScore, basePoints: this._runningScore, flow: run.flow },
-          run.threshold, this._runningScore >= run.threshold,
-          this._capture.getAll(),
-          this._style.getTriggeredCombos(), this._lastEnhancementEvents ?? []
-        );
-        const _hexEffectFin = getActiveEffect();
-        if (_hexEffectFin?.onRoundEnd) _hexEffectFin.onRoundEnd(this);
-        this._fireSpiritHook('onRoundEnd');
-        this._phase = "round_over";
+        const trigger = (_forceAutoBank && !roundOver) ? 'forced_auto_bank' : 'natural';
+        return this._endRound(trigger, { penaltyApplied, newYaku, allYaku: yakuForDiff,
+          yakuDisabled: !!_disablesYaku, tigerPush: false });
       } else if (_disablesYaku) {
         // Yaku disabled — offer free bank/continue each turn
         this._phase = "yaku_decision";
@@ -2069,9 +2072,7 @@ export default class GameRoundManager {
         this._phase = "idle";
       }
 
-      const status = _forceAutoBank ? "round_over"
-                   : (newYaku.length > 0 || tigerTriggered) ? "yaku_decision"
-                   : roundOver ? "round_over"
+      const status = (newYaku.length > 0 || tigerTriggered) ? "yaku_decision"
                    : _disablesYaku ? "yaku_decision" : "ok";
 
       // Refresh deck flip preview for next turn.
@@ -2088,14 +2089,12 @@ export default class GameRoundManager {
         allYaku:          yakuForDiff,
         basePoints:       this._runningScore,
         finalScore:       this._runningScore,
-        flow,
-        pushEscalation,
+        flow:             run.flow,
         pushFactor:       1.0,
         penaltyApplied,
         pushCount:        this._pushCount,
         pushDepth:        this._pushDepth,
         pigDoubleKi:      this._pigDoubleKi,
-        nextFailFlow:     1.0,
         turn:             this._turn,
         deckCard:         this._lastDeckCard,
         discarded:        [...this._discardedThisTurn],
