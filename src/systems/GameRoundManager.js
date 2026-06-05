@@ -747,16 +747,6 @@ export default class GameRoundManager {
       if (spirit.id === 'engine_lincoln') incrementPerElement(spirit, 'banks', 1);
     }
 
-    // Decay spirits: lose value at round end.
-    for (const spirit of run.activeSpirits) {
-      if (spirit.id === 'decay_persimmon' && spirit.state) {
-        spirit.state.remaining = Math.max(0, spirit.state.remaining - 3);
-      }
-      if (spirit.id === 'decay_pear' && spirit.state) {
-        spirit.state.remaining = Math.max(0, spirit.state.remaining - 5);
-      }
-    }
-
     // sym_snails: track unplayed cards remaining at bank.
     this._trackSnailsUnplayed();
 
@@ -2046,18 +2036,6 @@ export default class GameRoundManager {
         // engine_napoleon: +0.2 additive mult per push failure (permanent).
         for (const spirit of run.activeSpirits) {
           if (spirit.id === 'engine_napoleon') incrementPerElement(spirit, 'pushFails', 1);
-        }
-      }
-
-      // Decay spirits: lose value at round end (natural round-over path).
-      if (roundOver) {
-        for (const spirit of run.activeSpirits) {
-          if (spirit.id === 'decay_persimmon' && spirit.state) {
-            spirit.state.remaining = Math.max(0, spirit.state.remaining - 3);
-          }
-          if (spirit.id === 'decay_pear' && spirit.state) {
-            spirit.state.remaining = Math.max(0, spirit.state.remaining - 5);
-          }
         }
       }
 

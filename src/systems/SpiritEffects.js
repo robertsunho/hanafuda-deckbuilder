@@ -1060,6 +1060,11 @@ const _effects = {
       const stacks = effectivePower(spirit);
       return { addMult: n * stacks };
     },
+    // Migrated from GRM bank + natural inline decrement blocks (F4.18b #2).
+    // Now also fires on the consumable-empty-hand path (was a bug omission).
+    onRoundEnd({ spirit }) {
+      if (spirit.state) spirit.state.remaining = Math.max(0, spirit.state.remaining - 3);
+    },
   },
 
   decay_pear: {
@@ -1069,6 +1074,10 @@ const _effects = {
       if (n === 0) return null;
       const stacks = effectivePower(spirit);
       return { addPoints: n * stacks };
+    },
+    // Migrated from GRM bank + natural inline decrement blocks (F4.18b #2).
+    onRoundEnd({ spirit }) {
+      if (spirit.state) spirit.state.remaining = Math.max(0, spirit.state.remaining - 5);
     },
   },
 
