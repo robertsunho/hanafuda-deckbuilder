@@ -3518,3 +3518,87 @@ resource it DIRECTLY moves (deck size delta).
 
 **Going forward:** every Tier-2 migration ships with a regression test using `makeRound()`.
 The test is part of the migration's "done" criteria, not a separate task.
+
+---
+
+## D-F4.18b — Round-end pipeline unification campaign COMPLETE (2026-06-05)
+
+**Status:** COMPLETE (6/6). Branch `f4.18b-pre-unification` (commit 0fe6733) retained as a
+revert point until in-game verification confirms the GameScene end-screen integration.
+
+**Context:** What began as a single F4.20 spirit migration (Crow) surfaced — via a dedicated
+recon (`docs/recon/round_end_pipeline_recon.md`) — that the codebase had **four** parallel
+round-end pipelines, not the two assumed: bank (`bankScore`), natural + forced-auto-bank
+(`_finalizeTurn`), and a severely stripped consumable-empty-hand path
+(`_checkRoundEndOnEmptyHand`, "1D"). The 1D path fired only the onRoundEnd hooks and skipped
+flow decay, post-round enhancements, logging, field scoring, and every round-end spirit
+tenant — a real gameplay bug (a round ended via Horse/Monkey lost flow decay, card mutations,
+and spirit effects). This promoted the work from a single migration to a Tier-3 pipeline
+consolidation (provisionally F4.18b), braided with the F4.20 tenant migrations.
+
+**Strategy (recon verdict: DRIFTED, risk LOW):** migrate every inline round-end tenant into
+hooks FIRST, then unify. Once the tenants lived in hooks that already fire on all paths, the
+four teardown sequences became near-identical and the unification was a mechanical merge.
+
+**Campaign steps (each shipped + headless-tested):**
+1. `sym_crow` → `onRoundEnd` hook [FIX: now fires on 1D]. Commit e2d85e4.
+2. `decay_persimmon`/`decay_pear` decrement → `onRoundEnd` [FIX: now fire on 1D]. Commit 986173c.
+3. `engine_lincoln` → new `onBank` hook [PRESERVE: bank-only]. Commit 595a4e1.
+4. `engine_napoleon` → new `onPushFailure` hook [PRESERVE: natural-push-failure-only]. Commit 0fe6733.
+   (+ centralized `equipSpiritWithState` test helper, retiring per-file init copies.)
+5. Snails decision: resolved into step 6 — `_trackSnailsUnplayed` joins the unified teardown,
+   fires on all triggers including 1D.
+6. Unification: `_endRound(trigger)` + `_buildRoundEndResult(trigger, flow, ctx)`. All four
+   call sites route through it. Commit 1893f0e.
+
+**Key architectural decisions:**
+- **Return-intent / lifecycle hook pattern** (from the F4.20 ledger) extended with two new
+  lifecycle hooks: `onBank` (explicit-bank-only) and `onPushFailure` (natural-round-over-with-
+  push-penalty-only). These are deliberately NOT `onRoundEnd` — they fire on a specific
+  sub-condition, which is why each tenant got the semantically-correct hook rather than reusing
+  the general round-end hook. Documented in the SpiritEffects.js lifecycle header.
+- **1D omissions treated as bugs to FIX, not behavior to preserve.** Migrating a tenant into
+  `onRoundEnd`/snails inherently makes it fire on the 1D path (where `_fireSpiritHook` already
+  ran). This is desired. Every such [FIX] was called out in its commit and asserted in tests
+  (the 1D bug-fix case). Bank/natural behavior was strictly PRESERVED.
+- **Flow capture normalized to POST-decay** in the unified return (bank already did this;
+  natural captured pre-decay). Safe because GameScene reads `run.flow` live, not `result.flow`
+  (confirmed in recon Section 6).
+- **Vestigial fields removed:** `pushEscalation` and `nextFailFlow` (recon confirmed GameScene
+  reads neither). The non-round-end `_finalizeTurn` exits (yaku_decision/ok/idle) were left
+  UNCHANGED — only the round-ending branch routes through `_endRound`.
+- **Teardown order:** unified on bankScore's canonical sequence (the most-exercised path). No
+  order conflict existed — the core teardown was already identical across bank and natural.
+
+**Verification:**
+- 28 headless tests pass, 1 skipped. New `test/round_end_unification.test.js` drives all four
+  triggers and asserts the core teardown ran on each, plus return-contract preservation.
+- **Open: case 3 (forced-auto-bank) is SKIPPED** — needs the `yaku_ends_round` hexagram set up
+  headlessly. The path is exercised by code but not yet test-covered. Follow-up: add the test
+  or verify in-game.
+- **Recommended: in-game verification** of an actual bank and an actual natural round-end
+  screen, since the headless harness cannot see the GameScene end-screen rendering integration.
+  The return-field diff indicates safety, but this closes the loop on the one thing tests can't.
+
+**Strategic insight (Robert, 2026-06-05) — reorganization is iterative, not terminal:**
+Several foundational-mechanic-changing hexagram modes (e.g. hex_29 rank-matching, which
+disables yaku and changes capture rules; and other under-developed modes) need Phase 5 design
+work. That new design WILL generate new code that subsequently needs its own audit and
+reorganization. Architectural cleanup is therefore not a single terminal pass — it interleaves
+with design, and each round of design creates new debt. This reinforces:
+- F4.24b (the prescriptive `ARCHITECTURE.md`) should be written LATE, against stabilized code,
+  AFTER the mechanic-changing modes are fleshed out — otherwise it documents an architecture
+  Phase 5 immediately churns.
+- The recurring F4.24a diagnostic-checkpoint model (vs. a one-shot terminal doc) is the right
+  shape precisely because of this iteration.
+- Expect future "campaigns" like F4.18b: a recon surfaces that a planned-linear task is
+  actually a braided consolidation. The linear plan is a hypothesis about dependencies; recon
+  routinely revises it. The discipline is deliberateness about scope + rigorous documentation,
+  NOT adherence to the original linear sequence.
+
+**Cross-references:**
+- `docs/recon/round_end_pipeline_recon.md` (the mapping that drove the campaign)
+- `docs/process/F4.18b_campaign_ledger.md` (step tracker)
+- D-F4.20-TIER2 (the return-intent pattern this campaign extended)
+- F4.17/F4.18 (sibling pipeline-consolidation tasks; F4.18b is the round-end instance)
+- Branch `f4.18b-pre-unification` (revert point)
