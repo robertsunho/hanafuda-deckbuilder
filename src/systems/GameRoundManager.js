@@ -621,12 +621,8 @@ export default class GameRoundManager {
     // Remove all played cards from hand.
     this._hand.removeMany(cardIds);
 
-    // sym_ants: state counts cards played; stack multiplier applied in engine output.
-    for (const spirit of run.allSpirits) {
-      if (spirit.id === 'sym_ants') {
-        incrementPerElement(spirit, 'totalPlayed', cardIds.length);
-      }
-    }
+    // sym_ants counts cards played (mult applied in engine output) via onCardPlayed.
+    this._fireCardPlayedHooks(cards);
 
     // Multi-play turn: resolve any pending match from a previous play this turn.
     if (this._playsThisTurn > 0) {
@@ -1047,6 +1043,22 @@ export default class GameRoundManager {
       const effect = SpiritEffects.get(spirit.id);
       if (effect?.onFieldDiscard) {
         effect.onFieldDiscard({ card, source, spirit, spirits: run.activeSpirits, run, roundManager: this });
+      }
+    }
+  }
+
+  /**
+   * Fire the onCardPlayed hook for every equipped spirit that implements it.
+   * Event-data hook carrying the cards played this play (sym_ants counts them).
+   * Iterates allSpirits (incl. Negatives) — incrementPerElement routes Negatives
+   * to their newEvents accumulator, matching the prior inline behavior.
+   * @param {object[]} cards  The cards played in this play.
+   */
+  _fireCardPlayedHooks(cards) {
+    for (const spirit of run.allSpirits) {
+      const effect = SpiritEffects.get(spirit.id);
+      if (effect?.onCardPlayed) {
+        effect.onCardPlayed({ cards, spirit, spirits: run.activeSpirits, run, roundManager: this });
       }
     }
   }

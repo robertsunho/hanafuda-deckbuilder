@@ -15,6 +15,7 @@
 //   onCaptureComplete({ cards, run })             — once after a capture resolves (Glory)
 //   onFieldDiscard({ card, source, spirit, run }) — once per discarded card; post-commit
 //                                                   side-effects only (Recycling, Ship)
+//   onCardPlayed({ cards, spirit, run })          — once per play, carrying the cards played (Ants)
 //
 // Hooks fire once per equipped spirit instance (regular + Negative). Use
 // effectivePower(spirit) inside for per-stack scaling. A hook that should ignore
@@ -695,6 +696,12 @@ const _effects = {
   },
 
   sym_ants: {
+    // +0.5 additive mult per card played (mult applied in applyEngine). F4.20: migrated
+    // off the inline playHandCards counter. No isNegative guard — the old path iterated
+    // run.allSpirits, and incrementPerElement routes Negatives to their newEvents accumulator.
+    onCardPlayed({ cards, spirit }) {
+      incrementPerElement(spirit, 'totalPlayed', cards.length);
+    },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
         const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 0.5 * (spirit.powerLevel ?? 1);
