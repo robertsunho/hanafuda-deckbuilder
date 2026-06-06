@@ -198,6 +198,82 @@ trap the discard recon caught with the stale hex_51 "bypasses everything" premis
 
 ---
 
+## Candidate F — Accumulator-engine negative-iteration consistency audit
+
+**Status:** RECON-FIRST + CORRECTNESS audit. Unlike Candidate C (pure naming/vocabulary), this
+one has a BEHAVIORAL correctness answer hiding in it — a likely double-/half-counting scoring
+bug on transcended (negative) copies. The recon must read the actual negative-accumulator
+semantics, not just rename things.
+
+**The trigger (concrete):** all three are accumulator engines, yet they disagree on which
+spirit set the live-event INCREMENT iterates:
+- `sym_ants` (`totalPlayed`) — increments over **`run.allSpirits`** (INCLUDES negatives).
+- `engine_ship` (`cardsDiscarded`) — increments over **`run.activeSpirits`** (EXCLUDES negatives).
+- `engine_moths` (`t1Procs`/`t2Procs`) — increments over **`run.activeSpirits`** (EXCLUDES negatives).
+
+They cannot all be right on principle. Either negatives keep accruing live events
+post-transcendence (then Ship/Moths are under-counting — a "half-counting" bug) or negatives are
+frozen at the transcendence snapshot (then Ants is double-counting against its own snapshot).
+Either way the wrong ones produce a real scoring error that only manifests with a TRANSCENDED
+copy of that spirit — i.e. late-game, easy to miss.
+
+**The crux question the recon must answer:** what are the intended semantics of a transcended
+accumulator's value? Each negative `applyEngine` branch computes roughly
+`preTranscendTotal + newEvents × rate × powerLevel`. So:
+- If `newEvents` is DESIGNED to keep counting events AFTER transcendence (scaled by powerLevel),
+  then incrementing the negative is CORRECT → `allSpirits` (Ants) is right, Ship/Moths are bugged.
+- If the negative's value is meant to be FROZEN at snapshot (`preTranscendTotal` only, `newEvents`
+  should stay 0), then incrementing the negative double-counts → `activeSpirits` (Ship/Moths) is
+  right, Ants is bugged.
+- There may be a THIRD category (or more): non-accumulator counters, spirits that legitimately
+  freeze, spirits that legitimately keep accruing — the audit should not assume exactly two.
+
+**Scope (expanded per Robert):** audit ALL accumulator-engine spirits — not just these three —
+for their activeSpirits-vs-allSpirits increment behavior. Known/likely accumulators to include
+(verify against source, don't trust this list): sym_ants, sym_snails, sym_algae, sym_badger,
+sym_ducks, engine_ship, engine_moths, engine_lincoln, engine_napoleon, engine_devotion/habitat/
+ceremony/agriculture (the onCardSeen rank counters), engine_plenty, engine_radiance/banner
+(per-round array resets), decay_persimmon/pear, engine_palace, engine_missing_number,
+engine_northern_lion (pushesWitnessed), plus anything `incrementPerElement` touches. For each:
+record (a) the increment site(s) and which spirit-set they iterate, (b) whether it goes through
+`incrementPerElement` (which routes negatives to `newEvents`) or a bespoke increment, (c) what its
+negative `applyEngine` branch does with `preTranscendTotal`/`newEvents`.
+
+**Deliverable:**
+1. A table: every accumulator engine × {increment iteration set, increment mechanism, negative
+   applyEngine treatment}.
+2. A determination: are there correct REASONS for the differences (→ document them and add a
+   naming/comment fix so the intent is legible — Candidate C overlap), or is one category simply
+   implemented incorrectly (→ a deliberate [FIX] campaign making them consistent), or are there
+   MORE than two categories (→ name and define each)?
+3. If a [FIX] is warranted: per-spirit, which way each wrong one moves, with a test asserting the
+   transcended-copy scoring is now correct.
+
+**Relationship to existing candidates / history:**
+- This is the SAME bug class as: the Negative Osprey/Catcher counter-reset bug (DECISIONS_LOG),
+  F2.4 item 10 ("broader regular-vs-negative iteration asymmetry audit"), the ship-hook `!isNegative`
+  guard added in F4.17, and F1.8.b followup #3 (which already distinguished accumulator vs
+  non-accumulator increment sites and switched some to broader iteration). Candidate F is the
+  systematic version of that recurring whack-a-mole.
+- Overlaps **Candidate B** (accumulator-cluster abstraction — the transcendence-snapshot /
+  `incrementPerElement` / `aggregateNumericState` machinery is exactly what must be read to answer
+  the crux question) and **Candidate C** (the activeSpirits/scoringSpirits/allSpirits getters are
+  named by membership, not intent — the legibility fix rides here). Consider doing F as the
+  correctness-recon that B's abstraction is then built on top of.
+
+**Sequencing:** do the AUDIT (read-only, produces the table + determination) at a Tier-2 lull —
+it's read-only and low-risk and would de-risk every future accumulator migration. Defer any
+[FIX] campaign until the audit's determination is in hand. Do NOT fix anything reactively during
+the in-flight migrations — preserve existing behavior (as the Moths/Ants migrations correctly
+did) and let this audit decide the corrections deliberately.
+
+**Note:** F4.20 migrations to date PRESERVED each spirit's existing iteration exactly (Ants
+allSpirits, Ship/Moths activeSpirits) — correctly, since preservation is the migration rule and
+the correct semantics weren't yet determined. So no migration "introduced" this; they faithfully
+carried forward a pre-existing inconsistency, now flagged for deliberate resolution.
+
+---
+
 ## Cross-references
 - D-F4.18b (iterative-reorganization principle: reorg interleaves with design; name late)
 - F4.24b (prescriptive ARCHITECTURE.md, deliberately late — coordinate with Candidate C)
@@ -208,3 +284,6 @@ trap the discard recon caught with the stale hex_51 "bypasses everything" premis
   Horse/catcher/hand-cap deliberation and the stale `HandManager` capacity-contract JSDoc)
 - F4.20 engine_moths migration (where Candidate E surfaced — the t1Procs wood-slot-creation
   counter; the slot-model recon was banked so it didn't derail that low-risk migration)
+- F4.20 Ants/Moths/Ship migrations + F4.17 ship-hook `!isNegative` guard (where Candidate F
+  surfaced — the allSpirits-vs-activeSpirits accumulator-increment inconsistency); F2.4 item 10;
+  Negative Osprey/Catcher reset bug (DECISIONS_LOG); overlaps Candidates B and C
