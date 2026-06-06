@@ -8,9 +8,18 @@
 //   onRoundEnd(ctx)    — at round-over (both bank and natural end)
 //   onBank(ctx)        — at explicit bank only (NOT natural/forced/consumable round-end)
 //   onPushFailure(ctx) — at natural round-over with active push penalty only
+//   onPushSuccess(ctx) — when a push succeeds (a new yaku completes while the push
+//                        penalty is active), fired in _finalizeTurn (Reward)
 //
-// Hooks fire once per equipped spirit instance (regular + Negative).
-// Use effectivePower(spirit) inside for per-stack scaling.
+// Event-data hooks (carry event payload instead of the standard ctx):
+//   onCaptureComplete({ cards, run })             — once after a capture resolves (Glory)
+//   onFieldDiscard({ card, source, spirit, run }) — once per discarded card; post-commit
+//                                                   side-effects only (Recycling, Ship)
+//
+// Hooks fire once per equipped spirit instance (regular + Negative). Use
+// effectivePower(spirit) inside for per-stack scaling. A hook that should ignore
+// Negatives (e.g. those mirroring a prior run.activeSpirits-only path) guards on
+// spirit.isNegative.
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // SpiritEffects — per-card spirit scoring registry
@@ -527,7 +536,17 @@ const _effects = {
     },
   },
   econ_lucky_charm:  {},  // probability modifier — handled in RNGHook.js
-  econ_reward:       {},  // push-success ki bonus — handled in GameRoundManager
+  econ_reward: {
+    // +10% of current ki per stack, each time a push succeeds (F4.20: migrated off
+    // inline _finalizeTurn). effectivePower per merged instance reproduces the prior
+    // summed `totalRewardStacks` exactly. Negatives excluded — the old path iterated
+    // run.activeSpirits, which omits Negatives.
+    onPushSuccess({ spirit }) {
+      if (spirit.isNegative) return;
+      const bonus = Math.floor(run.ki * 0.10 * effectivePower(spirit));
+      if (bonus > 0) run.addKi(bonus, 'reward_push');
+    },
+  },
   econ_piggybank:    {},  // ×2/×3/×4 hand ki (additive stacking)
   econ_coupon:       {},  // 15% shop discount (stacks to 45%)
   econ_replica: {

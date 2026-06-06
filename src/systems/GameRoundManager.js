@@ -2006,28 +2006,28 @@ export default class GameRoundManager {
       const pushSucceeded = this._pushPenaltyActive && newYaku.length > 0;
       if (pushSucceeded) {
         this._pushPenaltyActive = false;
-        run.onPushSuccess(this);  // increments _pushDepth
+        run.onPushSuccess(this);  // increments _pushDepth + fires hexagram onPushSuccess
         for (const spirit of run.activeSpirits) {
           if (spirit.id === 'engine_northern_lion') {
             incrementPerElement(spirit, 'pushesWitnessed', 1);
           }
         }
+        // Spirit-side push-success hooks (econ_reward). F4.20: replaces the inline
+        // econ_reward block that was gated on `newYaku>0 && _pushCount>0`. That gate is
+        // EQUIVALENT to `pushSucceeded` here (no behavior change), because:
+        //   • _pushPenaltyActive is set ONLY by pushOn() (which also bumps _pushCount) and
+        //     cleared on every yaku-completion → _pushPenaltyActive ⟹ _pushCount>0 always.
+        //   • The divergent state (_pushPenaltyActive=false ∧ _pushCount>0 ∧ newYaku>0)
+        //     needs a yaku reached after a prior push cleared, WITHOUT a new push — i.e.
+        //     continuePlay(). The Continue button is offered ONLY when yaku is disabled
+        //     (GameScene), and yaku-disabled forces newYaku.length=0 above. So whenever
+        //     newYaku>0, continue-without-push is unreachable; after a yaku the player can
+        //     only Bank (round ends) or Push. Tiger only triggers on newYaku===0.
+        //   ⇒ at newYaku>0, _pushPenaltyActive ⟺ _pushCount>0. Fired here, ordering after
+        //     run.onPushSuccess preserves econ_reward seeing post-hexagram ki.
+        this._fireSpiritHook('onPushSuccess');
       } else if (newYaku.length > 0) {
         this._pushPenaltyActive = false;
-      }
-
-      // econ_reward: gain 10% of current ki per stack on each push success.
-      if (newYaku.length > 0 && this._pushCount > 0) {
-        let totalRewardStacks = 0;
-        for (const spirit of run.activeSpirits) {
-          if (spirit.id === 'econ_reward') {
-            totalRewardStacks += effectivePower(spirit);
-          }
-        }
-        if (totalRewardStacks > 0) {
-          const bonus = Math.floor(run.ki * 0.10 * totalRewardStacks);
-          if (bonus > 0) run.addKi(bonus, 'reward_push');
-        }
       }
 
       // engine_bullseye: track yaku rank triggers, fire when all 4 ranks covered.
