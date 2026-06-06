@@ -3602,3 +3602,66 @@ with design, and each round of design creates new debt. This reinforces:
 - D-F4.20-TIER2 (the return-intent pattern this campaign extended)
 - F4.17/F4.18 (sibling pipeline-consolidation tasks; F4.18b is the round-end instance)
 - Branch `f4.18b-pre-unification` (revert point)
+
+---
+
+## D-F4.17 — Discard pipeline unification campaign COMPLETE (2026-06-06)
+
+**Decision:** Route EVERY discard site through one canonical `_discardCard(card, source)` /
+`_discardCards(cards, source)` on GameRoundManager, so a discard fires the same complete set
+of effects regardless of source. Design principle (Robert): **all discards are equal.**
+Ran as a 5-step migrate-then-unify campaign (same shape as D-F4.18b), each step independently
+shippable + headless-tested.
+
+**Sites unified (the asymmetry matrix, all rows now ✅):** deck-overflow (`_handleFieldDiscard`,
+now `_discardCard`), hand-play overflow, hex_51 reveal-miss, `zodiac_horse`, `zodiac_monkey`,
+`zodiac_ox`. Each fires: catcher gate → bookkeeping (`_discardedThisTurn`/`_allDiscards`/
+`_discardCount`) → `onFieldDiscard` hooks (recycling, ship) → stamp dispatch.
+
+**Decisions locked + applied:**
+1. **Stale premise corrected (recon).** The planned F4.17 (OVERHAUL_PLAN) claimed hex_51
+   reveal-miss BYPASSES the discard effects. In current code it does NOT — it already routed
+   through `_handleFieldDiscard` and fired the full set. The feared "TANGLED" risk was absent;
+   verdict was DRIFTED, close to CLEAN. (This matches OVERHAUL_PLAN's own hex_51 status note
+   at the bottom of the doc, which already said "unified reveal-miss with `_handleFieldDiscard`."
+   The F4.17 entry's "bypasses" framing was the stale part.)
+2. **`game_catcher` is a GATE, not a hook.** It decides WHETHER to discard (short-circuits
+   before bookkeeping); recycling/ship REACT to a committed discard. `onFieldDiscard` carries
+   only post-commit side-effects. Catcher now intercepts on ALL sources (Robert: YES).
+3. **`zodiac_ox` IS a full discard.** Catcher rescuing a swept stranded stack to HAND is Ox's
+   signature recovery mechanic — the only way to pull stranded field cards back into hand.
+   (Reverses the old "leave Ox as-is" tentative note in the planned entry.)
+4. **Bookkeeping uniformity is a deliberate [FIX].** Consumable discards (Horse/Monkey/Ox)
+   previously skipped `_discardCount`/`_discardedThisTurn`; now they count. `roundDiscardCount`
+   reporting changed accordingly (confirmed wanted).
+5. **Ki reason unified:** `recycling_overflow` → `recycling_discard` (single reason; zero
+   `recycling_overflow` hits remain in `src/`).
+6. **Report reality, not intent:** result `discarded`/`discardedCards` + status messages
+   reflect the actually-discarded subset (catcher-rescued cards excluded). Without this, a
+   rescued card would falsely animate to the discard pile (hand-overflow → GameScene).
+
+**Emergent composition (Horse × catcher), no special code:** Horse's rule stays "redraw the
+number discarded"; catcher rescues at discard-time; `HandManager.add` clamps to the cap. The
+three compose: full-hand + catcher = anti-synergy (end 8, leftover stays in deck);
+short-hand + catcher = synergy (rescued card is a bonus). "Consistency over convenience" —
+each system keeps its one rule.
+
+**Notable correction during step 5 (deviation from the step prompt, flagged):** the prompt
+said keep Horse's redraw flat (`min(handSize, drawPile)`) and rely on `add`'s clamp, asserting
+"no clamp math needed; leftover stays in deck." **Verified false:** `DeckManager.draw(n)`
+*splices* the pile, so an over-draw is removed-then-dropped (the card is LOST, not left in
+deck) — contradicting the prompt's own worked outcome. Resolved by honoring the outcome:
+redraw `= min(handSize, drawPile, _hand.availableSlots)` (standard push/bank draw-what-fits).
+Identical to the old flat redraw when no catcher (hand empty → availableSlots ≥ handSize).
+
+**Observation filed:** `HandManager` constructor JSDoc said "throws a RangeError" beyond
+maxSize — stale; `add()` silently clamps. Corrected the doc in this campaign.
+
+**Cross-references:**
+- `docs/recon/discard_pipeline_recon.md` (the mapping + asymmetry matrix that drove it)
+- `docs/process/F4.17_campaign_ledger.md` (step tracker, per-step notes)
+- D-F4.18b (sibling round-end campaign; same migrate-then-unify shape)
+- D-F4.20-TIER2 (the return-intent hook pattern `onFieldDiscard` follows)
+- Tests: `test/spirits/discard_{field_hooks,hand_overflow,monkey,horse_ox}.test.js`
+- Branch `f4.17-pre-fixes` @ f4e46fd (revert point — last all-[PRESERVE] state, retained
+  until the batched in-game verification session alongside `f4.18b-pre-unification`)

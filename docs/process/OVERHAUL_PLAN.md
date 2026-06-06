@@ -3152,7 +3152,22 @@ Examples surfaced during F2.3 recon:
 
 ---
 
-### F4.17: Discard pipeline unification — multiple discard pathways bypass stamp dispatch (renamed + scope expanded 2026-05-15 from Phase 2C hex_51 verification)
+### F4.17: Discard pipeline unification — ✅ COMPLETE (2026-06-06, 5-step campaign)
+
+**✅ COMPLETE — see `docs/process/F4.17_campaign_ledger.md` and DECISIONS_LOG D-F4.17.**
+All six discard sites now route through one canonical `_discardCard(card, source)` /
+`_discardCards(cards, source)` on GameRoundManager; the asymmetry matrix is all ✅.
+
+**⚠️ Stale-premise correction:** the "reveal-miss discards BYPASS the discard pipeline"
+framing below (item 3, and the Phase 2C bullets) was STALE. Recon (`docs/recon/
+discard_pipeline_recon.md`) confirmed hex_51 reveal-miss already routed through
+`_handleFieldDiscard` and fired the full set — consistent with this doc's own hex_51 status
+note ("unified reveal-miss with `_handleFieldDiscard`"). The feared "TANGLED" risk was absent;
+verdict was DRIFTED-close-to-CLEAN. Other corrections vs. the plan below: **Ox IS a full
+discard** (item under "Per-pathway" said "leave as-is" — reversed; catcher rescuing a stranded
+stack to hand is Ox's signature mechanic); catcher is a GATE not a hooked side-effect;
+bookkeeping uniformity + ki-reason unification (`recycling_overflow`→`recycling_discard`) were
+deliberate [FIX]es. The original planning text is retained below for historical context.
 
 **Background:** During F2.3 audit Prompt B verification, recon confirmed that the stamp discard-trigger dispatch lives ONLY in the `playHandCards` discard path. Consumable-driven discards (Horse: hand reset; Monkey: hand-discard equal to captured count) push to `_allDiscards` without firing the stamps' discard-trigger effects.
 
@@ -4426,8 +4441,8 @@ Effect on playability between Phase 2C and F5.0: hexagrams are playable but may 
 
 **hex_51 Zhèn (`deck_flip_revealed`):**
 - ✅ Patched + Verified: unified reveal-miss with `_handleFieldDiscard`, push re-peek
-- 🔲 Architecture: F4.17 expands further unification (Horse/Monkey discards through helper)
-- Status: complete, broader cleanup in F4.17
+- ✅ Architecture: F4.17 COMPLETE (2026-06-06) — reveal-miss + Horse/Monkey/Ox/hand-overflow all route through canonical `_discardCard`
+- Status: complete (F4.17 unification done)
 
 **hex_52 Gèn (`yaku_ends_round`):**
 - ✅ Patched + Verified: `modifyFlowDecay: () => 1.0` keeps late-game viable
