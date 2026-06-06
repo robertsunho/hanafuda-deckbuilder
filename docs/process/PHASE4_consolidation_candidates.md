@@ -99,9 +99,59 @@ uses should be the vocabulary the code uses.
 
 ---
 
+## Candidate D — Hand-capacity / hand-management consolidation
+
+**Surfaced:** F4.17 step 5 (Horse / catcher / hand-cap deliberation), 2026-06-06.
+
+**The fragmentation.** "How many cards fit in the hand, and what happens when more arrive than
+fit" is currently decided independently at every site that grows the hand — with *inconsistent*
+rules — and there are TWO competing notions of the cap itself:
+
+- **Two cap fields.** `HandManager.maxSize` (the real limit, set each round at
+  `GameRoundManager.startRound` from `HAND_SIZE + bonus`, via the `modifyHandSize` hook) AND a
+  separate `_handSizeCap` field on GRM that `sym_osprey` gates on as `this._handSizeCap ?? 99`
+  (`GameRoundManager.js` ~1807). These are not the same number and not kept in sync — Osprey's
+  soft check (`< _handSizeCap ?? 99`) is effectively "no cap" while `_hand.add` enforces the
+  real `maxSize`. One of these is likely vestigial; recon must establish which.
+- **Each hand-growth site handles overflow differently.** Catcher gates on
+  `_hand.availableSlots > 0`; Osprey gates on `< _handSizeCap ?? 99`; Horse (post-F4.17#5)
+  clamps its redraw to `min(handSize, drawPile, availableSlots)`; stamp `fireDraw`
+  (`_dispatchStampDiscardEffects`) draws into hand with **no cap check at all** (recon
+  `discard_pipeline_recon.md` §8); `HandManager.add` silently clamps as the final backstop.
+  Four different pre-checks guarding one underlying invariant, plus a silent clamp — exactly
+  the "every system reinvents the same decision" smell.
+- **Stale contract.** `HandManager`'s constructor JSDoc claimed `add` "throws a RangeError"
+  beyond the cap; it actually silently clamps. (Corrected in F4.17#5, but the divergence is a
+  symptom: the capacity contract wasn't legible enough that callers trusted it — so they each
+  added their own pre-check instead of relying on `add`.)
+
+**The shape of the consolidation (provisional).** A single, legible hand-capacity contract:
+`add` clamps and *reports* what it dropped (or callers ask `availableSlots`/`isFull()` and
+trust them), so no site needs a bespoke pre-check. Possibly one canonical "draw N into hand,
+leftover stays in deck" helper (the push/bank convention Horse now follows by hand) that
+Osprey / stamp-draw / Rat / catcher all route through, instead of each composing draw + add +
+its own clamp. Decide the ONE cap field and delete the other.
+
+**Recon-first caveat (same discipline that corrected the hex_51 premise).** Before deciding
+the shape, recon must map a possible **RunManager-side** piece: hand size is partly governed by
+run-level state (Blessings / `modifyHandSize` / `modifyCardsDealt` hooks, any persistent
+hand-size mods), so the "cap" is not purely a HandManager concern. Map every reader and writer
+of both `maxSize` and `_handSizeCap`, and every site that adds to the hand, before proposing
+the unified contract — the F4.17 lesson was that the planned premise (hex_51 "bypasses") was
+stale; assume the same here and verify against current code.
+
+**Timing.** Independent of the discard campaign (F4.17 is closed). Could pair with the
+Blessings hand-cap pass (where the stamp-draw-lacking-cap-check observation was filed to be
+revisited). Not urgent; no known active bug — the silent clamp makes the current fragmentation
+*safe but illegible*. A cleanup-for-clarity candidate, not a bug fix.
+
+---
+
 ## Cross-references
 - D-F4.18b (iterative-reorganization principle: reorg interleaves with design; name late)
 - F4.24b (prescriptive ARCHITECTURE.md, deliberately late — coordinate with Candidate C)
 - F4.20 (spirit-logic migration; Candidate A is in this family)
 - `docs/recon/discard_pipeline_recon.md` Section 8 (adjacent smells: duplicated
   `game_catcher` state-init; per-copy catcher state; stamp draw lacking hand-cap check)
+- D-F4.17 / `docs/process/F4.17_campaign_ledger.md` (where Candidate D surfaced — the
+  Horse/catcher/hand-cap deliberation and the stale `HandManager` capacity-contract JSDoc)
