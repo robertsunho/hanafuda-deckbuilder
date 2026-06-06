@@ -40,11 +40,22 @@ describe('F4.20 — engine_moths via onWoodSlotCreated spirit hook', () => {
     expect(neg.state.newEvents1).toBe(0);   // wood-slot t1 not credited to Negatives
   });
 
-  it('Silk stranding-avoidance credit (t2) stays separate and untouched', () => {
+  it('Silk anti-strand credit (t2) fires via onSilkAntiStrand, separate from t1', () => {
     const { grm } = makeRound({ spiritIds: ['engine_moths'], deckCardIds: FIELD_FULL_DECK });
     const spirit = equipSpiritWithState('engine_moths', { elements: [{ t1Procs: 0, t2Procs: 0 }] });
-    grm._creditMothsT2();                                       // the Silk anti-strand path
+    grm._fireSilkAntiStrandHooks();
     expect(aggregateNumericState(spirit, 't2Procs')).toBe(1);
-    expect(aggregateNumericState(spirit, 't1Procs')).toBe(0);   // unaffected by the t2 credit
+    expect(aggregateNumericState(spirit, 't1Procs')).toBe(0);   // t1 unaffected
+  });
+
+  it('Negative engine_moths is NOT credited t2 (active-only preserved)', () => {
+    const { grm } = makeRound({ spiritIds: [], deckCardIds: FIELD_FULL_DECK });
+    run.addSpiritDirect({
+      id: 'engine_moths', name: 'Moths', isNegative: true, stackCount: 1, powerLevel: 2,
+      state: { key1: 't1Procs', key2: 't2Procs', preTranscendTotal: 1, oldestAtTranscend: 0, newEvents1: 0, newEvents2: 0 },
+    });
+    const neg = run.allSpirits.find(s => s.id === 'engine_moths' && s.isNegative);
+    grm._fireSilkAntiStrandHooks();
+    expect(neg.state.newEvents2).toBe(0);   // Silk t2 not credited to Negatives
   });
 });

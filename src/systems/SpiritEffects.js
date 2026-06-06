@@ -16,8 +16,8 @@
 //   onFieldDiscard({ card, source, spirit, run }) — once per discarded card; post-commit
 //                                                   side-effects only (Recycling, Ship)
 //   onCardPlayed({ cards, spirit, run })          — once per play, carrying the cards played (Ants)
-//   onWoodSlotCreated({ spirit, run })            — when a Wood (Leaf/Silk) field slot is created (Moths t1;
-//                                                   the Silk-avoidance t2 stays inline in _creditMothsT2)
+//   onWoodSlotCreated({ spirit, run })            — when a Wood (Leaf/Silk) field slot is created (Moths t1)
+//   onSilkAntiStrand({ spirit, run })             — when a Silk 3-stack banks instead of stranding (Moths t2)
 //
 // Hooks fire once per equipped spirit instance (regular + Negative). Use
 // effectivePower(spirit) inside for per-stack scaling. A hook that should ignore
@@ -951,13 +951,17 @@ const _effects = {
   },
 
   engine_moths: {
-    // +0.3 mult-mult per Wood (Leaf/Silk) field-slot creation (t1). F4.20: migrated off the
-    // two inline GRM `woodSlotCreated` blocks. Negatives excluded — the old path iterated
-    // run.activeSpirits. The Silk stranding-avoidance credit (t2) is a separate event and
-    // stays inline in GRM `_creditMothsT2` (Silk anti-stranding logic left untouched).
+    // Both counter events are hooks (F4.20): t1 = Wood (Leaf/Silk) field-slot creation
+    // (onWoodSlotCreated, +0.3 mult-mult each); t2 = Silk stranding-avoidance (onSilkAntiStrand,
+    // +0.6 each). Negatives excluded on both — the old inline paths iterated run.activeSpirits.
+    // Only the Moths CREDIT moved; the Silk anti-stranding LOGIC still lives in GRM _doDeckPhase.
     onWoodSlotCreated({ spirit }) {
       if (spirit.isNegative) return;
       incrementPerElement(spirit, 't1Procs', 1);
+    },
+    onSilkAntiStrand({ spirit }) {
+      if (spirit.isNegative) return;
+      incrementPerElement(spirit, 't2Procs', 1);
     },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {

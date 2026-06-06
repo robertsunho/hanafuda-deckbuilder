@@ -1060,14 +1060,27 @@ export default class GameRoundManager {
   /**
    * Fire the onWoodSlotCreated hook for every equipped spirit that implements it.
    * Fired once each time a Wood (Leaf/Silk) field slot is created (engine_moths t1).
-   * The Silk stranding-avoidance credit (engine_moths t2) is a SEPARATE event and stays
-   * in _creditMothsT2 — do not fold it in here.
+   * The Silk stranding-avoidance credit (engine_moths t2) is a SEPARATE event —
+   * see _fireSilkAntiStrandHooks.
    */
   _fireWoodSlotCreatedHooks() {
     for (const spirit of run.allSpirits) {
       const effect = SpiritEffects.get(spirit.id);
       if (effect?.onWoodSlotCreated) {
         effect.onWoodSlotCreated({ spirit, spirits: run.activeSpirits, run, roundManager: this });
+      }
+    }
+  }
+
+  /**
+   * Fire the onSilkAntiStrand hook for every equipped spirit that implements it.
+   * Fired once each time a Silk 3-stack is banked instead of stranded (engine_moths t2).
+   */
+  _fireSilkAntiStrandHooks() {
+    for (const spirit of run.allSpirits) {
+      const effect = SpiritEffects.get(spirit.id);
+      if (effect?.onSilkAntiStrand) {
+        effect.onSilkAntiStrand({ spirit, spirits: run.activeSpirits, run, roundManager: this });
       }
     }
   }
@@ -1780,18 +1793,6 @@ export default class GameRoundManager {
   }
 
   /**
-   * Increment Moths tier 2 procs for a Silk anti-stranding event.
-   * Called once per stranding event prevented.
-   */
-  _creditMothsT2() {
-    for (const spirit of run.activeSpirits) {
-      if (spirit.id === 'engine_moths') {
-        incrementPerElement(spirit, 't2Procs', 1);
-      }
-    }
-  }
-
-  /**
    * Draw and apply the top card of the deck (the automatic deck-flip phase).
    * Resolves the pending match (if any) based on whether the deck card shares
    * its month with the pending slot.  If the deck is empty the flip is skipped.
@@ -1863,7 +1864,7 @@ export default class GameRoundManager {
             this._addCapture(captured);
             _flipResult   = 'silk_capture';
             _flipCaptures = captured;
-            this._creditMothsT2();
+            this._fireSilkAntiStrandHooks();
           }
         } else {
           // Standard addToPendingMatch handles 4-card auto-capture and stranding.
@@ -1897,7 +1898,7 @@ export default class GameRoundManager {
             if (captured.length > 0) {
               this._addCapture(captured);
               _flipCaptures = [..._flipCaptures, ...captured];
-              this._creditMothsT2();
+              this._fireSilkAntiStrandHooks();
             }
           } else {
             this._field.strandPendingMatch();
