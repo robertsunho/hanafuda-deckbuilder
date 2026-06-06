@@ -656,27 +656,16 @@ export default class GameRoundManager {
         }
       }
     }
+    let lostToDiscard = [];
     if (handResult.captured) {
       // All 4 cards of the month assembled — capture immediately.
       this._addCapture(handResult.captured);
     } else if (handResult.discarded) {
-      // No room on the field — all played cards are lost.
-      for (const card of cards) {
-        this._discardedThisTurn.push(card);
-        this._allDiscards.push(card);
-        this._discardCount++;
-        // econ_recycling: +5 ki per stack per field-full discard.
-        const recyclingStacks1 = run.countStackedById('econ_recycling');
-        if (recyclingStacks1 > 0) run.addKi(5 * recyclingStacks1, 'recycling_overflow');
-        // engine_ship: +0.3 mult-mult per card discarded (permanent).
-        for (const spirit of run.activeSpirits) {
-          if (spirit.id === 'engine_ship') {
-            incrementPerElement(spirit, 'cardsDiscarded', 1);
-          }
-        }
-        // Stamp discard-trigger effects (Option C shuffle).
-        this._dispatchStampDiscardEffects(card);
-      }
+      // No room on the field — route through the canonical discard pipeline.
+      // F4.17#3: gains catcher (an overflowed card may be rescued to hand instead
+      // of lost) + unified recycling reason; ship/stamps unchanged. lostToDiscard
+      // is the subset actually discarded (not caught) — drives result.discarded below.
+      lostToDiscard = this._discardCards(cards, 'hand_overflow');
     }
 
     // Track whether the play went to an empty slot (no field match, no capture,
@@ -697,7 +686,7 @@ export default class GameRoundManager {
       handCards:    cards,
       matched:      handResult.matched,
       autoCaptured: handResult.captured != null,
-      discarded:    handResult.discarded ? [...cards] : [],
+      discarded:    lostToDiscard,
       basePoints:   this._basePoints,
       playsRemaining: this._requiredPlaysPerTurn - this._playsThisTurn,
     };
@@ -1227,9 +1216,14 @@ export default class GameRoundManager {
    * Batch convenience around _discardCard for sites that discard a set of cards.
    * @param {object[]} cards
    * @param {'deck_overflow'|'hand_overflow'|'consumable'|'reveal_miss'} source
+   * @returns {object[]} The subset actually discarded (i.e. NOT rescued by catcher).
    */
   _discardCards(cards, source) {
-    for (const card of cards) this._discardCard(card, source);
+    const discarded = [];
+    for (const card of cards) {
+      if (this._discardCard(card, source) === 'field_discard') discarded.push(card);
+    }
+    return discarded;
   }
 
   /**
