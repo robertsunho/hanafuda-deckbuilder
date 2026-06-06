@@ -3665,3 +3665,125 @@ maxSize — stale; `add()` silently clamps. Corrected the doc in this campaign.
 - Tests: `test/spirits/discard_{field_hooks,hand_overflow,monkey,horse_ox}.test.js`
 - Branch `f4.17-pre-fixes` @ f4e46fd (revert point — last all-[PRESERVE] state, retained
   until the batched in-game verification session alongside `f4.18b-pre-unification`)
+
+---
+
+## D-F4-SCOPE — Category-reorganization symmetry + GRM/RunManager destination audit (2026-06-06)
+
+**Status:** PLANNING DECISION. No code. Defines two scope expansions to Phase 4 Tier 2/Tier 3
+and their sequencing. To be turned into concrete task blocks when reached.
+
+### Part 1 — The category-reorganization gap (consumables + hexagrams)
+
+**Observation (Robert):** Phase 4's "put things where they belong" migration work is built
+almost entirely around spirits — F4.24a Section 7 is spirit-logic seepage, the F4.16/F4.20
+triage ledger sorts spirits into Bucket A/B, and the marquee Tier-2 tasks are phrased as "move
+spirit logic into SpiritEffects.js." Consumables and hexagrams receive only piecemeal coverage
+(F4.38 Wu Xing, F4.15 consumable activation paths, F4.34 Water depreciation, the hex_51/hex_52
+patches) — each surfaced reactively when a feature happened to touch it, never audited as a
+category the way spirits were.
+
+**Why the gap exists:** The early-May audit that seeded the task list was spirit-centric, so
+there's no consumable/hexagram seepage inventory to build a dedicated block from. The plan can
+only schedule what the map revealed. This is not a decision that consumables/hexagrams don't
+need the same treatment — it's that nobody ran the equivalent audit.
+
+**Evidence the seepage exists for both (from this session's own work):**
+- **Consumables:** `ConsumableEffects.js` carried discard bookkeeping inline in Horse/Monkey/Ox
+  (pulled into the pipeline in F4.17), and still carries capture/redraw/field-clear/empty-hand
+  logic whose "does this belong here?" status is unaudited. Consumables are also split across
+  `ConsumableEffects.js` (zodiac + alchemical) AND GameScene/ShrineScene `_cardTargetMode` (Wu
+  Xing element consumables) — so the canonical "home document" is itself partly unsettled.
+- **Hexagrams:** hex_51 discard behavior was threaded through `_addFlippedCardToField` in GRM
+  (not behind a hook) until F4.17 unified it; F4.24a flagged RunManager↔HexagramEffects import
+  cycles. Hexagram "seepage" looks different from spirits — it's less "logic in the wrong file"
+  and more "hexagram behavior implemented inline at a callsite instead of behind the
+  `applyHook`/`getActiveEffect` layer."
+
+**Decision:** Add two new Tier-2 task blocks, each following the proven spirit anatomy:
+1. **Consumable-logic centralization.** Inventory → triage (Bucket A migrate / Bucket B
+   document-only) → migration campaigns. Part of the audit is deciding the canonical home
+   (`ConsumableEffects.js` vs the scene-level `_cardTargetMode` split), not just migrating into
+   an obvious one. F4.15 (activation-path unification) and F4.38 (Wu Xing) become MEMBERS of
+   this block, not standalone tasks.
+2. **Hexagram-logic centralization.** Inventory → triage → campaigns. The audit question is
+   "which hexagram effects bypass the hook layer and reach into GRM/RunManager directly," plus
+   untangling the RunManager↔HexagramEffects import cycle. Likely thornier than consumables
+   because the seepage is hook-shaped, not file-shaped.
+
+**Bucket A/B discipline carries over:** not everything should move. Bucket B = the logic is a
+term in a core-owned formula, lifting it adds indirection, it's clearer in place. The triage is
+what keeps the migrations honest (same as the spirit triage).
+
+**Sequencing:** Run these AFTER the spirit migrations settle, not in parallel —
+- The spirit work is actively relocating logic; some apparent consumable/hexagram seepage may
+  move or dissolve as a side effect ("don't clean code that's about to move").
+- The spirit migrations are the template — doing them first means consumable/hexagram campaigns
+  inherit a proven pattern (return-intent hooks, Bucket A/B triage, campaign ledgers).
+- Concretely: the audits slot at the end-of-Tier-2 F4.24a checkpoint — that recurring
+  diagnostic snapshot gets expanded to enumerate consumable + hexagram seepage, not just
+  re-diff spirit seepage. Migration campaigns follow the audits.
+
+### Part 2 — GRM/RunManager destination-document audit
+
+**Observation (Robert):** The places where most misplaced code accumulates are
+`GameRoundManager` and `RunManager`. Beyond pulling category logic out of them, these two files
+deserve their own dedicated audit — both for out-of-place code AND for general
+organization/flow, given how central they are.
+
+**The key distinction — two different audits in one:**
+- **Displacement** — code that should live elsewhere (spirit/consumable/hexagram logic sitting
+  in GRM/RunManager). This is the same debt the category audits target, viewed from the
+  receiving end.
+- **Intrinsic organization** — for the code that legitimately IS GRM's/RunManager's job (round
+  loop, phase state machine, the run singleton's ki/spirits/flow state): is it coherently
+  structured? Method ordering, internal cohesion, the dual spirit-init paths F4.24a already
+  flagged, the import cycles. This debt is UNIQUE to these files; no category audit touches it.
+
+**Why direction + timing matter:** The category audits are source-document audits (organized
+around whose logic it is). This is a destination-document audit (start at the sink, ask "what
+doesn't belong, and is what does belong organized?"). The displacement half is largely a side
+effect of finishing the category migrations — every spirit/consumable/hexagram pulled home
+drains GRM/RunManager. Running this audit before the category work finishes would re-enumerate
+displacement that's about to relocate anyway (the "don't clean code about to move" trap).
+
+**Decision:** Place the GRM/RunManager audit AFTER all three category centralizations complete
+(spirits + consumables + hexagrams) — i.e. late Tier 3 / the Tier 3→4 boundary — as a focused
+F4.24a-style deep dive scoped to these two files. At that point:
+- Displacement is already mostly drained, so what REMAINS is high-signal: either
+  legitimately-theirs, or a genuinely-orphaned piece no category claimed.
+- The files have stopped churning, so the intrinsic organization question can be asked cleanly
+  (organizing a stable thing, not a moving one).
+
+**Dovetail with F4.24b:** This audit is essentially the recon that makes F4.24b writable for
+GRM/RunManager. You can't write the prescriptive "here's how the round manager is structured and
+how to build on it" until the pass that MAKES it well-structured has run. The audit feeds the
+terminal ARCHITECTURE.md directly.
+
+**Caveat (flagged, judged low-risk):** There's a mild risk the audit reveals GRM/RunManager
+intrinsic structure that should have informed how the migrations were done (wishing the target
+shape were known earlier). Judged low: the migrations follow established hook patterns regardless
+of GRM's internal tidiness, and the intrinsic-organization question genuinely can't be answered
+until the churn stops. "Drain first" still wins.
+
+### The arc this completes
+
+This is the capstone of the "put things where they belong" thesis: first give every category
+(spirits → consumables → hexagrams) its home; THEN turn around and audit the houses everything
+was living in (GRM/RunManager), now emptied of what didn't belong, for what remains and how it's
+organized. Reorganization is a category-by-category sweep (rhymes with the iterative-reorg
+principle and Candidate C); spirits were simply first because they were the category the May
+audit happened to map.
+
+**Cross-references:**
+- `PHASE_4_TASK_ORDERING.md` (Tier 2 logic-centralization; these are new Tier-2 blocks + a
+  late-Tier-3 destination audit)
+- D-F4.24-ORDERING (the F4.24a recurring-checkpoint / F4.24b terminal-reference split this
+  builds on — the category audits expand a checkpoint; the GRM/RunManager audit feeds F4.24b)
+- D-F4.20-TIER2 (the spirit-migration anatomy these mirror: triage ledger → Bucket A/B →
+  return-intent hook campaigns)
+- F4.15, F4.38, F4.34 (reframed as members of the consumable-logic block, not standalone)
+- `PHASE4_consolidation_candidates.md` Candidate C (naming/vocabulary cohesion — same
+  category-by-category reorganization spirit)
+- F4.24a `F4.24_inventory_pass1.md` Section 8 (already flagged dual spirit-init paths in
+  RunManager + the import cycles — seed observations for the GRM/RunManager audit)
