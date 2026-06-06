@@ -147,6 +147,57 @@ revisited). Not urgent; no known active bug — the silent clamp makes the curre
 
 ---
 
+## Candidate E — Field slot-model / slot-creation pipeline recon
+
+**Status:** RECON-FIRST CANDIDATE. The deliverable is a MAP + a verdict on whether a
+consolidation even exists — NOT a campaign. Do not scope a campaign from fragments.
+
+**The instinct (Robert, 2026-06-06):** there are several pathways to "slot creation" in the
+game — Leaf/Silk (Wood) cards, the Rooster zodiac (9th slot), and others — and it's worth
+checking whether these pipelines are separate or share something unifiable.
+
+**The crucial distinction to resolve FIRST (why this needs recon, not a guess):** "slot
+creation" appears to mean (at least) two DIFFERENT things, which may share only the word:
+1. **Field CAPACITY changes** — how many slots the field has. Rooster
+   (`_roosterBonusThisRound`), blessing `plus_field_slot`, Amber's permanent mod, and the
+   `modifyFieldSlots` hexagram hook all funnel through `GameRoundManager._recomputeFieldSlots()`
+   → `field.setMaxSlots(...)`. This is a *capacity* pipeline.
+2. **A WOOD slot coming into existence** — what `engine_moths` `t1Procs` counts. Comes back as
+   `handResult.woodSlotCreated` from `FieldManager.playHandCards`, tied to placing a
+   Wood-element (Leaf/Silk) card. This is about a slot's *kind/nature* at placement, not field
+   capacity.
+   (Also nearby: Leaf-spawned field slots — a Phase 3 fix area, `Math.max(maxSlots, slots.length)`
+   iteration — which may be a third distinct notion.)
+
+These *sound* unifiable (all say "slot" + "create") but may be mechanically unrelated — capacity
+vs. slot-kind vs. spawned-slot. **The recon's job is to determine whether they share underlying
+operations or are legitimately separate mechanisms that share a noun** (the same lexical-overlap
+trap the discard recon caught with the stale hex_51 "bypasses everything" premise).
+
+**Recon deliverable (a `FieldManager` slot-model map):**
+- How does `FieldManager` represent a slot (shape, state, "kind"/element, pending/normal/stranded)?
+- Enumerate every distinct "create / modify / change-capacity-of a slot" pathway: Rooster
+  capacity bump, blessing/Amber capacity, the `modifyFieldSlots` hook, wood-slot creation at
+  placement, Leaf-spawned slots, stranded→normal transitions, etc.
+- For each: where does it live, and does it touch shared code or its own path?
+- Verdict: is there genuine duplication / smeared ownership (a real consolidation), or are these
+  separate concerns that only share vocabulary (→ at most a Candidate-C naming clarification)?
+
+**Placement / sequencing:**
+- The slot model lives in `FieldManager` — a DIFFERENT file from the GRM/RunManager audit
+  (D-F4-SCOPE), so this is its own small recon, not part of that audit (though it may attach to
+  any future FieldManager-area work).
+- Let recent churn settle first: Leaf-spawned field slots were a Phase 3 fix area, so the slot
+  model may still be moving there.
+- Connection: rhymes with the category-reorg / Candidate-C thinking — "slot creation" MIGHT be a
+  concept smeared across owners (FieldManager placement + GRM `_recomputeFieldSlots` + capacity
+  modifiers + the hexagram hook). But *might be* — the recon decides.
+- NOT part of the engine_moths migration (which only counts the wood-slot event that already
+  fires; it does not require understanding the slot model). Banked separately so it doesn't
+  derail a clean low-risk migration.
+
+---
+
 ## Cross-references
 - D-F4.18b (iterative-reorganization principle: reorg interleaves with design; name late)
 - F4.24b (prescriptive ARCHITECTURE.md, deliberately late — coordinate with Candidate C)
@@ -155,3 +206,5 @@ revisited). Not urgent; no known active bug — the silent clamp makes the curre
   `game_catcher` state-init; per-copy catcher state; stamp draw lacking hand-cap check)
 - D-F4.17 / `docs/process/F4.17_campaign_ledger.md` (where Candidate D surfaced — the
   Horse/catcher/hand-cap deliberation and the stale `HandManager` capacity-contract JSDoc)
+- F4.20 engine_moths migration (where Candidate E surfaced — the t1Procs wood-slot-creation
+  counter; the slot-model recon was banked so it didn't derail that low-risk migration)
