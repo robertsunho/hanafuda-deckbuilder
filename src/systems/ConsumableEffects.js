@@ -15,7 +15,7 @@
 // GameScene and ShrineScene via the _cardTargetMode system, not here.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import run, { incrementPerElement } from './RunManager.js';
+import run from './RunManager.js';
 import { getSpiritDef, SPIRIT_CATALOG } from '../data/spirits.js';
 import { findFusionRecipe, findFusionRecipeByResult } from '../data/fusionRecipes.js';
 import FieldManager from './FieldManager.js';
@@ -46,9 +46,17 @@ const _effects = {
       }
       const cards = roundManager._field.clearSlot(params.slotIndex);
       if (!cards) return { success: false, message: 'Slot is empty.' };
-      // Cleared cards go to the discard pile.
-      roundManager._allDiscards.push(...cards);
-      return { success: true, message: `Cleared ${cards.length} card(s) from slot ${params.slotIndex}.`, clearedCards: cards };
+      // F4.17#5: route cleared field cards through the canonical discard pipeline.
+      // Gains catcher (stranded cards can be RESCUED TO HAND — Ox's signature recovery
+      // mechanic), recycling, ship, stamps, and full bookkeeping. Was _allDiscards-only.
+      // No empty-hand check: Ox never touches the hand, so it can't empty it.
+      const actuallyDiscarded = roundManager._discardCards(cards, 'consumable');
+      return {
+        success: true,
+        message: `Cleared ${cards.length} card(s) from slot ${params.slotIndex}.`,
+        clearedCards: cards,
+        discardedCards: actuallyDiscarded,
+      };
     },
   },
 
@@ -99,26 +107,26 @@ const _effects = {
       const oldHand = roundManager._hand.getAll();
       const handSize = oldHand.length;
 
-      // Push to discard pile, then clear hand BEFORE stamp dispatch
-      // so stamp draw effects fire onto the empty hand.
-      roundManager._allDiscards.push(...oldHand);
+      // Clear hand FIRST — so stamp draws / catcher rescues land on an empty hand and a
+      // catcher rescue re-adds cleanly without duplication — THEN route the old cards
+      // through the canonical discard pipeline.
+      // F4.17#5: gains catcher (rescue → hand), recycling, and full bookkeeping
+      // (_discardCount/_discardedThisTurn — was _allDiscards-only). Ship + stamps now fire
+      // INSIDE _discardCard; the old inline ship loop is removed (it would double-count).
       roundManager._hand.clear();
+      roundManager._discardCards(oldHand, 'consumable');
 
-      // engine_ship + stamp dispatch per discarded card.
-      for (const card of oldHand) {
-        for (const spirit of run.activeSpirits) {
-          if (spirit.id === 'engine_ship') {
-            incrementPerElement(spirit, 'cardsDiscarded', 1);
-          }
-        }
-        roundManager._dispatchStampDiscardEffects(card);
-      }
-
-      // Refill to original hand size (or deck size if smaller).
-      const drawCount = Math.min(handSize, roundManager.deck.drawPileSize);
+      // Redraw the number discarded, but never beyond the hand's remaining room. If catcher
+      // rescued any cards, the redraw fills only the leftover slots and the un-drawable cards
+      // STAY IN THE DECK (push/bank draw convention) — draw() splices the pile, so drawing
+      // more than fits would lose them. availableSlots reflects the post-rescue hand
+      // (catcher already ran inside _discardCards). With no catcher the hand is empty here,
+      // availableSlots = maxSize >= handSize, so this is identical to the old flat redraw.
+      const drawCount = Math.min(
+        handSize, roundManager.deck.drawPileSize, roundManager._hand.availableSlots,
+      );
       if (drawCount > 0) {
-        const drawn = roundManager.deck.draw(drawCount);
-        roundManager._hand.add(drawn);
+        roundManager._hand.add(roundManager.deck.draw(drawCount));
       }
 
       if (roundManager._checkRoundEndOnEmptyHand()) {

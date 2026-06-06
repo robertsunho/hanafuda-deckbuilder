@@ -23,8 +23,8 @@ export default class HandManager {
   /**
    * @param {object} [options]
    * @param {number} [options.maxSize=Infinity]  Maximum cards allowed in hand.
-   *   Attempting to add cards beyond this limit throws a RangeError.
-   *   Pass Infinity (the default) to disable the limit.
+   *   Adding cards beyond this limit silently clamps to maxSize (excess cards are
+   *   skipped — see add()). Pass Infinity (the default) to disable the limit.
    */
   constructor({ maxSize = Infinity } = {}) {
     if (maxSize < 1) throw new RangeError("maxSize must be at least 1");
