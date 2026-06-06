@@ -1179,12 +1179,15 @@ export default class GameRoundManager {
   }
 
   /**
-   * Handle a field-full discard for a single deck card.
-   * Applies econ_recycling (+5 ki) and game_catcher (→hand) if active.
-   * @param {object} card  The deck card being discarded.
-   * @returns {string} The flip result string ('field_discard' or 'catcher').
+   * Catcher interception GATE: decides WHETHER a card is discarded at all.
+   * If game_catcher has catches remaining this round and the hand has room,
+   * route the card to hand instead and report it consumed. Kept separate from
+   * the discard side-effects (recycling/ship) because it prevents the discard
+   * rather than reacting to one (F4.17 campaign decision).
+   * @param {object} card
+   * @returns {boolean} True if the card was caught (→ hand); caller skips the discard.
    */
-  _handleFieldDiscard(card) {
+  _tryCatcherIntercept(card) {
     const catcherSpirits = run.allSpirits.filter(s => s.id === 'game_catcher');
     const catcherMax = run.countStackedById('game_catcher');
     if (catcherMax > 0 && this._hand.availableSlots > 0) {
@@ -1194,17 +1197,39 @@ export default class GameRoundManager {
           if (c.state) c.state.catchesUsedThisRound = used + 1;
         }
         this._hand.add([card]);
-        return 'catcher';
+        return true;
       }
     }
+    return false;
+  }
+
+  /**
+   * Canonical single-card discard. Every discard site routes here.
+   * Order: catcher gate (may consume → 'catcher') → bookkeeping →
+   * onFieldDiscard side-effects (recycling, ship) → stamp dispatch.
+   * @param {object} card
+   * @param {'deck_overflow'|'hand_overflow'|'consumable'|'reveal_miss'} source
+   * @returns {string} 'catcher' (caught → hand) or 'field_discard' (discarded).
+   */
+  _discardCard(card, source) {
+    if (this._tryCatcherIntercept(card)) return 'catcher';
     this._discardedThisTurn.push(card);
     this._allDiscards.push(card);
     this._discardCount++;
     // econ_recycling (+5 ki/stack) + engine_ship (cardsDiscarded++) via onFieldDiscard.
-    this._fireFieldDiscardHooks(card, 'deck_overflow');
+    this._fireFieldDiscardHooks(card, source);
     // Stamp discard-trigger effects.
     this._dispatchStampDiscardEffects(card);
     return 'field_discard';
+  }
+
+  /**
+   * Batch convenience around _discardCard for sites that discard a set of cards.
+   * @param {object[]} cards
+   * @param {'deck_overflow'|'hand_overflow'|'consumable'|'reveal_miss'} source
+   */
+  _discardCards(cards, source) {
+    for (const card of cards) this._discardCard(card, source);
   }
 
   /**
@@ -1217,7 +1242,7 @@ export default class GameRoundManager {
         s && s.state !== 'pending' && this._field.matchesSlot(card, s)
       );
       if (!hasMatch) {
-        return { captured: null, discarded: true };
+        return { captured: null, discarded: true, discardSource: 'reveal_miss' };
       }
     }
     const result = this._field.addFlippedCard(card);
@@ -1882,7 +1907,7 @@ export default class GameRoundManager {
           _flipResult   = 'capture';
           _flipCaptures = [..._flipCaptures, ...flipResult.captured];
         } else if (flipResult.discarded) {
-          _flipResult = this._handleFieldDiscard(deckCard);
+          _flipResult = this._discardCard(deckCard, flipResult.discardSource ?? 'deck_overflow');
         }
       }
     } else {
@@ -1915,7 +1940,7 @@ export default class GameRoundManager {
           _flipResult   = 'capture';
           _flipCaptures = [..._flipCaptures, ...flipResult.captured];
         } else if (flipResult.discarded) {
-          _flipResult = this._handleFieldDiscard(deckCard);
+          _flipResult = this._discardCard(deckCard, flipResult.discardSource ?? 'deck_overflow');
         } else {
           _flipResult = 'capture'; // hand pair captured even if flip just placed
         }
@@ -1927,7 +1952,7 @@ export default class GameRoundManager {
           _flipResult   = 'capture';
           _flipCaptures = flipResult.captured;
         } else if (flipResult.discarded) {
-          _flipResult = this._handleFieldDiscard(deckCard);
+          _flipResult = this._discardCard(deckCard, flipResult.discardSource ?? 'deck_overflow');
         }
       }
     }
@@ -1945,7 +1970,7 @@ export default class GameRoundManager {
         _flip2Result   = 'capture';
         _flip2Captures = flipResult2.captured;
       } else if (flipResult2.discarded) {
-        _flip2Result = this._handleFieldDiscard(deckCard2);
+        _flip2Result = this._discardCard(deckCard2, flipResult2.discardSource ?? 'deck_overflow');
       }
       logger.logDeckFlip(deckCard2, _flip2Result, _flip2Captures);
     }
