@@ -1046,6 +1046,23 @@ export default class GameRoundManager {
   }
 
   /**
+   * Fire the onFieldDiscard hook for every equipped spirit that implements it.
+   * Side-effect hooks that REACT to a committed discard (econ_recycling +5 ki/stack,
+   * engine_ship cardsDiscarded++). Catcher interception is NOT here — it decides
+   * WHETHER to discard and lives at the call site (see F4.17 campaign ledger).
+   * @param {object} card
+   * @param {'deck_overflow'|'hand_overflow'|'consumable'|'reveal_miss'} source
+   */
+  _fireFieldDiscardHooks(card, source) {
+    for (const spirit of run.allSpirits) {
+      const effect = SpiritEffects.get(spirit.id);
+      if (effect?.onFieldDiscard) {
+        effect.onFieldDiscard({ card, source, spirit, spirits: run.activeSpirits, run, roundManager: this });
+      }
+    }
+  }
+
+  /**
    * Dispatch a card's discard-trigger stamp effects with retrigger awareness.
    * Blue → consumable, Green → +3 ki, Purple/Black/Gray → draw +1.
    * @param {object} card  The discarded card.
@@ -1183,14 +1200,8 @@ export default class GameRoundManager {
     this._discardedThisTurn.push(card);
     this._allDiscards.push(card);
     this._discardCount++;
-    const recyclingStacks = run.countStackedById('econ_recycling');
-    if (recyclingStacks > 0) run.addKi(5 * recyclingStacks, 'recycling_discard');
-    // engine_ship: +0.3 mult-mult per card discarded (permanent).
-    for (const spirit of run.activeSpirits) {
-      if (spirit.id === 'engine_ship') {
-        incrementPerElement(spirit, 'cardsDiscarded', 1);
-      }
-    }
+    // econ_recycling (+5 ki/stack) + engine_ship (cardsDiscarded++) via onFieldDiscard.
+    this._fireFieldDiscardHooks(card, 'deck_overflow');
     // Stamp discard-trigger effects.
     this._dispatchStampDiscardEffects(card);
     return 'field_discard';

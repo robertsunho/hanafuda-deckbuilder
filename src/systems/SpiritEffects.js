@@ -518,7 +518,14 @@ const _effects = {
       return ki * (1 + stacks);
     },
   },
-  econ_recycling:    {},  // +5 ki per overflow discard
+  econ_recycling: {
+    // +5 ki per stack on every field discard.
+    // F4.17#1: migrated off inline _handleFieldDiscard. effectivePower per equipped
+    // instance sums to the prior `5 * countStackedById('econ_recycling')` exactly.
+    onFieldDiscard({ spirit }) {
+      run.addKi(5 * effectivePower(spirit), 'recycling_discard');
+    },
+  },
   econ_lucky_charm:  {},  // probability modifier — handled in RNGHook.js
   econ_reward:       {},  // push-success ki bonus — handled in GameRoundManager
   econ_piggybank:    {},  // ×2/×3/×4 hand ki (additive stacking)
@@ -1153,6 +1160,13 @@ const _effects = {
   },
 
   engine_ship: {
+    // +1 cardsDiscarded per field discard (drives +0.3 mult-mult/card).
+    // F4.17#1: migrated off inline _handleFieldDiscard. Negatives (transcended)
+    // are excluded to match the prior activeSpirits-only increment — the negative
+    // form tracks via its own preTranscendTotal/newEvents in applyEngine.
+    onFieldDiscard({ spirit }) {
+      if (!spirit.isNegative) incrementPerElement(spirit, 'cardsDiscarded', 1);
+    },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
         const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * 0.3 * (spirit.powerLevel ?? 1);
