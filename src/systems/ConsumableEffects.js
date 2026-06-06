@@ -151,22 +151,26 @@ const _effects = {
       // Route through full scoring pipeline.
       roundManager._addCapture(cards);
 
-      // Discard equal number from hand (oldest first).
+      // Discard equal number from hand (oldest first). Remove from hand BEFORE the
+      // canonical discard so a catcher rescue cleanly re-adds the card (no duplication).
       const handCards = roundManager._hand.getAll();
       const discardCount = Math.min(cards.length, handCards.length);
       const toDiscard = handCards.slice(0, discardCount);
       for (const c of toDiscard) roundManager._hand.remove(c.id);
-      roundManager._allDiscards.push(...toDiscard);
-      for (const card of toDiscard) roundManager._dispatchStampDiscardEffects(card);
+      // F4.17#4: route through the canonical pipeline — gains catcher (rescue → hand),
+      // econ_recycling, engine_ship, and full bookkeeping (_discardCount/_discardedThisTurn).
+      // Stamp dispatch still fires inside _discardCard. actuallyDiscarded excludes rescues.
+      const actuallyDiscarded = roundManager._discardCards(toDiscard, 'consumable');
 
-      // Empty-hand check — Monkey may have spent the player's last cards.
+      // Empty-hand check — Monkey may have spent the player's last cards. Runs AFTER any
+      // catcher rescue so it sees the true post-rescue hand.
       roundManager._checkRoundEndOnEmptyHand();
 
       return {
         success: true,
-        message: `Monkey: captured ${cards.length} card(s), discarded ${discardCount} from hand.`,
+        message: `Monkey: captured ${cards.length} card(s), discarded ${actuallyDiscarded.length} from hand.`,
         capturedCards: cards,
-        discardedCards: toDiscard,
+        discardedCards: actuallyDiscarded,
       };
     },
   },
