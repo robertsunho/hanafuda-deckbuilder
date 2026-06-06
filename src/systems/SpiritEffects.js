@@ -16,6 +16,8 @@
 //   onFieldDiscard({ card, source, spirit, run }) — once per discarded card; post-commit
 //                                                   side-effects only (Recycling, Ship)
 //   onCardPlayed({ cards, spirit, run })          — once per play, carrying the cards played (Ants)
+//   onWoodSlotCreated({ spirit, run })            — when a Wood (Leaf/Silk) field slot is created (Moths t1;
+//                                                   the Silk-avoidance t2 stays inline in _creditMothsT2)
 //
 // Hooks fire once per equipped spirit instance (regular + Negative). Use
 // effectivePower(spirit) inside for per-stack scaling. A hook that should ignore
@@ -949,6 +951,14 @@ const _effects = {
   },
 
   engine_moths: {
+    // +0.3 mult-mult per Wood (Leaf/Silk) field-slot creation (t1). F4.20: migrated off the
+    // two inline GRM `woodSlotCreated` blocks. Negatives excluded — the old path iterated
+    // run.activeSpirits. The Silk stranding-avoidance credit (t2) is a separate event and
+    // stays inline in GRM `_creditMothsT2` (Silk anti-stranding logic left untouched).
+    onWoodSlotCreated({ spirit }) {
+      if (spirit.isNegative) return;
+      incrementPerElement(spirit, 't1Procs', 1);
+    },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
         const t = (spirit.state?.preTranscendTotal ?? 1) +

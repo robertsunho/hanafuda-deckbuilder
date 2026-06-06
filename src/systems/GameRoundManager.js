@@ -644,14 +644,8 @@ export default class GameRoundManager {
     }
 
     const handResult = this._field.playHandCards(cards, targetMonth);
-    // engine_moths: Wood (Leaf or Silk) field slot creation.
-    if (handResult.woodSlotCreated) {
-      for (const spirit of run.activeSpirits) {
-        if (spirit.id === 'engine_moths') {
-          incrementPerElement(spirit, 't1Procs', 1);
-        }
-      }
-    }
+    // engine_moths: Wood (Leaf or Silk) field slot creation → onWoodSlotCreated.
+    if (handResult.woodSlotCreated) this._fireWoodSlotCreatedHooks();
     let lostToDiscard = [];
     if (handResult.captured) {
       // All 4 cards of the month assembled — capture immediately.
@@ -1064,6 +1058,21 @@ export default class GameRoundManager {
   }
 
   /**
+   * Fire the onWoodSlotCreated hook for every equipped spirit that implements it.
+   * Fired once each time a Wood (Leaf/Silk) field slot is created (engine_moths t1).
+   * The Silk stranding-avoidance credit (engine_moths t2) is a SEPARATE event and stays
+   * in _creditMothsT2 — do not fold it in here.
+   */
+  _fireWoodSlotCreatedHooks() {
+    for (const spirit of run.allSpirits) {
+      const effect = SpiritEffects.get(spirit.id);
+      if (effect?.onWoodSlotCreated) {
+        effect.onWoodSlotCreated({ spirit, spirits: run.activeSpirits, run, roundManager: this });
+      }
+    }
+  }
+
+  /**
    * Dispatch a card's discard-trigger stamp effects with retrigger awareness.
    * Blue → consumable, Green → +3 ki, Purple/Black/Gray → draw +1.
    * @param {object} card  The discarded card.
@@ -1252,14 +1261,8 @@ export default class GameRoundManager {
       }
     }
     const result = this._field.addFlippedCard(card);
-    // engine_moths: Wood (Leaf or Silk) field slot creation.
-    if (result.woodSlotCreated) {
-      for (const spirit of run.activeSpirits) {
-        if (spirit.id === 'engine_moths') {
-          incrementPerElement(spirit, 't1Procs', 1);
-        }
-      }
-    }
+    // engine_moths: Wood (Leaf or Silk) field slot creation → onWoodSlotCreated.
+    if (result.woodSlotCreated) this._fireWoodSlotCreatedHooks();
     return result;
   }
 
