@@ -3755,6 +3755,26 @@ F4.24a-style deep dive scoped to these two files. At that point:
 - The files have stopped churning, so the intrinsic organization question can be asked cleanly
   (organizing a stable thing, not a moving one).
 
+**Named sub-area of the GRM/RunManager audit — push/bank pipeline mapping.** (Surfaced
+2026-06-06 while migrating econ_reward, F4.20 #2.) The push/bank mechanic's logic + state is
+spread across many surfaces and is a strong consolidation candidate, but must NOT be scoped from
+fragments — it needs its own top-to-bottom recon (the equivalent of `round_end_pipeline_recon.md`)
+before any campaign shape is decided. Surfaces glimpsed incidentally during F4.20 #2:
+`pushOn()` / `bankScore()` / `continuePlay()` (the three `yaku_decision` exits) and the
+yaku-resolution `pushSucceeded` block in GRM `_finalizeTurn`; `run.onPushSuccess()` /
+`onPushFailure()` / `onBank()` in RunManager (the flow-multiplier side); the push-curve math
+(`getPushMultiplier`, `_pushDepth`, `_getNextPushDealCount`,
+`pushCurveSuccessAmplifier`/`pushCurveFailureAmplifier` hooks); the Tiger flag
+(`_tigerPushActive`) as an alternate entry into `yaku_decision`; and a scatter of push state
+fields (`_pushPenaltyActive`, `_pushCount`, `_pushDepth`, `_atRiskScore`, `_dogProtection`,
+`_roundEndingAfterDecision`, `_tigerPushActive`). This is *intrinsic* GRM/RunManager logic (not
+displaced spirit logic), so it belongs to the "intrinsic organization" half of the audit.
+**Sequencing:** do it AFTER the F4.20 spirit migrations settle — the push-success block is still
+being drained of tenants (econ_reward in #2; engine_northern_lion's `pushesWitnessed` increment
+is Bucket-T but still inline), so auditing it now would map a moving target. Drain first, then
+map the stabilized pipeline. First concrete deliverable = a push/bank pipeline recon doc, NOT a
+campaign.
+
 **Dovetail with F4.24b:** This audit is essentially the recon that makes F4.24b writable for
 GRM/RunManager. You can't write the prescriptive "here's how the round manager is structured and
 how to build on it" until the pass that MAKES it well-structured has run. The audit feeds the
