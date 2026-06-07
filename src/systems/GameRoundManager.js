@@ -1311,7 +1311,9 @@ export default class GameRoundManager {
       const _scoringSpirits = run.scoringSpirits;
 
       // Reset Golden Toad per-capture application counter.
-      for (const spirit of _activeSpirits) {
+      // F4.20-FIX2: iterate allSpirits so a transcended toad resets too (its onCardScored
+      // already fires for Negatives; without this reset it jams at max). See SPIRIT_SET_ITERATION_RULE.md.
+      for (const spirit of run.allSpirits) {
         if (spirit.id === 'engine_golden_toad') spirit._captureAppliedCount = 0;
       }
 
@@ -1633,7 +1635,9 @@ export default class GameRoundManager {
       });
 
       // ── Post-capture spirit effects (return-intent hooks) ──────────────────
-      for (const spirit of _activeSpirits) {
+      // F4.20-FIX2: iterate allSpirits so transcended (Negative) copies fire too
+      // (Glory's draw is a chain effect, not a slot effect) — see SPIRIT_SET_ITERATION_RULE.md.
+      for (const spirit of run.allSpirits) {
         const effect = SpiritEffects.get(spirit.id);
         if (!effect?.onCaptureComplete) continue;
         const intent = effect.onCaptureComplete({ cards, spirit, run });
@@ -1673,7 +1677,9 @@ export default class GameRoundManager {
 
 
     // sym_caterpillar: eat leaf-enhanced cards (Wood element).
-    for (const spirit of run.activeSpirits) {
+    // F4.20-FIX2: iterate allSpirits so a transcended caterpillar eats/metamorphoses too —
+    // see SPIRIT_SET_ITERATION_RULE.md.
+    for (const spirit of run.allSpirits) {
       if (spirit.id === 'sym_caterpillar' && spirit.state) {
         for (const card of cards) {
           if (card.enhancement?.element === 'wood') {
@@ -1885,7 +1891,8 @@ export default class GameRoundManager {
           } else {
             _flipResult = 'strand';
             // sym_ducks: -1 multValue on strand (floor at 0).
-            for (const spirit of run.activeSpirits) {
+            // F4.20-FIX2: iterate allSpirits so a transcended ducks moves too — see SPIRIT_SET_ITERATION_RULE.md.
+            for (const spirit of run.allSpirits) {
               if (spirit.id === 'sym_ducks' && spirit.state) {
                 spirit.state.multValue = Math.max(0, (spirit.state.multValue ?? 0) - 1);
               }
@@ -1938,7 +1945,8 @@ export default class GameRoundManager {
         this._field.removeCardById(handCard.id);
         this._addCapture([handCard, deckCard]);
         // sym_ducks: +1 multValue when a deck-flip matches a single played card.
-        for (const spirit of run.activeSpirits) {
+        // F4.20-FIX2: iterate allSpirits so a transcended ducks moves too — see SPIRIT_SET_ITERATION_RULE.md.
+        for (const spirit of run.allSpirits) {
           if (spirit.id === 'sym_ducks' && spirit.state) {
             spirit.state.multValue = (spirit.state.multValue ?? 0) + 1;
           }
