@@ -278,9 +278,9 @@ carried forward a pre-existing inconsistency, now flagged for deliberate resolut
 - D-F4.18b (iterative-reorganization principle: reorg interleaves with design; name late)
 - F4.24b (prescriptive ARCHITECTURE.md, deliberately late — coordinate with Candidate C)
 - F4.20 (spirit-logic migration; Candidate A is in this family)
-- `docs/recon/discard_pipeline_recon.md` Section 8 (adjacent smells: duplicated
+- `docs/archive/phase4/discard_pipeline_recon.md` Section 8 (adjacent smells: duplicated
   `game_catcher` state-init; per-copy catcher state; stamp draw lacking hand-cap check)
-- D-F4.17 / `docs/process/F4.17_campaign_ledger.md` (where Candidate D surfaced — the
+- D-F4.17 / `docs/archive/phase4/F4.17_campaign_ledger.md` (where Candidate D surfaced — the
   Horse/catcher/hand-cap deliberation and the stale `HandManager` capacity-contract JSDoc)
 - F4.20 engine_moths migration (where Candidate E surfaced — the t1Procs wood-slot-creation
   counter; the slot-model recon was banked so it didn't derail that low-risk migration)

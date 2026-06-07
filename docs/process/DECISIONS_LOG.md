@@ -3360,7 +3360,7 @@ and the reference share a backbone, which is the source of the apparent contradi
 
 1. **F4.24a — Diagnostic checkpoints (RECURRING).** Read-only enumeration sweeps run by
    Claude Code. Run at:
-   - Phase 4 start (DONE — shipped as `docs/process/F4.24_inventory_pass1.md`, 2026-06-04)
+   - Phase 4 start (DONE — shipped as `docs/archive/phase4/F4.24_inventory_pass1.md`, 2026-06-04)
    - The end of major architectural chunks (end of Tier 2, end of Tier 3, and any other
      point where a fresh structural view is warranted before the next wave builds on it).
    Each checkpoint is a **disposable snapshot**. Its job is to (a) surface the current
@@ -3527,7 +3527,7 @@ The test is part of the migration's "done" criteria, not a separate task.
 revert point until in-game verification confirms the GameScene end-screen integration.
 
 **Context:** What began as a single F4.20 spirit migration (Crow) surfaced — via a dedicated
-recon (`docs/recon/round_end_pipeline_recon.md`) — that the codebase had **four** parallel
+recon (`docs/archive/phase4/round_end_pipeline_recon.md`) — that the codebase had **four** parallel
 round-end pipelines, not the two assumed: bank (`bankScore`), natural + forced-auto-bank
 (`_finalizeTurn`), and a severely stripped consumable-empty-hand path
 (`_checkRoundEndOnEmptyHand`, "1D"). The 1D path fired only the onRoundEnd hooks and skipped
@@ -3597,8 +3597,8 @@ with design, and each round of design creates new debt. This reinforces:
   NOT adherence to the original linear sequence.
 
 **Cross-references:**
-- `docs/recon/round_end_pipeline_recon.md` (the mapping that drove the campaign)
-- `docs/process/F4.18b_campaign_ledger.md` (step tracker)
+- `docs/archive/phase4/round_end_pipeline_recon.md` (the mapping that drove the campaign)
+- `docs/archive/phase4/F4.18b_campaign_ledger.md` (step tracker)
 - D-F4.20-TIER2 (the return-intent pattern this campaign extended)
 - F4.17/F4.18 (sibling pipeline-consolidation tasks; F4.18b is the round-end instance)
 - Branch `f4.18b-pre-unification` (revert point)
@@ -3658,8 +3658,8 @@ Identical to the old flat redraw when no catcher (hand empty → availableSlots 
 maxSize — stale; `add()` silently clamps. Corrected the doc in this campaign.
 
 **Cross-references:**
-- `docs/recon/discard_pipeline_recon.md` (the mapping + asymmetry matrix that drove it)
-- `docs/process/F4.17_campaign_ledger.md` (step tracker, per-step notes)
+- `docs/archive/phase4/discard_pipeline_recon.md` (the mapping + asymmetry matrix that drove it)
+- `docs/archive/phase4/F4.17_campaign_ledger.md` (step tracker, per-step notes)
 - D-F4.18b (sibling round-end campaign; same migrate-then-unify shape)
 - D-F4.20-TIER2 (the return-intent hook pattern `onFieldDiscard` follows)
 - Tests: `test/spirits/discard_{field_hooks,hand_overflow,monkey,horse_ox}.test.js`

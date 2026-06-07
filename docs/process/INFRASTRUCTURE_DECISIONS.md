@@ -124,18 +124,31 @@ drifted/stale copy) and keeps a single canonical source — the same single-sour
 /src/                              ← code
 /docs/
   DESIGN_DOC_V5.md                 ← design source of truth
-  /process/                        ← LIVING refs (consulted + updated)
-    OVERHAUL_PLAN.md, DECISIONS_LOG.md, DESIGN_DOC_PATCHES.md,
-    PHASE_3_LESSONS.md, INFRASTRUCTURE_DECISIONS.md
+  /process/                        ← the LIVE set (durable refs + currently-active)
+    PHASE4_STATE.md                ← live "where are we" index (single anchor)
+    OVERHAUL_PLAN.md, DECISIONS_LOG.md, DESIGN_DOC_PATCHES.md, PHASE_3_LESSONS.md,
+    INFRASTRUCTURE_DECISIONS.md, TEST_HARNESS_GOTCHAS.md, SPIRIT_SET_ITERATION_RULE.md,
+    PHASE4_consolidation_candidates.md   (partially-live banked threads)
   /archive/                        ← HISTORICAL, point-in-time, do NOT edit
-    PHASE_4_ENTRY_BRIEF.md, PHASE_4_TASK_ORDERING.md,
     INFRASTRUCTURE_PLAN.md (superseded by this file), UPLOAD_MANIFEST.md
+    /phase4/                       ← completed Phase-4 task records (CLOSED/SUPERSEDED headers)
+      PHASE_4_ENTRY_BRIEF.md, PHASE_4_TASK_ORDERING.md,
+      F4.16_F4.20_triage_ledger.md, F4.20_candidate_F_audit_findings.md,
+      F4.24_inventory_pass1.md, F4.17_campaign_ledger.md, F4.18b_campaign_ledger.md,
+      discard_pipeline_recon.md, round_end_pipeline_recon.md
     /investigations/               ← prior recon evidence (verify vs current code)
       cleanup-audit-report.md, three-marks-investigation.md, yaku-investigation.md
+  (docs/recon/ and docs/prompts/ no longer exist — recon folded into archive/phase4/,
+   prompts/ deleted)
 ```
 
 - **process/ vs archive/:** living/updated → process; immutable snapshot → archive.
   Don't edit archived files; if stale, re-recon fresh rather than amend.
+- **Doc lifecycle — "rule vs record" test.** A doc stays in `process/` only while upcoming work
+  needs to consult it (a *rule*, plan, or live reference). When a doc becomes a *record* of how a
+  completed task went, move it to `archive/phase4/` at that task's close-out (the close-out ritual),
+  with a CLOSED status header. This keeps `process/` to the live set and prevents bloat.
+  `PHASE4_STATE.md` is the live index of which docs are which.
 - **Investigations** (three-marks, yaku, cleanup-audit) are kept: they're the recon
   behind specific Phase 4 tasks (e.g. three-marks → F4.10 naming cleanup + F4.27;
   yaku → F4.8 + the two-scoring-paths debt in F4 Tier-equivalent work). Treat as
@@ -149,10 +162,11 @@ drifted/stale copy) and keeps a single canonical source — the same single-sour
 
 - **In the repo → synced into knowledge** (durable): everything under `/docs/`
   plus `CLAUDE.md` and the codebase. Nothing uploaded separately.
-- **First conversation only** (Phase-3→4 transition, ages out): paste
-  `PHASE_4_ENTRY_BRIEF.md` and `PHASE_4_TASK_ORDERING.md` into the opening message
-  to orient it. Their canonical home is still `/docs/archive/`; the paste is just
-  for immediate orientation.
+- **First conversation only** (Phase-3→4 transition, ages out): `PHASE_4_ENTRY_BRIEF.md` and
+  `PHASE_4_TASK_ORDERING.md` were the bootstrap orientation. They are now SUPERSEDED as live
+  anchors by `docs/process/PHASE4_STATE.md` — the single live "where are we" doc — and have moved
+  to `/docs/archive/phase4/` (alongside `UPLOAD_MANIFEST.md` in `/docs/archive/`). Consult
+  PHASE4_STATE.md for current state; the archived pair is the bootstrap record only.
 
 ## Past-conversation migration into the Project
 

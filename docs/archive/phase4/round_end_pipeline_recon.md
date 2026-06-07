@@ -1,5 +1,7 @@
 # Round-End Pipeline Recon (pre-F4.18b)
 
+> **STATUS: CLOSED 2026-06-07 — consumed by F4.18b. Historical record, do not update. See PHASE4_STATE.md.**
+
 **Date:** 2026-06-05. **Source:** `GameRoundManager.js` read top-to-bottom against live
 working tree (commit c4fee6b+).
 

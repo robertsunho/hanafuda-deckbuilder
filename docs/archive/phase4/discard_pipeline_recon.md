@@ -1,5 +1,7 @@
 # Recon (F4.17): Discard Pipeline Map + Asymmetry Matrix + `onFieldDiscard` Design
 
+> **STATUS: CLOSED 2026-06-07 — consumed by F4.17. Historical record, do not update. See PHASE4_STATE.md.**
+
 **Status:** READ-ONLY recon. No `src/**` changes. Verified against current code on
 branch `main` (commit `e91ad1c`), 2026-06-06.
 

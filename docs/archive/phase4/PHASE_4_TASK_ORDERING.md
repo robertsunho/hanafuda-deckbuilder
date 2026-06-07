@@ -1,5 +1,7 @@
 # Phase 4 Task Ordering Plan
 
+> **STATUS: SUPERSEDED as a live anchor by docs/process/PHASE4_STATE.md (2026-06-07). Retained as the Phase-4 bootstrap record; do not use as current guidance.**
+
 **For:** The new Claude entering Phase 4. Read after `PHASE_4_ENTRY_BRIEF.md`.
 **Status:** Proposed ordering as of 2026-06-02, to be discussed and confirmed with Robert in the first Phase 4 session.
 

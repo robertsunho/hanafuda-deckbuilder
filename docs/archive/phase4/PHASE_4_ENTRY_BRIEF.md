@@ -1,5 +1,7 @@
 # Phase 4 Entry Brief
 
+> **STATUS: SUPERSEDED as a live anchor by docs/process/PHASE4_STATE.md (2026-06-07). Retained as the Phase-4 bootstrap record; do not use as current guidance.**
+
 **For:** The next Claude entering Phase 4 of the Hanatu audit/overhaul.
 **Status:** Phase 3 complete as of 2026-06-02. Phase 4 not yet started.
 **This document:** Onboarding. Read this first. It points to everything else.

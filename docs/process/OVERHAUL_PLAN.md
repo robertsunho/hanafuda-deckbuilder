@@ -3163,13 +3163,13 @@ Examples surfaced during F2.3 recon:
 
 ### F4.17: Discard pipeline unification — ✅ COMPLETE (2026-06-06, 5-step campaign)
 
-**✅ COMPLETE — see `docs/process/F4.17_campaign_ledger.md` and DECISIONS_LOG D-F4.17.**
+**✅ COMPLETE — see `docs/archive/phase4/F4.17_campaign_ledger.md` and DECISIONS_LOG D-F4.17.**
 All six discard sites now route through one canonical `_discardCard(card, source)` /
 `_discardCards(cards, source)` on GameRoundManager; the asymmetry matrix is all ✅.
 
 **⚠️ Stale-premise correction:** the "reveal-miss discards BYPASS the discard pipeline"
-framing below (item 3, and the Phase 2C bullets) was STALE. Recon (`docs/recon/
-discard_pipeline_recon.md`) confirmed hex_51 reveal-miss already routed through
+framing below (item 3, and the Phase 2C bullets) was STALE. Recon
+(`docs/archive/phase4/discard_pipeline_recon.md`) confirmed hex_51 reveal-miss already routed through
 `_handleFieldDiscard` and fired the full set — consistent with this doc's own hex_51 status
 note ("unified reveal-miss with `_handleFieldDiscard`"). The feared "TANGLED" risk was absent;
 verdict was DRIFTED-close-to-CLEAN. Other corrections vs. the plan below: **Ox IS a full
