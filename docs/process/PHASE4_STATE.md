@@ -168,6 +168,7 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 - `SPIRIT_SET_ITERATION_RULE.md` — durable (the transcendence/spirit-set invariant; a rule, not a record).
 - `PHASE4_consolidation_candidates.md` — partially-live (banked threads incl. Candidate C).
 - `PHASE4_STATE.md` — this doc (live state).
+- `consumable_block_kickoff.md` — currently-active (the consumable block's kickoff + opening recon; archives at block close).
 
 **`docs/` root:** `DESIGN_DOC_V5.md` — durable design source of truth.
 
