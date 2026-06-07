@@ -3807,3 +3807,57 @@ audit happened to map.
   category-by-category reorganization spirit)
 - F4.24a `F4.24_inventory_pass1.md` Section 8 (already flagged dual spirit-init paths in
   RunManager + the import cycles — seed observations for the GRM/RunManager audit)
+
+---
+
+## D-F4.20-VELOCITY — Velocity exponential-on-stack: Phase-5 deferral (Option A: document, change nothing) (2026-06-06)
+
+**Status:** DEFERRED (to Phase 5)
+
+**Context:** The F4.20-FIX velocity test flagged the exponential output for design confirm —
+specifically whether `powerLevel` should scale *inside* the `1.5^x` exponent. We read the real
+formula (both branches, against synced source) and deliberately decided to **document the question
+and change no code now.**
+
+**What the code actually does:**
+- **Negative branch:** `effectiveT2 = t2ProcsAtTranscend + newT2Procs × powerLevel`, then
+  `t2Mult = Math.pow(1.5, effectiveT2)`. So `powerLevel` is INSIDE the exponent → a transcended
+  velocity compounds on stack (powerLevel 2, +3 procs → `1.5^6 ≈ 11.4×`, not `1.5^3 ≈ 3.4×`).
+- **Regular branch:** `Math.pow(1.5, t2)` with no `powerLevel` in the exponent, BUT
+  `_scaleEngineOutput` then applies `multiplyMult = Math.pow(multiplyMult, n)` for n stacks → the
+  regular form ALSO compounds exponentially on stack count.
+
+**Key finding — the two branches are currently CONSISTENT with each other.** Both compound on stack
+(one via powerLevel-in-exponent, one via `_scaleEngineOutput`'s `Math.pow(…, n)`). The F4.20-FIX
+negative-accrual change did NOT introduce a new inconsistency — it faithfully preserved velocity's
+existing compounding behavior for the transcended form.
+
+**Decision — Option A (document, change nothing). Rationale:**
+1. **It's a balance decision, not a structural one — and balance is Phase 5.** Choosing the base
+   (1.5? 1.1? capped?) or whether to compound on stack at all is calibration that must happen with
+   the surrounding balance pass, not in isolation during Phase-4 consolidation.
+2. **Any code change now would create a NEW inconsistency.** "Fixing" only the negative branch to
+   scale rate-not-exponent would make it inconsistent with its own regular form (which still
+   compounds via `_scaleEngineOutput`). A half-fix is worse than the documented status quo.
+
+**The throughline question, framed for Phase 5:** The codebase's stacking throughline is ADDITIVE,
+not multiplicative (Yang ×2 at 3-stack → ×6 = 2×3, NOT ×8 = 2³). `_scaleEngineOutput` encodes this
+for `addMult`/`addPoints` (linear) but uses `Math.pow(…, n)` for `multiplyMult` (compounding) — and
+velocity, being exponential, compounds hard on top of that. So velocity is an across-the-board
+exception to the additive throughline, in BOTH forms. Phase 5 must decide the **binary**: is
+velocity's exponential-compounding-on-stack a **sanctioned** exception (its identity = the designed
+exponential build-around payoff; roguelikes often want one or two such targets) or an **accidental**
+one to sand down to the additive grammar — and only THEN the magnitude. (Robert's analysis: even
+base 1.5 is large; an additive reading of stack → ~4.5 effective exponent at 3-stack = explosive;
+lowering the base to 1.1 gentles the curve but does NOT resolve the inconsistency-in-KIND.) Decide
+both branches together (keep them consistent).
+
+**Test status:** `velocity.test.js` asserts negative accrual (`newT2Procs` advances) + monotonic
+output movement off a frozen baseline — deliberately NOT the exact exponential value. Correct
+granularity given the magnitude is an open Phase-5 question. **Leave as-is.**
+
+**Codebase changes:** None.
+
+**Cross-references:** F5.1 (balance tuning), F4.27-ish stacking-pattern audit
+(`_scaleEngineOutput` canonicalization), F4.38 (Wu Xing); OVERHAUL_PLAN F2.5 "Deferred to Phase 5";
+F4.20-FIX campaign (triage ledger). [[D-TEST-HARNESS]] notes the Vitest suite this test lives in.

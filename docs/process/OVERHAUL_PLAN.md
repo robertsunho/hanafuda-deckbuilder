@@ -1195,6 +1195,15 @@ The complexity is in handling powerLevel mismatch between copier and target. If 
 - Ducks: full effect redesign needed; not just architecture but mechanic
   - Currently flat-state `multValue` (net deck-flip matches minus strands)
   - Bundle with other Phase 5 redesign work
+- **Velocity exponential-on-stack (balance, not structure):** both branches compound on stack
+  (negative: `powerLevel` inside the `1.5^x` exponent; regular: `_scaleEngineOutput`'s
+  `Math.pow(mult, n)`) — currently CONSISTENT with each other, but an across-the-board exception to
+  the codebase's otherwise-ADDITIVE stacking throughline. Phase 5 binary decision: **sanctioned**
+  build-around payoff vs **sand-down** to additive grammar — and only then the magnitude (base 1.5
+  is already explosive). Decide both branches together. Full rationale: DECISIONS_LOG
+  `D-F4.20-VELOCITY`. Cross-ref F5.1 (balance), F4.27-ish (`_scaleEngineOutput` canonicalization),
+  F4.38 (Wu Xing). F4.20-FIX deliberately left `velocity.test.js` asserting accrual + monotonic
+  output only (NOT the exact exponential) at this granularity.
 
 **Cat 5 activation semantics:**
 - Past Life: sale-activated. Player sells stack, creates copies of target spirit. Negative form sells to create Negative copy at copier's powerLevel.
