@@ -953,14 +953,14 @@ const _effects = {
   engine_moths: {
     // Both counter events are hooks (F4.20): t1 = Wood (Leaf/Silk) field-slot creation
     // (onWoodSlotCreated, +0.3 mult-mult each); t2 = Silk stranding-avoidance (onSilkAntiStrand,
-    // +0.6 each). Negatives excluded on both — the old inline paths iterated run.activeSpirits.
-    // Only the Moths CREDIT moved; the Silk anti-stranding LOGIC still lives in GRM _doDeckPhase.
+    // +0.6 each). F4.20-FIX: negatives now accrue on both (dropped the isNegative guards) — per
+    // the locked F2.5 design the transcended copy scores off preTranscendTotal + newEvents1/2 ×
+    // scaling × powerLevel, so the dual-key counters must keep advancing post-transcendence.
+    // Only the Moths CREDIT lives here; the Silk anti-stranding LOGIC still lives in GRM _doDeckPhase.
     onWoodSlotCreated({ spirit }) {
-      if (spirit.isNegative) return;
       incrementPerElement(spirit, 't1Procs', 1);
     },
     onSilkAntiStrand({ spirit }) {
-      if (spirit.isNegative) return;
       incrementPerElement(spirit, 't2Procs', 1);
     },
     applyEngine({ spirit }) {
@@ -1201,11 +1201,12 @@ const _effects = {
 
   engine_ship: {
     // +1 cardsDiscarded per field discard (drives +0.3 mult-mult/card).
-    // F4.17#1: migrated off inline _handleFieldDiscard. Negatives (transcended)
-    // are excluded to match the prior activeSpirits-only increment — the negative
-    // form tracks via its own preTranscendTotal/newEvents in applyEngine.
+    // F4.20-FIX: negatives now accrue too (dropped the prior !isNegative guard). Per the
+    // locked F2.5 design a transcended copy scores off preTranscendTotal + newEvents ×
+    // scaling × powerLevel, so newEvents must keep advancing post-transcendence —
+    // incrementPerElement routes the negative to its newEvents key.
     onFieldDiscard({ spirit }) {
-      if (!spirit.isNegative) incrementPerElement(spirit, 'cardsDiscarded', 1);
+      incrementPerElement(spirit, 'cardsDiscarded', 1);
     },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {

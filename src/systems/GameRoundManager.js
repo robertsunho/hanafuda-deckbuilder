@@ -789,8 +789,10 @@ export default class GameRoundManager {
     if (!effect) return { success: false, message: `Unknown consumable: ${consumable.id}` };
     const result = effect.execute({ roundManager: this, params });
     // sym_badger: count zodiac/consumable activations.
+    // F4.20-FIX: iterate allSpirits so transcended (Negative) copies accrue too. (The
+    // RunManager._notifyBadger path already iterates allSpirits; this in-round path lagged.)
     if (result.success !== false) {
-      for (const spirit of run.activeSpirits) {
+      for (const spirit of run.allSpirits) {
         if (spirit.id === 'sym_badger') {
           incrementPerElement(spirit, 'consumablesUsed', 1);
         }
@@ -819,7 +821,9 @@ export default class GameRoundManager {
         card.enhancement.depLevel = (card.enhancement.depLevel ?? 0) + 1;
         events.push(`${card.id} Water dep → level ${card.enhancement.depLevel}`);
         // engine_glacier: tier-aware depreciation tracking.
-        for (const spirit of run.activeSpirits) {
+        // F4.20-FIX: iterate allSpirits so transcended (Negative) copies accrue too
+        // (incrementPerElement routes them to newEvents1/2 per the locked F2.5 design).
+        for (const spirit of run.allSpirits) {
           if (spirit.id === 'engine_glacier') {
             if (tier === 'base')     incrementPerElement(spirit, 't1Procs', 1);
             if (tier === 'upgraded') incrementPerElement(spirit, 't2Procs', 1);
@@ -831,7 +835,8 @@ export default class GameRoundManager {
         const breakChance = getFireBreakChance(tier);
         if (rollProbability(breakChance, 'fire_break')) {
           // engine_carbon: tier-aware break tracking (read tier before destruction).
-          for (const spirit of run.activeSpirits) {
+          // F4.20-FIX: iterate allSpirits so transcended (Negative) copies accrue too.
+          for (const spirit of run.allSpirits) {
             if (spirit.id === 'engine_carbon') {
               if (tier === 'base')     incrementPerElement(spirit, 't1Procs', 1);
               if (tier === 'upgraded') incrementPerElement(spirit, 't2Procs', 1);
@@ -886,7 +891,8 @@ export default class GameRoundManager {
       for (let _ht = 0; _ht < _heldTriggers; _ht++) {
         rate += getEarthInterestRate(card.enhancement.tier);
         // engine_fossil: tier-aware Earth interest proc tracking.
-        for (const spirit of run.activeSpirits) {
+        // F4.20-FIX: iterate allSpirits so transcended (Negative) copies accrue too.
+        for (const spirit of run.allSpirits) {
           if (spirit.id === 'engine_fossil') {
             const tier = card.enhancement.tier;
             if (tier === 'base')     incrementPerElement(spirit, 't1Procs', 1);
@@ -1336,7 +1342,9 @@ export default class GameRoundManager {
             if (henh.tier === 'upgraded' && rollProbability(getMeteoriteJackpotChance(), 'meteorite_jackpot')) {
               run.addKi(30, 'meteorite_jackpot');
               // engine_velocity: +t2Procs per Meteorite jackpot.
-              for (const spirit of _activeSpirits) {
+              // F4.20-FIX: iterate allSpirits so transcended (Negative) copies accrue too
+              // (incrementPerElement routes them via the t2ProcsAtTranscend marker → newT2Procs).
+              for (const spirit of run.allSpirits) {
                 if (spirit.id === 'engine_velocity') {
                   incrementPerElement(spirit, 't2Procs', 1);
                 }
@@ -1543,7 +1551,8 @@ export default class GameRoundManager {
 
       if (cards.length === 4) {
         // engine_missing_number: increment counter on 4-stack scored.
-        for (const spirit of _activeSpirits) {
+        // F4.20-FIX: iterate allSpirits so transcended (Negative) copies accrue too.
+        for (const spirit of run.allSpirits) {
           if (spirit.id === 'engine_missing_number') {
             incrementPerElement(spirit, 'totalStacks', 1);
           }
@@ -2052,7 +2061,8 @@ export default class GameRoundManager {
         if (rank) this._bullseyeInventory[rank]++;
       }
       while (BULLSEYE_RANKS.every(r => this._bullseyeInventory[r] >= 1)) {
-        for (const spirit of run.activeSpirits) {
+        // F4.20-FIX: iterate allSpirits so transcended (Negative) copies accrue too.
+        for (const spirit of run.allSpirits) {
           if (spirit.id === 'engine_bullseye') {
             incrementPerElement(spirit, 'qualifiedCount', 1);
           }

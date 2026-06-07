@@ -34,6 +34,20 @@ describe('F4.17#1/#2 — onFieldDiscard hook fires via _discardCard (deck overfl
     expect(aggregateNumericState(spirit, 'cardsDiscarded')).toBe(1);
   });
 
+  // F4.20-FIX: a transcended (Negative) ship now accrues post-transcendence too —
+  // the !isNegative guard was dropped so newEvents keeps advancing per the locked design.
+  it('Negative engine_ship accrues newEvents on field discard (F4.20-FIX)', () => {
+    const { grm } = makeRound({ spiritIds: [], deckCardIds: DECK });
+    run.addSpiritDirect({
+      id: 'engine_ship', name: 'Ship', isNegative: true, stackCount: 1, powerLevel: 2,
+      state: { key: 'cardsDiscarded', preTranscendTotal: 1, oldestAtTranscend: 0, newEvents: 0 },
+    });
+    const neg = run.allSpirits.find(s => s.id === 'engine_ship' && s.isNegative);
+    grm._discardCard(freshCard('december_plain_1'), 'deck_overflow');
+    grm._discardCard(freshCard('december_plain_2'), 'deck_overflow');
+    expect(neg.state.newEvents).toBe(2);   // was frozen at 0 pre-fix
+  });
+
   it('bookkeeping is unchanged (counts the discard, returns field_discard)', () => {
     const { grm } = makeRound({ spiritIds: [], deckCardIds: DECK });
     const before = grm.discardCount;

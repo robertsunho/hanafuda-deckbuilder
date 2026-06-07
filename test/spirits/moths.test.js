@@ -29,7 +29,7 @@ describe('F4.20 — engine_moths via onWoodSlotCreated spirit hook', () => {
     expect(aggregateNumericState(spirit, 't1Procs')).toBe(2);
   });
 
-  it('Negative engine_moths is NOT incremented (mirrors the prior activeSpirits-only path)', () => {
+  it('Negative engine_moths accrues t1 newEvents1 (F4.20-FIX: was excluded, now accrues)', () => {
     const { grm } = makeRound({ spiritIds: [], deckCardIds: FIELD_FULL_DECK });
     run.addSpiritDirect({
       id: 'engine_moths', name: 'Moths', isNegative: true, stackCount: 1, powerLevel: 2,
@@ -37,7 +37,9 @@ describe('F4.20 — engine_moths via onWoodSlotCreated spirit hook', () => {
     });
     const neg = run.allSpirits.find(s => s.id === 'engine_moths' && s.isNegative);
     grm._fireWoodSlotCreatedHooks();
-    expect(neg.state.newEvents1).toBe(0);   // wood-slot t1 not credited to Negatives
+    grm._fireWoodSlotCreatedHooks();
+    expect(neg.state.newEvents1).toBe(2);   // wood-slot t1 now credited to Negatives (flipped from 0)
+    expect(neg.state.newEvents2).toBe(0);   // Silk t2 path untouched
   });
 
   it('Silk anti-strand credit (t2) fires via onSilkAntiStrand, separate from t1', () => {
@@ -48,7 +50,7 @@ describe('F4.20 — engine_moths via onWoodSlotCreated spirit hook', () => {
     expect(aggregateNumericState(spirit, 't1Procs')).toBe(0);   // t1 unaffected
   });
 
-  it('Negative engine_moths is NOT credited t2 (active-only preserved)', () => {
+  it('Negative engine_moths accrues t2 newEvents2 (F4.20-FIX: was excluded, now accrues)', () => {
     const { grm } = makeRound({ spiritIds: [], deckCardIds: FIELD_FULL_DECK });
     run.addSpiritDirect({
       id: 'engine_moths', name: 'Moths', isNegative: true, stackCount: 1, powerLevel: 2,
@@ -56,6 +58,7 @@ describe('F4.20 — engine_moths via onWoodSlotCreated spirit hook', () => {
     });
     const neg = run.allSpirits.find(s => s.id === 'engine_moths' && s.isNegative);
     grm._fireSilkAntiStrandHooks();
-    expect(neg.state.newEvents2).toBe(0);   // Silk t2 not credited to Negatives
+    expect(neg.state.newEvents2).toBe(1);   // Silk t2 now credited to Negatives (flipped from 0)
+    expect(neg.state.newEvents1).toBe(0);   // wood-slot t1 path untouched
   });
 });
