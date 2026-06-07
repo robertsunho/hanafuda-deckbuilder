@@ -360,6 +360,8 @@ class RunManager {
     // Hexagram modifier first — establishes the base price for this run.
     const hexAdjusted = applyHook('modifyShopPrice', baseCost, baseCost);
     // Coupon discount applies to the hex-adjusted price.
+    // Bucket-B (F4.20): econ_coupon's discount is a term in this RunManager-owned shop-pricing
+    // formula — intentionally in place, not seepage. See F4.16_F4.20_triage_ledger.md.
     const couponStacks = this.countStackedById('econ_coupon');
     if (couponStacks <= 0) return hexAdjusted;
     const remainingPct = Math.max(0, 100 - couponStacks * 15);
@@ -1235,6 +1237,8 @@ class RunManager {
     const pushFailed   = result.penaltyApplied ?? false;
     const pushDepth    = result.pushDepth ?? 0;
     const outcome      = pushFailed ? 'failure' : 'success';
+    // Bucket-B (F4.20): econ_piggybank's x(1+stacks) on handKi is a term in this RunManager-owned
+    // ki-reward formula — intentionally in place, not seepage. See F4.16_F4.20_triage_ledger.md.
     const piggyStacks  = this.countStackedById('econ_piggybank');
     const piggyMult    = piggyStacks > 0 ? (1 + piggyStacks) : 1;
     let handKi         = pushFailed ? 0 : cardsInHand * piggyMult;
@@ -1261,6 +1265,8 @@ class RunManager {
   /** Base interest rate applied at the start of each round. */
   get interestRate() {
     let rate = 0.10;
+    // Bucket-B (F4.20): econ_bonds (+0.05/stack) and econ_ingot (+ki*0.0001) are terms in this
+    // RunManager-owned compounding formula — intentionally in place, not seepage. See F4.16_F4.20_triage_ledger.md.
     const bondsCount = this.countStackedById('econ_bonds');
     rate += bondsCount * 0.05;
     if (this._allSpirits.some(s => s.id === 'econ_ingot'))  rate += this._ki * 0.0001;

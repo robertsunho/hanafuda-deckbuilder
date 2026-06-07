@@ -400,6 +400,8 @@ export default class GameRoundManager {
     this._field.setCaptureRule(applyHook('overridesCaptureRule', 'month'));
 
     // Gankyil legendary: auto-capture at 3-stack instead of 4-stack.
+    // Bucket-B (F4.20): legend_gankyil's autoCaptureThreshold is a field state-machine concern —
+    // intentionally in place (structural, not a scoring hook), not seepage. See F4.16_F4.20_triage_ledger.md.
     this._field.autoCaptureThreshold = run.activeSpirits.some(s => s.id === 'legend_gankyil') ? 3 : 4;
 
     const _baseHandSize   = applyHook('modifyHandSize', GameRoundManager.HAND_SIZE + _handSizeBonus, GameRoundManager.HAND_SIZE + _handSizeBonus);
@@ -2062,6 +2064,8 @@ export default class GameRoundManager {
       if (pushSucceeded) {
         this._pushPenaltyActive = false;
         run.onPushSuccess(this);  // increments _pushDepth + fires hexagram onPushSuccess
+        // Bucket-T (F4.20): engine_northern_lion's pushesWitnessed is a shop-utility counter (drives
+        // free rerolls), out of accumulator scope — intentionally in place, not seepage. See F4.16_F4.20_triage_ledger.md.
         for (const spirit of run.activeSpirits) {
           if (spirit.id === 'engine_northern_lion') {
             incrementPerElement(spirit, 'pushesWitnessed', 1);

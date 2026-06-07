@@ -1876,6 +1876,8 @@ export class ShrineScene extends Phaser.Scene {
     btn.on('pointerout',  () => btn.setFillStyle(0x1a4a2a));
     btn.on('pointerdown', () => {
       // legend_waidan: Sacred Grove only — create negative consumable copies per stack.
+      // Bucket-B (F4.20): Sacred Grove exit is a scene-transition event (no spirit hook fires here) —
+      // intentionally in place, not seepage. See F4.16_F4.20_triage_ledger.md.
       if (this._isGrove) {
         const waidanStacks = run.spirits
           .filter(s => s.id === 'legend_waidan')
