@@ -36,6 +36,20 @@ describe('F4.20-FIX — engine_missing_number accrues for negatives via _addCapt
     grm._addCapture(FOUR());
     expect(neg.state.newEvents).toBe(2);
   });
+
+  // F4.20 counter wave (onStackCaptured migration) — PRESERVE timing: the dispatcher fires
+  // BEFORE Phase 2 applyEngine, so the triggering 4-capture's own +1 is visible to its
+  // applyEngine that same capture (1 x 5 = addMult 5, not 0).
+  it('PRESERVE timing: the triggering 4-capture counts itself in its own Phase-2 applyEngine', () => {
+    const { grm } = makeRound({ spiritIds: ['engine_missing_number'], deckCardIds: DECK });
+    equipSpiritWithState('engine_missing_number', { elements: [{ totalStacks: 0 }] });
+    const steps = [];
+    grm.setScoringStepCallback(e => steps.push(e));
+    grm._addCapture(FOUR());
+    const step = steps.find(e => e.type === 'engine_effect' && e.spirit?.id === 'engine_missing_number');
+    expect(step).toBeDefined();
+    expect(step.addMult).toBe(5); // totalStacks incremented to 1 BEFORE Phase 2 read
+  });
 });
 
 // ── engine_bullseye — all-4-ranks while-loop in _finalizeTurn ────────────────

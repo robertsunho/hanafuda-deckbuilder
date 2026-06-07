@@ -18,6 +18,13 @@
 //   onCardPlayed({ cards, spirit, run })          — once per play, carrying the cards played (Ants)
 //   onWoodSlotCreated({ spirit, run })            — when a Wood (Leaf/Silk) field slot is created (Moths t1)
 //   onSilkAntiStrand({ spirit, run })             — when a Silk 3-stack banks instead of stranding (Moths t2)
+//   onRoundEndUnplayed({ spirit, handCount, run }) — round-end unplayed-hand tally, fired in the
+//                                                   teardown BEFORE _scoreFieldCards (so the count is
+//                                                   visible to round-end field scoring). NOT onRoundEnd,
+//                                                   which fires later, post-field-score (Snails).
+//   onStackCaptured({ cards, spirit, run })       — once per capture, BEFORE Phase 2 applyEngine (so a
+//                                                   4-stack capture's own count is visible to applyEngine
+//                                                   that same capture). Body guards on cards.length (Missing Number).
 //
 // Hooks fire once per equipped spirit instance (regular + Negative). Use
 // effectivePower(spirit) inside for per-stack scaling. A hook that should ignore
@@ -737,6 +744,12 @@ const _effects = {
   },
 
   sym_snails: {
+    // F4.20 counter wave: migrated from GRM._trackSnailsUnplayed (inline). Fired by
+    // _fireRoundEndUnplayedHooks at the SAME teardown point (before _scoreFieldCards), so
+    // timing is byte-identical. No isNegative guard — the old path iterated allSpirits.
+    onRoundEndUnplayed({ spirit, handCount }) {
+      incrementPerElement(spirit, 'totalUnplayed', handCount);
+    },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
         const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 1 * (spirit.powerLevel ?? 1);
@@ -1178,6 +1191,13 @@ const _effects = {
   // ── Event-Hook Engine Spirits (E2b) ──────────────────────────────────────
 
   engine_missing_number: {
+    // F4.20 counter wave: migrated from GRM._addCapture inline 4-stack block. Fired by
+    // _fireStackCapturedHooks BEFORE Phase 2 applyEngine, so the triggering 4-capture's own
+    // count is visible to applyEngine that same capture (byte-identical timing). No isNegative
+    // guard — the old path iterated allSpirits (F4.20-FIX).
+    onStackCaptured({ cards, spirit }) {
+      if (cards.length === 4) incrementPerElement(spirit, 'totalStacks', 1);
+    },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
         const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 5 * (spirit.powerLevel ?? 1);

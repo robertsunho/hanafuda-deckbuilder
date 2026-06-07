@@ -969,13 +969,19 @@ export default class GameRoundManager {
    *
    * @param {object[]} cards
    */
-  /** sym_snails: accumulate hand card count at round end (permanent). */
-  _trackSnailsUnplayed() {
-    const handCount = this._hand.getAll().length;
+  /**
+   * Fire onRoundEndUnplayed (round-end unplayed-hand tally) for every equipped spirit.
+   * Fired in the teardown BEFORE _scoreFieldCards so the count is visible to round-end field
+   * scoring — NOT via the generic onRoundEnd (which fires later, post-field-score). Iterates
+   * allSpirits (incl. Negatives) — incrementPerElement routes Negatives to their newEvents.
+   * (F4.20 counter wave: replaced the inline sym_snails _trackSnailsUnplayed.)
+   */
+  _fireRoundEndUnplayedHooks(handCount) {
     if (handCount === 0) return;
     for (const spirit of run.allSpirits) {
-      if (spirit.id === 'sym_snails') {
-        incrementPerElement(spirit, 'totalUnplayed', handCount);
+      const effect = SpiritEffects.get(spirit.id);
+      if (effect?.onRoundEndUnplayed) {
+        effect.onRoundEndUnplayed({ spirit, handCount, run, roundManager: this });
       }
     }
   }
@@ -1094,6 +1100,21 @@ export default class GameRoundManager {
   }
 
   /**
+   * Fire the onStackCaptured hook for every equipped spirit that implements it. Fired once per
+   * capture, BEFORE Phase 2 applyEngine, so a 4-stack capture's own count is visible to its
+   * applyEngine that same capture. Iterates allSpirits (incl. Negatives). The cards.length guard
+   * lives in the hook body. (F4.20 counter wave: replaced the inline engine_missing_number block.)
+   */
+  _fireStackCapturedHooks(cards) {
+    for (const spirit of run.allSpirits) {
+      const effect = SpiritEffects.get(spirit.id);
+      if (effect?.onStackCaptured) {
+        effect.onStackCaptured({ cards, spirit, run, roundManager: this });
+      }
+    }
+  }
+
+  /**
    * Dispatch a card's discard-trigger stamp effects with retrigger awareness.
    * Blue → consumable, Green → +3 ki, Purple/Black/Gray → draw +1.
    * @param {object} card  The discarded card.
@@ -1142,7 +1163,7 @@ export default class GameRoundManager {
 
     // ── Shared core teardown (runs for ALL triggers, including 1D) ────
     // Order matches bankScore's canonical sequence (the most-exercised path).
-    this._trackSnailsUnplayed();
+    this._fireRoundEndUnplayedHooks(this._hand.getAll().length);
     this._scoreFieldCards();
     run.applyFlowDecay();
     const flow = run.flow;   // POST-decay capture
@@ -1557,15 +1578,10 @@ export default class GameRoundManager {
         }
       }
 
-      if (cards.length === 4) {
-        // engine_missing_number: increment counter on 4-stack scored.
-        // F4.20-FIX: iterate allSpirits so transcended (Negative) copies accrue too.
-        for (const spirit of run.allSpirits) {
-          if (spirit.id === 'engine_missing_number') {
-            incrementPerElement(spirit, 'totalStacks', 1);
-          }
-        }
-      }
+      // engine_missing_number counter (4-stack capture) — fired BEFORE Phase 2 so the
+      // triggering capture's own count is visible to its applyEngine this same capture.
+      // The cards.length===4 guard lives in the hook body. (F4.20 counter wave.)
+      this._fireStackCapturedHooks(cards);
 
       // ── Phase 2: Apply engine spirits in slot order ────────────────────────
       const allEngineSpirits = run.allSpirits;
