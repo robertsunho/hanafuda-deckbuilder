@@ -25,6 +25,12 @@ exists ONLY to collapse a multi-member stack into one coherent post-transcendenc
 accruing at a powerLevel-scaled rate (the locked F2.5 design). It does NOT make Negatives a lesser
 or restricted class.
 
+> *Implementation note (2026-06-06): "same placement in the chain" is the DESIGN INTENT and the
+> target state. The code currently APPENDS a transcended spirit to the end of `_allSpirits`
+> (`_acquireSpiritStack`) rather than preserving its slot position — a known divergence being
+> corrected by the transcend-placement fix (see the F4.16_F4.20 triage ledger, site #6 follow-up).
+> Until that lands, transcended spirits relocate to the chain end; after it, this clause is literal.*
+
 ⇒ **No effect / scoring / targeting path may exclude a Negative.** A path that does is a bug.
 
 ### 2. Legendaries are a SEPARATE CATEGORY — not chain members

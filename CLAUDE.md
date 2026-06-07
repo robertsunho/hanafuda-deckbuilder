@@ -13,10 +13,26 @@ A koi-koi-inspired roguelike deckbuilder. Phaser.js + Vite. Solo dev (Robert) wi
 
 ```bash
 npx vite build              # Production build; runs after every code change to verify
+npm test                    # Vitest suite (vitest run); runs after any logic change
 npx vite                    # Dev server (rarely used in this workflow)
 ```
 
-There are no automated tests. Verification happens via build + manual in-game testing by Robert.
+## Automated tests
+
+Headless Vitest suite (`npm test`) drives the engine under Node — the `src/systems/` + `src/data/`
+import graph is browser-free, so no Phaser/DOM shim. Verification is now build + `npm test` +
+manual in-game testing (in-game still covers rendering/UX; tests cover engine logic).
+
+- **Layout & harness:** `test/spirits/*.test.js` (one file per spirit/tight cluster).
+  `test/helpers.js`: `makeRound({spiritIds, spirits, deckCardIds})`, `equipSpiritWithState(id, {state}|{elements})`,
+  `playRoundToEnd(grm)`. Read `/docs/process/TEST_HARNESS_GOTCHAS.md` before writing tests —
+  determinism (Math.random stubbed during the deal), `run.reset()` isolation, accumulator seeding,
+  and proportional yaku thresholds all live there.
+- **Granularity:** assert at the smallest real enclosing method/dispatcher (`_addCapture`,
+  `_fireXHooks`), not full integration scenarios. If a setup fights you past one fix, skip with a note.
+- **Transcended copies & [FIX] tests:** seed a Negative via `run.addSpiritDirect` and assert it
+  fires/accrues like a regular. [PRESERVE] tests assert behavior unchanged; deliberate [FIX] changes
+  flip an assertion (e.g. `==0`→`==N`) as the visible proof.
 
 ## File layout
 
@@ -74,6 +90,16 @@ The engine has reusable primitives (hooks like `modifyFlowDecay`, `disablesYaku`
 
 ### Don't create parallel paths
 If similar code exists for the same conceptual operation (e.g., spirit acquisition, card discard, stamp dispatch), use the existing path. Don't create a second implementation that diverges. The Phase 4 work is consolidating exactly these parallel paths; don't add more.
+
+### Which spirit-set to iterate
+
+Transcendence frees a *slot*, not placement: a Negative is a full chain member for all
+effect/scoring/targeting — never exclude Negatives there; only slot-capacity counts exclude them.
+Legendaries are a separate category (own slot, not in the chain, don't stack/transcend, but do
+score). Reaching for `activeSpirits` to FIRE / SCORE / TARGET is almost always wrong — use
+`allSpirits` (the chain) or `scoringSpirits` (scoring, incl. legendaries); `activeSpirits` is for
+slot-capacity and legendary-presence questions only. Full rule + getter-by-question table:
+`/docs/process/SPIRIT_SET_ITERATION_RULE.md`.
 
 ### Existing patterns to respect (established in Phases 0-3)
 
