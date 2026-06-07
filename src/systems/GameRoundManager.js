@@ -1010,7 +1010,9 @@ export default class GameRoundManager {
       const effect = SpiritEffects.get(spirit.id);
       if (effect?.getRetriggerCount) {
         count += effect.getRetriggerCount({
-          card, spirit, spirits: run.activeSpirits, triggerType, isFirstCardOfCapture,
+          // [FIX] allSpirits = chain in placement order so Mirror/Memory can target/be-targeted
+          // by Negatives (was run.activeSpirits). See SPIRIT_SET_ITERATION_RULE.md.
+          card, spirit, spirits: run.allSpirits, triggerType, isFirstCardOfCapture,
         });
       }
     }
@@ -1309,6 +1311,10 @@ export default class GameRoundManager {
       // Cache spirit arrays for this capture (same object references as _allSpirits).
       const _activeSpirits  = run.activeSpirits;
       const _scoringSpirits = run.scoringSpirits;
+      // The chain in TRUE PLACEMENT ORDER (regulars + Negatives, no legendaries) — the
+      // targeting ctx for Mirror/Memory adjacency. [FIX] was _activeSpirits (Negatives
+      // excluded); transcended spirits are valid targets/targeters. See SPIRIT_SET_ITERATION_RULE.md.
+      const _chainSpirits   = run.allSpirits;
 
       // Reset Golden Toad per-capture application counter.
       // F4.20-FIX2: iterate allSpirits so a transcended toad resets too (its onCardScored
@@ -1457,7 +1463,7 @@ export default class GameRoundManager {
             // Accumulators handle stack scaling internally; non-accumulators use count multiplier.
             const count = ACCUMULATOR_SPIRIT_IDS.has(spirit.id) ? 1 : effectivePower(spirit);
             for (let _yy = 0; _yy < _yinYangTriggers; _yy++) {
-              const r = effect.onCardScored({ card, spirit, spirits: _activeSpirits });
+              const r = effect.onCardScored({ card, spirit, spirits: _chainSpirits });
               if (r) {
                 const prevPts  = points;
                 const prevMult = mult;
@@ -1496,7 +1502,7 @@ export default class GameRoundManager {
           const count = ACCUMULATOR_SPIRIT_IDS.has(spirit.id) ? 1 : effectivePower(spirit);
           const prevState = JSON.stringify(spirit.state ?? spirit.elements);
           for (let copy = 0; copy < count * _yinYangTriggers; copy++) {
-            effect.onCardSeen({ card, spirit, spirits: _activeSpirits });
+            effect.onCardSeen({ card, spirit, spirits: _chainSpirits });
           }
           if (this._onScoringStep && JSON.stringify(spirit.state) !== prevState) {
             this._onScoringStep({ type: 'engine_state_update', spirit, card });
@@ -1530,7 +1536,7 @@ export default class GameRoundManager {
             const effect = SpiritEffects.get(spirit.id);
             if (!effect?.onCardScored) continue;
             const count = ACCUMULATOR_SPIRIT_IDS.has(spirit.id) ? 1 : effectivePower(spirit);
-            const r = effect.onCardScored({ card, spirit, spirits: _activeSpirits });
+            const r = effect.onCardScored({ card, spirit, spirits: _chainSpirits });
             if (r) {
               const prevPts  = points;
               const prevMult = mult;
@@ -1567,7 +1573,7 @@ export default class GameRoundManager {
         const effect = SpiritEffects.get(spirit.id);
         if (!effect?.applyEngine) continue;
         for (let _yy = 0; _yy < _yinYangTriggers; _yy++) {
-          const r = effect.applyEngine({ spirit, mult, points, spirits: _activeSpirits, cards });
+          const r = effect.applyEngine({ spirit, mult, points, spirits: _chainSpirits, cards });
           if (r) {
             const prevPts  = points;
             const prevMult = mult;

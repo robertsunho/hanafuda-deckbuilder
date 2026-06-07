@@ -371,8 +371,10 @@ const _effects = {
       if (FieldManager.MAX_SLOTS + mod - 1 < 1) return { success: false, message: 'Cannot reduce field slots below 1' };
       const snapshotPower = target.stackCount ?? 1;
       const inheritedState = target.state ?? null;
-      run.removeSpiritObj(target);
-      run.addSpiritDirect({ id: target.id, name: target.name, isNegative: true, stackCount: 1, powerLevel: snapshotPower, state: inheritedState });
+      // [FIX] Transcendence PRESERVES chain position — replace IN PLACE at the target's index
+      // instead of remove + add-to-end (the prior path relocated the Negative to the chain end).
+      // See SPIRIT_SET_ITERATION_RULE.md §1.
+      run.replaceSpiritObj(target, { id: target.id, name: target.name, isNegative: true, stackCount: 1, powerLevel: snapshotPower, state: inheritedState });
       run._permanentFieldSlotMod = mod - 1;
       if (roundManager) roundManager._recomputeFieldSlots();
       return { success: true, message: `${target.name} transcended! Field -1 slot.` };

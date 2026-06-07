@@ -782,8 +782,11 @@ class RunManager {
           const snapshotPower = Math.min(3, existing.stackCount - 1);
           const aggregatedState = this._aggregateElementsForNegative(existing, snapshotPower);
           const idx = this._allSpirits.indexOf(existing);
-          this._allSpirits.splice(idx, 1);
-          this._allSpirits.push({
+          // [FIX] Transcendence PRESERVES chain position — replace the transcending spirit
+          // IN PLACE at its index, not splice+push-to-end (the prior append relocated the
+          // Negative to the chain end). Transcendence frees a slot, it must not move the
+          // spirit. See SPIRIT_SET_ITERATION_RULE.md §1.
+          this._allSpirits.splice(idx, 1, {
             id: spiritDef.id, name: spiritDef.name,
             stackCount: 1, isNegative: true, powerLevel: snapshotPower,
             state: aggregatedState, acquiredRound: this._round ?? 0,
