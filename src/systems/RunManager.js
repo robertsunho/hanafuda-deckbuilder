@@ -6,7 +6,7 @@
 import { getSpiritDef, SPIRIT_CATALOG }          from '../data/spirits.js';
 import { cards as ALL_CARDS, baseCards }          from '../data/cards.js';
 import { WUXING_CONSUMABLES, CHAKRA_TOOLS, getElementDef } from '../data/consumables.js';
-import { getStampDef, mixStamps, PRIMARY_STAMPS } from '../data/stamps.js';
+import { getStampDef, PRIMARY_STAMPS } from '../data/stamps.js';
 import { ZODIAC_CONSUMABLES, getZodiacDef }     from '../data/zodiacConsumables.js';
 import logger                                   from './GameplayLogger.js';
 import { resolveHexagram }                      from './HexagramGenerator.js';
@@ -1393,6 +1393,21 @@ class RunManager {
     }
   }
 
+  /**
+   * Charge ki for a consumable activation at its effective cost and record the
+   * activation (Badger). Run-economy concern owned by RunManager; consumable
+   * effect handlers (ConsumableEffects.js) call this after validating their target.
+   * @param {number} baseCost
+   * @returns {boolean} false if unaffordable — no ki spent, no activation recorded.
+   */
+  spendKiForConsumable(baseCost) {
+    const cost = this.getEffectiveCost(baseCost);
+    if (this._ki < cost) return false;
+    this._ki -= cost;
+    this._notifyBadger();
+    return true;
+  }
+
   // ── Card shop ─────────────────────────────────────────────────────────────
 
   /**
@@ -1663,28 +1678,9 @@ class RunManager {
   }
 
   // ── Stamps ────────────────────────────────────────────────────────────────
-
-  /**
-   * Apply a stamp to a card in the deck.
-   * Replaces any existing stamp (no longer blocks re-stamping).
-   * @param {string} cardId
-   * @param {string} stampId  e.g. 'stamp_red', 'stamp_blue', …
-   * @returns {{ success: boolean, reason?: string }}
-   */
-  applyStamp(cardId, stampId) {
-    const card = this._deck.find(c => c.id === cardId);
-    if (!card) return { success: false, reason: 'Card not found' };
-    const stampDef = getStampDef(stampId);
-    if (!stampDef) return { success: false, reason: 'Unknown stamp type' };
-    const cost = this.getEffectiveCost(stampDef.cost);
-    if (this._ki < cost) return { success: false, reason: 'Not enough ki' };
-    this._ki -= cost;
-    const resultStampId = mixStamps(card.ribbonStamp, stampId);
-    card.ribbonStamp = resultStampId;
-    logger.logCardStamped(card.name ?? card.id, resultStampId);
-    this._notifyBadger();
-    return { success: true };
-  }
+  // Stamp application migrated to ConsumableEffects.js (consumable-block A1).
+  // Card-level mutation lives there; ki spend + Badger stay here via
+  // spendKiForConsumable(). mixStamps remains the data-owned mixing primitive.
 
   // ── Wu Xing enhancements ───────────────────────────────────────────────────
 

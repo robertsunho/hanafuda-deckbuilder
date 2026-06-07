@@ -2393,7 +2393,8 @@ export class GameScene extends Phaser.Scene {
       this._renderAll();
 
     } else if (id.startsWith('stamp_')) {
-      const result = run.applyStamp(card.id, id);
+      const result = ConsumableEffects.get(id)?.execute({ params: { cardId: card.id, stampId: id } })
+        ?? { success: false };
       if (result.success) {
         run.consumeById(id);
         logger.logConsumableUse(consName, `stamped ${card.id}`);

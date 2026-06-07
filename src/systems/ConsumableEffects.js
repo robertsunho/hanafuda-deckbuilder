@@ -11,14 +11,17 @@
 //   Zodiac — 13 tactical items (rat, ox, tiger, rabbit, dragon, snake,
 //            horse, goat, monkey, rooster, dog, pig, cat)
 //
-// Card-targeting consumables (Wu Xing elements) are handled directly in
-// GameScene and ShrineScene via the _cardTargetMode system, not here.
+// Stamp consumables are handled here too (shared handler at the bottom); the
+// scenes' _cardTargetMode only does target-picking. Wu Xing element + chakra
+// application still live on RunManager (consumable-block migration in progress).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import run from './RunManager.js';
 import { getSpiritDef, SPIRIT_CATALOG } from '../data/spirits.js';
 import { findFusionRecipe, findFusionRecipeByResult } from '../data/fusionRecipes.js';
 import FieldManager from './FieldManager.js';
+import { STAMPS, getStampDef, mixStamps } from '../data/stamps.js';
+import logger from './GameplayLogger.js';
 
 const _effects = {
 
@@ -425,6 +428,29 @@ const _effects = {
     },
   },
 };
+
+// ── Stamp consumables ───────────────────────────────────────────────────────
+// Card-level mutation (mix + write) is the canonical consumable-block concern and
+// lives here. The ki spend + Badger activation are run-economy concerns owned by
+// RunManager (run.spendKiForConsumable). All stamp ids share this one handler;
+// the specific stamp is supplied via params.stampId.
+const _applyStamp = {
+  requiresInput: true,
+  inputType: 'card',
+  execute({ params }) {
+    const { cardId, stampId } = params ?? {};
+    const card = run._deck.find(c => c.id === cardId);
+    if (!card) return { success: false, reason: 'Card not found' };
+    const stampDef = getStampDef(stampId);
+    if (!stampDef) return { success: false, reason: 'Unknown stamp type' };
+    if (!run.spendKiForConsumable(stampDef.cost)) return { success: false, reason: 'Not enough ki' };
+    const resultStampId = mixStamps(card.ribbonStamp, stampId);
+    card.ribbonStamp = resultStampId;
+    logger.logCardStamped(card.name ?? card.id, resultStampId);
+    return { success: true };
+  },
+};
+for (const _s of STAMPS) _effects[_s.id] = _applyStamp;
 
 // ── Public interface ──────────────────────────────────────────────────────────
 

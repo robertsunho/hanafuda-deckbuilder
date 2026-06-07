@@ -19,6 +19,7 @@ import { PRIMARY_STAMPS, SECONDARY_STAMPS,
 import { ZODIAC_CONSUMABLES }                  from '../data/zodiacConsumables.js';
 import { generateShopCards }                   from '../data/shopCards.js';
 import logger                                   from '../systems/GameplayLogger.js';
+import ConsumableEffects                        from '../systems/ConsumableEffects.js';
 import { applyHook }                            from '../systems/HexagramEffects.js';
 import { getHexagram }                          from '../data/hexagrams.js';
 import { getSpiritContrib, getElementContrib }   from './shared/spiritTooltip.js';
@@ -1841,7 +1842,8 @@ export class ShrineScene extends Phaser.Scene {
         spr.on('pointerover', () => spr.setTint(0xffccee));
         spr.on('pointerout',  () => spr.clearTint());
         spr.on('pointerdown', () => {
-          const result = run.applyStamp(card.id, stampDef.id);
+          const result = ConsumableEffects.get(stampDef.id)?.execute({ params: { cardId: card.id, stampId: stampDef.id } })
+            ?? { success: false };
           if (result.success) {
             logger.logConsumableUse(stampDef.name, `stamped ${card.id}`);
             if (onSuccess) onSuccess();
