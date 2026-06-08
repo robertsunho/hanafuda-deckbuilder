@@ -300,12 +300,15 @@ Same shape, N implementations — the shrine-side analogue of the GameScene thre
 fragmentation F4.15 targets.
 
 **Chakra-sub-recon evidence (two sharpenings):**
-1. **A picker primitive already PARTIALLY exists.** All seven chakra overlays funnel through one
-   shared `_buildPracticeGrid({ title, instruction, cards, selectedIds, onSelect, onAction,
-   onCancel })`. So the consolidation is *replacing N bespoke wrappers around an existing grid
-   builder* with one parameterized surface — not building a picker from scratch. That lowers the
-   architectural-half risk and is positive evidence the abstraction is natural (the grid is the
-   seam; the per-family wrappers are the duplication).
+1. **A picker primitive already PARTIALLY exists, and the seven chakra overlays are
+   near-identical.** Every one funnels through the same shared `_buildPracticeGrid({ title,
+   instruction, cards, selectedIds, onSelect, onAction, onCancel })`, and each defines the same
+   `refund = () => { run.addKi(def.cost); destroy _confirmObjs; _buildUI() }` plus the same
+   `render()` wrapper — differing only in target-count cap (1/2/3), label text, and which
+   `applyChakra*` it calls. Same shape, seven copies. So the consolidation is *collapsing
+   duplicated scaffolding around an existing grid builder*, not building a picker from scratch.
+   That lowers the architectural-half risk and is positive evidence the abstraction is natural
+   (the grid is the seam; the per-family wrappers are the duplication).
 2. **The cancel/economy model is NOT uniform across families — the unified surface must
    parameterize it, not assume one.** Chakras charge ki at *purchase* (overlay titled "X ki
    paid") and **refund on cancel** via `run.addKi(def.cost)`. Stamps (post-A1) charge ki at
@@ -314,10 +317,15 @@ fragmentation F4.15 targets.
    economy/cancel policy (charge-at-purchase+refund vs. charge-at-apply+no-refund), or the ki
    timing must be normalized first. Flag this as a design sub-decision for the architectural half.
 
+**Related dispatch fragility (from the recon).** Activation dispatch currently leans on id-prefix
+string matching (`element_` / `stamp_` / `chakra_`) rather than a uniform `category` /
+`dispatchKind` field, even though the data already carries `category`. The unified surface should
+normalize on the field, not the prefix (F4.15 owns this normalization).
+
 **The two separable halves (do NOT conflate):**
 1. **Architectural — dispatch/wiring unification (Phase 4, F4.15 / this block).** Once every
-   family's effect body is a `ConsumableEffects.get(id).execute()` entry (A1 did stamp; chakra +
-   element campaigns follow), the shrine's application paths can collapse onto one dispatch the
+   family's effect body is a `ConsumableEffects.get(id).execute()` entry (A1 did stamp; A2 chakra
+   + A3 element follow), the shrine's application paths can collapse onto one dispatch the
    same way GameScene's three paths do. Belongs in Phase 4 — "consolidate parallel activation
    paths," ShrineScene side. **The stamp path is the first family already routed through the
    unified effect dispatch** (A1), so it's the reference shape.
@@ -333,10 +341,12 @@ with one canonical post-apply `_buildUI()` path — instead of `_showStampCardSe
 path / per-chakra overlays each composing it by hand. (Mirrors how A1's `_applyStamp` is one
 handler registered for all stamp ids.)
 
-**Scope/risk.** Architectural half: medium — depends on chakra + element campaigns landing first
+**Scope/risk.** Architectural half: medium — depends on A2 (chakra) + A3 (element) landing first
 (they supply the `execute()` entries the unified dispatch calls), on the picker abstraction
 handling the varying target arities, AND on resolving the per-family economy/cancel policy
-(point 2). UX half: separate, Phase 5, lower architectural risk.
+(point 2). The Crown two-stage source→target pick is the one overlay whose interaction differs
+structurally — the abstraction must accommodate it or leave it bespoke. UX half: separate,
+Phase 5, lower architectural risk.
 
 **Timing.** Architectural half rides *after* the chakra + element campaigns within this block (it
 consumes their output) and dovetails with F4.15's GameScene-side dispatch collapse — same
@@ -345,7 +355,7 @@ before the per-family `execute()` entries exist (would be abstracting over paths
 
 **Cross-references.**
 - F4.15 (GameScene activation-path unification — the sibling architectural task; same dispatch
-  collapse, GameScene side).
+  collapse, GameScene side; also owns the id-prefix → `category`-field dispatch normalization).
 - Consumable-block A1 + chakra sub-recon (`consumable_inventory_pass1.md` §8; stamp = first
   family routed; chakra overlays + `_buildPracticeGrid` seam + the ki-timing difference are the
   sharpening evidence; this candidate surfaced here).
@@ -370,3 +380,5 @@ before the per-family `execute()` entries exist (would be abstracting over paths
 - F4.20 Ants/Moths/Ship migrations + F4.17 ship-hook `!isNegative` guard (where Candidate F
   surfaced — the allSpirits-vs-activeSpirits accumulator-increment inconsistency); F2.4 item 10;
   Negative Osprey/Catcher reset bug (DECISIONS_LOG); overlaps Candidates B and C
+- Consumable-block A1 + chakra sub-recon (where Candidate G surfaced — shrine application-flow
+  unification; architectural half = F4.15/this block, UX half = Phase 5)
