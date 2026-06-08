@@ -255,5 +255,68 @@ plus the F4.15 dispatch consolidation.
    the current dispatch leans on **id-prefix string matching** (`element_`/`stamp_`/`chakra_`)
    rather than a uniform `category` field — a fragility F4.15's unified dispatch should normalize
    (e.g. a single `category`/`dispatchKind` field per consumable).
-</content>
-</invoke>
+
+---
+
+## 8. Campaign decisions (appended as campaigns scope)
+
+### A1 — Stamp → ConsumableEffects ✅ SHIPPED 2026-06-07
+Card mutation (mix + `ribbonStamp` write + `logCardStamped`) moved to a shared
+`ConsumableEffects` handler registered for all 9 stamp ids. Ki spend + Badger stay
+RunManager-owned via new `run.spendKiForConsumable(baseCost)`. Both scene call sites route
+through `ConsumableEffects.get(id).execute()`. `RunManager.applyStamp` removed. Test:
+`test/consumables/stamp_apply.test.js`.
+
+### A2 — Chakra class: DETERMINATION = **Option A (all seven migrate)**
+
+**Chakra × state-touches (verified against source, RunManager 1524–1678):**
+
+| Chakra | Home | Mutates | Also fires | External deps | Caller entanglement |
+|---|---|---|---|---|---|
+| Root | RM | card fields (temporal flip + flag) | `_notifyBadger` | — | none |
+| Sacral | RM | card fields (month/name/vertical + flag) | `_notifyBadger` | **`_baseCardLookup`** (module-private Map) | none |
+| Solar Plexus | RM | card fields (type/points/name + flag) | `_notifyBadger` | inline CYCLE/POINTS/TYPE_NAMES tables | none |
+| Heart | RM | card field (random `edition`) | `_notifyBadger` | `Math.random` | none |
+| Crown | RM | full identity `Object.assign` deep-clone | `_notifyBadger` | — | two-stage target pick (scene) |
+| Third Eye | RM | **deck membership** (delete) | via `deleteCard`: `_fireCardDestroyedEvent`, `_notifyBadger` | `deleteCard` (existing primitive) | GameScene `removeCardFromHand` (round-view) |
+| Throat | RM | **deck membership** (duplicate→push) | `engine_palace` cardsAdded, `_notifyBadger` | `_throatCounter` instance state | GameScene `deck.insertIntoDrawPile(newCard)` (round-view) |
+
+**Crown home (§4): confirmed RunManager-resident**, structurally identical to the other
+card-field mutators (no GRM residence; the within-class-inconsistency worry is refuted).
+
+**Throat / Third Eye coupling verdicts (3-condition Bucket-B test):** both ARE deck-membership +
+spirit-event ops that RunManager rightly owns, so in isolation each reads as Bucket-B. BUT the
+decision unit is the CLASS, and leaving 2 of 7 in RunManager would *perpetuate* the "chakras in
+two places" anti-state and block F4.15 (every consumable must be dispatchable via the registry).
+Resolution: migrate them as **thin `.execute()` handlers that call RunManager primitives** — the
+collection-invariant work stays correctly owned (exactly the A1 rule + how `alch_*` calls
+`run._acquireSpiritStack`). A thin uniform-dispatch handler is not "indirection for nothing"; the
+registry-routability IS the value. → **Option A, not C** (a 5/2 split would be the inconsistency
+we're ending, not a real boundary).
+
+**[PRESERVE] invariants A2 must honor:**
+1. **Chakras do NOT charge ki at apply** (unlike stamps). Cost is paid at shop purchase; ShrineScene
+   overlays show "X ki paid" and *refund* on cancel. A2 handlers call **badger only**, NOT
+   `spendKiForConsumable`. Adding ki deduction would double-charge — a behavior bug.
+2. Caller-side round-view sync stays in GameScene: Throat→`insertIntoDrawPile(newCard)`,
+   Third Eye→`removeCardFromHand` (single + multi). Handlers return `newCard`/`success` as today.
+
+**Latent finding (clean up during A2, not before):** the single-target handler
+(`_onCardTargetSelected`, GameScene ~2410–2422) passes `card.id` (a **string**) to the
+array-expecting Root/Sacral/SolarPlexus/ThirdEye methods. Those branches are **unreachable** —
+those four are maxTargets>1 and route through the multi-target Confirm path (~2037–2040). Only
+Heart/Throat/Crown legitimately reach the single-target handler. A2's unified dispatch should
+delete the dead branches and normalize on an array signature.
+
+**A2 primitive-extraction + migration plan (ordered, lowest-risk first):**
+1. Migrate the 5 card-field mutators (carry bodies into `ConsumableEffects`): **Root → Solar
+   Plexus → Heart → Crown → Sacral**. Sacral needs a base-card lookup exposed (export
+   `getBaseCard(month,type)` / the `_baseCardLookup` map from RunManager or cards.js — the one
+   non-trivial extraction).
+2. **Third Eye:** handler = ≤2 guard + loop over existing `run.deleteCard(id)`.
+3. **Throat:** extract `run.duplicateCardToDeck(cardId) → { newCard }` (owns `_throatCounter`++,
+   deep-clone+suffix, `_deck.push`, `engine_palace` counter, badger); handler calls it, returns
+   `newCard`; scene keeps the draw-pile insert.
+4. Rewire both scene paths + ShrineScene overlays to `ConsumableEffects.get(id).execute()`;
+   delete the unreachable single-target branches; consider a small `run.notifyConsumableUsed()`
+   public alias so handlers don't reach `_notifyBadger` directly.
