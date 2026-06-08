@@ -371,3 +371,33 @@ entirely to F4.38. **F4.34 reconfirmed:** `SNOW_MULT`/`ICE_MULT` (ScoringEngine)
 importers — live path is `getWaterMult`; GameplayLogger uses its own local arrays. (Aside, not A3
 scope: three different Water-dep representations now exist — `getWaterMult` formula, ScoringEngine
 arrays, logger-local arrays — a display-drift cleanup for F4.34/F4.38, flagged not fixed.)
+
+**A3 attach-surface recon (Recon 1) — the migration plan.** `applyElement` is a 5-outcome state
+machine (`applied_base` / `no_effect` / `upgraded` / `stripped` / `overwritten`). Callers: ONLY
+GameScene:2347 + ShrineScene:1759 (no tests, no internal callers). The 3 helpers
+(`_createBaseEnhancement`, `_isGenerativeElement`, `_isDestructiveElement`) are called ONLY by
+`applyElement` → they move wholesale.
+
+- **MOVE → ConsumableEffects** (one shared `_applyElement` handler registered for all 5 `element_*`
+  ids, à la A1's shared stamp handler; takes `params.cardId` + `params.element`): the state-machine
+  body + the 3 private helpers. Returns `{ action, returnedConsumable? }` byte-identical.
+- **Badger = on-mutation-only [PRESERVE detail].** `applyElement` fires badger on the 4 mutating
+  outcomes but NOT on `no_effect` (same-element / already-upgraded) or card-not-found. Handler calls
+  `run.notifyConsumableUsed()` (A2's public alias) in the 4 mutating branches only.
+- **STAYS in RunManager:** nothing element-specific remains (the whole state machine + helpers
+  leave). `addConsumable`/`canAddConsumable` stay (inventory-economy). Proc surface untouched.
+- **STAYS in scenes for A3 (unchanged):** the strip→return re-add + `ENH_NAMES`/`ACTION_MSG`
+  display. A3 is a PURE relocation — scenes keep consuming `returnedConsumable` exactly as today.
+- **Caller-entanglement split:** strip-return decision = effect-logic; `addConsumable`/
+  `canAddConsumable` = inventory-economy (RunManager); "returned"/"lost" messaging = scene display.
+  The strip-return block is **DUPLICATED** across the two scenes (GameScene: full "returned"/"lost"
+  messaging; ShrineScene: silent `catch {}`, no "lost" message). **De-duping/centralizing it is
+  DEFERRED to Candidate G**, not bundled into A3 — it touches per-scene messaging differences +
+  inventory-economy and is exactly the shrine-side win Candidate G owns. (If later centralized, the
+  handler would do the re-add and return `returnedToInventory` so scenes keep only display.)
+- **Result-shape contract (A3 regression spec):** the 5 `action` values + `returnedConsumable` on
+  strip; card-not-found → `{ action: 'no_effect' }` (no badger). Plus the §A3-pre-recon
+  `card.enhancement` field contract above.
+- **Dispatch:** scenes route `ConsumableEffects.get(id).execute({ params: { cardId, element } })`
+  (GameScene derives `element = id.replace('element_','')`; ShrineScene uses
+  `consumableDef.element ?? id.replace(...)`). id-prefix routing normalization → F4.15/Candidate G.
