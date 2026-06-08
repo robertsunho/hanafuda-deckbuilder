@@ -455,3 +455,73 @@ importer census fresh at execution time (the census below is a point-in-time sna
   consumables.js → repoint the 7 importers (merge the multi-line scene imports) → delete the two
   files → build (= reference-completeness check). **Sequencing: land BEFORE F4.15** so dispatch
   unification lands on the settled single import path. No STOP conditions.
+**SHIPPED 2026-06-08** — zodiac+stamps folded into consumables.js; 6 importers repointed; both
+files deleted; build green, 123 tests pass.
+
+### F4.15 / A4 — dispatch unification — RECON (read-only); plan below
+
+Post-A1–A3 reframe (verified): the GameScene "three paths" are no longer *logic* forks — every
+family already ends in `ConsumableEffects.get(id).execute()`. They are *orchestration* forks
+differing in (1) target-picking, (2) interpreting a **non-uniform result contract**, (3)
+consume/log/render. That contract divergence is the difficulty, not routing.
+
+**Dispatch sites mapped:**
+- **GameScene initial fork** (`_renderActionButtons` ~2092): `isCardTarget` (id-prefix
+  `element_`/`stamp_`/`chakra_`) → `_activateCardTarget`; `category==='alchemical'` →
+  `_activateAlchemical`; else zodiac → `_round.useConsumable` (GRM delegates to ConsumableEffects +
+  badger), `needsTarget` → `_showZodiacTargetPicker`, **`revealedCards` → `_showRoosterOverlay`**.
+- **`_activateCardTarget`** (~2280): multi-target (`maxTargets>1 && !crown`) → `select_multi_targets`;
+  else `select_source` (single; Crown two-stage handled in the click handler).
+- **`_onCardTargetSelected`**: multi-target accumulate + Confirm (calls execute w/ `cardIds`); then
+  separate `if (id.startsWith(...))` tails for element / stamp / chakra, each interpreting its own
+  result shape + firing its side effects.
+- **`_activateAlchemical`** (GameScene, static import): `requiresInput` → spirit picker, else execute now.
+- **ShrineScene**: per-family overlays (chakra ×7, stamp selector, booster/element) + a SECOND
+  `_activateAlchemical` (dynamic `import()` + a dead `registry.get('ConsumableEffects')` line).
+
+**Result-contract divergence** (the crux): zodiac `{success, needsTarget?, message?}`; alchemical
+`{success, message?}`; element `{action: applied_base|no_effect|upgraded|stripped|overwritten,
+returnedConsumable?}`; stamp `{success, reason?}`; chakra `{success, newCard?, existingEdition?,
+reason?}`. **Recommend per-family result *adapters*, NOT one normalized contract** — element's
+5-value `action` taxonomy is real information the messaging uses; flattening to `{success}` loses
+it. The dispatcher is uniform up to `execute()`, then a per-family/per-kind tail interprets the
+result. Tails MUST stay **scene-side** (they call scene methods — `insertIntoDrawPile`,
+`removeCardFromHand`, `setStatus`, `_renderAll`); ConsumableEffects is engine/scene-agnostic and
+can't own them.
+
+**Side effects the unified path must still fire:** element strip → `returnedConsumable` re-add +
+messaging (GameScene verbose / ShrineScene silent); chakra Throat → `insertIntoDrawPile(newCard)`,
+Third Eye → `removeCardFromHand`; zodiac slot/yaku → `_showZodiacTargetPicker`; `_renderAll()` every
+path; in-round `consumeById` vs shrine purchase model.
+
+**`revealedCards`/`_showRoosterOverlay` is a DEAD branch** — no `execute()` returns `revealedCards`
+(grep: only the read site + the overlay def). Drop it in F4.15 (or Tier-5).
+
+**`_activateAlchemical` two copies → UNIFY.** Same dispatch over the same effects; they differ only
+in result presentation (GameScene `setStatus`+`_renderAll` vs ShrineScene `_showAlchemicalResult`
+overlay) — that's the per-scene tail. At minimum kill ShrineScene's dynamic `import()` + dead
+registry line (a static import exists since A1).
+
+**id-prefix → `dispatchKind` (recommend, in F4.15 scope):** add a uniform `dispatchKind` field in
+consumables.js (now consolidated — perfect timing) so the dispatcher reads ONE field instead of
+prefix-match + category-check + fall-through. Values: `none` (most zodiac), `slot` (Ox/Monkey),
+`yaku` (Snake), `card_single` (element/stamp/Heart/Throat), `card_multi` (Root/Sacral/SolarPlexus/
+ThirdEye), `card_pair` (Crown), `spirit_*` (alchemical — already encoded in `effect.inputType`;
+reconcile, don't duplicate).
+
+**Plan — split into two campaigns** (15b is the block's highest-risk — touches ALL consumable
+activation in BOTH scenes):
+- **F4.15a** — add `dispatchKind` to consumables.js + repoint the discriminator reads; behavior
+  identical (low risk, de-risks the collapse).
+- **F4.15b** — collapse the GameScene fork + `_activate*` into one `_dispatchConsumable(cons)`
+  (the OVERHAUL_PLAN `_useConsumable` proposal — validated as a PROPOSAL, not current code; the
+  real entry today is the inline fork in `_renderActionButtons`); per-family result tails; unify
+  the two alchemical wrappers; drop the dead rooster branch. Scene-UI, not headless-testable →
+  build + manual across every family × target-mode.
+
+**Scope line — F4.15 (dispatch) vs Candidate G (shrine UX):** F4.15 unifies HOW `execute()` is
+called + how results route (the `dispatchKind` target-mode contract + per-family tails, both scenes).
+**Candidate G** unifies the shrine OVERLAY/picker UI (7 chakra overlays + stamp selector + booster →
+one picker surface) + the strip-return de-dup. They meet at target-picking: F4.15 defines the
+target-mode contract; G builds the unified shrine UI against it. No STOP / no residual logic (every
+family already routes through `execute()`).
