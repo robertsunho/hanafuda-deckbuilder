@@ -88,7 +88,12 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
 - **badger** — `onConsumableUsed` belongs to the consumable block, not the spirit wave. Folded there.
 - **GRM/RunManager destination audit** (D-F4-SCOPE Part 2) — late Tier 3; feeds F4.24b. Drain
   categories first, then audit the emptied managers for displacement + intrinsic organization.
-- **Other consolidation candidates A/B/D/E** — in `PHASE4_consolidation_candidates.md`.
+- **Candidate G — shrine card-enhancement application flow** (surfaced A1; sharpened by the chakra
+  sub-recon). Two halves: the *architectural* dispatch/wiring unification (Phase 4 — collapse the
+  bespoke per-family shrine overlays onto one `ConsumableEffects.get(id).execute()` surface,
+  dovetails with F4.15; rides after the chakra+element campaigns supply the `execute()` entries)
+  vs. the *UX-completion* polish (Phase 5). Full entry in `PHASE4_consolidation_candidates.md`.
+- **Other consolidation candidates A/B/D/E/F** — in `PHASE4_consolidation_candidates.md`.
 
 ---
 

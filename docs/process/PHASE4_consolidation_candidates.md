@@ -274,6 +274,89 @@ carried forward a pre-existing inconsistency, now flagged for deliberate resolut
 
 ---
 
+## Candidate G — Shrine card-enhancement application flow
+
+**Surfaced:** Consumable-block A1 (stamp migration), 2026-06-07 — observing that the shrine
+can apply *some* card enhancements (stamp selector, element booster path, chakra overlays) but
+through a patchwork of bespoke per-family handlers, not one coherent application surface.
+**Sharpened by the chakra sub-recon** (2026-06-07) — see the two evidence points below.
+
+**Two-half framing (Robert).** The architectural half (dispatch/wiring unification) is Phase 4 /
+this block; the UX-completion half is Phase 5. Filing the whole thing as Phase 5 would lose the
+architectural half to the exact "surfaced reactively, never audited as a category" gap that
+D-F4-SCOPE exists to close.
+
+**The fragmentation.** "Apply a card-enhancement at the shrine" is currently implemented once
+per family, each with its own overlay, its own target-picker, and its own post-apply bookkeeping:
+- **Stamp** — `ShrineScene._showStampCardSelector` (now routes its *effect* through
+  `ConsumableEffects` after A1, but the overlay/picker is still bespoke).
+- **Wu Xing element** — the booster-pack / element apply path (`run.applyElement` at the shop,
+  with the stripped-element refund + `addConsumable` dance inline in the scene).
+- **Chakra** — per-chakra overlays (`_showRootOverlay … _showCrownOverlay`, dispatched by
+  `_showChakraOverlay`) + `RunManager.applyChakra*` (the chakra sub-recon's Option-A migration
+  target).
+Each reinvents: build overlay → pick card(s) → call apply → handle cancel → `_buildUI()`.
+Same shape, N implementations — the shrine-side analogue of the GameScene three-path
+fragmentation F4.15 targets.
+
+**Chakra-sub-recon evidence (two sharpenings):**
+1. **A picker primitive already PARTIALLY exists.** All seven chakra overlays funnel through one
+   shared `_buildPracticeGrid({ title, instruction, cards, selectedIds, onSelect, onAction,
+   onCancel })`. So the consolidation is *replacing N bespoke wrappers around an existing grid
+   builder* with one parameterized surface — not building a picker from scratch. That lowers the
+   architectural-half risk and is positive evidence the abstraction is natural (the grid is the
+   seam; the per-family wrappers are the duplication).
+2. **The cancel/economy model is NOT uniform across families — the unified surface must
+   parameterize it, not assume one.** Chakras charge ki at *purchase* (overlay titled "X ki
+   paid") and **refund on cancel** via `run.addKi(def.cost)`. Stamps (post-A1) charge ki at
+   *apply* via `spendKiForConsumable` and do **not** refund (nothing was pre-charged). So the
+   draft's "one canonical refund-on-cancel path" is too strong: the surface needs a per-family
+   economy/cancel policy (charge-at-purchase+refund vs. charge-at-apply+no-refund), or the ki
+   timing must be normalized first. Flag this as a design sub-decision for the architectural half.
+
+**The two separable halves (do NOT conflate):**
+1. **Architectural — dispatch/wiring unification (Phase 4, F4.15 / this block).** Once every
+   family's effect body is a `ConsumableEffects.get(id).execute()` entry (A1 did stamp; chakra +
+   element campaigns follow), the shrine's application paths can collapse onto one dispatch the
+   same way GameScene's three paths do. Belongs in Phase 4 — "consolidate parallel activation
+   paths," ShrineScene side. **The stamp path is the first family already routed through the
+   unified effect dispatch** (A1), so it's the reference shape.
+2. **UX completion (Phase 5).** A polished, complete, consistent shrine application *experience*
+   for every family on top of the unified dispatch — filling any genuinely-unimplemented family
+   UX and making overlay/picker presentation coherent. Content/polish, correctly Phase 5.
+
+**Shape of the consolidation (provisional).** One shrine application surface: a single overlay +
+target-picker (extending the existing `_buildPracticeGrid` seam) parameterized by the
+consumable's target arity (`card`, `card_multi` up-to-N, `source+target` pairs for Crown) and by
+its economy/cancel policy (point 2 above), dispatching to `ConsumableEffects.get(id).execute()`
+with one canonical post-apply `_buildUI()` path — instead of `_showStampCardSelector` / element
+path / per-chakra overlays each composing it by hand. (Mirrors how A1's `_applyStamp` is one
+handler registered for all stamp ids.)
+
+**Scope/risk.** Architectural half: medium — depends on chakra + element campaigns landing first
+(they supply the `execute()` entries the unified dispatch calls), on the picker abstraction
+handling the varying target arities, AND on resolving the per-family economy/cancel policy
+(point 2). UX half: separate, Phase 5, lower architectural risk.
+
+**Timing.** Architectural half rides *after* the chakra + element campaigns within this block (it
+consumes their output) and dovetails with F4.15's GameScene-side dispatch collapse — same
+unification, both scenes. UX half deferred to Phase 5. Do NOT attempt the picker abstraction
+before the per-family `execute()` entries exist (would be abstracting over paths still moving).
+
+**Cross-references.**
+- F4.15 (GameScene activation-path unification — the sibling architectural task; same dispatch
+  collapse, GameScene side).
+- Consumable-block A1 + chakra sub-recon (`consumable_inventory_pass1.md` §8; stamp = first
+  family routed; chakra overlays + `_buildPracticeGrid` seam + the ki-timing difference are the
+  sharpening evidence; this candidate surfaced here).
+- D-F4-SCOPE (the "audit categories deliberately, don't let them surface only reactively"
+  principle this entry honors by capturing the architectural half rather than punting it all to P5).
+- Candidate C (the unified surface's parameters — arity, economy policy — are intent-named
+  concepts; rides the late vocabulary pass).
+- Banked headline in PHASE4_STATE §4.
+
+---
+
 ## Cross-references
 - D-F4.18b (iterative-reorganization principle: reorg interleaves with design; name late)
 - F4.24b (prescriptive ARCHITECTURE.md, deliberately late — coordinate with Candidate C)
