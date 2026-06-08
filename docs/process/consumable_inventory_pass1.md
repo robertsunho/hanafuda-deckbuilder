@@ -320,3 +320,54 @@ delete the dead branches and normalize on an array signature.
 4. Rewire both scene paths + ShrineScene overlays to `ConsumableEffects.get(id).execute()`;
    delete the unreachable single-target branches; consider a small `run.notifyConsumableUsed()`
    public alias so handlers don't reach `_notifyBadger` directly.
+
+### A2 — Chakra → ConsumableEffects ✅ SHIPPED 2026-06-07
+All 7 chakras migrated (Option A). 5 card-field handlers carry their bodies; Third Eye loops
+`run.deleteCard`; Throat calls extracted `run.duplicateCardToDeck`. `getBaseCard(month,type)`
+added to cards.js and `_baseCardLookup` deleted (promoteCard repointed — one lookup). Added
+public `run.notifyConsumableUsed()`. INVARIANT held: chakras charge no ki at apply. Dead
+single-target branches removed. Test: `test/consumables/chakra_apply.test.js` (10 cases).
+
+### A3 — Wu Xing attach: PRE-RECON (proc-surface boundary) — VERDICT = **SHARED-STATE**
+
+Boundary map (read-only) for the Wu Xing *attach* migration (A3). Attach = `RunManager.applyElement`
++ `_createBaseEnhancement` + `_isGenerativeElement`/`_isDestructiveElement`. Proc = per-scoring /
+round-end behavior of the attached `card.enhancement`.
+
+**Proc-site table** (element × site / phase / enhancement fields read / writes):
+
+| Element | Proc site(s) | Phase | Reads | Writes enh? |
+|---|---|---|---|---|
+| Water | `getWaterMult(tier,depLevel)` GRM:470/1414/1547; **depLevel++** GRM:823 | per-card score + round-end | `tier`,`depLevel` | **YES — depLevel++ (round-end only)** |
+| Fire | `getFireFlatPoints` GRM:465/1407/1546; yaku wildcard `_selectAdditiveYakuCards` 864–879 (+ScoringEngine partition); break roll GRM:835–851 | per-card score + yaku select + round-end | `tier`,`element` | No — break calls `run.deleteCard` (deck membership), never writes enh |
+| Earth | `getEarthInterestRate` `_computeEarthKiBonus` GRM:888–906; `getEarthHeldMult` GRM:1384 | round-end ki + held-in-hand | `tier`,`element` | No |
+| Metal | `getMetalHeldMult` GRM:1370; jackpot `getMeteoriteJackpotChance` GRM:1373 | held-in-hand (Phase 1) | `tier`,`element` | No |
+| Wood | `getWoodScoringMult` GRM:475/1421/1548; slot-create `woodSlotCreated` FieldManager 185/249/322 | per-card score + placement | `tier`,`element` | No |
+
+Observing spirits: Glacier (Water dep), Carbon (Fire break), Fossil (Earth interest), Velocity
+(Metal) — all READ-only on enhancement, accrue via `incrementPerElement`.
+
+**Coupling resolution (`depLevel`/`tier` — the worry):** the ONLY proc-side write to
+`card.enhancement` anywhere is GRM:823 (`depLevel = (depLevel ?? 0) + 1`) at round-end. Attach
+writes `depLevel = 0` (base water) / resets to 0 on generative upgrade; proc increments at
+round-end. These writes are **temporally disjoint** — attach is a player action (in-round
+consumable or shrine), proc is `_applyPostRoundEnhancements` at bank/finalize; they never write
+`depLevel` in the same synchronous flow, so relocating attach cannot introduce a race. No proc
+reads `applyElement` internals or the generative/destructive maps. No proc writes `tier`/`element`.
+
+**Verdict: SHARED-STATE.** The boundary is cleanly separable in CODE (procs live in GRM scoring /
+round-end; attach in RunManager) — **A3 touches ZERO proc sites** — but attach and proc share the
+`card.enhancement` state contract, which A3 must preserve **byte-identically**:
+1. Base apply / overwrite → `{ element, tier:'base' }`, plus `depLevel:0` **only if water**.
+2. Generative upgrade → `tier='upgraded'`; `if (current.depLevel !== undefined) current.depLevel = 0`.
+3. Destructive strip → `card.enhancement = null`.
+4. `depLevel` stays **water-only / absent on non-water** (proc reads `depLevel ?? 0`; the upgrade
+   reset gates on `!== undefined` — adding depLevel to non-water would change upgrade behavior).
+5. `returnedConsumable: 'element_'+strippedElement` on strip (scene refund path depends on it).
+
+So A3 = relocate `applyElement` + the 2 cycle helpers + `_createBaseEnhancement` into a
+ConsumableEffects `element_*` handler, preserving the above contract; the proc surface is left
+entirely to F4.38. **F4.34 reconfirmed:** `SNOW_MULT`/`ICE_MULT` (ScoringEngine) have zero
+importers — live path is `getWaterMult`; GameplayLogger uses its own local arrays. (Aside, not A3
+scope: three different Water-dep representations now exist — `getWaterMult` formula, ScoringEngine
+arrays, logger-local arrays — a display-drift cleanup for F4.34/F4.38, flagged not fixed.)
