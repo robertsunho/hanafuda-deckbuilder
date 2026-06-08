@@ -401,3 +401,30 @@ GameScene:2347 + ShrineScene:1759 (no tests, no internal callers). The 3 helpers
 - **Dispatch:** scenes route `ConsumableEffects.get(id).execute({ params: { cardId, element } })`
   (GameScene derives `element = id.replace('element_','')`; ShrineScene uses
   `consumableDef.element ?? id.replace(...)`). id-prefix routing normalization → F4.15/Candidate G.
+
+### Water-dep representation reconciliation (post-A3 recon) — RESOLVED to a narrow decision
+
+Three reps, exact values verified:
+- **`getWaterMult(tier,depLevel)`** (HexagramEffects:742) — **LIVE scoring path, single source of
+  truth, the only hex-responsive one** (reads `modifyWaterDepreciation`). Snow `max(0.5, 2.0−0.25·dep)`,
+  Ice `max(0.25, 4.0−0.5·dep)`.
+- **`SNOW_MULT`/`ICE_MULT`** (ScoringEngine:21,23) — `[2.0,1.75,1.5,…]`/`[4.0,3.5,3.0,…]`. **AGREE
+  exactly** with `getWaterMult` at zero hex (same curve, table form). **Zero importers** (grep src+test)
+  → dead duplicate = F4.34's pure deletion target.
+- **GameplayLogger local `SNOW`/`ICE`** (GameplayLogger:488–489) — `[2.0,1.5,1.0,0.75,0.5,0.25]`/
+  `[4.0,3.0,2.0,1.5,1.0,0.75,0.5,0.25]`. **The lone outlier** — diverges from dep1 onward (Snow
+  dep1 1.5 vs live 1.75; Snow floor 0.25 vs live 0.5; Ice dep1 3.0 vs 3.5). Feeds the `×N`
+  annotation in `_cardLabel`.
+
+**Severity: low (dev-transcript only, NOT player-visible).** `_cardLabel`→`_log`→`_entries`+
+`console.log` is the playtest transcript ("copy/pasted into a conversation for analysis"), not the
+player-facing scoring UI (tooltips/badges already use `getWaterMult` per F3.6/F3.7). The drift
+misleads a dev reading transcript numbers for tuning, not the player.
+
+**Decision (for Robert):** logger fix is (a) **re-derive** — `_cardLabel` calls
+`getWaterMult(enh.tier, enh.depLevel)` instead of its local arrays (one source of truth,
+auto-correct under a depreciation hex), or (b) **re-number** the static arrays (simpler, but stays
+a duplicate that re-drifts under a hex). **Recommend (a).** F4.34 stays pure SNOW_MULT/ICE_MULT
+deletion regardless. Cleanest: one tiny "Water-dep single-source-of-truth" micro-task doing both
+(logger→getWaterMult + delete the dead ScoringEngine arrays), leaving `getWaterMult` the sole rep.
+No STOP conditions hit (formula matched; arrays dead; logger drift real).
