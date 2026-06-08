@@ -428,3 +428,30 @@ a duplicate that re-drifts under a hex). **Recommend (a).** F4.34 stays pure SNO
 deletion regardless. Cleanest: one tiny "Water-dep single-source-of-truth" micro-task doing both
 (logger→getWaterMult + delete the dead ScoringEngine arrays), leaving `getWaterMult` the sole rep.
 No STOP conditions hit (formula matched; arrays dead; logger drift real).
+**SHIPPED 2026-06-08** — logger re-derives via `getWaterMult`; `SNOW_MULT`/`ICE_MULT` deleted
+(F4.34 done); `test/consumables/water_mult.test.js` locks the curve.
+
+### Data-file consolidation (data-layer analogue) — recon, RECOMMEND option (a)
+
+Scattered consumable *data* (`consumables.js` + `zodiacConsumables.js` + `stamps.js`) → one home,
+mirroring the logic consolidation into ConsumableEffects. **No behavior to preserve — the only risk
+is reference-completeness** (a missed importer = build break), so the campaign MUST re-grep the
+importer census fresh at execution time (the census below is a point-in-time snapshot).
+
+- **No cross-imports:** the three files import nothing (independent) → merging is purely additive,
+  no internal rewiring.
+- **Importers (7, all static — re-verify at move-time):** consumables.js → RunManager,
+  ConsumableEffects, GameScene, ShrineScene. zodiacConsumables.js → RunManager, ShrineScene.
+  stamps.js → ConsumableEffects, RunManager, **SpiritEffects** (missed by the kickoff list),
+  GameScene, ShrineScene, **test/consumables/stamp_apply.test.js**. So 5 src files + 1 test repoint.
+- **`mixStamps` (logic in a data file):** travels WITH the stamp data — it + its private `STAMP_MIX`
+  matrix are one unit (the matrix IS stamp data, mixStamps its accessor). Lands in consumables.js
+  alongside the existing `getElementDef`/`getStampDef` lookups (the data-vs-logic line is already
+  soft there). Do NOT split it off to ConsumableEffects — separate concern, not worth bundling.
+- **Dead exports** (zero importers): `getAlchemicalDef`, `TERTIARY_STAMPS`, `QUATERNARY_STAMPS`.
+  Carry forward as-is to keep the move mechanical; drop in a Tier-5 dead-export sweep, not here.
+- **Recommendation = option (a):** fold zodiac + stamps into `consumables.js` (~300 lines combined —
+  readable; the data twin of ConsumableEffects). One campaign: append arrays+helpers+mixStamps to
+  consumables.js → repoint the 7 importers (merge the multi-line scene imports) → delete the two
+  files → build (= reference-completeness check). **Sequencing: land BEFORE F4.15** so dispatch
+  unification lands on the settled single import path. No STOP conditions.
