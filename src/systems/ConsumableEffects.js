@@ -24,11 +24,22 @@ import { getBaseCard } from '../data/cards.js';
 import { WUXING_CONSUMABLES, STAMPS, getStampDef, mixStamps } from '../data/consumables.js';
 import logger from './GameplayLogger.js';
 
+// Every handler declares an `inputType` — the universal target-mode discriminator
+// the scene dispatch switches on (F4.15a). Closed set:
+//   'none'        — fires immediately, no target (most zodiac)
+//   'slot'        — needs a field-slot index (Ox, Monkey)
+//   'yaku'        — needs a yaku name (Snake)
+//   'card'        — one deck card (element_*, stamp_*, chakra_heart/throat)
+//   'card_multi'  — up to N deck cards (chakra root/sacral/solar_plexus/third_eye)
+//   'card_pair'   — source + target deck cards (chakra_crown)
+//   'spirit_none' — alchemical, no spirit selection (Sulfur, Lead)
+//   'spirit_single_*' / 'spirit_pair*' — alchemical spirit selection (Cinnabar/Mercury/Jade/Amber/Pearl)
 const _effects = {
 
   // ── Zodiac consumables ────────────────────────────────────────────────────
 
   zodiac_rat: {
+    inputType: 'none',
     /** Draw 2 extra cards from the deck. */
     execute({ roundManager }) {
       const drawn = roundManager.deck.drawPileSize > 0
@@ -40,6 +51,7 @@ const _effects = {
   },
 
   zodiac_ox: {
+    inputType: 'slot',
     /**
      * Clear a stranded stack from one field slot.
      * Requires params.slotIndex.  Without it returns needsTarget='slot'.
@@ -65,6 +77,7 @@ const _effects = {
   },
 
   zodiac_tiger: {
+    inputType: 'none',
     /** Force a push without meeting a yaku threshold. */
     execute({ roundManager }) {
       roundManager._tigerPushActive = true;
@@ -73,6 +86,7 @@ const _effects = {
   },
 
   zodiac_rabbit: {
+    inputType: 'none',
     /** Remove push penalty for this round. */
     execute({ roundManager }) {
       roundManager._dogProtection = true;
@@ -81,6 +95,7 @@ const _effects = {
   },
 
   zodiac_dragon: {
+    inputType: 'none',
     /** Ki lottery: gain 0–30 ki (random). */
     execute() {
       const gain = Math.floor(Math.random() * 31);
@@ -90,6 +105,7 @@ const _effects = {
   },
 
   zodiac_snake: {
+    inputType: 'yaku',
     /**
      * Lower one yaku threshold by 1 this round.
      * Requires params.yakuName.  Without it returns needsTarget='yaku'.
@@ -106,6 +122,7 @@ const _effects = {
   },
 
   zodiac_horse: {
+    inputType: 'none',
     /** Discard your hand and draw an equal number of fresh cards. */
     execute({ roundManager }) {
       const oldHand = roundManager._hand.getAll();
@@ -141,6 +158,7 @@ const _effects = {
   },
 
   zodiac_goat: {
+    inputType: 'none',
     /** +1 ki per capture for the rest of this round. */
     execute({ roundManager }) {
       roundManager._goatActive = true;
@@ -149,6 +167,7 @@ const _effects = {
   },
 
   zodiac_monkey: {
+    inputType: 'slot',
     /**
      * Capture all cards on a field slot; discard equal number from hand.
      * Requires params.slotIndex.  Without it returns needsTarget='slot'.
@@ -188,6 +207,7 @@ const _effects = {
   },
 
   zodiac_rooster: {
+    inputType: 'none',
     /** +1 field slot for this round (stackable, resets at round end). */
     execute({ roundManager }) {
       roundManager._roosterBonusThisRound += 1;
@@ -197,6 +217,7 @@ const _effects = {
   },
 
   zodiac_dog: {
+    inputType: 'none',
     /** Retrieve 2 cards from the discard pile. */
     execute({ roundManager }) {
       const discards = roundManager._allDiscards;
@@ -209,6 +230,7 @@ const _effects = {
   },
 
   zodiac_pig: {
+    inputType: 'none',
     /** +10 ki immediately. */
     execute() {
       run.addKi(10, 'pig_zodiac');
@@ -217,6 +239,7 @@ const _effects = {
   },
 
   zodiac_cat: {
+    inputType: 'none',
     /** Summon a random Common spirit to an open slot. Excludes symbionts. */
     execute() {
       const COMMON_POOL = SPIRIT_CATALOG
@@ -325,6 +348,7 @@ const _effects = {
 
   alch_sulfur: {
     requiresInput: false,
+    inputType: 'spirit_none',
     execute() {
       const spirits = run.allSpirits;
       if (spirits.length === 0) return { success: false, message: 'No spirits to duplicate' };
@@ -387,6 +411,7 @@ const _effects = {
 
   alch_lead: {
     requiresInput: false,
+    inputType: 'spirit_none',
     execute() {
       if (!run.canAddSpirit) return { success: false, message: 'No spirit slot available' };
       const available = SPIRIT_CATALOG.filter(s => s.rarity === 'rare');

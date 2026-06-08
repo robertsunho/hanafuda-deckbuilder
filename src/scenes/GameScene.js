@@ -2079,8 +2079,12 @@ export class GameScene extends Phaser.Scene {
       const cons = entry?.cons;
       if (cons) {
         const y       = 700;
-        const isCardTarget = cons.id && (cons.id.startsWith('element_') || cons.id.startsWith('stamp_') || cons.id.startsWith('chakra_'));
-        const isAlchemical = cons.category === 'alchemical';
+        // F4.15a: dispatch keys off the handler's universal inputType discriminator,
+        // not id-prefix / category. card* → card-target picker; spirit_* → alchemical;
+        // none/slot/yaku → zodiac (immediate or target picker).
+        const kind = ConsumableEffects.get(cons.id)?.inputType ?? 'none';
+        const isCardTarget = kind === 'card' || kind === 'card_multi' || kind === 'card_pair';
+        const isAlchemical = kind.startsWith('spirit_');
         const btnLabel  = (isCardTarget || isAlchemical) ? `Activate: ${cons.name}` : `Use: ${cons.name}`;
 
         // Unified layout: Use/Activate on left, Cancel on right.
@@ -2096,21 +2100,18 @@ export class GameScene extends Phaser.Scene {
           } else if (isAlchemical) {
             this._activateAlchemical(cons, this._selectedConsumableIndex);
             this._selectedConsumableIndex = null;
+          } else if (kind === 'slot' || kind === 'yaku') {
+            // Zodiac with a target: open the picker up front (no discovery round-trip —
+            // the picker's on-select calls useConsumable once with the chosen target).
+            this._selectedConsumableIndex = null;
+            this._showZodiacTargetPicker(cons, kind);
           } else {
-            const precheck = this._round.useConsumable(cons, {});
-            if (!precheck.success && precheck.needsTarget) {
-              this._selectedConsumableIndex = null;
-              this._showZodiacTargetPicker(cons, precheck.needsTarget);
-            } else {
-              this._selectedConsumableIndex = null;
-              run.consumeById(cons.id);
-              if (precheck.revealedCards) {
-                this._showRoosterOverlay(precheck.revealedCards, precheck.message);
-              } else {
-                this._setStatus(precheck.message ?? `Used ${cons.name}.`);
-              }
-              this._renderAll();
-            }
+            // Zodiac immediate (inputType 'none'): execute once.
+            this._selectedConsumableIndex = null;
+            const result = this._round.useConsumable(cons, {});
+            run.consumeById(cons.id);
+            this._setStatus(result.message ?? `Used ${cons.name}.`);
+            this._renderAll();
           }
         });
         this._actionBtnObjs.push(useBtn);
