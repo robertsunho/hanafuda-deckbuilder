@@ -61,7 +61,7 @@
 import run, { effectivePower, aggregateNumericState, aggregateArrayLength,
                incrementPerElement, addUniqueToElements } from './RunManager.js';
 import { addCardBonusPoints } from './CardMutations.js';
-import { getStampDef } from '../data/stamps.js';
+import { getStampDef } from '../data/consumables.js';
 
 /** Maps ribbon card IDs to the stamp color they generate for Festival. */
 const RIBBON_STAMP_MAP = {

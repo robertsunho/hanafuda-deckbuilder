@@ -20,9 +20,8 @@ import run from './RunManager.js';
 import { getSpiritDef, SPIRIT_CATALOG } from '../data/spirits.js';
 import { findFusionRecipe, findFusionRecipeByResult } from '../data/fusionRecipes.js';
 import FieldManager from './FieldManager.js';
-import { STAMPS, getStampDef, mixStamps } from '../data/stamps.js';
 import { getBaseCard } from '../data/cards.js';
-import { WUXING_CONSUMABLES } from '../data/consumables.js';
+import { WUXING_CONSUMABLES, STAMPS, getStampDef, mixStamps } from '../data/consumables.js';
 import logger from './GameplayLogger.js';
 
 const _effects = {

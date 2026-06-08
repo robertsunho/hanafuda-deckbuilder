@@ -5,9 +5,8 @@
 // and run progression for the entire run.  Import the exported instance:
 import { getSpiritDef, SPIRIT_CATALOG }          from '../data/spirits.js';
 import { baseCards, getBaseCard }                 from '../data/cards.js';
-import { WUXING_CONSUMABLES, CHAKRA_TOOLS, getElementDef } from '../data/consumables.js';
-import { getStampDef, PRIMARY_STAMPS } from '../data/stamps.js';
-import { ZODIAC_CONSUMABLES, getZodiacDef }     from '../data/zodiacConsumables.js';
+import { WUXING_CONSUMABLES, CHAKRA_TOOLS, getElementDef,
+         getStampDef, PRIMARY_STAMPS, ZODIAC_CONSUMABLES, getZodiacDef } from '../data/consumables.js';
 import logger                                   from './GameplayLogger.js';
 import { resolveHexagram }                      from './HexagramGenerator.js';
 import { getHexagram as getHexagramDef }        from '../data/hexagrams.js';

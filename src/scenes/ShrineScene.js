@@ -13,10 +13,9 @@ import { SPIRIT_CATALOG, getSpiritDef }         from '../data/spirits.js';
 import { getAvailableFusions }                  from '../data/fusionRecipes.js';
 import { CHAKRA_TOOLS,
          WUXING_CONSUMABLES, getElementDef,
-         ALCHEMICAL_CONSUMABLES }               from '../data/consumables.js';
-import { PRIMARY_STAMPS, SECONDARY_STAMPS,
-         getStampDef }                          from '../data/stamps.js';
-import { ZODIAC_CONSUMABLES }                  from '../data/zodiacConsumables.js';
+         ALCHEMICAL_CONSUMABLES,
+         PRIMARY_STAMPS, SECONDARY_STAMPS, getStampDef,
+         ZODIAC_CONSUMABLES }                   from '../data/consumables.js';
 import { generateShopCards }                   from '../data/shopCards.js';
 import logger                                   from '../systems/GameplayLogger.js';
 import ConsumableEffects                        from '../systems/ConsumableEffects.js';

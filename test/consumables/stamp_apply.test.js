@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { makeRound, equipSpiritWithState } from '../helpers.js';
 import run, { aggregateNumericState } from '../../src/systems/RunManager.js';
 import ConsumableEffects from '../../src/systems/ConsumableEffects.js';
-import { getStampDef } from '../../src/data/stamps.js';
+import { getStampDef } from '../../src/data/consumables.js';
 
 // Consumable-block A1: stamp application migrated RunManager.applyStamp →
 // ConsumableEffects (card mutation) + run.spendKiForConsumable (ki + Badger).

@@ -2,9 +2,8 @@ import GameRoundManager      from '../systems/GameRoundManager.js';
 import { YAKU_INFO }         from '../systems/ScoringEngine.js';
 import run, { RunManager, effectivePower, aggregateNumericState, aggregateArrayLength,
                aggregateUniqueCount, longestHeldValue, getPushMultiplier } from '../systems/RunManager.js';
-import { getElementDef }     from '../data/consumables.js';
+import { getElementDef, getStampDef } from '../data/consumables.js';
 import { getSpiritDef }      from '../data/spirits.js';
-import { getStampDef }       from '../data/stamps.js';
 import logger                from '../systems/GameplayLogger.js';
 import SpiritEffects         from '../systems/SpiritEffects.js';
 import ConsumableEffects    from '../systems/ConsumableEffects.js';
