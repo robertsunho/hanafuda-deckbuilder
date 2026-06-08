@@ -22,6 +22,7 @@ import { findFusionRecipe, findFusionRecipeByResult } from '../data/fusionRecipe
 import FieldManager from './FieldManager.js';
 import { STAMPS, getStampDef, mixStamps } from '../data/stamps.js';
 import { getBaseCard } from '../data/cards.js';
+import { WUXING_CONSUMABLES } from '../data/consumables.js';
 import logger from './GameplayLogger.js';
 
 const _effects = {
@@ -596,6 +597,85 @@ const _applyStamp = {
   },
 };
 for (const _s of STAMPS) _effects[_s.id] = _applyStamp;
+
+// ── Wu Xing element consumables (ATTACH surface) ─────────────────────────────
+// Card-level enhancement mutation is the canonical consumable-block concern and
+// lives here. This is the ATTACH half only; the per-scoring/round-end PROC half
+// (Water depLevel++, Fire break, Earth interest, Metal jackpot, Wood slots) stays
+// in GameRoundManager/ScoringEngine — F4.38's territory. Per Recon 2 (SHARED-STATE)
+// the two halves share the `card.enhancement` field contract, preserved here
+// byte-identically. Badger fires on a real mutation only — NOT on no_effect.
+// All 5 element ids share this one handler; the element arrives via params.element.
+
+function _createBaseEnhancement(element) {
+  const enh = { element, tier: 'base' };
+  if (element === 'water') enh.depLevel = 0;   // depLevel is water-only (proc contract)
+  return enh;
+}
+
+// Generative cycle — applying an element's parent upgrades it:
+//   parentOf[fire]=wood, earth=fire, metal=earth, water=metal, wood=water
+function _isGenerativeElement(currentElement, appliedElement) {
+  const parentOf = {
+    fire: 'wood', earth: 'fire', metal: 'earth', water: 'metal', wood: 'water',
+  };
+  return parentOf[currentElement] === appliedElement;
+}
+
+// Destructive cycle — wood destroys earth, earth water, water fire, fire metal, metal wood.
+function _isDestructiveElement(currentElement, appliedElement) {
+  const destroys = {
+    wood: 'earth', earth: 'water', water: 'fire', fire: 'metal', metal: 'wood',
+  };
+  return destroys[appliedElement] === currentElement;
+}
+
+const _applyElement = {
+  requiresInput: true,
+  inputType: 'card',
+  execute({ params }) {
+    const { cardId, element } = params ?? {};
+    const card = run._deck.find(c => c.id === cardId);
+    if (!card) return { action: 'no_effect' };
+
+    const current = card.enhancement;
+
+    // No existing enhancement — apply base.
+    if (!current) {
+      card.enhancement = _createBaseEnhancement(element);
+      run.notifyConsumableUsed();
+      return { action: 'applied_base' };
+    }
+
+    const currentElement = current.element;
+
+    // Same element — no effect (no Badger).
+    if (currentElement === element) return { action: 'no_effect' };
+
+    // Generative: the applied element upgrades the current enhancement.
+    if (_isGenerativeElement(currentElement, element)) {
+      if (current.tier === 'upgraded') return { action: 'no_effect' };   // already at max (no Badger)
+      current.tier = 'upgraded';
+      if (current.depLevel !== undefined) current.depLevel = 0;   // reset Water dep
+      run.notifyConsumableUsed();
+      return { action: 'upgraded' };
+    }
+
+    // Destructive: the applied element strips the current enhancement.
+    if (_isDestructiveElement(currentElement, element)) {
+      const returnedElement = currentElement;
+      card.enhancement = null;
+      run.notifyConsumableUsed();
+      return { action: 'stripped', returnedConsumable: `element_${returnedElement}` };
+    }
+
+    // Any other element — overwrite with new base.
+    card.enhancement = _createBaseEnhancement(element);
+    run.notifyConsumableUsed();
+    return { action: 'overwritten' };
+  },
+};
+for (const _e of WUXING_CONSUMABLES) _effects[_e.id] = _applyElement;
 
 // ── Public interface ──────────────────────────────────────────────────────────
 

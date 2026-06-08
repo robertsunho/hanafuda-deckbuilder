@@ -1756,7 +1756,8 @@ export class ShrineScene extends Phaser.Scene {
         };
         if (consumableDef.id.startsWith('element_')) {
           const element = consumableDef.element ?? consumableDef.id.replace('element_', '');
-          const result  = run.applyElement(card.id, element);
+          const result  = ConsumableEffects.get(consumableDef.id)?.execute({ params: { cardId: card.id, element } })
+            ?? { action: 'no_effect' };
           if (result.action === 'stripped' && result.returnedConsumable) {
             const rd = getElementDef(result.returnedConsumable);
             if (rd && run.canAddConsumable) {

@@ -2344,7 +2344,8 @@ export class GameScene extends Phaser.Scene {
 
     if (id.startsWith('element_')) {
       const element = id.replace('element_', '');
-      const result  = run.applyElement(card.id, element);
+      const result  = ConsumableEffects.get(id)?.execute({ params: { cardId: card.id, element } })
+        ?? { action: 'no_effect' };
 
       // Handle stripped → return base consumable if inventory has space.
       let extraMsg = '';

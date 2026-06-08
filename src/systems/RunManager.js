@@ -1549,99 +1549,12 @@ class RunManager {
   // spendKiForConsumable(). mixStamps remains the data-owned mixing primitive.
 
   // ── Wu Xing enhancements ───────────────────────────────────────────────────
-
-  /**
-   * Apply a Wu Xing element to a card in the persistent deck.
-   * Handles all interaction rules: apply base, upgrade (generative), strip
-   * (destructive), overwrite (unrelated element), or no-effect (same element
-   * or already-upgraded generative).
-   *
-   * @param {string} cardId
-   * @param {string} element  'water' | 'wood' | 'fire' | 'earth' | 'metal'
-   * @returns {{ action: 'applied_base'|'upgraded'|'stripped'|'overwritten'|'no_effect',
-   *             returnedConsumable?: string }}
-   *   returnedConsumable is set only when action === 'stripped'; it is the id
-   *   of the base consumable for the stripped element (e.g. 'element_water').
-   */
-  applyElement(cardId, element) {
-    const card = this._deck.find(c => c.id === cardId);
-    if (!card) return { action: 'no_effect' };
-
-    const current = card.enhancement;
-
-    // No existing enhancement — apply base.
-    if (!current) {
-      card.enhancement = this._createBaseEnhancement(element);
-      this._notifyBadger();
-      return { action: 'applied_base' };
-    }
-
-    const currentElement = current.element;
-
-    // Same element — no effect.
-    if (currentElement === element) {
-      return { action: 'no_effect' };
-    }
-
-    // Generative: the applied element upgrades the current enhancement.
-    if (this._isGenerativeElement(currentElement, element)) {
-      if (current.tier === 'upgraded') {
-        return { action: 'no_effect' };   // already at max
-      }
-      current.tier = 'upgraded';
-      if (current.depLevel !== undefined) current.depLevel = 0;   // reset Water dep
-      this._notifyBadger();
-      return { action: 'upgraded' };
-    }
-
-    // Destructive: the applied element strips the current enhancement.
-    if (this._isDestructiveElement(currentElement, element)) {
-      const returnedElement = currentElement;
-      card.enhancement = null;
-      this._notifyBadger();
-      return { action: 'stripped', returnedConsumable: `element_${returnedElement}` };
-    }
-
-    // Any other element — overwrite with new base.
-    card.enhancement = this._createBaseEnhancement(element);
-    this._notifyBadger();
-    return { action: 'overwritten' };
-  }
-
-  /** @private */
-  _createBaseEnhancement(element) {
-    const enh = { element, tier: 'base' };
-    if (element === 'water') enh.depLevel = 0;
-    return enh;
-  }
-
-  /**
-   * Does `appliedElement` upgrade `currentElement` via the generative cycle?
-   * Generative: Wood→Fire, Fire→Earth, Earth→Metal, Metal→Water, Water→Wood.
-   * To upgrade an element, apply its parent:
-   *   parentOf[fire]=wood, parentOf[earth]=fire, parentOf[metal]=earth,
-   *   parentOf[water]=metal, parentOf[wood]=water
-   * @private
-   */
-  _isGenerativeElement(currentElement, appliedElement) {
-    const parentOf = {
-      fire: 'wood', earth: 'fire', metal: 'earth', water: 'metal', wood: 'water',
-    };
-    return parentOf[currentElement] === appliedElement;
-  }
-
-  /**
-   * Does `appliedElement` destroy `currentElement` via the destructive cycle?
-   * Destructive: Wood destroys Earth, Earth destroys Water, Water destroys Fire,
-   *              Fire destroys Metal, Metal destroys Wood.
-   * @private
-   */
-  _isDestructiveElement(currentElement, appliedElement) {
-    const destroys = {
-      wood: 'earth', earth: 'water', water: 'fire', fire: 'metal', metal: 'wood',
-    };
-    return destroys[appliedElement] === currentElement;
-  }
+  // Element ATTACH (applyElement + _createBaseEnhancement + the generative/
+  // destructive cycle helpers) migrated to ConsumableEffects.js (consumable-block
+  // A3). The per-scoring/round-end PROC surface (depLevel++/getWaterMult, Fire
+  // break, Earth interest, Metal jackpot, Wood slots) remains in GameRoundManager
+  // — F4.38's territory. addConsumable/canAddConsumable stay here (inventory
+  // economy the scenes call for the strip→return re-add).
 
   /**
    * Generate a random consumable from the full pool (Wu Xing, Zodiac, Chakra,
