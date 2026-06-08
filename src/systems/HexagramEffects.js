@@ -735,9 +735,9 @@ export function getFireBreakChance(tier) {
 }
 
 /**
- * Compute the current Water mult for a card.
- * Mirrors SNOW_MULT/ICE_MULT arrays at default rates; hexagram can alter the
- * depreciation rate via modifyWaterDepreciation.
+ * Compute the current Water mult for a card. The single source of truth for Snow/Ice
+ * depreciation (scoring, tooltips, badges, and the playtest logger all read this);
+ * hexagram can alter the depreciation rate via modifyWaterDepreciation.
  */
 export function getWaterMult(tier, depLevel) {
   const base  = tier === 'upgraded' ? 4.0 : 2.0;

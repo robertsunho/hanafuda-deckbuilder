@@ -13,6 +13,8 @@
 // analysis.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { getWaterMult } from './HexagramEffects.js';
+
 class GameplayLogger {
   constructor() {
     this._entries = [];
@@ -485,11 +487,9 @@ class GameplayLogger {
       const enhName = names[enh.element]?.[enh.tier] ?? enh.element;
       label += `[${enhName}`;
       if (enh.element === 'water') {
-        const SNOW = [2.0, 1.5, 1.0, 0.75, 0.5, 0.25];
-        const ICE  = [4.0, 3.0, 2.0, 1.5, 1.0, 0.75, 0.5, 0.25];
-        const arr = enh.tier === 'upgraded' ? ICE : SNOW;
-        const lvl = Math.min(enh.depLevel ?? 0, arr.length - 1);
-        label += ` ×${arr[lvl]}`;
+        // Single source of truth: the live scoring multiplier (hex-aware). Was a
+        // stale local table that drifted from getWaterMult; re-derived here.
+        label += ` ×${getWaterMult(enh.tier, enh.depLevel ?? 0)}`;
       }
       label += ']';
     }

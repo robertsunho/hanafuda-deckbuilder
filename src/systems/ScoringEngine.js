@@ -14,13 +14,8 @@
 // Actual scoring is per-capture accumulation in GameRoundManager.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Wu Xing Water depreciation multiplier tables ──────────────────────────────
-// depLevel indexes into the array.  Floored at the last entry.
-
-// Snow: −0.25 per use, floor 0.5
-export const SNOW_MULT = [2.0, 1.75, 1.5, 1.25, 1.0, 0.75, 0.5];
-// Ice: −0.5 per use, floor 0.25
-export const ICE_MULT  = [4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5, 0.25];
+// F4.34: the SNOW_MULT/ICE_MULT depreciation tables were removed here — they were
+// a dead duplicate of getWaterMult (HexagramEffects.js), the single source of truth.
 
 // ── Public yaku catalogue ─────────────────────────────────────────────────────
 
