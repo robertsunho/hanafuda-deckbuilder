@@ -2033,11 +2033,7 @@ export class GameScene extends Phaser.Scene {
         if (sel.length === 0) { this._setStatus('Select at least 1 card.'); return; }
         const cid = this._cardTargetMode.id;
         const cname = this._cardTargetMode.cons?.name ?? cid;
-        let result;
-        if (cid === 'chakra_root')              result = run.applyChakraRoot?.(sel);
-        else if (cid === 'chakra_sacral')       result = run.applyChakraSacral?.(sel);
-        else if (cid === 'chakra_solar_plexus') result = run.applyChakraSolarPlexus?.(sel);
-        else if (cid === 'chakra_third_eye')    result = run.applyChakraThirdEye?.(sel);
+        const result = ConsumableEffects.get(cid)?.execute({ params: { cardIds: sel } }) ?? { success: false };
         if (result?.success) {
           // Third Eye deletes cards from run deck; also remove from in-round hand
           if (cid === 'chakra_third_eye') {
@@ -2406,21 +2402,18 @@ export class GameScene extends Phaser.Scene {
       }
 
     } else if (id.startsWith('chakra_')) {
+      // Only single-target chakras reach this handler: Heart, Throat, Crown. The
+      // multi-target chakras (Root/Sacral/SolarPlexus/ThirdEye) are maxTargets>1
+      // and route through the Confirm path (select_multi_targets), never here.
       let result;
-      if (id === 'chakra_root')          result = run.applyChakraRoot?.(card.id);
-      else if (id === 'chakra_sacral')   result = run.applyChakraSacral?.(card.id);
-      else if (id === 'chakra_solar_plexus') result = run.applyChakraSolarPlexus?.(card.id);
-      else if (id === 'chakra_heart')    result = run.applyChakraHeart?.(card.id);
-      else if (id === 'chakra_throat') {
-        result = run.applyChakraThroat?.(card.id);
+      if (id === 'chakra_heart') {
+        result = ConsumableEffects.get(id)?.execute({ params: { cardId: card.id } });
+      } else if (id === 'chakra_throat') {
+        result = ConsumableEffects.get(id)?.execute({ params: { cardId: card.id } });
         if (result?.success && result.newCard) {
           this._round.deck.insertIntoDrawPile(result.newCard);
         }
-      }
-      else if (id === 'chakra_third_eye') {
-        result = run.applyChakraThirdEye?.([card.id]);
-        if (result?.success) this._round.removeCardFromHand(card.id);
-      } else if (id === 'chakra_crown')    {
+      } else if (id === 'chakra_crown') {
         // Crown needs two targets — store source first, then target
         if (!this._cardTargetMode.sourceCard) {
           this._cardTargetMode.sourceCard = card;
@@ -2428,7 +2421,7 @@ export class GameScene extends Phaser.Scene {
           this._renderAll();
           return;
         }
-        result = run.applyChakraCrown?.(this._cardTargetMode.sourceCard.id, card.id);
+        result = ConsumableEffects.get(id)?.execute({ params: { sourceId: this._cardTargetMode.sourceCard.id, targetId: card.id } });
       }
       if (result?.success) {
         run.consumeById(id);

@@ -845,6 +845,25 @@ export const baseCards = cards.filter(c => !c.speculative);
 /** The 13+1 speculative cards (not part of the base deck). */
 export const speculativeCards = cards.filter(c => c.speculative);
 
+/**
+ * Map `${month}_${type}` → the first card of that month/type in `cards`
+ * (base cards win over speculative because they appear first). The canonical
+ * base-card lookup used by rank promotion and chakra month/type mutations.
+ */
+const _baseCardByMonthType = new Map();
+for (const card of cards) {
+  const key = `${card.month}_${card.type}`;
+  if (!_baseCardByMonthType.has(key)) _baseCardByMonthType.set(key, card);
+}
+
+/**
+ * Look up the base card for a month/type pair.
+ * @param {number} month  1–12
+ * @param {string} type   'plain' | 'ribbon' | 'animal' | 'bright'
+ * @returns {object|null}
+ */
+export const getBaseCard = (month, type) => _baseCardByMonthType.get(`${month}_${type}`) ?? null;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper lookup objects
 // ─────────────────────────────────────────────────────────────────────────────

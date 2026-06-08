@@ -4,7 +4,7 @@
 // Manages the ki economy, spirit loadout, consumable inventory, deck state,
 // and run progression for the entire run.  Import the exported instance:
 import { getSpiritDef, SPIRIT_CATALOG }          from '../data/spirits.js';
-import { cards as ALL_CARDS, baseCards }          from '../data/cards.js';
+import { baseCards, getBaseCard }                 from '../data/cards.js';
 import { WUXING_CONSUMABLES, CHAKRA_TOOLS, getElementDef } from '../data/consumables.js';
 import { getStampDef, PRIMARY_STAMPS } from '../data/stamps.js';
 import { ZODIAC_CONSUMABLES, getZodiacDef }     from '../data/zodiacConsumables.js';
@@ -182,17 +182,6 @@ export function aggregateUniqueCount(spirit, key) {
 /** Ascending point order for card type promotion. */
 const TYPE_ORDER = ['plain', 'ribbon', 'animal', 'bright'];
 
-/**
- * Map from `${month}_${type}` → first card of that month/type in ALL_CARDS.
- * Used by promoteCard() to look up target card properties.
- */
-const _baseCardLookup = new Map();
-for (const card of ALL_CARDS) {
-  const key = `${card.month}_${card.type}`;
-  if (!_baseCardLookup.has(key)) {
-    _baseCardLookup.set(key, card);
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1316,8 +1305,7 @@ class RunManager {
     const progress  = card.promotionProgress || 0;
     const nextIdx   = (currentIdx + 1 + progress) % TYPE_ORDER.length;
     const nextType  = TYPE_ORDER[nextIdx];
-    const targetKey = `${card.month}_${nextType}`;
-    const target    = _baseCardLookup.get(targetKey);
+    const target    = getBaseCard(card.month, nextType);
 
     if (target) {
       card.id                = target.id;
@@ -1347,6 +1335,33 @@ class RunManager {
       this._deck.splice(idx, 1);
       this._notifyBadger();
     }
+  }
+
+  /**
+   * Duplicate a deck card: deep-clone it with a unique `_throat_N` id, push it
+   * to the persistent deck, and fire the collection-invariant side effects
+   * (engine_palace cardsAdded counter, Badger). Backs the Throat Chakra handler
+   * in ConsumableEffects; the caller inserts the returned card into the
+   * round-local draw pile for same-round availability.
+   * @param {string} cardId
+   * @returns {{ success: boolean, newCard?: object, reason?: string }}
+   */
+  duplicateCardToDeck(cardId) {
+    const card = this._deck.find(c => c.id === cardId);
+    if (!card) return { success: false, reason: 'Card not found' };
+    this._throatCounter++;
+    const newCard = {
+      ...JSON.parse(JSON.stringify(card)),
+      id:               card.id + `_throat_${this._throatCounter}`,
+      throatDuplicated: true,
+    };
+    this._deck.push(newCard);
+    // engine_palace: increment counter when a card is added to the deck.
+    for (const spirit of this._allSpirits) {
+      if (spirit.id === 'engine_palace') incrementPerElement(spirit, 'cardsAdded', 1);
+    }
+    this._notifyBadger();
+    return { success: true, newCard };
   }
 
   /**
@@ -1407,6 +1422,13 @@ class RunManager {
     this._notifyBadger();
     return true;
   }
+
+  /**
+   * Public entry for consumable effect handlers (ConsumableEffects.js) to record
+   * a consumable activation. Used by the chakra handlers, which (unlike stamps)
+   * charge no ki at apply — they only need to fire the Badger counter.
+   */
+  notifyConsumableUsed() { this._notifyBadger(); }
 
   // ── Card shop ─────────────────────────────────────────────────────────────
 
@@ -1516,166 +1538,10 @@ class RunManager {
   }
 
   // ── Chakra Tools ──────────────────────────────────────────────────────────
-
-  /**
-   * Root Chakra: toggle the temporal axis (day↔night) of up to 3 cards.
-   * @param {string[]} cardIds
-   */
-  applyChakraRoot(cardIds) {
-    if (cardIds.length > 3) return { success: false, reason: 'Root Chakra can toggle up to 3 cards' };
-    for (const id of cardIds) {
-      const card = this._deck.find(c => c.id === id);
-      if (!card) continue;
-      card.temporal = card.temporal === 'day' ? 'night' : 'day';
-      card.rootConverted = true;
-    }
-    this._notifyBadger();
-    return { success: true };
-  }
-
-  /**
-   * Sacral Chakra: advance the month of up to 3 cards (Dec → Jan cycle).
-   * Copies month/monthName/vertical/temporal from the base card of the new
-   * month, keeping the card's existing type (falls back to month data only
-   * if no base card exists for that type in the new month).
-   * @param {string[]} cardIds
-   */
-  applyChakraSacral(cardIds) {
-    if (cardIds.length > 3) return { success: false, reason: 'Sacral Chakra can advance up to 3 cards' };
-    for (const id of cardIds) {
-      const card = this._deck.find(c => c.id === id);
-      if (!card) continue;
-      const newMonth     = (card.month % 12) + 1;
-      const sameTypeKey  = `${newMonth}_${card.type}`;
-      const sameType     = _baseCardLookup.get(sameTypeKey);
-      if (sameType) {
-        card.month     = sameType.month;
-        card.monthName = sameType.monthName;
-        card.vertical  = sameType.vertical;
-        // temporal (day/night) is preserved — it is a symbolic axis independent of month
-        card.name      = sameType.name;
-      } else {
-        const fallback = _baseCardLookup.get(`${newMonth}_plain`)
-                      ?? _baseCardLookup.get(`${newMonth}_ribbon`)
-                      ?? _baseCardLookup.get(`${newMonth}_animal`)
-                      ?? _baseCardLookup.get(`${newMonth}_bright`);
-        card.month = newMonth;
-        if (fallback) {
-          card.monthName = fallback.monthName;
-          card.vertical  = fallback.vertical;
-          // temporal preserved
-        }
-      }
-      card.sacralConverted = true;
-    }
-    this._notifyBadger();
-    return { success: true };
-  }
-
-  /**
-   * Solar Plexus Chakra: cycle the type of up to 2 cards
-   * (plain→ribbon→animal→bright→plain).
-   * @param {string[]} cardIds
-   */
-  applyChakraSolarPlexus(cardIds) {
-    if (cardIds.length > 2) return { success: false, reason: 'Solar Plexus Chakra can cycle up to 2 cards' };
-    const CYCLE      = { plain: 'ribbon', ribbon: 'animal', animal: 'bright', bright: 'plain' };
-    const POINTS     = { plain: 3, ribbon: 10, animal: 12, bright: 20 };
-    const TYPE_NAMES = { bright: 'Bright', animal: 'Animal', ribbon: 'Ribbon', plain: 'Plain' };
-    for (const id of cardIds) {
-      const card = this._deck.find(c => c.id === id);
-      if (!card) continue;
-      const newType   = CYCLE[card.type] ?? card.type;
-      card.type       = newType;
-      card.points     = POINTS[newType];
-      card.name       = `${card.monthName ?? card.month} ${TYPE_NAMES[newType]}`;
-      card.solarPlexusConverted = true;
-    }
-    this._notifyBadger();
-    return { success: true };
-  }
-
-  /**
-   * Heart Chakra: apply a random edition to 1 card.
-   * 60% gold (+20 base pts), 30% crystal (+5 addMult), 10% ghost (×1.5 multMult).
-   * @param {string} cardId
-   * @returns {{ success: boolean, edition?: string, reason?: string }}
-   */
-  applyChakraHeart(cardId) {
-    const card = this._deck.find(c => c.id === cardId);
-    if (!card) return { success: false, reason: 'Card not found' };
-    if (card.edition) {
-      return { success: false, reason: 'Card already has an edition', existingEdition: card.edition };
-    }
-    const roll   = Math.random();
-    card.edition = roll < 0.6 ? 'gold' : roll < 0.9 ? 'crystal' : 'ghost';
-    this._notifyBadger();
-    return { success: true, edition: card.edition };
-  }
-
-  /**
-   * Throat Chakra: duplicate 1 card — add an exact copy to the deck.
-   * @param {string} cardId
-   * @returns {{ success: boolean, reason?: string }}
-   */
-  applyChakraThroat(cardId) {
-    const card = this._deck.find(c => c.id === cardId);
-    if (!card) return { success: false, reason: 'Card not found' };
-    this._throatCounter++;
-    const suffix  = `_throat_${this._throatCounter}`;
-    const newCard = {
-      ...JSON.parse(JSON.stringify(card)),
-      id:               card.id + suffix,
-      throatDuplicated: true,
-    };
-    this._deck.push(newCard);
-    // engine_palace: increment counter when a card is added to the deck.
-    for (const spirit of this._allSpirits) {
-      if (spirit.id === 'engine_palace') incrementPerElement(spirit, 'cardsAdded', 1);
-    }
-    this._notifyBadger();
-    return { success: true, newCard };
-  }
-
-  /**
-   * Third Eye Chakra: permanently delete up to 2 cards.
-   * @param {string[]} cardIds
-   */
-  applyChakraThirdEye(cardIds) {
-    if (cardIds.length > 2) return { success: false, reason: 'Third Eye Chakra can delete up to 2 cards' };
-    for (const id of cardIds) this.deleteCard(id);
-    return { success: true };
-  }
-
-  /**
-   * Crown Chakra: copy the identity (month/type/name/points/axes) of the
-   * SOURCE card onto the TARGET card, preserving the target's id, enhancement,
-   * stamp, and edition.
-   * @param {string} sourceId  Card whose identity will be copied.
-   * @param {string} targetId  Card that receives the identity.
-   * @returns {{ success: boolean, reason?: string }}
-   */
-  applyChakraCrown(sourceId, targetId) {
-    const source = this._deck.find(c => c.id === sourceId);
-    const target = this._deck.find(c => c.id === targetId);
-    if (!source || !target) return { success: false, reason: 'Card not found' };
-    if (source.id === target.id) return { success: false, reason: 'Source and target must be different' };
-
-    const savedId = target.id;
-
-    // Clear all properties so no stale state persists from the old identity.
-    for (const key of Object.keys(target)) delete target[key];
-
-    // Deep-clone source and assign all properties (identity, enhancement,
-    // stamps, editions, mutations, conversion flags — no whitelist needed).
-    Object.assign(target, JSON.parse(JSON.stringify(source)));
-
-    target.id = savedId;
-    target.baseImageId = source.baseImageId ?? source.id;
-    target.crownConverted = true;
-    this._notifyBadger();
-    return { success: true };
-  }
+  // Chakra application migrated to ConsumableEffects.js (consumable-block A2).
+  // Card-level mutation lives there; collection-invariant primitives stay here:
+  // deleteCard (Third Eye), duplicateCardToDeck (Throat), getBaseCard (cards.js,
+  // Sacral). Chakras charge NO ki at apply — handlers fire notifyConsumableUsed.
 
   // ── Stamps ────────────────────────────────────────────────────────────────
   // Stamp application migrated to ConsumableEffects.js (consumable-block A1).

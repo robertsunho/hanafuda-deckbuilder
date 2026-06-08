@@ -1177,7 +1177,7 @@ export class ShrineScene extends Phaser.Scene {
         },
         actionLabel: selectedIds.size > 0 ? `Toggle (${selectedIds.size})` : null,
         onAction: () => {
-          run.applyChakraRoot([...selectedIds]);
+          ConsumableEffects.get(def.id).execute({ params: { cardIds: [...selectedIds] } });
           logger.logConsumableUse(def.name, `toggled temporal on ${selectedIds.size} cards`);
           for (const o of this._confirmObjs) o.destroy();
           this._confirmObjs = [];
@@ -1210,7 +1210,7 @@ export class ShrineScene extends Phaser.Scene {
         },
         actionLabel: selectedIds.size > 0 ? `Advance (${selectedIds.size})` : null,
         onAction: () => {
-          run.applyChakraSacral([...selectedIds]);
+          ConsumableEffects.get(def.id).execute({ params: { cardIds: [...selectedIds] } });
           logger.logConsumableUse(def.name, `advanced month on ${selectedIds.size} cards`);
           for (const o of this._confirmObjs) o.destroy();
           this._confirmObjs = [];
@@ -1243,7 +1243,7 @@ export class ShrineScene extends Phaser.Scene {
         },
         actionLabel: selectedIds.size > 0 ? `Cycle Type (${selectedIds.size})` : null,
         onAction: () => {
-          run.applyChakraSolarPlexus([...selectedIds]);
+          ConsumableEffects.get(def.id).execute({ params: { cardIds: [...selectedIds] } });
           logger.logConsumableUse(def.name, `cycled type on ${selectedIds.size} cards`);
           for (const o of this._confirmObjs) o.destroy();
           this._confirmObjs = [];
@@ -1278,7 +1278,7 @@ export class ShrineScene extends Phaser.Scene {
         cards:       eligibleCards,
         selectedIds: new Set(),
         onSelect: (card) => {
-          const result = run.applyChakraHeart(card.id);
+          const result = ConsumableEffects.get(def.id).execute({ params: { cardId: card.id } });
           if (result.success) {
             logger.logConsumableUse(def.name, `applied ${result.edition} edition to ${card.id}`);
             for (const o of this._confirmObjs) o.destroy();
@@ -1309,7 +1309,7 @@ export class ShrineScene extends Phaser.Scene {
         cards:       run.getDeck(),
         selectedIds: new Set(),
         onSelect: (card) => {
-          const result = run.applyChakraThroat(card.id);
+          const result = ConsumableEffects.get(def.id).execute({ params: { cardId: card.id } });
           if (result.success) {
             logger.logConsumableUse(def.name, `duplicated ${card.id}`);
             for (const o of this._confirmObjs) o.destroy();
@@ -1344,7 +1344,7 @@ export class ShrineScene extends Phaser.Scene {
         },
         actionLabel: selectedIds.size > 0 ? `Delete (${selectedIds.size})` : null,
         onAction: () => {
-          run.applyChakraThirdEye([...selectedIds]);
+          ConsumableEffects.get(def.id).execute({ params: { cardIds: [...selectedIds] } });
           logger.logConsumableUse(def.name, `deleted ${selectedIds.size} cards`);
           for (const o of this._confirmObjs) o.destroy();
           this._confirmObjs = [];
@@ -1377,7 +1377,7 @@ export class ShrineScene extends Phaser.Scene {
         onSelect: (card) => {
           if (!phase2) { sourceCard = card; render(); }
           else {
-            const result = run.applyChakraCrown(sourceCard.id, card.id);
+            const result = ConsumableEffects.get(def.id).execute({ params: { sourceId: sourceCard.id, targetId: card.id } });
             if (result.success) {
               logger.logConsumableUse(def.name, `${sourceCard.id} identity → ${card.id}`);
               for (const o of this._confirmObjs) o.destroy();

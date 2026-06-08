@@ -21,6 +21,7 @@ import { getSpiritDef, SPIRIT_CATALOG } from '../data/spirits.js';
 import { findFusionRecipe, findFusionRecipeByResult } from '../data/fusionRecipes.js';
 import FieldManager from './FieldManager.js';
 import { STAMPS, getStampDef, mixStamps } from '../data/stamps.js';
+import { getBaseCard } from '../data/cards.js';
 import logger from './GameplayLogger.js';
 
 const _effects = {
@@ -425,6 +426,150 @@ const _effects = {
       run.removeZeroStackSpirits();
       run.addLegendarySpirit(capstoneDef);
       return { success: true, message: `Created ${capstoneDef.name}!` };
+    },
+  },
+
+  // ── Chakra consumables ──────────────────────────────────────────────────────
+  // Card-level mutation is the canonical consumable-block concern and lives here.
+  // Chakras charge NO ki at apply (paid at shop purchase; ShrineScene refunds on
+  // cancel) — handlers fire run.notifyConsumableUsed() only, NEVER
+  // spendKiForConsumable (that would double-charge). Deck-collection ops delegate
+  // to RunManager primitives (deleteCard, duplicateCardToDeck) which own their own
+  // spirit-event + Badger firing.
+
+  chakra_root: {
+    requiresInput: true,
+    inputType: 'card_multi',
+    execute({ params }) {
+      const cardIds = params?.cardIds ?? [];
+      if (cardIds.length > 3) return { success: false, reason: 'Root Chakra can toggle up to 3 cards' };
+      for (const id of cardIds) {
+        const card = run._deck.find(c => c.id === id);
+        if (!card) continue;
+        card.temporal = card.temporal === 'day' ? 'night' : 'day';
+        card.rootConverted = true;
+      }
+      run.notifyConsumableUsed();
+      return { success: true };
+    },
+  },
+
+  chakra_sacral: {
+    requiresInput: true,
+    inputType: 'card_multi',
+    execute({ params }) {
+      const cardIds = params?.cardIds ?? [];
+      if (cardIds.length > 3) return { success: false, reason: 'Sacral Chakra can advance up to 3 cards' };
+      for (const id of cardIds) {
+        const card = run._deck.find(c => c.id === id);
+        if (!card) continue;
+        const newMonth = (card.month % 12) + 1;
+        const sameType = getBaseCard(newMonth, card.type);
+        if (sameType) {
+          card.month     = sameType.month;
+          card.monthName = sameType.monthName;
+          card.vertical  = sameType.vertical;
+          // temporal (day/night) is preserved — a symbolic axis independent of month
+          card.name      = sameType.name;
+        } else {
+          const fallback = getBaseCard(newMonth, 'plain')
+                        ?? getBaseCard(newMonth, 'ribbon')
+                        ?? getBaseCard(newMonth, 'animal')
+                        ?? getBaseCard(newMonth, 'bright');
+          card.month = newMonth;
+          if (fallback) {
+            card.monthName = fallback.monthName;
+            card.vertical  = fallback.vertical;
+            // temporal preserved
+          }
+        }
+        card.sacralConverted = true;
+      }
+      run.notifyConsumableUsed();
+      return { success: true };
+    },
+  },
+
+  chakra_solar_plexus: {
+    requiresInput: true,
+    inputType: 'card_multi',
+    execute({ params }) {
+      const cardIds = params?.cardIds ?? [];
+      if (cardIds.length > 2) return { success: false, reason: 'Solar Plexus Chakra can cycle up to 2 cards' };
+      const CYCLE      = { plain: 'ribbon', ribbon: 'animal', animal: 'bright', bright: 'plain' };
+      const POINTS     = { plain: 3, ribbon: 10, animal: 12, bright: 20 };
+      const TYPE_NAMES = { bright: 'Bright', animal: 'Animal', ribbon: 'Ribbon', plain: 'Plain' };
+      for (const id of cardIds) {
+        const card = run._deck.find(c => c.id === id);
+        if (!card) continue;
+        const newType = CYCLE[card.type] ?? card.type;
+        card.type   = newType;
+        card.points = POINTS[newType];
+        card.name   = `${card.monthName ?? card.month} ${TYPE_NAMES[newType]}`;
+        card.solarPlexusConverted = true;
+      }
+      run.notifyConsumableUsed();
+      return { success: true };
+    },
+  },
+
+  chakra_heart: {
+    requiresInput: true,
+    inputType: 'card',
+    execute({ params }) {
+      const card = run._deck.find(c => c.id === params?.cardId);
+      if (!card) return { success: false, reason: 'Card not found' };
+      if (card.edition) {
+        return { success: false, reason: 'Card already has an edition', existingEdition: card.edition };
+      }
+      const roll   = Math.random();
+      card.edition = roll < 0.6 ? 'gold' : roll < 0.9 ? 'crystal' : 'ghost';
+      run.notifyConsumableUsed();
+      return { success: true, edition: card.edition };
+    },
+  },
+
+  chakra_throat: {
+    requiresInput: true,
+    inputType: 'card',
+    execute({ params }) {
+      // Deck duplication + engine_palace counter + Badger are collection-invariant
+      // work owned by RunManager; the scene inserts newCard into the round draw pile.
+      return run.duplicateCardToDeck(params?.cardId);
+    },
+  },
+
+  chakra_third_eye: {
+    requiresInput: true,
+    inputType: 'card_multi',
+    execute({ params }) {
+      const cardIds = params?.cardIds ?? [];
+      if (cardIds.length > 2) return { success: false, reason: 'Third Eye Chakra can delete up to 2 cards' };
+      // deleteCard fires _fireCardDestroyedEvent + Badger — do NOT re-notify here.
+      for (const id of cardIds) run.deleteCard(id);
+      return { success: true };
+    },
+  },
+
+  chakra_crown: {
+    requiresInput: true,
+    inputType: 'card_pair',
+    execute({ params }) {
+      const source = run._deck.find(c => c.id === params?.sourceId);
+      const target = run._deck.find(c => c.id === params?.targetId);
+      if (!source || !target) return { success: false, reason: 'Card not found' };
+      if (source.id === target.id) return { success: false, reason: 'Source and target must be different' };
+      const savedId = target.id;
+      // Clear all properties so no stale state persists from the old identity.
+      for (const key of Object.keys(target)) delete target[key];
+      // Deep-clone source and assign all properties (identity, enhancement, stamps,
+      // editions, mutations, conversion flags — no whitelist needed).
+      Object.assign(target, JSON.parse(JSON.stringify(source)));
+      target.id = savedId;
+      target.baseImageId = source.baseImageId ?? source.id;
+      target.crownConverted = true;
+      run.notifyConsumableUsed();
+      return { success: true };
     },
   },
 };
