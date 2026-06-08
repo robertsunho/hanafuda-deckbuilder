@@ -1752,10 +1752,7 @@ export class GameScene extends Phaser.Scene {
         btn.on('pointerout',  () => btn.setFillStyle(0x1a3a2a));
         btn.on('pointerdown', () => {
           objs.forEach(o => o.destroy());
-          const result = this._round.useConsumable(cons, { slotIndex: i });
-          run.consumeById(cons.id);
-          this._setStatus(result.message ?? `Used ${cons.name}.`);
-          this._renderAll();
+          this._executeAndFinalize(cons, { slotIndex: i });
         });
         objs.push(btn);
         objs.push(this.add.text(cx, btnY, lbl, { fontSize: '12px', color: '#ccddcc' }).setOrigin(0.5).setDepth(25));
@@ -1775,10 +1772,7 @@ export class GameScene extends Phaser.Scene {
         btn.on('pointerout',  () => btn.setFillStyle(0x2a1a3a));
         btn.on('pointerdown', () => {
           objs.forEach(o => o.destroy());
-          const result = this._round.useConsumable(cons, { yakuName });
-          run.consumeById(cons.id);
-          this._setStatus(result.message ?? `Used ${cons.name}.`);
-          this._renderAll();
+          this._executeAndFinalize(cons, { yakuName });
         });
         objs.push(btn);
         objs.push(this.add.text(cx, btnY, yakuName, { fontSize: '13px', color: '#ddaaff' }).setOrigin(0.5).setDepth(25));
@@ -2093,27 +2087,7 @@ export class GameScene extends Phaser.Scene {
           .setStrokeStyle(2, 0x4466cc).setInteractive({ useHandCursor: true }).setDepth(5);
         useBtn.on('pointerover',  () => useBtn.setFillStyle(0x2a4a8a));
         useBtn.on('pointerout',   () => useBtn.setFillStyle(0x1a2a5a));
-        useBtn.on('pointerdown',  () => {
-          if (isCardTarget) {
-            this._activateCardTarget(cons, this._selectedConsumableIndex);
-            this._selectedConsumableIndex = null;
-          } else if (isAlchemical) {
-            this._activateAlchemical(cons, this._selectedConsumableIndex);
-            this._selectedConsumableIndex = null;
-          } else if (kind === 'slot' || kind === 'yaku') {
-            // Zodiac with a target: open the picker up front (no discovery round-trip —
-            // the picker's on-select calls useConsumable once with the chosen target).
-            this._selectedConsumableIndex = null;
-            this._showZodiacTargetPicker(cons, kind);
-          } else {
-            // Zodiac immediate (inputType 'none'): execute once.
-            this._selectedConsumableIndex = null;
-            const result = this._round.useConsumable(cons, {});
-            run.consumeById(cons.id);
-            this._setStatus(result.message ?? `Used ${cons.name}.`);
-            this._renderAll();
-          }
-        });
+        useBtn.on('pointerdown',  () => this._dispatchConsumable(cons, this._selectedConsumableIndex));
         this._actionBtnObjs.push(useBtn);
         this._actionBtnObjs.push(
           this.add.text(useBtnX, y, btnLabel, {
@@ -2174,6 +2148,44 @@ export class GameScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(5)
     );
 
+  }
+
+  // ── Unified consumable dispatch (F4.15b) ─────────────────────────────────
+
+  /**
+   * Single entry for activating a consumable from the action-button row. Routes by
+   * the handler's universal `inputType` (F4.15a) to the right target flow; each flow
+   * keeps its own per-family result tail (card-target tails in _onCardTargetSelected,
+   * alchemical in _activateAlchemical, zodiac via _executeAndFinalize). Replaces the
+   * former three-path fork.
+   */
+  _dispatchConsumable(cons, idx) {
+    const kind = ConsumableEffects.get(cons.id)?.inputType ?? 'none';
+    this._selectedConsumableIndex = null;
+    if (kind === 'card' || kind === 'card_multi' || kind === 'card_pair') {
+      this._activateCardTarget(cons, idx);
+    } else if (kind.startsWith('spirit_')) {
+      this._activateAlchemical(cons, idx);
+    } else if (kind === 'slot' || kind === 'yaku') {
+      // Zodiac with a target: the picker's on-select executes once via _executeAndFinalize.
+      this._showZodiacTargetPicker(cons, kind);
+    } else {
+      // Zodiac immediate (inputType 'none').
+      this._executeAndFinalize(cons, {});
+    }
+  }
+
+  /**
+   * Execute a no-card-target consumable through the round and run the common finalize
+   * tail (consume from inventory, status message, re-render). Shared by the immediate
+   * zodiac path and the slot/yaku picker on-select.
+   */
+  _executeAndFinalize(cons, params) {
+    const result = this._round.useConsumable(cons, params);
+    run.consumeById(cons.id);
+    this._setStatus(result.message ?? `Used ${cons.name}.`);
+    this._renderAll();
+    return result;
   }
 
   // ── Alchemical activation (in-round) ─────────────────────────────────────

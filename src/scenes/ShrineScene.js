@@ -1903,22 +1903,20 @@ export class ShrineScene extends Phaser.Scene {
   // ── Alchemical consumable activation ──────────────────────────────────────
 
   _activateAlchemical(alchDef) {
-    const ConsumableEffects = this.scene.systems?.game?.registry?.get?.('ConsumableEffects');
-    // Direct import approach — ConsumableEffects is loaded at module level.
-    import('../systems/ConsumableEffects.js').then(mod => {
-      const effect = mod.default.get(alchDef.id);
-      if (!effect) { this._buildUI(); return; }
+    // F4.15b: use the static ConsumableEffects import (was a dynamic import() + a dead
+    // registry lookup). Result tail (_showAlchemicalResult overlay) stays scene-side.
+    const effect = ConsumableEffects.get(alchDef.id);
+    if (!effect) { this._buildUI(); return; }
 
-      if (!effect.requiresInput) {
-        // No selection needed (Sulfur, Lead) — execute immediately.
-        const result = effect.execute({ params: {} });
-        this._showAlchemicalResult(result);
-        return;
-      }
+    if (!effect.requiresInput) {
+      // No selection needed (Sulfur, Lead) — execute immediately.
+      const result = effect.execute({ params: {} });
+      this._showAlchemicalResult(result);
+      return;
+    }
 
-      // Needs spirit selection — show overlay.
-      this._showSpiritSelectionOverlay(alchDef, effect);
-    });
+    // Needs spirit selection — show overlay.
+    this._showSpiritSelectionOverlay(alchDef, effect);
   }
 
   _showAlchemicalResult(result) {
