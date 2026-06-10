@@ -61,18 +61,24 @@ Tier 2 — logic centralization
 │    (zodiac+stamps→consumables.js), Water-dep SSOT + F4.34, F4.15a/b dispatch collapse,
 │    Candidate G1/G2 (shrine random-8 surface), Tier-5 dead-code sweep — all shipped.
 │    F4.38 (Wu Xing proc surface) DEFERRED WHOLE to Tier-3 (scoring-loop dedup). See §4.
-├─ Hexagram-logic centralization ................... ◀── NEXT (fresh conversation)
-│    seepage is hook-shaped (which hex effects bypass applyHook/getActiveEffect into GRM);
-│    untangle RunManager↔HexagramEffects import cycle. Expected THORNIER than consumables —
-│    likely needs its own kickoff doc (recon → triage → campaigns), as the consumable block did.
+├─ Hexagram-logic centralization ................... ◀── IN PROGRESS (opened 2026-06-09)
+│    Recon DONE: seepage is fully hook-shaped, ZERO manager-resident hex logic (STOP cond. did
+│    not trigger); feared hex.effect=== name-checks were already clean. Smaller than feared.
+│    Rulings: dual dispatch KEPT + documented (no fireHook); import cycle DOCUMENT-AND-CONTAIN.
+│    See docs/process/hexagram_inventory_pass1.md (standing ref) + hexagram_block_kickoff.md.
+│      ├─ B1 header reconciliation (HexEffects header + DESIGN_DOC §9.1.2 + inventory doc) ✅ SHIPPED 2026-06-09
+│      ├─ A1 import-cycle document-and-contain + class-(c) param normalization ........... ◀── NEXT ([PRESERVE], 3 effect bodies)
+│      └─ X1 onCardScored/computeFinalScore/onCaptureComplete scoring-loop dup → Tier-3 ... HANDED OFF (see inventory §7)
 └─ F4.24a end-of-Tier-2 checkpoint ................. after the hexagram block (BOTH category blocks done)
      diff-against-pass-1 snapshot; expanded to enumerate consumable + hexagram seepage.
 ```
 
-**Immediate next action:** start the **hexagram-logic centralization** block in a FRESH conversation
-(per-category handoff), using the handoff template (§6). Its opening read-only recon doubles as the
-handoff test; given the expected thornier shape (hook-shaped seepage, RM↔HexagramEffects import
-cycle), the recon will likely recommend its own kickoff/inventory doc before any campaigns.
+**Immediate next action:** continue the **hexagram-logic centralization** block (OPEN). B1 (doc
+reconciliation) shipped 2026-06-09; the standing ref is `hexagram_inventory_pass1.md`. Next campaign
+is **A1** (import-cycle document-and-contain + class-(c) param normalization — `one_yaku_disabled`
+and `eight_spirits_graduated_tax` reach the `run` singleton instead of a handed param; `[PRESERVE]`,
+behavior-sensitive, recon-gated). After A1, the block closes (write `D-F4-HEXAGRAMS-TIER2`, archive
+the kickoff + inventory docs) and the **F4.24a end-of-Tier-2 checkpoint** runs.
 
 ---
 
