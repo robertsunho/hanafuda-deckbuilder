@@ -67,15 +67,34 @@ Tier 2 — logic centralization
 │    document-and-contain + class-(c) docs + hex_30 drift reconcile. Dual dispatch KEPT (no
 │    fireHook); import cycle ACCEPTED. X1 (onCardScored/computeFinalScore/onCaptureComplete
 │    scoring-loop dup) HANDED OFF to Tier-3 (subsumes F4.38).
-└─ F4.24a end-of-Tier-2 checkpoint ................. after the hexagram block (BOTH category blocks done)
-     diff-against-pass-1 snapshot; expanded to enumerate consumable + hexagram seepage.
+└─ F4.24a end-of-Tier-2 checkpoint ................. ✅ SHIPPED (2026-06-10) — pass-2 snapshot, 0 regressions
+     Verdict: Tier-2 thesis held — spirit/consumable/hexagram logic drained to canonical homes;
+     backbone −2 files/−527 lines; 8/14 pass-1 observations resolved. Remaining seepage is all
+     intentional (Bucket-B/T/N) or known-deferred to Tier-3. Snapshot: docs/archive/phase4/F4.24_inventory_pass2.md
+
+══ TIER 2 COMPLETE (2026-06-10) ══ — all three category drains closed + checkpoint verified.
+
+Tier 3 — pipeline consolidation  ◀── NEXT
+├─ Scoring-loop pass ............................... the marquee Tier-3 task; bundles three same-shape inheritances:
+│    • X1 — hexagram scoring-loop dup (onCardScored/computeFinalScore/onCaptureComplete twins)
+│    • F4.38 — Wu Xing proc surface (Fire/Water/Earth/Wood, deferred-whole from consumables)
+│    • N2 — stamp runtime-trigger surface (F4.38-sibling, surfaced by F4.24a)
+│    NOTE: N2 carries a live bug (PHASE4_consolidation_candidates.md:119 — _dispatchStampDiscardEffects
+│    draws to hand with no cap check); track as its own [FIX], do NOT [PRESERVE] it into the dedup.
+├─ Destination audit (D-F4-SCOPE Part 2) .......... GRM/RunManager intrinsic-org + import cycles #2/#3
+│    + _initSpiritState/_initSpiritElements twins (obs #13) + capstone-flag caching (obs #14). Feeds F4.24b.
+├─ F4.27 ........................................... util_past_life + sym_cuckoo_egg maturity/copy logic.
+└─ Named spirit hand-offs .......................... util_symbiosis/sym_algae summon (do LAST);
+     sym_ducks / engine_bullseye state-machines (need deck-flip / rank-inventory seams).
 ```
 
-**Immediate next action:** the **hexagram-logic centralization** block CLOSED 2026-06-09 (record:
-DECISIONS_LOG `D-F4-HEXAGRAMS-TIER2`). **Both Tier-2 category blocks (consumables + hexagrams) are now
-done.** The remaining Tier-2 item is the **F4.24a end-of-Tier-2 checkpoint** — diff-against-pass-1,
-expanded to enumerate consumable + hexagram seepage. **Tier-2 is complete once F4.24a lands**, after
-which Tier-3 (the scoring-pipeline pass that inherits hexagram X1 + F4.38) opens.
+**Immediate next action:** **Tier-2 is COMPLETE** (all three category drains closed + F4.24a checkpoint
+verified, 0 regressions — `docs/archive/phase4/F4.24_inventory_pass2.md`). Next chunk is **Tier-3 —
+pipeline consolidation**, whose marquee task is the **scoring-loop pass** bundling X1 (hexagram twins),
+F4.38 (Wu Xing procs), and N2 (stamp runtime-triggers) — all the same "proc behavior bound to the
+3-cluster scoring loop" shape. Tier-3 is a fresh chunk (a new orientation, not a continuation); it
+opens with its own planning/recon pass. Track the N2 stamp-discard cap bug as a [FIX], separate from
+the structural dedup.
 
 ---
 
@@ -98,12 +117,23 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
   (G1 deleted the dead cluster, G2 built the random-8 shrine application surface; see DECISIONS_LOG
   `D-G`). **Remaining: the UX-completion polish → Phase 5** (random-8 TUNING: subset size, gating,
   family eligibility, cost-scaling — the SHAPE is shipped, the tuning is calibration).
+- **Tier-3 scoring-loop pass (the marquee) — bundles X1 + F4.38 + N2.** All three are the same
+  "proc behavior bound to the 3-cluster scoring loop" shape: **X1** = hexagram twins
+  (onCardScored/computeFinalScore/onCaptureComplete, from `D-F4-HEXAGRAMS-TIER2` §7); **F4.38** = Wu
+  Xing proc surface (below); **N2** = stamp runtime-trigger surface (F4.24a finding — carries a live
+  [FIX]: `_dispatchStampDiscardEffects` draws to hand with no cap check, `PHASE4_consolidation_candidates.md:119`).
 - **F4.38 — Wu Xing proc surface → Tier-3 scoring-pipeline pass.** Deferred whole (the clean home
   needs the Fire/Water/Wood scoring triad — duplicated across 3 GRM clusters — collapsed, = scoring-
   loop restructuring, Tier-3 not Tier-2). Two spin-offs: **(a)** TIMING design-ruling (Snow dep /
   Ember break fire round-end = next-round effect; decide if per-card post-scoring is intended;
   Robert rules, balance-adjacent) and **(b)** the scoring-loop 3-cluster dedup (the Tier-3 target
   that subsumes Wu Xing extraction via the `onCardScored` delta contract). See `D-F4-CONSUMABLES-TIER2`.
+- **F4.24a-surfaced ratify/cleanup (non-Tier-3, low-priority).** N1 — `engine_northern_lion` is the
+  lone surviving `run.activeSpirits` accumulator (`GRM:2069`); one-line ratification that excluding
+  transcended copies from `pushesWitnessed` is intended. N3 — `engine_lincoln` desc/behavior mismatch
+  (`SpiritEffects.js:1103`; desc "bank without pushing" but increments every bank — D-F4-DOCSYNC-style).
+  Obs #4 (`test-run.js:54` dead smoke-test), #5 (RunManager duplicate `typeof window` debug blocks, one
+  ungated), #10 (`zodiac_rabbit` "Remove push penalty" sets `_dogProtection` — cosmetic naming).
 - **Tier-5 general dead-code pass — 3 routed survivors** from the consumable sweep: the
   `_drawLoadoutSlot`+`_confirmRelease` dead release-confirm chain (ShrineScene), the dead
   `_renderHexagramSymbol` twin (GameScene + ShrineScene), the stale `RunManager.advanceRound:1166`
@@ -203,7 +233,8 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 
 **`docs/archive/phase4/` — completed Phase-4 records (reference, do not update):**
 - `F4.16_F4.20_triage_ledger.md`, `F4.20_candidate_F_audit_findings.md` (CLOSED),
-  `F4.24_inventory_pass1.md` (STALE DIAGNOSTIC), `F4.17_campaign_ledger.md`,
+  `F4.24_inventory_pass1.md` (STALE DIAGNOSTIC), `F4.24_inventory_pass2.md` (end-of-Tier-2 checkpoint,
+  delta vs pass-1; the durable Tier-2-complete record), `F4.17_campaign_ledger.md`,
   `F4.18b_campaign_ledger.md`, `discard_pipeline_recon.md`, `round_end_pipeline_recon.md`,
   `PHASE_4_ENTRY_BRIEF.md`, `PHASE_4_TASK_ORDERING.md` (live content absorbed here; retained as bootstrap record).
 - **Consumable block (CLOSED 2026-06-09; record = DECISIONS_LOG `D-F4-CONSUMABLES-TIER2`):**
