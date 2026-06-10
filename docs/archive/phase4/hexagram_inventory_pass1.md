@@ -1,5 +1,10 @@
 # Hexagram-Logic Centralization — Inventory & Triage (Pass 1)
 
+> **✅ CLOSED / ARCHIVED 2026-06-09.** The hexagram-logic centralization block is complete. Durable
+> record: DECISIONS_LOG `D-F4-HEXAGRAMS-TIER2` (this doc's tables + §7 Tier-3 hand-off distilled into
+> the entry). Retained as the point-in-time recon record — **do not edit**; if its findings are needed,
+> re-recon against current source.
+
 > Standing reference for the hexagram block (Phase 4, Tier 2, third/final category).
 > Seeded from the opening recon. Status: LIVE during the block; archive at block close-out.
 > Companion to: `docs/process/hexagram_block_kickoff.md` (the brief), DECISIONS_LOG
@@ -172,9 +177,9 @@ but its duplication/merge is inseparable from the Tier-3 scoring-loop dedup → 
 
 - **B1** — header reconciliation (`HexagramEffects.js` header + DESIGN_DOC §9.1.2) + this doc.
   DOCUMENTATION-ONLY, zero code-path change. **Status: DONE.**
-- **A1** — import-cycle document-and-contain + class-(c) param normalization. `[PRESERVE]`. Gated on
-  Ruling 2 (made). Touches 3 effect bodies (behavior-sensitive) → gets its own recon-gated prompt.
-  **Status: PENDING.**
+- **A1** — import-cycle document-and-contain + class-(c) documentation (recon proved no [PRESERVE]-safe
+  param normalization exists; it became a pure documentation pass) + hex_30 drift reconciliation.
+  **Status: SHIPPED 2026-06-09.**
 - **X1** — CROSS-BLOCK → Tier-3 scoring-loop dedup. Hand-off stub, §7. **Status: HANDED OFF.**
 
 ## 7. Tier-3 hand-off stub (X1)

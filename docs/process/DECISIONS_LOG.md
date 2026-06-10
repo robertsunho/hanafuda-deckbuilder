@@ -4050,3 +4050,68 @@ natural late checkpoint. Mirrors the iterative-reorganization principle (D-F4.18
 tracks); F4.24b (terminal ARCHITECTURE.md — the late sweep's companion); D-F4-SCOPE (category-recon
 sequencing); D-F4.18b (iterative-reorganization principle); D-F4-HEXAGRAMS-TIER2 (the hex_30 drift that
 prompted this); `DESIGN_DOC_PATCHES.md` (the worklist).
+
+---
+
+## D-F4-HEXAGRAMS-TIER2 — Hexagram-logic centralization block CLOSED (2026-06-09)
+
+**Status:** CLOSED. Block-level umbrella record (hexagram analogue of `D-F4-CONSUMABLES-TIER2`).
+
+**Thesis + result.** The third and final Tier-2 category drain (after spirits/F4.20, consumables/
+`D-F4-CONSUMABLES-TIER2`). Expected thornier than consumables; turned out SMALLER. The opening recon
+established the seepage is fully HOOK-SHAPED — **zero** manager-resident hex logic (the STOP condition
+did not trigger). The feared `hex.effect ===` name-check special-casing was already clean (recon H1).
+What the block actually resolved: a dispatch-discipline documentation pass + a small import-cycle
+containment + a Tier-3 hand-off. No code-path changes shipped in the entire block — both campaigns were
+documentation-only.
+
+**Canonical-home rule (confirmed).** Hex behavior = a hook in `HEXAGRAM_EFFECTS`, dispatched via one of
+**3 documented classes**: (1) `applyHook(name, fallback, ...args)` — value-transformers + radical-mode
+flags; (2) direct `getActiveEffect()` reads — side-effect/lifecycle/merge/array hooks, whose contracts
+don't fit applyHook's single-fallback return; (3) Wu Xing `getX()` config-getter wrappers (which call
+applyHook internally). The engine calls hooks; it never special-cases a hex id. The Wu Xing config
+getters are correct residents of HexagramEffects, not seepage.
+
+**Ruling 1 = (b)+(c) [dispatch style].** The dual dispatch style is KEPT and DOCUMENTED, not unified —
+no `fireHook` void-dispatcher (the contracts genuinely differ; a second dispatcher would only half-unify
+and add churn). `onCardScored` / `computeFinalScore` are handled as a Tier-3 scoring-loop concern, not
+this block.
+
+**Ruling 2 = document-and-contain [import cycle].** The `RunManager ↔ HexagramEffects` cycle (and the
+transitive `ScoringEngine → SpiritEffects → RunManager → HexagramEffects → RunManager`) is ACCEPTED as
+deliberate dispatch-layer coupling — the only irreducible edge is `getActiveEffect`/`applyHook` needing
+`run.getHexagram()`. NOT broken (would touch ~30 applyHook sites for one import edge). The class-(c)
+effect bodies (`one_yaku_disabled`, `eight_spirits_graduated_tax`) read run-resident state directly
+because the state lives on the singleton and their dispatch arg (the GRM) can't carry it — documented,
+not normalized (the A1 recon proved no [PRESERVE]-safe param swap exists; `onRunStart` is the lone
+genuine handed-param case, already correct).
+
+**Campaigns shipped (both DOCUMENTATION-ONLY):**
+- **B1 — header reconciliation.** `HexagramEffects.js` header rewritten with the 3-dispatch-class model;
+  13 called-but-undocumented hooks added (4 lifecycle/event + 9 radical-mode flags); 8 Wu Xing getters
+  documented as Class 3; dead `modifyInitialFlow` deleted; `onBank`-vs-`RunManager.onBank` trap noted.
+  DESIGN_DOC §9.1.2 brought to parity (also corrected stale `modifyPushSuccess/Failure` →
+  `pushCurveSuccess/FailureAmplifier`, added `onBank`, removed spurious `onCardSeen`). New standing doc
+  `hexagram_inventory_pass1.md`.
+- **A1 — import-cycle containment + class-(c) docs + hex_30 drift reconciliation.** Import-line
+  containment note + 3 class-(c) clarifying comments + `onRunStart` contrast note. Folded in the hex_30
+  drift fix (below).
+
+**hex_30 drift reconciled (first D-F4-DOCSYNC instance).** The A1 recon found the `-1` yaku-threshold
+compensation + fixed-cycle rotation asserted in 4 places (the effect's code comment, the hexagrams.js
+`description`, DESIGN_DOC §9.2, and D0.10) but ABSENT from code (removed intentionally in commit
+8652c26; rotation is random-without-immediate-repeat). Robert ruled current code canonical; A1 corrected
+all 4 references (D0.10 got an appended reconciliation note, not a rewrite — the rule-vs-record
+convention). This was the worked example that prompted the `D-F4-DOCSYNC` reconcile-during-recon ruling.
+
+**X1 — handed to Tier-3 (NOT done here).** The threefold scoring-loop duplication — `onCardScored`
+(GRM `_addCapture` & `_scoreFieldCards`), `computeFinalScore` (same two sites), `onCaptureComplete`
+(normal path & the `disableCaptureScoring` branch) — is inseparable from the Tier-3 scoring-loop dedup
+that subsumes F4.38. Exact sites are in `hexagram_inventory_pass1.md` §7 (archived). Do NOT dedup these
+outside the Tier-3 pass.
+
+**Cross-references:** D-F4-SCOPE (the decision establishing this block); D-F4-CONSUMABLES-TIER2 (sibling
+block, same arc); D-F4-DOCSYNC (the doc-reconciliation ruling this block's hex_30 fix instantiated);
+D0.10 (the original hex_30 ruling, now carrying a reconciliation note); F4.38 / the Tier-3 scoring pass
+(inherits X1); F4.24a (the end-of-Tier-2 checkpoint, now next). Block docs `hexagram_block_kickoff.md` +
+`hexagram_inventory_pass1.md` ARCHIVED to `docs/archive/phase4/`.

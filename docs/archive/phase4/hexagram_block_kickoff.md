@@ -1,5 +1,8 @@
 # Hexagram-Logic Centralization — Block Kickoff Brief + Opening Recon
 
+> **✅ CLOSED / ARCHIVED 2026-06-09.** The hexagram-logic centralization block is complete. Durable
+> record: DECISIONS_LOG `D-F4-HEXAGRAMS-TIER2`. Retained as the block record — **do not edit**.
+
 > **Status:** Block setup, for the NEXT session (after the consumable block closed 2026-06-09). The
 > third and final Tier-2 category block. Frames the block + provides the opening read-only recon that
 > produces the hexagram triage inventory — the hexagram equivalent of the consumable block's

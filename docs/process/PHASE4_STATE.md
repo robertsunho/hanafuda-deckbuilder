@@ -61,24 +61,21 @@ Tier 2 — logic centralization
 │    (zodiac+stamps→consumables.js), Water-dep SSOT + F4.34, F4.15a/b dispatch collapse,
 │    Candidate G1/G2 (shrine random-8 surface), Tier-5 dead-code sweep — all shipped.
 │    F4.38 (Wu Xing proc surface) DEFERRED WHOLE to Tier-3 (scoring-loop dedup). See §4.
-├─ Hexagram-logic centralization ................... ◀── IN PROGRESS (opened 2026-06-09)
-│    Recon DONE: seepage is fully hook-shaped, ZERO manager-resident hex logic (STOP cond. did
-│    not trigger); feared hex.effect=== name-checks were already clean. Smaller than feared.
-│    Rulings: dual dispatch KEPT + documented (no fireHook); import cycle DOCUMENT-AND-CONTAIN.
-│    See docs/process/hexagram_inventory_pass1.md (standing ref) + hexagram_block_kickoff.md.
-│      ├─ B1 header reconciliation (HexEffects header + DESIGN_DOC §9.1.2 + inventory doc) ✅ SHIPPED 2026-06-09
-│      ├─ A1 import-cycle document-and-contain + class-(c) param normalization ........... ◀── NEXT ([PRESERVE], 3 effect bodies)
-│      └─ X1 onCardScored/computeFinalScore/onCaptureComplete scoring-loop dup → Tier-3 ... HANDED OFF (see inventory §7)
+├─ Hexagram-logic centralization ................... ✅ CLOSED (2026-06-09) — see DECISIONS_LOG D-F4-HEXAGRAMS-TIER2
+│    Recon: seepage fully hook-shaped, ZERO manager-resident hex logic. Smaller than feared.
+│    B1 header reconciliation (3-dispatch-class model + inventory doc); A1 import-cycle
+│    document-and-contain + class-(c) docs + hex_30 drift reconcile. Dual dispatch KEPT (no
+│    fireHook); import cycle ACCEPTED. X1 (onCardScored/computeFinalScore/onCaptureComplete
+│    scoring-loop dup) HANDED OFF to Tier-3 (subsumes F4.38).
 └─ F4.24a end-of-Tier-2 checkpoint ................. after the hexagram block (BOTH category blocks done)
      diff-against-pass-1 snapshot; expanded to enumerate consumable + hexagram seepage.
 ```
 
-**Immediate next action:** continue the **hexagram-logic centralization** block (OPEN). B1 (doc
-reconciliation) shipped 2026-06-09; the standing ref is `hexagram_inventory_pass1.md`. Next campaign
-is **A1** (import-cycle document-and-contain + class-(c) param normalization — `one_yaku_disabled`
-and `eight_spirits_graduated_tax` reach the `run` singleton instead of a handed param; `[PRESERVE]`,
-behavior-sensitive, recon-gated). After A1, the block closes (write `D-F4-HEXAGRAMS-TIER2`, archive
-the kickoff + inventory docs) and the **F4.24a end-of-Tier-2 checkpoint** runs.
+**Immediate next action:** the **hexagram-logic centralization** block CLOSED 2026-06-09 (record:
+DECISIONS_LOG `D-F4-HEXAGRAMS-TIER2`). **Both Tier-2 category blocks (consumables + hexagrams) are now
+done.** The remaining Tier-2 item is the **F4.24a end-of-Tier-2 checkpoint** — diff-against-pass-1,
+expanded to enumerate consumable + hexagram seepage. **Tier-2 is complete once F4.24a lands**, after
+which Tier-3 (the scoring-pipeline pass that inherits hexagram X1 + F4.38) opens.
 
 ---
 
@@ -200,7 +197,7 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 - `SPIRIT_SET_ITERATION_RULE.md` — durable (the transcendence/spirit-set invariant; a rule, not a record).
 - `PHASE4_consolidation_candidates.md` — partially-live (banked threads incl. Candidate C).
 - `PHASE4_STATE.md` — this doc (live state).
-- *(no currently-active block doc — the consumable block closed 2026-06-09; the hexagram block will add its own when it opens.)*
+- *(no currently-active block doc — all three Tier-2 category blocks (spirits, consumables, hexagrams) have closed; their docs are archived below. Next Tier-2 item is the F4.24a checkpoint, which adds no standing block doc.)*
 
 **`docs/` root:** `DESIGN_DOC_V5.md` — durable design source of truth.
 
@@ -212,6 +209,9 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 - **Consumable block (CLOSED 2026-06-09; record = DECISIONS_LOG `D-F4-CONSUMABLES-TIER2`):**
   `consumable_inventory_pass1.md` (the §8 campaign-decisions ledger — fully distilled into the entry),
   `consumable_block_kickoff.md` (kickoff brief).
+- **Hexagram block (CLOSED 2026-06-09; record = DECISIONS_LOG `D-F4-HEXAGRAMS-TIER2`):**
+  `hexagram_inventory_pass1.md` (the §2 reconciliation table + §7 Tier-3 hand-off — distilled into the
+  entry), `hexagram_block_kickoff.md` (kickoff brief + opening recon).
 
 **`docs/archive/` root — pre-Phase-4 history (do not edit):**
 - `INFRASTRUCTURE_PLAN.md` (superseded by INFRASTRUCTURE_DECISIONS), `UPLOAD_MANIFEST.md`
