@@ -460,38 +460,16 @@ export default class GameRoundManager {
         totalCardPts: 0,
       };
       let cardPts = getCardPoints(card);
-      const enh = card.enhancement;
-      if (enh?.element === 'fire') {
-        const _fp = getFireFlatPoints(enh.tier);
-        cardPts += _fp;
-        _cb.contributions.push({ source: `${enh.tier} Fire`, addPoints: _fp });
-      }
-      if (enh?.element === 'water') {
-        const _wm = getWaterMult(enh.tier, enh.depLevel ?? 0);
-        mult *= _wm;
-        _cb.contributions.push({ source: `${enh.tier} Water (dep ${enh.depLevel ?? 0})`, multiplyMult: _wm });
-      }
-      if (enh?.element === 'wood') {
-        const _wdm = getWoodScoringMult(enh.tier);
-        mult *= _wdm;
-        _cb.contributions.push({ source: `${enh.tier} Wood`, multiplyMult: _wdm });
-      }
-      if (card.edition === 'gold')    { cardPts += 20; _cb.contributions.push({ source: 'Gold edition', addPoints: 20 }); }
-      if (card.edition === 'crystal') { mult += 5;     _cb.contributions.push({ source: 'Crystal edition', addMult: 5 }); }
-      if (card.edition === 'ghost')   { mult *= 1.5;   _cb.contributions.push({ source: 'Ghost edition', multiplyMult: 1.5 }); }
+      ({ cardPts, mult } = this._applyCardEnhancements(card, cardPts, mult, _cb.contributions));
 
-      const _hexMod = getActiveEffect();
-      if (_hexMod?.onCardScored) {
-        const mod = _hexMod.onCardScored(card, { currentPoints: cardPts, currentMult: mult });
-        if (mod) {
-          if (mod.addPoints    !== undefined) cardPts += mod.addPoints;
-          if (mod.addMult      !== undefined) mult    += mod.addMult;
-          if (mod.multiplyMult !== undefined) mult    *= mod.multiplyMult;
-          _cb.contributions.push({
-            source: `hexagram ${run.getHexagram()?.englishName ?? 'hex'}`,
-            addPoints: mod.addPoints ?? 0, addMult: mod.addMult ?? 0, multiplyMult: mod.multiplyMult ?? 1,
-          });
-        }
+      const _hexFieldRes = this._applyHexCardScored(card, cardPts, mult);
+      cardPts = _hexFieldRes.cardPts;
+      mult    = _hexFieldRes.mult;
+      if (_hexFieldRes.mod) {
+        _cb.contributions.push({
+          source: `hexagram ${run.getHexagram()?.englishName ?? 'hex'}`,
+          addPoints: _hexFieldRes.mod.addPoints ?? 0, addMult: _hexFieldRes.mod.addMult ?? 0, multiplyMult: _hexFieldRes.mod.multiplyMult ?? 1,
+        });
       }
 
       for (const spirit of _fieldSpirits) {
@@ -537,9 +515,7 @@ export default class GameRoundManager {
 
     const flow = run.flow;
     const _hexCompute = getActiveEffect();
-    const fieldScore = _hexCompute?.computeFinalScore
-      ? _hexCompute.computeFinalScore(points, mult, flow)
-      : Math.round(points * mult * flow);
+    const fieldScore = this._computeCaptureScore(_hexCompute, points, mult, flow);
     this._runningScore += fieldScore;
 
     // ── Field scoring log (parity with capture scoring) ──
@@ -1310,6 +1286,93 @@ export default class GameRoundManager {
     return result;
   }
 
+  /**
+   * Apply Wu Xing enhancement (Fire/Water/Wood) + Gold/Crystal/Ghost edition math to a card's
+   * running points/mult. The single home for the per-card scoring math that was triplicated across
+   * the capture per-card loop, the Phase-1.5 retrigger loop, and _scoreFieldCards (the F4.38 triad).
+   * Pushes a telemetry breakdown to `contributions` when provided; the retrigger loop passes null
+   * (it emits no per-contribution breakdown — preserved).
+   * @returns {{cardPts:number, mult:number}}
+   */
+  _applyCardEnhancements(card, cardPts, mult, contributions) {
+    const enh = card.enhancement;
+    if (enh?.element === 'fire') {
+      const _fp = getFireFlatPoints(enh.tier);
+      cardPts += _fp;
+      contributions?.push({ source: `${enh.tier} Fire`, addPoints: _fp });
+    }
+    if (enh?.element === 'water') {
+      const _wm = getWaterMult(enh.tier, enh.depLevel ?? 0);
+      mult *= _wm;
+      contributions?.push({ source: `${enh.tier} Water (dep ${enh.depLevel ?? 0})`, multiplyMult: _wm });
+    }
+    if (enh?.element === 'wood') {
+      const _wdm = getWoodScoringMult(enh.tier);
+      mult *= _wdm;
+      contributions?.push({ source: `${enh.tier} Wood`, multiplyMult: _wdm });
+    }
+    if (card.edition === 'gold')    { cardPts += 20; contributions?.push({ source: 'Gold edition', addPoints: 20 }); }
+    if (card.edition === 'crystal') { mult += 5;     contributions?.push({ source: 'Crystal edition', addMult: 5 }); }
+    if (card.edition === 'ghost')   { mult *= 1.5;   contributions?.push({ source: 'Ghost edition', multiplyMult: 1.5 }); }
+    return { cardPts, mult };
+  }
+
+  /**
+   * Apply the active hexagram's onCardScored modifier to a card's running points/mult (the X1 hex
+   * scoring twin — one math home for _addCapture and _scoreFieldCards). Returns the raw `mod` so each
+   * caller can emit its own telemetry (the capture loop also drives the hexagram animation step; the
+   * two sites differ only in their contribution fallback label). The Phase-1.5 retrigger loop does
+   * NOT call this today — that omission (F2.10c) is preserved in D1 and addressed in D2.
+   * @returns {{cardPts:number, mult:number, mod:(object|null)}}
+   */
+  _applyHexCardScored(card, cardPts, mult) {
+    const effect = getActiveEffect();
+    if (effect?.onCardScored) {
+      const mod = effect.onCardScored(card, { currentPoints: cardPts, currentMult: mult });
+      if (mod) {
+        if (mod.addPoints    !== undefined) cardPts += mod.addPoints;
+        if (mod.addMult      !== undefined) mult    += mod.addMult;
+        if (mod.multiplyMult !== undefined) mult    *= mod.multiplyMult;
+        return { cardPts, mult, mod };
+      }
+    }
+    return { cardPts, mult, mod: null };
+  }
+
+  /**
+   * Final per-capture score: the active hexagram's computeFinalScore override, else the standard
+   * Math.round(points * mult * flow). The X1 computeFinalScore twin — one home for _addCapture and
+   * _scoreFieldCards. Takes the already-fetched active effect so callers can reuse it for logging
+   * (avoids a second getActiveEffect() call).
+   * @returns {number}
+   */
+  _computeCaptureScore(effect, points, mult, flow) {
+    return effect?.computeFinalScore
+      ? effect.computeFinalScore(points, mult, flow)
+      : Math.round(points * mult * flow);
+  }
+
+  /** Fire the active hexagram's onCaptureComplete hook (if any) for a completed capture. */
+  _fireHexOnCaptureComplete(cards) {
+    const effect = getActiveEffect();
+    if (effect?.onCaptureComplete) effect.onCaptureComplete({ run, capturedCards: cards });
+  }
+
+  /**
+   * Held-from-hand scoring contribution for one hand card during a capture. Returns a structured
+   * contribution object so the F5.8 Earth redesign can add `addKi`/`addInterest` channels without
+   * re-opening this seam (see scoring_loop_inventory_pass1.md §6). TODAY only `multiplyMult` is
+   * populated: Metal → getMetalHeldMult; Earth → getEarthHeldMult (×1.0 in ordinary play, hex-gated).
+   * The Meteorite jackpot RNG is a side-effect of the Metal branch and stays at the call site.
+   * @returns {{multiplyMult:number}|null}  null for non-Metal/Earth cards.
+   */
+  _heldCardContribution(handCard) {
+    const henh = handCard.enhancement;
+    if (henh?.element === 'metal') return { multiplyMult: getMetalHeldMult(henh.tier) };
+    if (henh?.element === 'earth') return { multiplyMult: getEarthHeldMult(henh.tier) };
+    return null;
+  }
+
   _addCapture(cards) {
     if (this._onScoringStep) this._onScoringStep({ type: 'capture_start' });
 
@@ -1323,10 +1386,7 @@ export default class GameRoundManager {
       logger.logCapture(cards, 'capture');
       const newCombos = this._style.checkCombos(this._capture.getAll());
       if (newCombos.length > 0) this._onStyleCombos(newCombos);
-      const _hexCapture = getActiveEffect();
-      if (_hexCapture?.onCaptureComplete) {
-        _hexCapture.onCaptureComplete({ run, capturedCards: cards });
-      }
+      this._fireHexOnCaptureComplete(cards);
       return;
     }
 
@@ -1366,10 +1426,11 @@ export default class GameRoundManager {
         const _heldTriggers = 1 + this._computeRetriggerCount(handCard, 'held_in_hand');
         for (let _ht = 0; _ht < _heldTriggers; _ht++) {
           const henh = handCard.enhancement;
+          // Held contribution object (F5.8 seam — only multiplyMult populated today).
+          const _held = this._heldCardContribution(handCard);
           if (henh?.element === 'metal') {
-            const _mMult = getMetalHeldMult(henh.tier);
-            mult *= _mMult;
-            if (_ht === 0) _bd.heldEffects.push({ source: `${henh.tier === 'upgraded' ? 'Meteorite' : 'Iron'} (${handCard.name})`, multiplyMult: _mMult });
+            mult *= _held.multiplyMult;
+            if (_ht === 0) _bd.heldEffects.push({ source: `${henh.tier === 'upgraded' ? 'Meteorite' : 'Iron'} (${handCard.name})`, multiplyMult: _held.multiplyMult });
             if (henh.tier === 'upgraded' && rollProbability(getMeteoriteJackpotChance(), 'meteorite_jackpot')) {
               run.addKi(30, 'meteorite_jackpot');
               // engine_velocity: +t2Procs per Meteorite jackpot.
@@ -1382,16 +1443,13 @@ export default class GameRoundManager {
               }
             }
           } else if (henh?.element === 'earth') {
-            const _eMult = getEarthHeldMult(henh.tier);
-            mult *= _eMult;
-            if (_ht === 0) _bd.heldEffects.push({ source: `${henh.tier === 'upgraded' ? 'Pottery' : 'Clay'} (${handCard.name})`, multiplyMult: _eMult });
+            mult *= _held.multiplyMult;
+            if (_ht === 0) _bd.heldEffects.push({ source: `${henh.tier === 'upgraded' ? 'Pottery' : 'Clay'} (${handCard.name})`, multiplyMult: _held.multiplyMult });
           }
         }
       }
 
       for (const card of cards) {
-        const enh = card.enhancement;
-
         // ── Per-card breakdown tracking ──
         const _cb = {
           cardName: card.name ?? card.id,
@@ -1401,56 +1459,26 @@ export default class GameRoundManager {
           totalCardPts: 0,
         };
 
-        // Base points (includes persistent mutations) + Fire additive.
+        // Base points (includes persistent mutations) + Wu Xing enhancement + edition math.
         let cardPts = getCardPoints(card);
-        if (enh?.element === 'fire') {
-          const _firePts = getFireFlatPoints(enh.tier);
-          cardPts += _firePts;
-          _cb.contributions.push({ source: `${enh.tier} Fire`, addPoints: _firePts });
-        }
-
-        // Water mult (Snow/Ice) — applied to capture-level mult.
-        if (enh?.element === 'water') {
-          const _wMult = getWaterMult(enh.tier, enh.depLevel ?? 0);
-          mult *= _wMult;
-          _cb.contributions.push({ source: `${enh.tier} Water (dep ${enh.depLevel ?? 0})`, multiplyMult: _wMult });
-        }
-
-        // Wood scoring mult — applied to the per-capture multiplier.
-        if (enh?.element === 'wood') {
-          const _woodM = getWoodScoringMult(enh.tier);
-          mult *= _woodM;
-          _cb.contributions.push({ source: `${enh.tier} Wood`, multiplyMult: _woodM });
-        }
-
-        // Edition bonuses — applied before spirit effects.
-        if (card.edition === 'gold')    { cardPts += 20;   _cb.contributions.push({ source: 'Gold edition', addPoints: 20 }); }
-        if (card.edition === 'crystal') { mult    += 5;    _cb.contributions.push({ source: 'Crystal edition', addMult: 5 }); }
-        if (card.edition === 'ghost')   { mult    *= 1.5;  _cb.contributions.push({ source: 'Ghost edition', multiplyMult: 1.5 }); }
+        ({ cardPts, mult } = this._applyCardEnhancements(card, cardPts, mult, _cb.contributions));
 
         // Hexagram onCardScored modifier — applied after editions, before spirits.
         // prevMult is saved so the animation event can show what the hexagram changed.
-        let _hexCardMod = null;
         const _hexCardPrevMult = mult;
         const _hexCardPrevPts  = cardPts;
-        {
-          const _hexMod = getActiveEffect();
-          if (_hexMod?.onCardScored) {
-            const mod = _hexMod.onCardScored(card, { currentPoints: cardPts, currentMult: mult });
-            if (mod) {
-              if (mod.addPoints    !== undefined) cardPts += mod.addPoints;
-              if (mod.addMult      !== undefined) mult    += mod.addMult;
-              if (mod.multiplyMult !== undefined) mult    *= mod.multiplyMult;
-              _hexCardMod = mod;
-              const _hexName = run.getHexagram()?.englishName ?? 'hexagram';
-              _cb.contributions.push({
-                source: `hexagram ${_hexName}`,
-                addPoints: mod.addPoints ?? 0,
-                addMult: mod.addMult ?? 0,
-                multiplyMult: mod.multiplyMult ?? 1,
-              });
-            }
-          }
+        const _hexCardRes = this._applyHexCardScored(card, cardPts, mult);
+        cardPts = _hexCardRes.cardPts;
+        mult    = _hexCardRes.mult;
+        const _hexCardMod = _hexCardRes.mod;
+        if (_hexCardMod) {
+          const _hexName = run.getHexagram()?.englishName ?? 'hexagram';
+          _cb.contributions.push({
+            source: `hexagram ${_hexName}`,
+            addPoints: _hexCardMod.addPoints ?? 0,
+            addMult: _hexCardMod.addMult ?? 0,
+            multiplyMult: _hexCardMod.multiplyMult ?? 1,
+          });
         }
 
         points += cardPts;
@@ -1541,14 +1569,10 @@ export default class GameRoundManager {
         const card = cards[_ci];
         const retriggerCount = this._computeRetriggerCount(card, 'capture', _ci === 0);
         for (let rt = 0; rt < retriggerCount; rt++) {
-          const enh = card.enhancement;
+          // D1: shared enhancement/edition math. Hex onCardScored is intentionally NOT applied here
+          // (the F2.10c omission) — D1 preserves it; D2 will add it via this same helper path.
           let cardPts = getCardPoints(card);
-          if (enh?.element === 'fire')  cardPts += getFireFlatPoints(enh.tier);
-          if (enh?.element === 'water') mult *= getWaterMult(enh.tier, enh.depLevel ?? 0);
-          if (enh?.element === 'wood')  mult *= getWoodScoringMult(enh.tier);
-          if (card.edition === 'gold')    cardPts += 20;
-          if (card.edition === 'crystal') mult    += 5;
-          if (card.edition === 'ghost')   mult    *= 1.5;
+          ({ cardPts, mult } = this._applyCardEnhancements(card, cardPts, mult, null));
           points += cardPts;
 
           if (this._onScoringStep) {
@@ -1626,9 +1650,7 @@ export default class GameRoundManager {
 
       const flow = run.flow;
       const _hexCompute = getActiveEffect();
-      const captureScore = _hexCompute?.computeFinalScore
-        ? _hexCompute.computeFinalScore(points, mult, flow)
-        : Math.round(points * mult * flow);
+      const captureScore = this._computeCaptureScore(_hexCompute, points, mult, flow);
       this._runningScore += captureScore;
 
       // ── Emit granular scoring log ──
@@ -1784,10 +1806,7 @@ export default class GameRoundManager {
     }
 
     // Hexagram onCaptureComplete hook (e.g. no_hand_ki_plus_capture: +3 ki per capture).
-    const _hexCapture = getActiveEffect();
-    if (_hexCapture?.onCaptureComplete) {
-      _hexCapture.onCaptureComplete({ run, capturedCards: cards });
-    }
+    this._fireHexOnCaptureComplete(cards);
   }
 
   /**
