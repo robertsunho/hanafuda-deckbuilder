@@ -117,6 +117,9 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
 - **F4.35 — scene-rendering unification** inherits the new shrine pickers (`_showShrineCardPicker`/
   `_showShrineSpiritPicker`, flagged `TODO(F4.35)`) for unification with GameScene's pickers, plus
   the `_renderHexagramSymbol` dead twin.
+- **Design-doc reconciliation (D-F4-DOCSYNC)** — reconcile-during-recon for stable areas (incremental);
+  full F4.14 sweep deferred to the F4.24b companion slot (late, against stabilized code). Raised
+  priority, code-stability trigger.
 - **Other consolidation candidates A/B/C/D/E/F** — in `PHASE4_consolidation_candidates.md`.
 
 ---

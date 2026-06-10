@@ -4001,3 +4001,52 @@ Phase 5 (random-8 tuning, Waidan Grove-exit coupling in `PHASE4_consolidation_ca
 Velocity magnitude `D-F4.20-VELOCITY`, Candidate G UX-completion half). Block doc
 `consumable_inventory_pass1.md` + `consumable_block_kickoff.md` ARCHIVED to `docs/archive/phase4/`.
 Next live thread: **hexagram-logic centralization**.
+
+---
+
+## D-F4-DOCSYNC — Design-doc reconciliation: reconcile-during-recon + defer the full sweep (2026-06-09)
+
+**Status:** PROCESS RULING (sequencing). No code.
+
+**Problem.** Phases 0–3 logged many DESIGN_DOC edits (in `DESIGN_DOC_PATCHES.md`, the F4.14 worklist)
+that were never applied, so the DESIGN_DOC is not authoritative. Tier-2 recon repeatedly hits stale
+doc-vs-code drift (latest: the hex_30 `-1`-compensation + fixed-cycle drift, found in the hexagram
+A1 recon — three docs asserted a mechanic the code didn't implement; resolved only via git archaeology).
+An unreliable doc taxes every remaining recon (the F4.24a checkpoint + all of Tier-3 consult it), and
+the cost compounds the longer it's deferred.
+
+**The tension.** Reconciling the whole DESIGN_DOC *now* would re-introduce the "don't clean code that's
+about to move" trap: Phase 4 is still changing code (Tier-3 pipeline consolidation is coming), so
+reconciling areas that are about to be rewritten means reconciling twice.
+
+**Decision — reconcile by stability, in two tracks:**
+1. **Reconcile-during-recon (immediate, ongoing).** When a recon surfaces a doc-vs-code drift in an
+   area that is ALREADY consolidated or stable, fix it inline as part of that block's documentation
+   pass — correcting the stale doc to match canonical code (or code to match doc, per a Robert ruling
+   on which is intended). This front-loads the high-value reconciliations (the ones blocking active
+   recon) and drains `DESIGN_DOC_PATCHES.md` incrementally, weighted toward the areas recon actually
+   touches. Example: the hex_30 reconciliation folded into hexagram-block A1.
+2. **The full sweep stays late, as the F4.24b companion.** Full F4.14 execution (applying the remaining
+   `DESIGN_DOC_PATCHES.md` worklist) runs LATE — against stabilized code, after Tier-3 settles the
+   areas still in flux — paired with **F4.24b** (the terminal prescriptive `ARCHITECTURE.md`). The two
+   are the same kind of "make the durable docs match the stabilized end-state" task; doing them together
+   avoids reconciling twice. Priority is raised vs. "someday," but the trigger is code-stability, not
+   calendar.
+
+**Rationale.** The incremental track IS the urgency increase Robert asked for — it resolves the drifts
+that actively block recon now, while deferring the low-value ones (areas Tier-3 will rewrite) to the
+natural late checkpoint. Mirrors the iterative-reorganization principle (D-F4.18b) and the
+"don't clean code about to move" discipline already used throughout Phase 4.
+
+**Mechanics.**
+- A recon that finds doc drift surfaces it as a STOP/flag (as the A1 recon did); Robert rules which
+  side is canonical; the fix rides that block's documentation pass.
+- Historical DECISION records (like D0.10) are NOT rewritten — they get a dated reconciliation note
+  appended (the rule-vs-record convention, INFRASTRUCTURE_DECISIONS); the live spec is code + DESIGN_DOC.
+- `DESIGN_DOC_PATCHES.md` remains the worklist; incremental reconciliations check items off it as they
+  land, so the eventual F4.24b-companion sweep only handles the remainder.
+
+**Cross-references:** F4.14 (design-doc reconciliation, Tier 1 — now split into incremental + late-sweep
+tracks); F4.24b (terminal ARCHITECTURE.md — the late sweep's companion); D-F4-SCOPE (category-recon
+sequencing); D-F4.18b (iterative-reorganization principle); D-F4-HEXAGRAMS-TIER2 (the hex_30 drift that
+prompted this); `DESIGN_DOC_PATCHES.md` (the worklist).
