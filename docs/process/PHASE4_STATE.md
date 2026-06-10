@@ -56,20 +56,23 @@ Tier 2 — logic centralization
 │    first wave, F4.20-FIX (neg accumulators), Candidate F audit + getter recon (verdict A),
 │    F4.20-FIX2 (5 effect sites), transcend-placement + mirror/memory ctx (site #6),
 │    second counter wave (snails + missing_number), Bucket-B/T doc sweep — all shipped.
-├─ Consumable-logic centralization ................. ◀── NEXT (fresh conversation)
-│    kickoff brief drafted: consumable_block_kickoff.md (inventory → Bucket A/B → campaigns;
-│    canonical-home question ConsumableEffects.js vs scene _cardTargetMode; F4.15/F4.38/F4.34
-│    are MEMBERS). Opens with a read-only recon = the handoff test.
-├─ Hexagram-logic centralization ................... after consumables
+├─ Consumable-logic centralization ................. ✅ CLOSED (2026-06-09) — see DECISIONS_LOG D-F4-CONSUMABLES-TIER2
+│    A1 stamp, A2 chakra (7, Option A), A3 Wu Xing attach (SHARED-STATE), data consolidation
+│    (zodiac+stamps→consumables.js), Water-dep SSOT + F4.34, F4.15a/b dispatch collapse,
+│    Candidate G1/G2 (shrine random-8 surface), Tier-5 dead-code sweep — all shipped.
+│    F4.38 (Wu Xing proc surface) DEFERRED WHOLE to Tier-3 (scoring-loop dedup). See §4.
+├─ Hexagram-logic centralization ................... ◀── NEXT (fresh conversation)
 │    seepage is hook-shaped (which hex effects bypass applyHook/getActiveEffect into GRM);
-│    untangle RunManager↔HexagramEffects import cycle. Likely thornier than consumables.
-└─ F4.24a end-of-Tier-2 checkpoint ................. after both category blocks
+│    untangle RunManager↔HexagramEffects import cycle. Expected THORNIER than consumables —
+│    likely needs its own kickoff doc (recon → triage → campaigns), as the consumable block did.
+└─ F4.24a end-of-Tier-2 checkpoint ................. after the hexagram block (BOTH category blocks done)
      diff-against-pass-1 snapshot; expanded to enumerate consumable + hexagram seepage.
 ```
 
-**Immediate next action:** start the consumable block in a FRESH conversation (first deliberate
-per-category handoff), using the handoff template (§6) + `consumable_block_kickoff.md`. Its opening
-read-only recon doubles as the handoff test.
+**Immediate next action:** start the **hexagram-logic centralization** block in a FRESH conversation
+(per-category handoff), using the handoff template (§6). Its opening read-only recon doubles as the
+handoff test; given the expected thornier shape (hook-shaped seepage, RM↔HexagramEffects import
+cycle), the recon will likely recommend its own kickoff/inventory doc before any campaigns.
 
 ---
 
@@ -88,12 +91,27 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
 - **badger** — `onConsumableUsed` belongs to the consumable block, not the spirit wave. Folded there.
 - **GRM/RunManager destination audit** (D-F4-SCOPE Part 2) — late Tier 3; feeds F4.24b. Drain
   categories first, then audit the emptied managers for displacement + intrinsic organization.
-- **Candidate G — shrine card-enhancement application flow** (surfaced A1; sharpened by the chakra
-  sub-recon). Two halves: the *architectural* dispatch/wiring unification (Phase 4 — collapse the
-  bespoke per-family shrine overlays onto one `ConsumableEffects.get(id).execute()` surface,
-  dovetails with F4.15; rides after the chakra+element campaigns supply the `execute()` entries)
-  vs. the *UX-completion* polish (Phase 5). Full entry in `PHASE4_consolidation_candidates.md`.
-- **Other consolidation candidates A/B/D/E/F** — in `PHASE4_consolidation_candidates.md`.
+- **Candidate G — shrine card-enhancement application flow** — *architectural half SHIPPED*
+  (G1 deleted the dead cluster, G2 built the random-8 shrine application surface; see DECISIONS_LOG
+  `D-G`). **Remaining: the UX-completion polish → Phase 5** (random-8 TUNING: subset size, gating,
+  family eligibility, cost-scaling — the SHAPE is shipped, the tuning is calibration).
+- **F4.38 — Wu Xing proc surface → Tier-3 scoring-pipeline pass.** Deferred whole (the clean home
+  needs the Fire/Water/Wood scoring triad — duplicated across 3 GRM clusters — collapsed, = scoring-
+  loop restructuring, Tier-3 not Tier-2). Two spin-offs: **(a)** TIMING design-ruling (Snow dep /
+  Ember break fire round-end = next-round effect; decide if per-card post-scoring is intended;
+  Robert rules, balance-adjacent) and **(b)** the scoring-loop 3-cluster dedup (the Tier-3 target
+  that subsumes Wu Xing extraction via the `onCardScored` delta contract). See `D-F4-CONSUMABLES-TIER2`.
+- **Tier-5 general dead-code pass — 3 routed survivors** from the consumable sweep: the
+  `_drawLoadoutSlot`+`_confirmRelease` dead release-confirm chain (ShrineScene), the dead
+  `_renderHexagramSymbol` twin (GameScene + ShrineScene), the stale `RunManager.advanceRound:1166`
+  JSDoc ("decay Style Base" — code no longer does it).
+- **Waidan Grove-exit coupling** — `legend_waidan`'s effect is inline in ShrineScene
+  `_drawContinueButton` (F4.20 Bucket-B seepage; no `onShrineExit` hook). If Waidan is cut → removal
+  site; if it stays → extract to a hook. Decision pending Waidan's fate. (`PHASE4_consolidation_candidates.md`.)
+- **F4.35 — scene-rendering unification** inherits the new shrine pickers (`_showShrineCardPicker`/
+  `_showShrineSpiritPicker`, flagged `TODO(F4.35)`) for unification with GameScene's pickers, plus
+  the `_renderHexagramSymbol` dead twin.
+- **Other consolidation candidates A/B/C/D/E/F** — in `PHASE4_consolidation_candidates.md`.
 
 ---
 
@@ -173,7 +191,7 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 - `SPIRIT_SET_ITERATION_RULE.md` — durable (the transcendence/spirit-set invariant; a rule, not a record).
 - `PHASE4_consolidation_candidates.md` — partially-live (banked threads incl. Candidate C).
 - `PHASE4_STATE.md` — this doc (live state).
-- `consumable_block_kickoff.md` — currently-active (the consumable block's kickoff + opening recon; archives at block close).
+- *(no currently-active block doc — the consumable block closed 2026-06-09; the hexagram block will add its own when it opens.)*
 
 **`docs/` root:** `DESIGN_DOC_V5.md` — durable design source of truth.
 
@@ -182,6 +200,9 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
   `F4.24_inventory_pass1.md` (STALE DIAGNOSTIC), `F4.17_campaign_ledger.md`,
   `F4.18b_campaign_ledger.md`, `discard_pipeline_recon.md`, `round_end_pipeline_recon.md`,
   `PHASE_4_ENTRY_BRIEF.md`, `PHASE_4_TASK_ORDERING.md` (live content absorbed here; retained as bootstrap record).
+- **Consumable block (CLOSED 2026-06-09; record = DECISIONS_LOG `D-F4-CONSUMABLES-TIER2`):**
+  `consumable_inventory_pass1.md` (the §8 campaign-decisions ledger — fully distilled into the entry),
+  `consumable_block_kickoff.md` (kickoff brief).
 
 **`docs/archive/` root — pre-Phase-4 history (do not edit):**
 - `INFRASTRUCTURE_PLAN.md` (superseded by INFRASTRUCTURE_DECISIONS), `UPLOAD_MANIFEST.md`

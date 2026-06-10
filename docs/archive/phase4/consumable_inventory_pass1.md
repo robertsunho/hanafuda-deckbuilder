@@ -1,6 +1,11 @@
 # Consumable-Logic Centralization — Inventory Pass 1 (read-only recon)
 
-**Status:** LIVING (process) — opening recon for the Tier-2 consumable-logic centralization block.
+> **✅ CLOSED / ARCHIVED 2026-06-09.** The Tier-2 consumable-logic centralization block is complete.
+> This doc's §8 campaign-decisions ledger has been fully distilled into DECISIONS_LOG
+> `D-F4-CONSUMABLES-TIER2` (the durable block record). Retained as the point-in-time recon record —
+> **do not edit**; if its findings are needed, re-recon against current source.
+
+**Status:** ARCHIVED (was LIVING) — opening recon for the Tier-2 consumable-logic centralization block.
 **Date:** 2026-06-07.
 **Mirrors:** the spirit block's `F4.24_inventory_pass1.md` (registry census + seepage table).
 **Scope:** READ-ONLY map. No source was edited. Member tasks folded in: **F4.15, F4.38, F4.34**.

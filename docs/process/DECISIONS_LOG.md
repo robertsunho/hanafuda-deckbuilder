@@ -3919,4 +3919,83 @@ untouched.
 
 **Cross-references:** OVERHAUL_PLAN F4.2.a (superseded premise / extended deletion), F4.35 (picker
 unification — inherits the new shrine pickers), F4.15a/b (the `inputType` dispatch contract this lands
-on), Phase 5 (random-8 tuning). [[D-F4.20-TIER2]] (Tier-2 consumable centralization arc).
+on), Phase 5 (random-8 tuning). [[D-F4-CONSUMABLES-TIER2]] (Tier-2 consumable centralization arc).
+
+## D-F4-CONSUMABLES-TIER2 — Consumable-logic centralization block CLOSED (2026-06-09)
+
+**The block-level umbrella for the entire Tier-2 consumable-logic centralization effort** (the second
+category block, after spirits). Distilled from `consumable_inventory_pass1.md` §8 (now archived). The
+`D-G` entry above is the shrine sub-record; this is the closing umbrella that references it.
+
+**Thesis + canonical-home rule.** Each subsystem owns its concern. **ConsumableEffects.js** owns
+dispatch + card-level mutation (one `.execute()` per consumable id). **RunManager** keeps run-economy
+(ki spend, inventory `addConsumable`/`canAddConsumable`, badger via the public
+`run.notifyConsumableUsed()`) + collection-invariant primitives (`deleteCard`, `duplicateCardToDeck`,
+`_acquireSpiritStack`). **Targeting/picker UI stays scene-side** (engine is scene-agnostic). The
+seepage cleaned up was manager-resident (Wu Xing/Chakra/Stamp logic sitting in RunManager), NOT
+scene-resident — scenes were already clean delegators (inventory §7 surprise #3).
+
+**The migration arc (all shipped):**
+- **A1 — Stamp → ConsumableEffects** (2026-06-07): mix + `ribbonStamp` write + log → shared handler
+  for all 9 stamp ids; ki/badger stay RunManager-owned; `RunManager.applyStamp` removed.
+- **A2 — Chakra class → ConsumableEffects** (2026-06-07): all 7 migrate as a class (Option A; a 5/2
+  split would perpetuate the "chakras in two places" anti-state). Thin handlers call RM primitives.
+  `getBaseCard` added to cards.js; `_baseCardLookup` deleted. **INVARIANT:** chakras charge no ki at
+  apply (paid at purchase) — handlers fire badger only. Dead single-target string-arg branches removed.
+- **A3 — Wu Xing attach → ConsumableEffects** (verdict **SHARED-STATE**): relocated `applyElement` +
+  the 2 cycle helpers + `_createBaseEnhancement` into one `element_*` handler, **touching ZERO proc
+  sites**. The attach↔proc boundary is cleanly separable in code; they only share the
+  `card.enhancement` state contract, preserved byte-identically (the only proc-side enh write is
+  round-end `depLevel++`, temporally disjoint from attach → no race).
+- **Data-file consolidation** (2026-06-08): zodiac + stamps folded into `consumables.js` (`mixStamps`
+  + its matrix travel with the data); 6 importers repointed; `zodiacConsumables.js`/`stamps.js`
+  deleted. Landed BEFORE F4.15 so dispatch unified on a settled single import path.
+- **Water-dep single-source-of-truth + F4.34** (2026-06-08): `getWaterMult` is the sole live rep;
+  dead `SNOW_MULT`/`ICE_MULT` deleted; GameplayLogger re-derives via `getWaterMult` (was a drifting
+  local table). `test/consumables/water_mult.test.js` locks the curve.
+- **F4.15a** (universal `inputType` discriminator) + **F4.15b** (collapse the GameScene three-path
+  fork + the two `_activateAlchemical` copies into one `_dispatchConsumable` + `_executeAndFinalize`,
+  per-family result tails kept scene-side, dead `revealedCards`/rooster branch dropped).
+- **Candidate G1/G2** — see `D-G`: deleted the 962-line dead shrine application cluster + Four
+  Practices, then built the random-8 shrine application surface (supersedes F4.2.a's no-application
+  premise). G1-fix restored `_drawContinueButton` (a live method the contiguous-range delete swept up).
+
+**F4.38 (Wu Xing proc surface) — DEFERRED WHOLE to a Tier-3 scoring-pipeline pass.** The recon
+located every proc site (no stragglers; the surface that defeated F3.7c is now bounded), but the
+clean home requires collapsing the Fire/Water/Wood scoring triad that is **duplicated across 3 GRM
+clusters** (`_scoreFieldCards`, `_addCapture` per-card, retrigger) — i.e. scoring-loop restructuring,
+which is **Tier-3, not Tier-2**. A partial round-end-only consolidation is net-negative (fragments the
+surface across two homes). Two spin-offs filed: **(a) a TIMING design-ruling** — Snow depreciation
+(`depLevel++`) and Ember break fire round-end (a NEXT-round effect; a card scores at full/unbroken
+state for its whole capture round); decide whether intended semantics are per-card post-scoring
+(same-round retrigger interaction). INDEPENDENT of the home; Robert rules; balance-adjacent (may pair
+with Phase 5). **(b) the scoring-loop 3-cluster dedup** = the Tier-3 target that subsumes Wu Xing
+extraction via the existing `onCardScored` delta contract (hex already uses it).
+
+**Tier-5 dead-code sweep + routing.** Removed (re-verified zero-caller): `_showRoosterOverlay`,
+`getAlchemicalDef`, `TERTIARY_STAMPS`, `QUATERNARY_STAMPS` (51 lines). The ~13-item 2026-05-01
+`cleanup-audit-report.md` backlog was **re-confirmed mostly already-removed** since that audit
+(buyYakuUpgrade, the style mutators, ribbonStamps.js, `_yakuUpgrades`/`_styleBase` plumbing,
+`_checkTsukiNarabi`, the GameScene CONS_SLOT_* constants — all already gone; the ScoringEngine
+"5-yaku" comment already fixed). **3 survivors routed to a general Tier-5 pass:** the
+`_drawLoadoutSlot`+`_confirmRelease` dead release-confirm chain (ShrineScene), the dead
+`_renderHexagramSymbol` twin (GameScene + ShrineScene), and the stale `advanceRound:1166` JSDoc.
+
+**Process lessons (the durable value for future blocks):**
+1. **Contiguous-range deletion vs method-by-method.** G1 deleted a line range as one block and swept
+   up the LIVE `_drawContinueButton` sitting between dead methods → a crash that build+tests didn't
+   catch. **Future deletion campaigns touching interleaved code: delete method-by-method with a
+   per-method caller check**, not by line range.
+2. **Scene-UI is the headless-test blind spot.** build-green + tests-green can BOTH be true with a
+   crash present (the G1 over-deletion; why F4.15b/G2 needed manual gates). **Manual in-scene
+   verification is the real gate for any reachable-UI change.**
+3. **Stale audits must be re-verified in BOTH directions.** The cleanup-audit's "still-live"
+   `practice_*` note was outdated (G1 had removed them); most of its backlog had silently resolved.
+   Re-grep current source; treat any audit as a candidate list, never a source of truth.
+
+**Cross-references:** `D-G` (shrine sub-record); F4.38 → Tier-3 scoring-pipeline pass (+ its timing
+& dedup spin-offs); F4.35 (inherits the new shrine pickers + the `_renderHexagramSymbol` dead twin);
+Phase 5 (random-8 tuning, Waidan Grove-exit coupling in `PHASE4_consolidation_candidates.md`,
+Velocity magnitude `D-F4.20-VELOCITY`, Candidate G UX-completion half). Block doc
+`consumable_inventory_pass1.md` + `consumable_block_kickoff.md` ARCHIVED to `docs/archive/phase4/`.
+Next live thread: **hexagram-logic centralization**.

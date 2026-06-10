@@ -1,6 +1,9 @@
 # Consumable-logic centralization — block kickoff brief + opening recon
 
-**Status:** Block setup, for the NEXT session (after F4.20 closes). This frames the block and
+> **✅ CLOSED / ARCHIVED 2026-06-09.** The block this kickoff opened is complete. Durable record:
+> DECISIONS_LOG `D-F4-CONSUMABLES-TIER2`. Retained as the bootstrap record — **do not edit**.
+
+**Status:** ARCHIVED (was: block setup, for the NEXT session after F4.20 closes). This frames the block and
 provides the opening read-only recon that produces the consumable triage inventory — the consumable
 equivalent of `F4.16_F4.20_triage_ledger.md`. Decided in D-F4-SCOPE Part 1 (DECISIONS_LOG).
 
