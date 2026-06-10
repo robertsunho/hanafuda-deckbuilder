@@ -2524,7 +2524,13 @@ Effort: 1 hour.
 
 Legacy consumable entries removed in F1.x legacy cleanup. The `_dogProtection` and `_pigDoubleKi` GRM fields remain — they're now used by zodiac replacements (zodiac_rabbit reuses `_dogProtection`). Renaming GRM internals deferred to F4.2.b below.
 
-### F4.2.a: ShrineScene dead method removal (post-F2.3.i)
+### F4.2.a: ShrineScene dead method removal (post-F2.3.i) **`✅ SHIPPED (Candidate G1/G2) 2026-06-09 — see DECISIONS_LOG D-G`**
+
+> **DONE + premise superseded.** G1 deleted the dead cluster (this list + Four Practices overlays +
+> the 4 RunManager `apply*` methods). G2 then RE-INTRODUCED a shrine application surface as random-8
+> (Use button → `inputType` dispatch → random-8 card picker / spirit picker), reversing the "shrine
+> has no application surface" premise below while honoring the delete-the-dead-code instruction.
+> Random-8 TUNING + picker unification (F4.35) deferred. Full record: DECISIONS_LOG **D-G**.
 
 After F2.3.i routed all consumable purchases through inventory, the in-shop apply methods became orphan dead code:
 - `_showChakraOverlay` — old in-shop chakra apply

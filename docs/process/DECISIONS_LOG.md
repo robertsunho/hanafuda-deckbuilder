@@ -3861,3 +3861,62 @@ granularity given the magnitude is an open Phase-5 question. **Leave as-is.**
 **Cross-references:** F5.1 (balance tuning), F4.27-ish stacking-pattern audit
 (`_scaleEngineOutput` canonicalization), F4.38 (Wu Xing); OVERHAUL_PLAN F2.5 "Deferred to Phase 5";
 F4.20-FIX campaign (triage ledger). [[D-TEST-HARNESS]] notes the Vitest suite this test lives in.
+
+## D-G — Shrine consumable-application: dead cluster deleted (G1) + random-8 surface built (G2) (2026-06-09)
+
+**Candidate G (Tier-2 consumable-logic centralization, architectural half).** Resolved a standing
+contradiction: OVERHAUL_PLAN F4.2.a said "delete the in-shop apply methods, the shrine has no
+application surface"; Robert wanted consumables USABLE at the shrine. The G recon proved both halves
+true at once — the F4.2.a methods were genuinely orphaned (keystone `_buyConsumable` had zero callers
+repo-wide; live purchases route `deckfix` → `run.addConsumable` → inventory), AND two competing
+selection models existed in dead code (`_buildPracticeGrid` full-deck vs `_showBoosterPack` random-8),
+neither reachable. Run as two campaigns.
+
+**G1 (commit `f93c4cc`) — deletion.** Removed the entire orphaned shrine application cluster
+(884 lines from ShrineScene: 7 chakra overlays + `_showChakraOverlay`, 4 Four Practices overlays +
+`_showPracticeOverlay`, `_buildPracticeGrid`, `_buyConsumable`→`_showUseOrCarryChoice`→
+`_showBoosterPack`, `_showStampCardSelector`, ShrineScene `_activateAlchemical`+`_showAlchemicalResult`
++`_showSpiritSelectionOverlay`, dead `practice_*` color entries) + 4 doubly-orphaned RunManager Four
+Practices methods (`applyPath`/`applyFasting`/`applyMind`/`applyTree`, 79 lines). Completes AND extends
+F4.2.a (which only named chakra/stamp/alchemical; G1 also covered Four Practices). Pure removal,
+nothing reachable → no behavior change. G1 captured the deleted interaction PATTERNS (multi-select
+Confirm, two-stage source→target, slice-8 grid) for G2 to reimplement.
+
+**G2 (this commit) — random-8 surface.** Made collected consumables usable at the shrine:
+- **Activate affordance:** a "Use" button on each rendered inventory slot in `_drawPersistentConsumables`,
+  gated on shrine-usable `inputType`. **Zodiac gets NO Use button** (none/slot/yaku = in-round only,
+  per Robert's ruling) — chosen over a disabled-with-tooltip variant for cleanliness.
+- **Shrine `_dispatchConsumable`:** mirrors GameScene's `inputType` dispatch MINUS zodiac. card/
+  card_multi/card_pair → random-8 card picker; spirit_* → spirit picker.
+- **Random-8 card picker** (`_showShrineCardPicker`): fresh `getDeck()`-shuffled-slice(8) PER ACTIVATION;
+  handles all 3 modes (single click; multi-select Set + Confirm capped at `cons.maxTargets`; two-stage
+  source→target for Crown). Result tail `_finishCardConsumable` handles element strip-return
+  (`run.addConsumable` if space) and the element `action`-vs-`success` reporting split.
+- **Spirit picker** (`_showShrineSpiritPicker`): mirrors GameScene's, with the canonical inputType
+  eligibility map; immediate-fire for no-target alchemicals (Lead/Sulfur).
+
+**The `roundManager` check (the recon STOP condition):** confirmed ALL shrine-usable families are
+run-scoped, none hard-require a round. element/stamp/chakra-single/multi/crown execute with `{ params }`
+only. chakra_throat's `duplicateCardToDeck` already pushes `newCard` into `run._deck`; the in-round
+`insertIntoDrawPile` is this-round-only and the shrine simply omits it. Only `alch_amber` touches
+`roundManager`, guarded by `if (roundManager)` — at the shrine it skips `_recomputeFieldSlots()`
+(no field to recompute; next `startRound` recomputes). No fake round context introduced.
+
+**Decisions recorded:**
+1. **Shrine application re-introduced as random-8, superseding F4.2.a's no-application premise**
+   (honoring its delete-the-dead-cluster instruction).
+2. **Random-8 SHAPE is shipped; TUNING deferred to Phase 5** — subset size (8), gating, family
+   eligibility, cost-scaling are all calibration for the balance pass.
+3. **New shrine pickers flagged for F4.35** (Option A: built shrine-local, accepting duplication with
+   GameScene's pickers; random-8 pool / no-`_round` differences made a shared abstraction premature).
+   `TODO(F4.35)` comments mark each new picker.
+
+**Verification:** build green; tests 127 passed / 1 skipped (baseline) for BOTH campaigns. G2 adds
+reachable scene-UI not covered by the headless suite — **manual in-shop verification is the real gate**
+(every usable family × mode: element apply/upgrade/strip/overwrite, stamp apply+mix, chakra single/
+Throat-duplicate/multi/Crown-pair, alchemical immediate + spirit-picker, zodiac-has-no-Use). GameScene
+untouched.
+
+**Cross-references:** OVERHAUL_PLAN F4.2.a (superseded premise / extended deletion), F4.35 (picker
+unification — inherits the new shrine pickers), F4.15a/b (the `inputType` dispatch contract this lands
+on), Phase 5 (random-8 tuning). [[D-F4.20-TIER2]] (Tier-2 consumable centralization arc).

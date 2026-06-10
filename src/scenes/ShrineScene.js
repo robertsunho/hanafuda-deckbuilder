@@ -579,6 +579,23 @@ export class ShrineScene extends Phaser.Scene {
           this._buildUI();
         });
       }
+
+      // Use button — card-target deck-fixers + alchemicals are usable at the shrine.
+      // Zodiac (inputType none/slot/yaku) is in-round only, so it gets no affordance.
+      const kind = ConsumableEffects.get(cons.id)?.inputType ?? 'none';
+      const usableAtShrine = kind === 'card' || kind === 'card_multi' ||
+        kind === 'card_pair' || kind.startsWith('spirit_');
+      if (usableAtShrine) {
+        const useBtn = this.add.text(x - CONS_CARD_W / 2 + 2, y + CONS_CARD_H / 2 - 2, 'Use', {
+          fontSize: '8px', color: '#aaffcc', fontStyle: 'bold',
+          backgroundColor: '#103a20', padding: { x: 3, y: 1 },
+        }).setOrigin(0, 1).setDepth(i + 4)
+          .setInteractive({ useHandCursor: true });
+        useBtn.on('pointerdown', (pointer, lx, ly, event) => {
+          event.stopPropagation();
+          this._dispatchConsumable(cons, i);
+        });
+      }
     }
   }
 
@@ -1136,6 +1153,265 @@ export class ShrineScene extends Phaser.Scene {
         break;
       }
     }
+  }
+
+  // ── Consumable application (random-8 shrine surface) ────────────────────────
+  // Re-introduces shrine application as random-8, superseding F4.2.a's no-shrine-
+  // application premise. Mirrors GameScene's inputType dispatch MINUS zodiac (in-
+  // round only). Pickers are built shrine-local with a fresh random-8 pool and no
+  // _round context; TUNING (subset size, gating) is deferred to Phase 5.
+  // TODO(F4.35): unify these shrine pickers with GameScene's _activateCardTarget /
+  // _onCardTargetSelected / _showAlchemicalTargetPicker (Option A duplication).
+
+  _dispatchConsumable(cons, idx) {
+    const kind = ConsumableEffects.get(cons.id)?.inputType ?? 'none';
+    if (kind === 'card' || kind === 'card_multi' || kind === 'card_pair') {
+      this._showShrineCardPicker(cons, idx, kind);
+    } else if (kind.startsWith('spirit_')) {
+      this._showShrineSpiritPicker(cons, idx);
+    }
+    // No none/slot/yaku branch: zodiac is in-round only (no Use affordance reaches here).
+  }
+
+  /** Build the params object a card-target consumable's execute() expects. */
+  _shrineCardParams(cons, card) {
+    const id = cons.id;
+    if (id.startsWith('element_')) return { cardId: card.id, element: cons.element ?? id.replace('element_', '') };
+    if (id.startsWith('stamp_'))   return { cardId: card.id, stampId: id };
+    return { cardId: card.id }; // chakra heart / throat
+  }
+
+  // TODO(F4.35): unify with GameScene _activateCardTarget / _onCardTargetSelected.
+  _showShrineCardPicker(cons, idx, kind) {
+    const deck = run.getDeck();
+    // Fresh random-8 per activation (re-draw each use; avoids stale-pool bugs).
+    const pool = [...deck].sort(() => Math.random() - 0.5).slice(0, Math.min(8, deck.length));
+    const selectedIds = new Set();   // card_multi
+    let   sourceCard  = null;        // card_pair
+    const maxTargets  = cons.maxTargets ?? 1;
+
+    const close = () => { for (const o of this._confirmObjs) o.destroy(); this._confirmObjs = []; };
+
+    const render = () => {
+      for (const o of this._confirmObjs) o.destroy();
+      this._confirmObjs = [];
+      const push = obj => { this._confirmObjs.push(obj); return obj; };
+
+      const cx = 640, cy = 356, W = 760, H = 470;
+      push(this.add.rectangle(cx, cy, W, H, 0x040810, 0.97).setStrokeStyle(2, 0x2a5a88).setDepth(50));
+      push(this.add.text(cx, cy - H / 2 + 16, `${cons.name} — Select Card${kind === 'card' ? '' : 's'}`, {
+        fontSize: '16px', color: '#88ddff', fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(50));
+
+      let instruction;
+      if (kind === 'card_pair') {
+        instruction = sourceCard
+          ? `Source: ${sourceCard.name}. Step 2: click the card to receive its identity.`
+          : 'Step 1: click the source card to copy.';
+      } else if (kind === 'card_multi') {
+        instruction = `Select up to ${maxTargets} cards, then Confirm.  Selected: ${selectedIds.size}/${maxTargets}`;
+      } else {
+        instruction = 'Click a card to apply.';
+      }
+      push(this.add.text(cx, cy - H / 2 + 36, instruction, {
+        fontSize: '11px', color: '#557799', wordWrap: { width: W - 40 }, align: 'center',
+      }).setOrigin(0.5, 0).setDepth(50));
+
+      const SCALE = 0.6, CW = Math.round(64 * SCALE), CH = Math.round(104 * SCALE);
+      const COLS = 4, GAP = 16, ROWH = CH + 30;
+      const gridW = COLS * CW + (COLS - 1) * GAP;
+      const gx = cx - gridW / 2 + CW / 2;
+      const gy = cy - H / 2 + 66 + CH / 2;
+
+      for (let i = 0; i < pool.length; i++) {
+        const card     = pool[i];
+        const col      = i % COLS, row = Math.floor(i / COLS);
+        const px       = gx + col * (CW + GAP);
+        const py       = gy + row * ROWH;
+        const isSource = sourceCard && card.id === sourceCard.id;
+        const selected = selectedIds.has(card.id) || isSource;
+
+        const spr = push(this.add.image(px, py, _tex(card)).setScale(SCALE).setDepth(51));
+        if (selected) spr.setTint(0xffcc44);
+        push(this.add.text(px, py + CH / 2 + 2, `${card.name} [${card.type[0]}]`, {
+          fontSize: '8px', color: selected ? '#ffcc44' : '#8899aa',
+          wordWrap: { width: CW + GAP - 2 }, align: 'center',
+        }).setOrigin(0.5, 0).setDepth(51));
+
+        const disabled = kind === 'card_pair' && isSource; // can't pick source as target
+        if (disabled) { spr.setAlpha(0.5); continue; }
+
+        spr.setInteractive({ useHandCursor: true });
+        spr.on('pointerover', () => { if (!selected) spr.setTint(0xaaddff); });
+        spr.on('pointerout',  () => { if (selected) spr.setTint(0xffcc44); else spr.clearTint(); });
+        spr.on('pointerdown', () => {
+          if (kind === 'card') {
+            const result = ConsumableEffects.get(cons.id)?.execute({ params: this._shrineCardParams(cons, card) }) ?? { success: false };
+            close();
+            this._finishCardConsumable(cons, result);
+          } else if (kind === 'card_multi') {
+            if (selectedIds.has(card.id)) selectedIds.delete(card.id);
+            else if (selectedIds.size < maxTargets) selectedIds.add(card.id);
+            render();
+          } else { // card_pair
+            if (!sourceCard) { sourceCard = card; render(); }
+            else {
+              const result = ConsumableEffects.get(cons.id)?.execute({ params: { sourceId: sourceCard.id, targetId: card.id } }) ?? { success: false };
+              close();
+              this._finishCardConsumable(cons, result);
+            }
+          }
+        });
+      }
+
+      const btnY = cy + H / 2 - 26;
+      if (kind === 'card_multi' && selectedIds.size > 0) {
+        const aBtn = push(this.add.rectangle(cx - 90, btnY, 150, 32, 0x1a4a1a)
+          .setStrokeStyle(1, 0x44cc66).setInteractive({ useHandCursor: true }).setDepth(52));
+        aBtn.on('pointerover', () => aBtn.setFillStyle(0x2a6a2a));
+        aBtn.on('pointerout',  () => aBtn.setFillStyle(0x1a4a1a));
+        aBtn.on('pointerdown', () => {
+          const result = ConsumableEffects.get(cons.id)?.execute({ params: { cardIds: [...selectedIds] } }) ?? { success: false };
+          close();
+          this._finishCardConsumable(cons, result);
+        });
+        push(this.add.text(cx - 90, btnY, `Confirm (${selectedIds.size})`, { fontSize: '12px', color: '#aaffcc' }).setOrigin(0.5).setDepth(52));
+      }
+
+      const cBtn = push(this.add.rectangle(cx + 80, btnY, 140, 32, 0x2a1a1a)
+        .setStrokeStyle(1, 0x664444).setInteractive({ useHandCursor: true }).setDepth(52));
+      cBtn.on('pointerover', () => cBtn.setFillStyle(0x4a2a2a));
+      cBtn.on('pointerout',  () => cBtn.setFillStyle(0x2a1a1a));
+      cBtn.on('pointerdown', () => { close(); this._buildUI(); });
+      push(this.add.text(cx + 80, btnY, 'Cancel', { fontSize: '11px', color: '#ffaaaa' }).setOrigin(0.5).setDepth(52));
+    };
+    render();
+  }
+
+  /** Result tail for card-target consumables. Element reports via `action`; others via `success`. */
+  _finishCardConsumable(cons, result) {
+    const id = cons.id;
+    if (id.startsWith('element_')) {
+      const action = result.action ?? 'no_effect';
+      if (action === 'no_effect') { this._buildUI(); this._showShrineToast('No effect.', false); return; }
+      let extra = '';
+      if (action === 'stripped' && result.returnedConsumable) {
+        const rd = getElementDef(result.returnedConsumable);
+        if (rd && run.canAddConsumable) {
+          try {
+            run.addConsumable({ id: rd.id, name: rd.name, description: rd.description, category: rd.category });
+            extra = `  ${rd.name} returned.`;
+          } catch (_) { extra = '  (inventory full — base lost)'; }
+        } else if (rd) extra = '  (inventory full — base lost)';
+      }
+      run.consumeById(id);
+      logger.logConsumableUse(cons.name, `${action} at shop${extra}`);
+      this._buildUI();
+      this._showShrineToast(`${cons.name}: ${action}.${extra}`, true);
+      return;
+    }
+    // chakra_throat returns { newCard } already pushed into run._deck by duplicateCardToDeck;
+    // there's no round draw pile at the shrine, so nothing extra to insert.
+    if (!result.success) { this._buildUI(); this._showShrineToast(result.reason ?? 'Cannot apply.', false); return; }
+    run.consumeById(id);
+    logger.logConsumableUse(cons.name, 'applied at shop');
+    this._buildUI();
+    this._showShrineToast(`${cons.name} applied!`, true);
+  }
+
+  // TODO(F4.35): unify with GameScene _showAlchemicalTargetPicker.
+  _showShrineSpiritPicker(cons, idx) {
+    const effect = ConsumableEffects.get(cons.id);
+    if (!effect) return;
+
+    // No-target alchemicals (Lead, Sulfur) — fire immediately, no picker.
+    if (!effect.requiresInput) {
+      const result = effect.execute({ params: {} });
+      if (result.success) { run.consumeById(cons.id); logger.logConsumableUse(cons.name, 'used at shop'); }
+      this._buildUI();
+      this._showShrineToast(result.message ?? (result.success ? `${cons.name} used.` : 'Failed.'), !!result.success);
+      return;
+    }
+
+    const inputType = effect.inputType;
+    const isPair    = inputType === 'spirit_pair' || inputType === 'spirit_pair_tier3';
+    const spirits   = run.spirits;
+    const selected  = [];
+
+    const eligible = spirits.map((s, i) => {
+      const def = getSpiritDef(s.id);
+      switch (inputType) {
+        case 'spirit_pair':                 return { s, i, ok: true };
+        case 'spirit_pair_tier3':           return { s, i, ok: def?.tier === 3 };
+        case 'spirit_single_fusion':        return { s, i, ok: def?.tier === 2 || def?.tier === 3 };
+        case 'spirit_single_stackable':     return { s, i, ok: (s.stackCount ?? 1) < 3 };
+        case 'spirit_single_transcendable': return { s, i, ok: (s.stackCount ?? 1) >= 3 };
+        default:                            return { s, i, ok: true };
+      }
+    });
+
+    if (eligible.filter(e => e.ok).length === 0) {
+      this._buildUI();
+      this._showShrineToast('No eligible spirits.', false);
+      return;
+    }
+
+    for (const o of this._confirmObjs) o.destroy();
+    this._confirmObjs = [];
+    const push = obj => { this._confirmObjs.push(obj); return obj; };
+    const close = () => { for (const o of this._confirmObjs) o.destroy(); this._confirmObjs = []; };
+    const cx = 640, cy = 360, W = 700, H = 300;
+
+    push(this.add.rectangle(cx, cy, W, H, 0x0a0f1e, 0.97).setStrokeStyle(2, 0x4488aa).setDepth(55));
+    push(this.add.text(cx, cy - 120, `${cons.name}: Select ${isPair ? '2 spirits' : '1 spirit'}`, {
+      fontSize: '14px', color: '#ddeeff', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(55));
+
+    const GAP = 76, startX = cx - ((spirits.length - 1) * GAP) / 2;
+    for (const { s, i, ok } of eligible) {
+      const sx = startX + i * GAP, sy = cy;
+      const card = push(this.add.rectangle(sx, sy, 64, 80, ok ? 0x0d1b2a : 0x0a0a14)
+        .setStrokeStyle(1, ok ? 0x4488aa : 0x222233).setDepth(56));
+      push(this.add.text(sx, sy - 10, s.name, {
+        fontSize: '9px', color: ok ? '#cce0ff' : '#445566', wordWrap: { width: 56 }, align: 'center',
+      }).setOrigin(0.5).setDepth(56));
+      if ((s.stackCount ?? 1) > 1) {
+        push(this.add.text(sx + 28, sy - 36, `\xD7${s.stackCount}`, { fontSize: '9px', color: '#ffee66' }).setOrigin(1, 0).setDepth(57));
+      }
+      if (!ok) continue;
+      card.setInteractive({ useHandCursor: true });
+      card.on('pointerdown', () => {
+        if (selected.includes(i)) return;
+        selected.push(i);
+        card.setStrokeStyle(2, 0x44ff44);
+        if (!isPair || selected.length >= 2) {
+          const params = isPair ? { spiritIndices: selected } : { spiritIndex: selected[0] };
+          const result = effect.execute({ params });
+          close();
+          if (result.success) { run.consumeById(cons.id); logger.logConsumableUse(cons.name, 'used at shop'); }
+          this._buildUI();
+          this._showShrineToast(result.message ?? (result.success ? `${cons.name} used.` : 'Failed.'), !!result.success);
+        }
+      });
+    }
+
+    const cancelBtn = push(this.add.rectangle(cx, cy + 120, 90, 28, 0x2a1a1a)
+      .setStrokeStyle(1, 0xaa4444).setInteractive({ useHandCursor: true }).setDepth(56));
+    cancelBtn.on('pointerdown', () => { close(); this._buildUI(); });
+    push(this.add.text(cx, cy + 120, 'Cancel', { fontSize: '11px', color: '#ffaaaa' }).setOrigin(0.5).setDepth(56));
+  }
+
+  /** Brief auto-dismissing feedback overlay (the shrine has no persistent status line). */
+  _showShrineToast(message, success = true) {
+    const cx = 640, cy = 300;
+    const fill   = success ? 0x1a3a1a : 0x3a1a1a;
+    const border = success ? 0x44aa44 : 0xaa4444;
+    const objs = [];
+    objs.push(this.add.rectangle(cx, cy, 380, 64, fill, 0.97).setStrokeStyle(2, border).setDepth(70));
+    objs.push(this.add.text(cx, cy, message, {
+      fontSize: '13px', color: success ? '#aaffcc' : '#ffaaaa', wordWrap: { width: 350 }, align: 'center',
+    }).setOrigin(0.5).setDepth(70));
+    this.time.delayedCall(1400, () => { for (const o of objs) o.destroy(); });
   }
 
 }
