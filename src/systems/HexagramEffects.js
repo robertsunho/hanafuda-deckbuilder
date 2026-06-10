@@ -92,6 +92,13 @@
 //
 // ─────────────────────────────────────────────────────────────────────────────
 
+// NOTE: RunManager ↔ HexagramEffects is a deliberate, accepted import cycle (Ruling 2,
+// D-F4-HEXAGRAMS-TIER2). getActiveEffect/applyHook need run.getHexagram(); a few effect
+// bodies (one_yaku_disabled, eight_spirits_graduated_tax) read run-resident state directly
+// because that state lives on the run singleton and their dispatch arg (the GRM) can't carry
+// it. Resolves at runtime via ES-module circular-ref timing. Not broken — see
+// docs/process/hexagram_inventory_pass1.md §4. Deeper cycle work, if ever, belongs to the
+// GRM/RunManager destination audit (D-F4-SCOPE Part 2, late Tier-3), NOT here.
 import run from './RunManager.js';
 import { cards as ALL_CARDS_WITH_SPEC } from '../data/cards.js';
 
@@ -375,14 +382,19 @@ export const HEXAGRAM_EFFECTS = {
   },
 
   // ── One yaku disabled (1) ─────────────────────────────────────────────────
-  // Cycles through kasu → tanzaku → tane → hikari each round.
+  // Each round a random yaku is disabled, never the same one two rounds running.
   // The disabled yaku gets Infinity threshold (unreachable).
-  // All other yaku get baseThreshold − 1.
+  // All other yaku keep their normal threshold (no compensation).
 
   one_yaku_disabled: {
+    // onRunStart's runManager param IS the run singleton (dispatched from RunManager as
+    // effect.onRunStart(this)), so this one correctly uses its handed param — the contrast
+    // case to onRoundStart/modifyYakuThreshold below, which reach the singleton directly.
     onRunStart(runManager) {
       runManager._hexagramState = { lastDisabledYaku: null, disabledYakuThisRound: null };
     },
+    // Reaches the run singleton (not the handed GRM): _hexagramState lives on run, and the
+    // GRM dispatch arg can't carry it. Accepted under Ruling 2 (see import note above).
     onRoundStart() {
       const YAKU = ['kasu', 'tanzaku', 'tane', 'hikari'];
       if (!run._hexagramState) {
@@ -393,6 +405,8 @@ export const HEXAGRAM_EFFECTS = {
       state.disabledYakuThisRound = candidates[Math.floor(Math.random() * candidates.length)];
       state.lastDisabledYaku = state.disabledYakuThisRound;
     },
+    // Value-transformer (applyHook): signature is (yakuName, baseThreshold) — no run/runManager
+    // param exists in the applyHook convention, so it reads _hexagramState from the singleton.
     modifyYakuThreshold(yakuName, baseThreshold) {
       const disabled = run._hexagramState?.disabledYakuThisRound;
       if (yakuName === disabled) return Infinity;
@@ -483,6 +497,8 @@ export const HEXAGRAM_EFFECTS = {
 
   eight_spirits_graduated_tax: {
     modifySpiritSlots: () => 8,
+    // Reaches the run singleton (not the handed GRM): needs run.scoringSpirits + run.spendKi/ki,
+    // which the GRM dispatch arg doesn't expose. Accepted under Ruling 2 (see import note above).
     onRoundEnd() {
       const spiritCount = run.scoringSpirits.length;
       const excess = Math.max(0, spiritCount - 4);

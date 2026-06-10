@@ -2382,7 +2382,7 @@ The 8 double-trigram hexagrams are formed from a trigram repeated twice. They pr
 | `hex_02` | Kūn (Receptive Earth) | `no_effect` | Default hexagram for first runs; gameplay proceeds normally |
 | `hex_01` | Qián (Creative Heaven) | `score_field_at_round_end` | Score field contents at round end. Captures REMOVE cards from scoring — captures become detrimental |
 | `hex_29` | Kǎn (Abysmal Water) | `match_by_rank` | Cards match by rank (bright/animal/ribbon/plain) instead of by month. Yaku are disabled |
-| `hex_30` | Lí (Clinging Fire) | `one_yaku_disabled` | One yaku is disabled each round, cycling kasu→tanzaku→tane→hikari. The non-disabled yaku get threshold-1 |
+| `hex_30` | Lí (Clinging Fire) | `one_yaku_disabled` | One randomly chosen yaku is disabled each round (never the same one two rounds running). The non-disabled yaku keep their normal thresholds |
 | `hex_51` | Zhèn (Arousing Thunder) | `deck_flip_revealed` | All deck cards are revealed face-up; the next deck flip is known in advance. Unmatched flips are discarded |
 | `hex_52` | Gèn (Keeping Still) | `yaku_ends_round` | Completing any yaku immediately auto-banks the round. No pushing |
 | `hex_57` | Xùn (Gentle Wind) | `match_by_adjacent_month` | Cards match the months directly before and after them (wraps Jan/Dec) |
@@ -2394,7 +2394,7 @@ These 8 hexagrams represent the deepest variation in the game. Each fundamentall
 
 **Kǎn (Abysmal Water) replaces month-matching with rank-matching.** The fundamental capture mechanic changes — instead of matching cherry blossom with another cherry blossom, players match brights with brights, ribbons with ribbons. Yaku are disabled because rank-matching removes the yaku gate's meaning. Push-your-luck still functions but yaku gates do not.
 
-**Lí (Clinging Fire) creates a rotating disability.** Each round, a different yaku is unreachable (Infinity threshold). The other three yaku get threshold-1 to compensate. Players adapt loadouts to whichever yaku is disabled this round.
+**Lí (Clinging Fire) creates a rotating disability.** Each round, a randomly chosen yaku is unreachable (Infinity threshold), never the same one two rounds running. The other three yaku are scored at their normal thresholds. Players adapt loadouts to whichever yaku is disabled this round.
 
 **Zhèn (Arousing Thunder) eliminates deck-flip surprise.** Every deck card is visible. Strategy shifts from probabilistic capture planning to deterministic capture planning. Unmatched flips are discarded (rather than placed on field), changing the field-overflow dynamic.
 

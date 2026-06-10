@@ -66,7 +66,7 @@ const _ALL = [
     id: 'hex_30', number: 30, sortOrder: 8,
     chineseName: 'Lí', chineseCharacter: '離', englishName: 'Clinging Fire',
     category: 'double_trigram', effect: 'one_yaku_disabled',
-    description: 'Each round, one yaku is disabled (cycles through Kasu \u2192 Tanzaku \u2192 Tane \u2192 Hikari). The other three yaku have their thresholds reduced by 1 to compensate.',
+    description: 'Each round, one randomly chosen yaku is disabled (never the same yaku two rounds in a row). The other three yaku are scored at their normal thresholds.',
     lines: [1,0,1,1,0,1],
   },
 

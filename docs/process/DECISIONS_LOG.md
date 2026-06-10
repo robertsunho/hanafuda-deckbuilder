@@ -610,6 +610,8 @@ The implementation in `src/systems/HexagramEffects.js` (lines 342-360) is correc
 **Open follow-up (Phase 3 UI work):**
 - The Yaku Reference panel (Slice 6 C56) and/or the active hexagram display (Slice 6 C57) should surface the currently-disabled yaku per round, since players will need to know which yaku is unavailable each round. Deferred to Phase 3.
 
+**Reconciliation note (2026-06-09, Robert — hexagram block A1):** The `-1` compensation described above was subsequently REMOVED as an intentional balance edit (commit 8652c26, "Phase 0-3 audit complete"), and the rotation moved from a fixed Kasu→Tanzaku→Tane→Hikari cycle to random-without-immediate-repeat. Current code is canonical: disabled yaku → Infinity; other yaku → normal threshold (no compensation); random non-repeating selection. The stale `-1`/fixed-cycle references in hexagrams.js, HexagramEffects.js, and DESIGN_DOC §9.2 were corrected in A1 to match. This entry is left intact as the historical record of the original D0.10 ruling.
+
 ---
 
 ## D0.11 — Speculative cards integration + Symbiosis stacking semantics
