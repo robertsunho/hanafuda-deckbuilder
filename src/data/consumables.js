@@ -134,8 +134,6 @@ export const ALCHEMICAL_CONSUMABLES = [
   { id: 'alch_pearl',    name: 'Pearl',    description: 'Fuse 2 Tier 3 cross-fusions into a Tier 4 Capstone (Legendary slot). Components preserved.', cost: 50, category: 'alchemical' },
 ];
 
-export const getAlchemicalDef = (id) => ALCHEMICAL_CONSUMABLES.find(c => c.id === id);
-
 // ── Zodiac Consumables ──────────────────────────────────────────────────────
 // 13 tactical in-round items (merged from zodiacConsumables.js, consumable-block
 // data consolidation). `category` here is a functional tag, not 'zodiac'.
@@ -263,8 +261,6 @@ export const STAMPS = [
 
 export const PRIMARY_STAMPS   = STAMPS.filter(s => s.tier === 'primary');
 export const SECONDARY_STAMPS = STAMPS.filter(s => s.tier === 'secondary');
-export const TERTIARY_STAMPS    = STAMPS.filter(s => s.tier === 'tertiary');
-export const QUATERNARY_STAMPS  = STAMPS.filter(s => s.tier === 'quaternary');
 
 /**
  * Look up a stamp definition by its id.
