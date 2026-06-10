@@ -2318,17 +2318,16 @@ The default hexagram for a player's first run is **`hex_02` (Kūn / Receptive Ea
 
 #### 9.1.2 Effect Hooks
 
-Hexagram effects are implemented as a set of optional hook methods. The active hexagram's hooks are queried by the game engine at relevant moments. Hooks include:
+Hexagram effects are implemented as a set of optional hook methods. The active hexagram's hooks are queried by the game engine at relevant moments. Hooks dispatch in one of three deliberate ways (value-transformers + flags via `applyHook`; side-effect/merge hooks via direct `getActiveEffect()` reads; Wu Xing config via `getX()` wrappers) — the canonical breakdown lives in the `HexagramEffects.js` header. Hooks include:
 
 - `onRunStart(runManager)` / `onRoundStart()` / `onRoundEnd()` — Lifecycle hooks
-- `onCardScored(card)` — Per-card during scoring chain (Phase 2)
-- `onCardSeen(card)` — Per-card during scoring chain (state tracking)
+- `onCardScored(card, context)` — Per-card during scoring chain (Phase 2); returns `{ addPoints?, addMult?, multiplyMult? } | null` merged into running totals (`context: { currentPoints, currentMult }`)
 - `onCaptureComplete({run})` — After each capture
-- `onPushSuccess(run)` / `onPushFailure(run)` — Push events
+- `onPushSuccess(run)` / `onPushFailure(run)` / `onBank(run)` — Push/bank events (the hex `onBank` is dispatched from GameRoundManager and is distinct from `RunManager.onBank`)
 - `modifyDeck(cards)` — Deck composition (run start only)
 - `modifyYakuThreshold(yakuName, baseThreshold)` — Yaku threshold tuning
 - `modifyFieldSlots(base)` / `modifyHandSize(base)` / `modifySpiritSlots(base)` / `modifyCardsDealt(base)` — Slot/hand modifiers
-- `modifyPushSuccess()` / `modifyPushFailure()` / `modifyFlowDecay()` — Flow modifiers
+- `pushCurveSuccessAmplifier()` / `pushCurveFailureAmplifier()` / `modifyFlowDecay()` — Flow modifiers
 - `modifyStyleKi(baseKi)` / `modifyStyleFlow(baseFlow)` — Style combo tuning
 - `modifyKiReward()` / `modifyHandKi()` / `modifyInterestRate()` / `modifyShopPrice()` / `modifyShopCount()` / `modifyRerollCost()` — Economy modifiers
 - `modifyFirePoints(tier)` / `modifyFireBreakChance(tier)` / `modifyWoodScoring(tier)` / `modifyEarthInterest(tier)` / `modifyEarthHeld(tier)` / `modifyMetalHeldMult(tier)` / `modifyMeteoriteJackpot()` / `modifyWaterDepreciation(tier)` — Wu Xing parameter tuning

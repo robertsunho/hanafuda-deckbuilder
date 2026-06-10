@@ -4,14 +4,27 @@
 // Each key is an effect ID from hexagrams.js.  Values are objects with optional
 // hook functions.  Only the hooks an effect needs should be defined.
 //
-// Hook signatures (all optional):
+// Hooks dispatch in one of THREE ways (this is deliberate, not inconsistency — the
+// contracts genuinely differ; see DECISIONS_LOG D-F4-HEXAGRAMS-TIER2 and
+// docs/process/hexagram_inventory_pass1.md):
 //
-//   onRunStart(runManager)        — called once when setHexagram() assigns a hex
-//   onRoundStart(roundManager)    — called at startRound()
-//   onRoundEnd(roundManager)      — called when phase transitions to 'round_over'
+//   (1) applyHook(name, fallback, ...args) — value-transformers + flags. The hook
+//       returns a value; applyHook returns `fallback` when no active effect defines it.
+//       Used by every modify*/amplifier below + the radical-mode flags.
 //
-//   onCardScored(card, context)   — return { addPoints?, addMult?, multiplyMult? } | null
-//     context: { currentPoints, currentMult }
+//   (2) Direct getActiveEffect()?.hook(...) reads — side-effect/lifecycle hooks (return
+//       nothing) and the scoring-merge hooks (onCardScored/computeFinalScore, whose
+//       multi-field merge / formula-override contracts don't fit applyHook's single
+//       fallback return). modifyDeck is here too (returns the whole deck array).
+//
+//   (3) getX() wrapper helpers (getFireFlatPoints/getWaterMult/…) — the Wu Xing config
+//       getters at the bottom of this file. The engine calls getX(); getX() calls
+//       applyHook internally. The hook NAME (modifyFirePoints etc.) is never passed to
+//       applyHook at an engine call site.
+//
+// Hook signatures (all optional). Grouped by dispatch class:
+//
+// ── Class (1) — applyHook value-transformers ──────────────────────────────────
 //
 //   modifyYakuThreshold(yakuName, baseThreshold) → modifiedThreshold
 //   modifyFieldSlots(baseSlots) → modifiedSlots
@@ -23,7 +36,6 @@
 //   pushCurveSuccessAmplifier(baseAmp) → modifiedAmp   (default: 1.0)
 //   pushCurveFailureAmplifier(baseAmp) → modifiedAmp   (default: 1.0)
 //   modifyFlowDecay(baseMultiplier) → modifiedMultiplier     (default: 0.95)
-//   modifyInitialFlow(baseFlow) → modifiedFlow
 //
 //   modifyKiReward(baseKi, context) → modifiedKi
 //   modifyInterestRate(baseRate) → modifiedRate
@@ -32,15 +44,51 @@
 //   modifyShopPrice(basePrice, item) → modifiedPrice
 //   modifyRerollCost(baseCost, rerollIndex) → modifiedCost
 //
-//   modifyDeck(cards) → modifiedCards   — applied once at run start
+//   modifyStyleKi(baseKi) → modifiedKi
+//   modifyStyleFlow(baseFlow) → modifiedFlow
+//
+// ── Class (1) — applyHook radical-mode flags ──────────────────────────────────
 //
 //   overridesCaptureRule() → 'month' | 'rank' | 'adjacent_month'
+//   revealsDeckFlip() → bool
+//   discardUnmatchedDeckFlip() → bool
+//   forceAutoBankOnYaku() → bool
+//   modifyPlaysPerTurn(base) → int
+//   disablesYaku() → bool
+//   disableCaptureScoring() → bool
+//   scoreFieldAtRoundEnd() → bool
+//   shouldSpiritsFireTwice() → bool
+//   modifyDeckFlipsPerTurn() → int
 //
+// ── Class (2) — direct getActiveEffect() reads (side-effect / merge / array) ───
+//
+//   onRunStart(runManager)        — called once when setHexagram() assigns a hex
+//   onRoundStart(roundManager)    — called at startRound()
+//   onRoundEnd(roundManager)      — called when phase transitions to 'round_over'
+//   onCaptureComplete({ run })    — called after a capture resolves (void)
+//   onPushSuccess(run)            — push succeeded (void)
+//   onPushFailure(run)            — push failed (void)
+//   onBank(run)                   — player banked (void). This is the HEX onBank hook,
+//     dispatched from GameRoundManager. DISTINCT from RunManager.onBank (flow/push-curve),
+//     which does NOT call this hook. Do not consolidate the two.
+//
+//   modifyDeck(cards) → modifiedCards   — applied once at run start (array return)
+//
+//   onCardScored(card, context)   — return { addPoints?, addMult?, multiplyMult? } | null
+//     context: { currentPoints, currentMult }   (multi-field merge — Tier-3 scoring loop)
 //   computeFinalScore(points, mult, flow) → score
 //     overrides the per-capture formula: Math.round(points * mult * flow)
 //
-//   modifyStyleKi(baseKi) → modifiedKi
-//   modifyStyleFlow(baseFlow) → modifiedFlow
+// ── Class (3) — Wu Xing config getters (read via getX() wrappers below) ────────
+//
+//   modifyFirePoints(tier)        — via getFireFlatPoints
+//   modifyFireBreakChance(tier)   — via getFireBreakChance
+//   modifyWaterDepreciation(tier) — via getWaterMult
+//   modifyMetalHeldMult(tier)     — via getMetalHeldMult
+//   modifyMeteoriteJackpot()      — via getMeteoriteJackpotChance
+//   modifyEarthInterest(tier)     — via getEarthInterestRate
+//   modifyWoodScoring(tier)       — via getWoodScoringMult
+//   modifyEarthHeld(tier)         — via getEarthHeldMult
 //
 // ─────────────────────────────────────────────────────────────────────────────
 
