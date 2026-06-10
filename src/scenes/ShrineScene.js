@@ -971,6 +971,36 @@ export class ShrineScene extends Phaser.Scene {
     }
   }
 
+  _drawContinueButton() {
+    const label = this._isGrove ? 'Enter the Forest' : 'Continue';
+    const btn   = this.add.rectangle(640, BTN_Y, 260, 44, 0x1a4a2a)
+      .setStrokeStyle(2, 0x44aa66).setInteractive({ useHandCursor: true });
+    btn.on('pointerover', () => btn.setFillStyle(0x2a6a3a));
+    btn.on('pointerout',  () => btn.setFillStyle(0x1a4a2a));
+    btn.on('pointerdown', () => {
+      // legend_waidan: Sacred Grove only — create negative consumable copies per stack.
+      // Bucket-B (F4.20): Sacred Grove exit is a scene-transition event (no spirit hook fires here) —
+      // intentionally in place, not seepage. See F4.16_F4.20_triage_ledger.md.
+      if (this._isGrove) {
+        const waidanStacks = run.spirits
+          .filter(s => s.id === 'legend_waidan')
+          .reduce((sum, s) => sum + (s.stackCount ?? 1), 0);
+        for (let i = 0; i < waidanStacks; i++) {
+          const all = [...run._consumables, ...run._negativeConsumables];
+          if (all.length > 0) {
+            const pick = all[Math.floor(Math.random() * all.length)];
+            run.addNegativeConsumable(pick, 'Waidan Sacred Grove exit');
+          }
+        }
+      }
+      logger.logShopExit(run.ki);
+      this.scene.start('GameScene');
+    });
+    this.add.text(640, BTN_Y, label, {
+      fontSize: '16px', color: '#ffffff', stroke: '#000000', strokeThickness: 2,
+    }).setOrigin(0.5);
+  }
+
   _rerollSection(currentOfferings, generateFn) {
     const fresh = generateFn();
     for (let i = 0; i < currentOfferings.length; i++) {

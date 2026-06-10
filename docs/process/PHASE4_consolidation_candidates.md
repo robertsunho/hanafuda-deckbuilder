@@ -382,3 +382,16 @@ before the per-family `execute()` entries exist (would be abstracting over paths
   Negative Osprey/Catcher reset bug (DECISIONS_LOG); overlaps Candidates B and C
 - Consumable-block A1 + chakra sub-recon (where Candidate G surfaced — shrine application-flow
   unification; architectural half = F4.15/this block, UX half = Phase 5)
+
+## Banked: Waidan Grove-exit coupling in `_drawContinueButton` (from G1-fix, 2026-06-09)
+
+`legend_waidan`'s Grove-exit effect (spawn a negative consumable per Waidan stack on shrine exit)
+is inlined inside ShrineScene `_drawContinueButton` — documented F4.20 Bucket-B seepage (no
+`onShrineExit` spirit hook exists, so the scene-transition event was deliberately left inline; see
+`F4.16_F4.20_triage_ledger.md`). Robert flagged the coupling: a general-purpose continue button
+shouldn't embed one spirit's effect, AND Waidan may be cut.
+- **If Waidan is cut →** this is the removal site (delete the `if (this._isGrove)` Waidan block).
+- **If Waidan stays →** consider extracting to a named helper (e.g. an `onShrineExit` hook) so the
+  continue button stays general.
+- **Decision pending Waidan's fate.** Left AS-IS for now (G1-fix restored it byte-for-byte; not
+  decoupled).
