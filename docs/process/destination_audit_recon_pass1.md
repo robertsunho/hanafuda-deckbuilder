@@ -226,6 +226,18 @@ flags would sit alongside it. **Verdict: genuine intrinsic-org [FIX], small, [PR
 (cache at round start, read the cached fields in the loop). Micro-optimization + legibility, not a behavior
 change.
 
+> **[CORRECTION — verified during Campaign 2, 2026-06-11]** The "round-invariant loadout" premise above is
+> **REFUTED**. `alch_pearl` (`ConsumableEffects.js:422`, `inputType: 'spirit_pair_tier3'`) forges a capstone
+> via `run.addLegendarySpirit(capstoneDef)` (`capstoneDef.capstone === true`, guarded at :440) and is
+> dispatchable **mid-round** — `GameScene._dispatchConsumable` → `_showAlchemicalTargetPicker`'s `isPair`
+> branch accepts `'spirit_pair_tier3'`, with no round-phase guard. So a reachable state exists: capture with
+> no capstone → forge one via Pearl mid-round → later captures in the same round pick it up via the
+> per-capture `run.activeSpirits.some(...)` (GRM:1407/1422-1424). The per-capture read is therefore
+> **load-bearing**, not redundant — it lets a mid-round Pearl-forged capstone take scoring effect for the
+> rest of the round. Caching at `startRound` would be a **silent behavior change**, not a [PRESERVE] tidy.
+> **Ruling (Robert): obs #14 WON'T-FIX (Option A) — leave the per-capture read.** Closed won't-fix (NOT
+> silently-resolved; the read stays deliberately). See DECISIONS_LOG `D-F4-SCOPE` obs #14.
+
 ---
 
 ## Part 4 — Verdict
@@ -246,8 +258,11 @@ category logic. The remaining items are *intrinsic-org*, not displacement.
 
 **3. Intrinsic-org — SEVERAL small campaigns, not one pass. Recommended sequence (all [PRESERVE] unless
 noted):**
-1. **Dead-import delete** (cycle #3) — 1 line, trivial. *(Independent; do first.)*
-2. **Obs #14 capstone caching** — cache 3 flags at `startRound`, read in `_addCapture`. Small, byte-identical.
+1. **Dead-import delete** (cycle #3) — 1 line, trivial. *(Independent; do first.)* — ✅ DONE (commit `83d9920`).
+2. ~~**Obs #14 capstone caching**~~ — **CLOSED, WON'T-FIX (2026-06-11).** Step-0 verification refuted the
+   round-invariant premise: `alch_pearl` forges a capstone mid-round, so the per-capture `.some()` is
+   load-bearing and caching would be a silent behavior change. Ruling: leave the per-capture read (Option A).
+   See the Part 3c correction note + DECISIONS_LOG `D-F4-SCOPE` obs #14. **Next live campaign = item 3.**
 3. **Obs #13 init-path unification** — merge `_initSpiritState` + `_initSpiritElements` (2 callers); campaign
    must verify the non-accumulator union is path-safe. Small.
 4. **Round-state reset dedup** — reconcile the constructor (85-192) vs `startRound` (340-391) field lists

@@ -4262,3 +4262,34 @@ Dog-at-full-hand `success: false` is **provisional** under that candidate.
 surfaced — `PHASE4_consolidation_candidates.md`); the separately-banked Osprey-deck-flip-hook migration
 (PHASE4_STATE §4 — untouched, distinct from the now-resolved hand-cap gate). Pass doc
 `hand_capacity_inventory_pass1.md` ARCHIVED to `docs/archive/phase4/`.
+
+---
+
+## D-F4-SCOPE / obs #14 — capstone-flag caching: WON'T-FIX (2026-06-11)
+
+**Status:** CLOSED, won't-fix. A destination-audit sub-campaign (recon Part 3c / Part 4 item 2).
+
+**Observation.** `GameRoundManager._addCapture` recomputes the three capstone flags per capture via
+`run.activeSpirits.some(s => s.id === 'capstone_…')` (reads `run.activeSpirits` fresh at GRM:1407, the
+`.some()` at GRM:1422-1424), driving the yin-yang trigger-doubling, universe mult-mirroring, and nature
+carry. The recon proposed caching them once at `startRound` as a [PRESERVE] micro-optimization, on the
+premise that the capstone loadout is round-invariant.
+
+**The premise is REFUTED (Campaign-2 Step-0 verification).** `alch_pearl` (`ConsumableEffects.js:422`,
+`inputType: 'spirit_pair_tier3'`) forges a capstone via `run.addLegendarySpirit(capstoneDef)`
+(`capstoneDef.capstone === true`, guarded :440) and is dispatchable **mid-round** — `GameScene._dispatchConsumable`
+→ `_showAlchemicalTargetPicker`'s `isPair` branch accepts `'spirit_pair_tier3'`, no round-phase guard. So a
+reachable state exists: capture with no capstone → forge one via Pearl mid-round → later captures in the
+same round currently pick it up via the per-capture `.some()`. A round-start cache would miss it → a
+**silent scoring change**, not a [PRESERVE] tidy.
+
+**Ruling (Robert): Option A — leave the per-capture read.** The `.some()` is three scans of a tiny array
+(negligible), and the per-capture read is **load-bearing**: it is what makes a mid-round Pearl-forged
+capstone take scoring effect for the rest of the round. The micro-optimization is not worth a behavior
+change or a cache-invalidation coupling. obs #14 closes won't-fix — recorded so it is NOT mistaken for
+silently-resolved; the per-capture read stays deliberately.
+
+**Process note.** The recon's "round-invariant" claim (Part 3c) was unverified; the campaign's Step-0
+gate caught it before any edit. The recon doc Part 3c carries a [CORRECTION] note; Part 4 item 2 is marked
+CLOSED/won't-fix. Next destination-audit campaign = obs #13 (spirit-init unification). Cross-ref: `D-F4-SCOPE`
+(charter); cycle #3 sever (commit `83d9920`, the prior sub-campaign).

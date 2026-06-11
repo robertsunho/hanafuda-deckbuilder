@@ -82,8 +82,10 @@ Tier 3 — pipeline consolidation  ◀── IN PROGRESS
 ├─ Candidate D — hand-capacity consolidation ....... ✅ CLOSED (2026-06-10) — D-F4-HANDCAP-TIER3
 │    _drawIntoHand (one bug/8 sites, deck-integrity, hand-identical) + Osprey respects cap
 │    + _handSizeCap deleted. N2 resolved. Surfaced Candidate H (consumable-consumption).
-├─ Destination audit (D-F4-SCOPE Part 2) .......... ◀── NEXT — GRM/RunManager intrinsic-org + import
-│    cycles #2/#3 + _initSpiritState/_initSpiritElements twins (obs #13) + capstone caching (#14). Feeds F4.24b.
+├─ Destination audit (D-F4-SCOPE Part 2) .......... ◀── IN PROGRESS — recon landed (destination_audit_recon_pass1.md).
+│    cycle #3 severed ✅ (83d9920); obs #14 capstone caching CLOSED won't-fix (alch_pearl forges capstones
+│    mid-round → per-capture read is load-bearing); obs #13 _initSpiritState/_initSpiritElements unification ◀ NEXT;
+│    cycle #2 accept-and-contain; reset-dedup, _phase machine, push/bank recon banked. Feeds F4.24b.
 ├─ F4.27 ........................................... util_past_life + sym_cuckoo_egg maturity/copy logic.
 └─ Named spirit hand-offs .......................... util_symbiosis/sym_algae summon (LAST); sym_ducks/engine_bullseye state-machines.
 ```
