@@ -1889,7 +1889,11 @@ export default class GameRoundManager {
     const ospreyMax = run.countStackedById('sym_osprey');
     if (ospreyMax > 0) {
       const used = ospreySpirits[0]?.state?.flipsUsedThisRound ?? 0;
-      if (used < ospreyMax && this._hand.getAll().length < (this._handSizeCap ?? 99)) {
+      // Respect the hand cap (F4-HANDCAP-E1c): at a full hand the flip is NOT pulled to hand —
+      // it falls through to normal field placement below (nothing lost). Was gated on the
+      // vestigial _handSizeCap (?? 99, never assigned → effectively no cap), which leaked the
+      // flip via add()'s silent clamp when full.
+      if (used < ospreyMax && this._hand.availableSlots > 0) {
         for (const os of ospreySpirits) {
           if (os.state) os.state.flipsUsedThisRound = used + 1;
         }

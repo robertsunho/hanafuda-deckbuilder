@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { makeRound } from './helpers.js';
+import { makeRound, equipSpiritWithState } from './helpers.js';
 import ConsumableEffects from '../src/systems/ConsumableEffects.js';
+import { baseCards } from '../src/data/cards.js';
 
 // F4-HANDCAP — deck-integrity verification for the hand-growth consolidation.
 //
@@ -89,5 +90,41 @@ describe('zodiac_dog — discard-pile retrieval respects the cap (E1b)', () => {
     expect(r.retrievedCards.map(c => c.id)).toEqual(['discarded_b']); // LIFO: last in, first out
     expect(grm._allDiscards.map(c => c.id)).toEqual(['discarded_a']); // the un-retrievable one stays
     expect(grm.hand.getAll().length).toBe(8);
+  });
+});
+
+describe('sym_osprey — respects the hand cap (E1c, the one behavior change)', () => {
+  // First deck flip is DECK[16] = 'february_plain_1'. Osprey (N=1) intercepts the first flip
+  // to hand IF there is room; at a full hand it must NOT intercept — the flip falls through to
+  // normal field placement (the behavior change: pre-fix it was add()'d and silently leaked).
+  const FLIP_ID = 'february_plain_1';
+
+  it('with room: pulls the first flip to hand (unchanged from today)', () => {
+    const { grm } = makeRound({ spiritIds: ['sym_osprey'], deckCardIds: DECK });
+    const osprey = equipSpiritWithState('sym_osprey', { state: { flipsUsedThisRound: 0 } });
+
+    grm.playHandCards(['january_plain_1']);             // hand 8→7, one slot free
+    grm.playDeckPhase();
+
+    expect(osprey.state.flipsUsedThisRound).toBe(1);    // intercepted
+    expect(grm.hand.getAll().some(c => c.id === FLIP_ID)).toBe(true); // flip is in hand
+  });
+
+  it('at a FULL hand: does NOT intercept — the flip reaches the board, nothing lost', () => {
+    const { grm } = makeRound({ spiritIds: ['sym_osprey'], deckCardIds: DECK });
+    const osprey = equipSpiritWithState('sym_osprey', { state: { flipsUsedThisRound: 0 } });
+
+    grm.playHandCards(['january_plain_1']);             // hand 8→7
+    // Top the hand back to full so the deck flip meets a full hand. december_plain_1 is not in DECK.
+    grm.hand.add([JSON.parse(JSON.stringify(baseCards.find(c => c.id === 'december_plain_1')))]);
+    expect(grm.hand.availableSlots).toBe(0);            // 8/8 — full at flip time
+
+    grm.playDeckPhase();
+
+    expect(osprey.state.flipsUsedThisRound).toBe(0);    // [FIX] NOT intercepted at a full hand
+    expect(grm.hand.getAll().some(c => c.id === FLIP_ID)).toBe(false); // flip not pulled to hand
+    // Nothing lost: the flip reached the board (field placement or capture), not the void.
+    const onBoard = [...grm.field.getAll(), ...grm.capture.getAll()];
+    expect(onBoard.some(c => c.id === FLIP_ID)).toBe(true);
   });
 });
