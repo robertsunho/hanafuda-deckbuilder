@@ -11,6 +11,14 @@ import logger                                   from './GameplayLogger.js';
 import { resolveHexagram }                      from './HexagramGenerator.js';
 import { getHexagram as getHexagramDef }        from '../data/hexagrams.js';
 import { getActiveEffect, applyHook }          from './HexagramEffects.js';
+// NOTE: RunManager ↔ SpiritEffects is a deliberate, accepted import cycle (accept-and-contain,
+// D-F4-SCOPE Part 2). Both directions resolve at call-time (ES-module circular-ref timing);
+// nothing is load-bearing at module-eval. Not broken: the shared spirit-math helpers
+// (effectivePower/aggregate*/incrementPerElement/addUniqueToElements) are used by BOTH modules,
+// so relocating them only re-imports them back — only a neutral module would clarify ownership,
+// and even that leaves the run import. If ever cut, sever the light edge (RM→SpiritEffects, ~2
+// sites: NEGATIVE_SNAPSHOT + SpiritEffects.get), not the heavy one (~25 sites). See
+// docs/process/destination_audit_recon_pass1.md Part 2.
 import SpiritEffects, { NEGATIVE_SNAPSHOT }     from './SpiritEffects.js';
 import { getBlessingDef }                      from '../data/blessings.js';
 //

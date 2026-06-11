@@ -29,7 +29,6 @@ export const YAKU_INFO = {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-import SpiritEffects from './SpiritEffects.js';
 import { getFireFlatPoints } from './HexagramEffects.js';
 import { getCardPoints }     from './CardMutations.js';
 
