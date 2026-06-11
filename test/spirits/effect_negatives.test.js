@@ -57,10 +57,13 @@ describe('F4.20-FIX2 — effect sites include Negatives', () => {
     grm.playDeckPhase();
 
     expect(grm.capture.getAll().some(c => c.type === 'bright')).toBe(true);
+    // [FIX] F4-HANDCAP-E1: full hand → 1 free slot after the play, so Glory's flat-2 lands 1
+    // and the 2nd card stays in the deck (was spliced-and-leaked pre-fix). The transcended
+    // copy still FIRES — that's what this test guards; hand contents identical pre/post.
     const glory = grm.scoringEvents.find(e => e.type === 'glory_draw');
     expect(glory).toBeDefined();
-    expect(glory.count).toBe(2);
-    expect(grm.deck.drawPileSize).toBe(deckBefore - 1 - 2); // 1 flip + 2 Glory draw
+    expect(glory.count).toBe(1);
+    expect(grm.deck.drawPileSize).toBe(deckBefore - 1 - 1); // 1 flip + 1 Glory draw (1 slot free)
   });
 
   it('#2 a transcended golden_toad resets per capture (no jam) and gilds a card', () => {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeRound } from './helpers.js';
+import SpiritEffects from '../src/systems/SpiritEffects.js';
 
 // Shared deck layout that produces a bright capture:
 // hand[0] = january_plain_1 matches field january_crane (bright) → pending;
@@ -36,10 +37,14 @@ describe('util_glory — onCaptureComplete draw intent (F4.20 #1)', () => {
     const captured = grm.capture.getAll();
     expect(captured.some(c => c.type === 'bright')).toBe(true);
 
+    // [FIX] F4-HANDCAP-E1: hand is full (8/8); after playing 1 card exactly 1 slot is free,
+    // so Glory's flat-2 intent lands only 1 and the 2nd card STAYS in the deck (was spliced-
+    // and-leaked pre-fix: deck −2, event count 2, but only 1 card ever reached the hand).
+    // Hand contents are identical pre/post; the count + deck assertions are the deck-integrity proof.
     const glory = grm.scoringEvents.find(e => e.type === 'glory_draw');
     expect(glory).toBeDefined();
-    expect(glory.count).toBe(2);
-    expect(grm.deck.drawPileSize).toBe(deckBefore - 1 - 2); // 1 flip + 2 Glory draw
+    expect(glory.count).toBe(1);
+    expect(grm.deck.drawPileSize).toBe(deckBefore - 1 - 1); // 1 flip + 1 Glory draw (1 slot free)
   });
 
   it('does not draw on a non-bright capture', () => {
@@ -52,18 +57,14 @@ describe('util_glory — onCaptureComplete draw intent (F4.20 #1)', () => {
     expect(grm.scoringEvents.find(e => e.type === 'glory_draw')).toBeUndefined();
   });
 
-  it('draws a FLAT 2 at 2 stacks (behavior preservation — NOT 2×stacks)', () => {
-    const { grm } = makeRound({
-      spirits: [{ id: 'util_glory', stackCount: 2 }],
-      deckCardIds: BRIGHT_CAPTURE_DECK,
+  it('draws a FLAT 2 intent on a bright capture (behavior preservation — NOT 2×stacks)', () => {
+    // The flat-vs-×stacks property lives in the effect INTENT (onCaptureComplete returns a
+    // fixed draw count, ignoring stacks). Post F4-HANDCAP-E1 the _drawIntoHand clamp lands
+    // only what fits (1 in the full-hand integration scenario), so the in-hand count can no
+    // longer distinguish 2 from 4 — assert the intent directly (smallest enclosing site).
+    const intent = SpiritEffects.get('util_glory').onCaptureComplete({
+      cards: [{ type: 'bright' }],
     });
-    const deckBefore = grm.deck.drawPileSize;
-    grm.playHandCards(['january_plain_1']);
-    grm.playDeckPhase();
-
-    const glory = grm.scoringEvents.find(e => e.type === 'glory_draw');
-    expect(glory).toBeDefined();
-    expect(glory.count).toBe(2);                       // flat 2, NOT 4
-    expect(grm.deck.drawPileSize).toBe(deckBefore - 1 - 2);
+    expect(intent.draw).toBe(2);                       // flat 2, NOT 2×stacks = 4
   });
 });

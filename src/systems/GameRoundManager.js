@@ -407,7 +407,7 @@ export default class GameRoundManager {
     const _baseHandSize   = applyHook('modifyHandSize', GameRoundManager.HAND_SIZE + _handSizeBonus, GameRoundManager.HAND_SIZE + _handSizeBonus);
     this._hand.maxSize    = _baseHandSize;
     const _initialDeal    = applyHook('modifyCardsDealt', _baseHandSize + _dealCountBonus, _baseHandSize + _dealCountBonus, 'initial');
-    this._hand.add(this._deck.draw(_initialDeal));
+    this._drawIntoHand(_initialDeal);
 
     // Deal field cards one at a time so stacking rules are applied per card.
     for (const card of this._deck.draw(GameRoundManager.FIELD_DEAL)) {
@@ -1097,6 +1097,21 @@ export default class GameRoundManager {
    * Blue → consumable, Green → +3 ki, Purple/Black/Gray → draw +1.
    * @param {object} card  The discarded card.
    */
+  /**
+   * Draw up to `want` cards from the deck into the hand, clamped to what the deck has AND what
+   * the hand can hold. Cards that don't fit STAY IN THE DECK (not spliced-and-dropped). The one
+   * home for "draw N into hand" — replaces the scattered add(draw(n)) sites that leaked the deck
+   * on a full hand. (Draw-pile source only; zodiac_dog retrieves from the discard pile — see its
+   * own clamp.)
+   * @returns {{ drawn: object[], leftover: number }}
+   */
+  _drawIntoHand(want) {
+    const n = Math.min(want, this._deck.drawPileSize, this._hand.availableSlots);
+    const drawn = n > 0 ? this._deck.draw(n) : [];
+    if (drawn.length > 0) this._hand.add(drawn);
+    return { drawn, leftover: want - drawn.length };
+  }
+
   _dispatchStampDiscardEffects(card) {
     if (!card.ribbonStamp) return;
     const stamp = card.ribbonStamp;
@@ -1108,10 +1123,7 @@ export default class GameRoundManager {
     for (let rt = 0; rt < fireCount; rt++) {
       if (fireCons) run.generateRandomConsumable();
       if (fireKi) run.addKi(3, `${stamp}_discard`);
-      if (fireDraw) {
-        const drawN = Math.min(1, this._deck.drawPileSize);
-        if (drawN > 0) this._hand.add(this._deck.draw(drawN));
-      }
+      if (fireDraw) this._drawIntoHand(1);
     }
   }
 
@@ -1693,10 +1705,8 @@ export default class GameRoundManager {
         const intent = effect.onCaptureComplete({ cards, spirit, run });
         if (!intent) continue;
         if (intent.draw > 0) {
-          const drawN = Math.min(intent.draw, this._deck.drawPileSize);
-          const drawn = drawN > 0 ? this._deck.draw(drawN) : [];
+          const { drawn } = this._drawIntoHand(intent.draw);
           if (drawn.length > 0) {
-            this._hand.add(drawn);
             this._scoringEvents.push({ type: 'glory_draw', count: drawn.length });
           }
         }
@@ -1714,10 +1724,7 @@ export default class GameRoundManager {
         const fireCount = 1 + this._computeRetriggerCount(card, 'capture', _si === 0);
         for (let rt = 0; rt < fireCount; rt++) {
           if (fireKi) run.addKi(3, `${stamp}_capture`);
-          if (fireDraw) {
-            const drawN = Math.min(1, this._deck.drawPileSize);
-            if (drawN > 0) this._hand.add(this._deck.draw(drawN));
-          }
+          if (fireDraw) this._drawIntoHand(1);
           if (fireCons) run.generateRandomConsumable();
         }
       }
@@ -2144,10 +2151,7 @@ export default class GameRoundManager {
               if (fireDraw || fireKi || fireCons) {
                 const fireCount = 1 + this._computeRetriggerCount(card, 'yaku');
                 for (let rt = 0; rt < fireCount; rt++) {
-                  if (fireDraw) {
-                    const drawN = Math.min(1, this._deck.drawPileSize);
-                    if (drawN > 0) this._hand.add(this._deck.draw(drawN));
-                  }
+                  if (fireDraw) this._drawIntoHand(1);
                   if (fireKi) run.addKi(3, `${stamp}_yaku`);
                   if (fireCons) run.generateRandomConsumable();
                 }

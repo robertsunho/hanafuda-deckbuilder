@@ -42,10 +42,7 @@ const _effects = {
     inputType: 'none',
     /** Draw 2 extra cards from the deck. */
     execute({ roundManager }) {
-      const drawn = roundManager.deck.drawPileSize > 0
-        ? roundManager.deck.draw(Math.min(2, roundManager.deck.drawPileSize))
-        : [];
-      if (drawn.length > 0) roundManager._hand.add(drawn);
+      const { drawn } = roundManager._drawIntoHand(2);
       return { success: true, message: `Drew ${drawn.length} card(s).`, drawnCards: drawn };
     },
   },
@@ -221,8 +218,12 @@ const _effects = {
     /** Retrieve 2 cards from the discard pile. */
     execute({ roundManager }) {
       const discards = roundManager._allDiscards;
-      const count = Math.min(2, discards.length);
-      if (count === 0) return { success: false, message: 'No cards in discard pile.' };
+      if (discards.length === 0) return { success: false, message: 'No cards in discard pile.' };
+      // Clamp to hand room BEFORE the splice so un-retrievable cards STAY in the discard pile
+      // (the splice is the only path out of _allDiscards — splicing more than fits would lose
+      // them permanently, since the discard pile has no per-round reset). LIFO order preserved.
+      const count = Math.min(2, discards.length, roundManager._hand.availableSlots);
+      if (count === 0) return { success: false, message: 'Hand is full.' };
       const retrieved = discards.splice(discards.length - count, count);
       roundManager._hand.add(retrieved);
       return { success: true, message: `Dog: retrieved ${count} card(s) from discard.`, retrievedCards: retrieved };
