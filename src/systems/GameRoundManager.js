@@ -1321,8 +1321,9 @@ export default class GameRoundManager {
    * Apply the active hexagram's onCardScored modifier to a card's running points/mult (the X1 hex
    * scoring twin — one math home for _addCapture and _scoreFieldCards). Returns the raw `mod` so each
    * caller can emit its own telemetry (the capture loop also drives the hexagram animation step; the
-   * two sites differ only in their contribution fallback label). The Phase-1.5 retrigger loop does
-   * NOT call this today — that omission (F2.10c) is preserved in D1 and addressed in D2.
+   * two sites differ only in their contribution fallback label). The Phase-1.5 retrigger loop also
+   * calls this (F2.10c, D2) so a retriggered card gets the active hex multiplier the same as its
+   * first pass; the retrigger context discards the returned `mod` (no per-retrigger breakdown).
    * @returns {{cardPts:number, mult:number, mod:(object|null)}}
    */
   _applyHexCardScored(card, cardPts, mult) {
@@ -1569,10 +1570,13 @@ export default class GameRoundManager {
         const card = cards[_ci];
         const retriggerCount = this._computeRetriggerCount(card, 'capture', _ci === 0);
         for (let rt = 0; rt < retriggerCount; rt++) {
-          // D1: shared enhancement/edition math. Hex onCardScored is intentionally NOT applied here
-          // (the F2.10c omission) — D1 preserves it; D2 will add it via this same helper path.
+          // Shared enhancement/edition math, then hex onCardScored — same order as the first-pass
+          // loop (B). F2.10c (D2): a retrigger scores the card the same way the first pass did, so the
+          // active season/axis hex multiplier applies per retrigger too. (`mod` discarded: C emits its
+          // own `retrigger` step event and no per-contribution breakdown — telemetry unchanged.)
           let cardPts = getCardPoints(card);
           ({ cardPts, mult } = this._applyCardEnhancements(card, cardPts, mult, null));
+          ({ cardPts, mult } = this._applyHexCardScored(card, cardPts, mult));
           points += cardPts;
 
           if (this._onScoringStep) {

@@ -2975,6 +2975,8 @@ Math verified for both:
 
 **Surfaced UX observation (not blocking):** The per-card scoring log does not display the retrigger as a separate line item. The deleted block included a `logRetriggerScoring` call that produced this output; the new Phase 1.5 path uses `_onScoringStep` events but the GameplayLogger doesn't currently render those as readable per-retrigger lines. Math is correct (proved by running mult progression), just less self-documenting in the log. Candidate for follow-up UX fix.
 
+**F2.10c resolution note (2026-06-10):** The hex `onCardScored` half of this omission was fixed in the Tier-3 scoring-loop pass (campaign D2 — the retrigger loop now applies hex via `_applyHexCardScored`). The "metal-from-hand" half was a mis-bundling: held-from-hand mult is `held_in_hand`-retrigger-scoped (site A) and is correctly NOT applied by the scoring (`'capture'`) retrigger loop. No metal-from-hand change was needed. See `D-F4-SCORING-TIER3`.
+
 ---
 
 ## 2026-05-14: F2.6 verification + push_ki_swing semantic change
