@@ -4117,3 +4117,69 @@ block, same arc); D-F4-DOCSYNC (the doc-reconciliation ruling this block's hex_3
 D0.10 (the original hex_30 ruling, now carrying a reconciliation note); F4.38 / the Tier-3 scoring pass
 (inherits X1); F4.24a (the end-of-Tier-2 checkpoint, now next). Block docs `hexagram_block_kickoff.md` +
 `hexagram_inventory_pass1.md` ARCHIVED to `docs/archive/phase4/`.
+
+---
+
+## D-F4-SCORING-TIER3 — Tier-3 scoring-loop pass CLOSED (2026-06-10)
+
+**Status:** CLOSED. The marquee Tier-3 task (pipeline consolidation). Umbrella record for the
+scoring-loop pass (campaigns D1 + D2).
+
+**Thesis + result.** The opening recon overturned the roadmap's "merge two parallel loops" premise
+(OVERHAUL_PLAN F4.18): F2.10b had already merged the parallel stamp scoring-retrigger loop into the
+Phase-1.5 `retriggerCount`. What actually remained was the per-card scoring math TRIPLICATED across
+three sites — B (`_addCapture` per-card), C (`_addCapture` Phase-1.5 retrigger), F (`_scoreFieldCards`)
+— plus the X1 hex twins. So the pass = a behavior-preserving structural dedup (D1) + one deliberate
+behavior fix (D2). Three roadmap-inherited "gaps" were investigated and found NOT to be gaps before any
+edit: the two-loops framing (already merged); "metal-from-hand omitted from retriggers" (already
+`held_in_hand`-retrigger-aware at site A); "Earth held-mult during scoring" (×1.0 no-op unless
+`boost_earth`/hex_15). Only the hex `onCardScored` omission (F2.10c) was real.
+
+**D1 — structural dedup (behavior-preserving, byte-identical). Commit `09046bd`.** Five shared helpers
+in `GameRoundManager.js`: `_applyCardEnhancements` (Fire/Water/Wood + Gold/Crystal/Ghost — was 3×: B/C/F);
+`_applyHexCardScored` (hex onCardScored — was 2×: B/F — **subsumes X1**); `_computeCaptureScore`
+(computeFinalScore commit — was 2×: E/F — **subsumes X1**); `_fireHexOnCaptureComplete` (was 2×: normal
+path + disableCaptureScoring branch); `_heldCardContribution` (site A held-from-hand). **Subsumes F4.38**
+— the Wu Xing scoring triad now has one home. Spirit `onCardScored` loops left per-site (B's
+points-accumulation + yin/yang/universe coupling vs F's simpler cardPts form genuinely diverge — partial
+dedup that's provably identical beats full dedup that might drift). Verified byte-identical via an A/B
+harness (new vs git-stashed old) over a broad matrix (enhancements/editions/hex onCardScored/
+computeFinalScore/Phase-1.5 white+gray retriggers/held-metal+jackpot/`_scoreFieldCards`); only wall-clock
+timestamps differed.
+
+**D1 — held-from-hand seam shaped for F5.8 (Robert's ruling).** `_heldCardContribution` returns a
+structured `{ multiplyMult }` (today only that field populated — byte-identical), with `addKi`/
+`addInterest` as latent channels reserved for the F5.8 Earth redesign (Clay/Pottery → per-scoring
+ki/interest). The Meteorite jackpot RNG stays inline as a Metal-branch side-effect (NOT routed into a ki
+channel). Not speculative — a documented Phase-5 intent in its known shape, behavior-neutral now.
+
+**D2 — F2.10c [FIX] (the one deliberate behavior change). Commit `682c2c8`.** The Phase-1.5 retrigger
+loop (C) now calls `_applyHexCardScored`, so a retriggered card gets the active season/axis hex
+multiplier the same as its first scoring pass (previously omitted). The ONLY observable behavior change
+in the pass. Targeted partition verification: control A (no hex + retrigger) byte-identical; control B
+(hex + no retrigger) byte-identical; changed (hex + retrigger) increased as hand-computed (1220→1956).
+The F2.10b DECISIONS_LOG note was clarified (only the hex half was a real omission; the
+"metal-from-hand" half was a mis-bundling — held-from-hand is `held_in_hand`-scoped, correctly excluded
+from the scoring `'capture'` retrigger).
+
+**HALTED — merge-vs-separate capture/scoring.** The recon confirmed separating re-reverses the
+deliberate F2.3 Prompt-B-follow-up merge ("scoring + capture-trigger stamps fire in one atomic capture
+event"), is separation-blocked by ≥5 named compounding interactions (Dew/Wish/Family/Rainbow + capture
+stamps; White/Gray universal), and is already relocated to Phase 5/F5.0. Not done; not this pass.
+
+**N2 — PROMOTED to Candidate D (NOT done here).** The stamp hand-cap finding (stamp draws splice the
+card out of the deck before `HandManager.add` clamps → silent card-leak on a full hand; same no-cap
+pattern at the discard/capture/yaku draw branches) was found to be one instance of the banked Candidate
+D hand-capacity fragmentation (~5 hand-growth sites with inconsistent cap rules; two competing cap
+fields `HandManager.maxSize` vs GRM `_handSizeCap`, one likely vestigial). Robert ruled D3 = the full
+Candidate D consolidation, which gets its own opening recon. The fix pattern is established:
+`zodiac_horse`'s `min(want, drawPileSize, availableSlots)` "leftover stays in deck" convention. **Not
+fixed in this pass — handed to Candidate D.**
+
+**Doc drift corrected (D-F4-DOCSYNC instance).** DESIGN_DOC §8.2.2 Earth-held-mult line qualified
+(×1.0/hex-gated, not baseline; rode D1).
+
+**Cross-references:** D-F4-HEXAGRAMS-TIER2 §7 (X1 source — now subsumed); D-F4-CONSUMABLES-TIER2 (F4.38
+source — now subsumed); F2.10b / F2.10c (the retrigger-omission lineage); D-F4-DOCSYNC (the Earth §8.2.2
+fix); Candidate D (inherits N2); F5.0 (merge-vs-separate, deferred); F5.8 (Earth redesign — the seam is
+prepared). Pass doc `scoring_loop_inventory_pass1.md` ARCHIVED to `docs/archive/phase4/`.

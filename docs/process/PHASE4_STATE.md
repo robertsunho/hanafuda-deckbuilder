@@ -74,13 +74,15 @@ Tier 2 — logic centralization
 
 ══ TIER 2 COMPLETE (2026-06-10) ══ — all three category drains closed + checkpoint verified.
 
-Tier 3 — pipeline consolidation  ◀── NEXT
-├─ Scoring-loop pass ............................... the marquee Tier-3 task; bundles three same-shape inheritances:
-│    • X1 — hexagram scoring-loop dup (onCardScored/computeFinalScore/onCaptureComplete twins)
-│    • F4.38 — Wu Xing proc surface (Fire/Water/Earth/Wood, deferred-whole from consumables)
-│    • N2 — stamp runtime-trigger surface (F4.38-sibling, surfaced by F4.24a)
-│    NOTE: N2 carries a live bug (PHASE4_consolidation_candidates.md:119 — _dispatchStampDiscardEffects
-│    draws to hand with no cap check); track as its own [FIX], do NOT [PRESERVE] it into the dedup.
+Tier 3 — pipeline consolidation  ◀── IN PROGRESS
+├─ Scoring-loop pass ............................... ✅ CLOSED (2026-06-10) — see DECISIONS_LOG D-F4-SCORING-TIER3
+│    D1 dedup (5 helpers; subsumes F4.38 + X1; byte-identical) + D2 F2.10c (hex on scoring
+│    retriggers, the one behavior change). Merge-vs-separate HALTED → Phase 5/F5.0. Held-seam
+│    shaped for F5.8. N2 hand-cap PROMOTED → Candidate D.
+├─ Candidate D — hand-capacity consolidation ....... ◀── NEXT (own recon)
+│    inherits N2 (stamp-draw card-leak). ~5 hand-growth sites w/ inconsistent cap rules + two
+│    competing cap fields (HandManager.maxSize vs GRM _handSizeCap, one likely vestigial).
+│    Fix pattern established: zodiac_horse's min(want, drawPile, availableSlots). Opens read-only.
 ├─ Destination audit (D-F4-SCOPE Part 2) .......... GRM/RunManager intrinsic-org + import cycles #2/#3
 │    + _initSpiritState/_initSpiritElements twins (obs #13) + capstone-flag caching (obs #14). Feeds F4.24b.
 ├─ F4.27 ........................................... util_past_life + sym_cuckoo_egg maturity/copy logic.
@@ -88,13 +90,13 @@ Tier 3 — pipeline consolidation  ◀── NEXT
      sym_ducks / engine_bullseye state-machines (need deck-flip / rank-inventory seams).
 ```
 
-**Immediate next action:** **Tier-2 is COMPLETE** (all three category drains closed + F4.24a checkpoint
-verified, 0 regressions — `docs/archive/phase4/F4.24_inventory_pass2.md`). Next chunk is **Tier-3 —
-pipeline consolidation**, whose marquee task is the **scoring-loop pass** bundling X1 (hexagram twins),
-F4.38 (Wu Xing procs), and N2 (stamp runtime-triggers) — all the same "proc behavior bound to the
-3-cluster scoring loop" shape. Tier-3 is a fresh chunk (a new orientation, not a continuation); it
-opens with its own planning/recon pass. Track the N2 stamp-discard cap bug as a [FIX], separate from
-the structural dedup.
+**Immediate next action:** the **scoring-loop pass CLOSED** 2026-06-10 (D1 dedup + D2 F2.10c; record
+`D-F4-SCORING-TIER3`) — the marquee Tier-3 consolidation is done (subsumed X1 + F4.38). Next is
+**Candidate D — hand-capacity consolidation** (inherits N2, the stamp-draw card-leak): ~5 hand-growth
+sites with inconsistent cap rules + two competing cap fields (`HandManager.maxSize` vs GRM
+`_handSizeCap`, one likely vestigial). It opens with its own read-only recon (the two-cap-field question
+may need a Robert ruling on `sym_osprey`'s cap behavior). Then the destination audit, F4.27, named
+hand-offs. Merge-vs-separate (F5.0) and the Earth redesign (F5.8) stay Phase-5 banked.
 
 ---
 
@@ -117,17 +119,15 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
   (G1 deleted the dead cluster, G2 built the random-8 shrine application surface; see DECISIONS_LOG
   `D-G`). **Remaining: the UX-completion polish → Phase 5** (random-8 TUNING: subset size, gating,
   family eligibility, cost-scaling — the SHAPE is shipped, the tuning is calibration).
-- **Tier-3 scoring-loop pass (the marquee) — bundles X1 + F4.38 + N2.** All three are the same
-  "proc behavior bound to the 3-cluster scoring loop" shape: **X1** = hexagram twins
-  (onCardScored/computeFinalScore/onCaptureComplete, from `D-F4-HEXAGRAMS-TIER2` §7); **F4.38** = Wu
-  Xing proc surface (below); **N2** = stamp runtime-trigger surface (F4.24a finding — carries a live
-  [FIX]: `_dispatchStampDiscardEffects` draws to hand with no cap check, `PHASE4_consolidation_candidates.md:119`).
-- **F4.38 — Wu Xing proc surface → Tier-3 scoring-pipeline pass.** Deferred whole (the clean home
-  needs the Fire/Water/Wood scoring triad — duplicated across 3 GRM clusters — collapsed, = scoring-
-  loop restructuring, Tier-3 not Tier-2). Two spin-offs: **(a)** TIMING design-ruling (Snow dep /
-  Ember break fire round-end = next-round effect; decide if per-card post-scoring is intended;
-  Robert rules, balance-adjacent) and **(b)** the scoring-loop 3-cluster dedup (the Tier-3 target
-  that subsumes Wu Xing extraction via the `onCardScored` delta contract). See `D-F4-CONSUMABLES-TIER2`.
+- **Tier-3 scoring-loop pass — ✅ CLOSED 2026-06-10 (`D-F4-SCORING-TIER3`).** D1 dedup + D2 F2.10c.
+  **X1 SUBSUMED** (hex twins collapsed into `_applyHexCardScored`/`_computeCaptureScore`/
+  `_fireHexOnCaptureComplete`). **F4.38 SUBSUMED** (Wu Xing scoring triad → `_applyCardEnhancements`,
+  one home). **N2 PROMOTED → Candidate D** (the hand-cap card-leak is one instance of the broader
+  hand-capacity fragmentation; gets its own recon). Held-from-hand seam shaped for F5.8.
+- **F4.38(a) — Wu Xing TIMING design-ruling (still banked).** The structural dedup (b) shipped in
+  D-F4-SCORING-TIER3; the remaining spin-off is the balance-adjacent timing question (Snow dep / Ember
+  break fire at round-end = next-round effect; decide if per-card post-scoring is intended). Robert
+  rules; Phase-5-adjacent. See `D-F4-CONSUMABLES-TIER2`.
 - **F4.24a-surfaced ratify/cleanup (non-Tier-3, low-priority).** N1 — `engine_northern_lion` is the
   lone surviving `run.activeSpirits` accumulator (`GRM:2069`); one-line ratification that excluding
   transcended copies from `pushesWitnessed` is intended. N3 — `engine_lincoln` desc/behavior mismatch
@@ -147,7 +147,12 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
 - **Design-doc reconciliation (D-F4-DOCSYNC)** — reconcile-during-recon for stable areas (incremental);
   full F4.14 sweep deferred to the F4.24b companion slot (late, against stabilized code). Raised
   priority, code-stability trigger.
-- **Other consolidation candidates A/B/C/D/E/F** — in `PHASE4_consolidation_candidates.md`.
+- **Candidate D — hand-capacity consolidation** — NOW the active Tier-3 item (next after the
+  scoring-loop pass). Inherits **N2** (stamp-draw card-leak): ~5 hand-growth sites with inconsistent
+  cap rules + two competing cap fields (`HandManager.maxSize` vs GRM `_handSizeCap`, one likely
+  vestigial). Fix pattern: `zodiac_horse`'s `min(want, drawPile, availableSlots)`. Opens with its own
+  read-only recon. Detail in `PHASE4_consolidation_candidates.md`.
+- **Other consolidation candidates A/B/C/E/F** — in `PHASE4_consolidation_candidates.md`.
 
 ---
 
@@ -227,7 +232,7 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 - `SPIRIT_SET_ITERATION_RULE.md` — durable (the transcendence/spirit-set invariant; a rule, not a record).
 - `PHASE4_consolidation_candidates.md` — partially-live (banked threads incl. Candidate C).
 - `PHASE4_STATE.md` — this doc (live state).
-- *(no currently-active block doc — all three Tier-2 category blocks (spirits, consumables, hexagrams) have closed; their docs are archived below. Next Tier-2 item is the F4.24a checkpoint, which adds no standing block doc.)*
+- *(no currently-active standing doc — Tier-2 is complete (F4.24a shipped) and the Tier-3 scoring-loop pass has closed; all their docs are archived below. The next Tier-3 item, Candidate D (hand-capacity consolidation), opens with its own read-only recon and will add its inventory doc here when it does.)*
 
 **`docs/` root:** `DESIGN_DOC_V5.md` — durable design source of truth.
 
@@ -243,6 +248,9 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 - **Hexagram block (CLOSED 2026-06-09; record = DECISIONS_LOG `D-F4-HEXAGRAMS-TIER2`):**
   `hexagram_inventory_pass1.md` (the §2 reconciliation table + §7 Tier-3 hand-off — distilled into the
   entry), `hexagram_block_kickoff.md` (kickoff brief + opening recon).
+- **Scoring-loop pass (CLOSED 2026-06-10; record = DECISIONS_LOG `D-F4-SCORING-TIER3`):**
+  `scoring_loop_inventory_pass1.md` (the §2 structural map + §5/§6 scope/seam — distilled into the
+  entry; N2 promoted to Candidate D).
 
 **`docs/archive/` root — pre-Phase-4 history (do not edit):**
 - `INFRASTRUCTURE_PLAN.md` (superseded by INFRASTRUCTURE_DECISIONS), `UPLOAD_MANIFEST.md`

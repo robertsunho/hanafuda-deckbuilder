@@ -1,5 +1,9 @@
 # Scoring-Loop Consolidation — Inventory & Triage (Pass 1)
 
+> **✅ CLOSED / ARCHIVED 2026-06-10.** The Tier-3 scoring-loop pass is complete (D1+D2). Durable
+> record: DECISIONS_LOG `D-F4-SCORING-TIER3`. N2 promoted to Candidate D. Retained as the pass
+> record — **do not edit**.
+
 > Standing reference for the **Tier-3 scoring-loop pass** (Phase 4, Tier 3, the marquee task).
 > Seeded from the opening recon + the design rulings made in the kickoff discussion. Status: LIVE
 > during the pass; archive at pass close-out.
@@ -161,10 +165,10 @@ it now in a shape with room for those channels:
 
 ## 8. Campaign ledger
 
-- **D1** — structural dedup + held-from-hand seam-shaping. [PRESERVE], byte-identical. Subsumes F4.38 + X1. **Status: PENDING (next).**
-- **D2** — F2.10c hex-on-scoring-retrigger [FIX]. One enumerable behavior change. After D1. **Status: PENDING.**
-- **D3** — N2 hand-cap [FIX]. Independent. **Status: PENDING.**
-- Doc drifts (§7) — ride D1 (DESIGN_DOC §8.2.2 touched by seam work) / D2 (F2.10b note). **Status: PENDING.**
+- **D1** — structural dedup + held-from-hand seam-shaping. [PRESERVE], byte-identical. Subsumes F4.38 + X1. **Status: SHIPPED 2026-06-10 (`09046bd`).**
+- **D2** — F2.10c hex-on-scoring-retrigger [FIX]. One enumerable behavior change. After D1. **Status: SHIPPED 2026-06-10 (`682c2c8`).**
+- **D3** — N2 hand-cap [FIX]. **Status: PROMOTED to Candidate D** (full hand-capacity consolidation; gets its own recon — ~5 hand-growth sites + the two-cap-field question). Not shipped in this pass.
+- Doc drifts (§7) — DESIGN_DOC §8.2.2 DONE (rode D1); F2.10b note DONE (rode D2). **Status: SHIPPED.**
 
 ## 9. Process notes
 
