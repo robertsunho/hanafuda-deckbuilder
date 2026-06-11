@@ -136,21 +136,16 @@ const _effects = {
 
       // Redraw the number discarded, but never beyond the hand's remaining room. If catcher
       // rescued any cards, the redraw fills only the leftover slots and the un-drawable cards
-      // STAY IN THE DECK (push/bank draw convention) — draw() splices the pile, so drawing
-      // more than fits would lose them. availableSlots reflects the post-rescue hand
-      // (catcher already ran inside _discardCards). With no catcher the hand is empty here,
-      // availableSlots = maxSize >= handSize, so this is identical to the old flat redraw.
-      const drawCount = Math.min(
-        handSize, roundManager.deck.drawPileSize, roundManager._hand.availableSlots,
-      );
-      if (drawCount > 0) {
-        roundManager._hand.add(roundManager.deck.draw(drawCount));
-      }
+      // STAY IN THE DECK (the _drawIntoHand convention — draw() splices the pile, so drawing
+      // more than fits would lose them). availableSlots reflects the post-rescue hand (catcher
+      // already ran inside _discardCards). With no catcher the hand is empty here, so this is
+      // identical to the old flat redraw.
+      const { drawn } = roundManager._drawIntoHand(handSize);
 
       if (roundManager._checkRoundEndOnEmptyHand()) {
         return { success: true, message: 'Horse: deck exhausted, round ended.' };
       }
-      return { success: true, message: `Horse: hand refreshed (${drawCount} drawn).` };
+      return { success: true, message: `Horse: hand refreshed (${drawn.length} drawn).` };
     },
   },
 

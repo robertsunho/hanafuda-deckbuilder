@@ -84,7 +84,7 @@ export default class GameRoundManager {
 
   constructor() {
     this._deck    = new DeckManager();
-    this._hand    = new HandManager({ maxSize: 16 }); // 16 allows push accumulation in capture mode
+    this._hand    = new HandManager(); // real cap set every round at startRound (modifyHandSize)
     this._field   = new FieldManager();
     this._capture = new CaptureManager();
     this._scoring = new ScoringEngine();
@@ -721,8 +721,7 @@ export default class GameRoundManager {
     this._pushPenaltyActive = true;
     // Hand cards carry over; deal a fixed number of additional cards.
     const dealCount = this._getNextPushDealCount();
-    const handCount = Math.min(dealCount, this._deck.drawPileSize, this._hand.availableSlots);
-    if (handCount > 0) this._hand.add(this._deck.draw(handCount));
+    const { drawn: pushDrawn } = this._drawIntoHand(dealCount);
     this._peekNextDeckFlip();
     // Re-snapshot yaku using only unspent cards so spent yaku can re-trigger.
     const unspentAfterPush = this._capture.getAll().filter(c => !this._spentCardIds.has(c.id));
@@ -737,7 +736,7 @@ export default class GameRoundManager {
       failedPushFactor: 1.0,
       failedFlow:       run.flow * getPushMultiplier(nextDepth, 'failure'),
       successFlow:      run.flow * getPushMultiplier(nextDepth, 'success'),
-      dealCount:        handCount,
+      dealCount:        pushDrawn.length,
     };
   }
 
