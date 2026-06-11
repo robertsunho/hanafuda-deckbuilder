@@ -90,104 +90,14 @@ export default class GameRoundManager {
     this._scoring = new ScoringEngine();
     this._style   = new StyleEngine();
 
-    /** @type {'idle'|'awaiting_deck'|'round_over'} */
-    this._phase = "idle";
+    // Per-round state — initialized here for first-shape, then re-applied every round by
+    // startRound() through the SAME helpers, so the two field lists can't drift (item 4 dedup).
+    this._resetRoundState();
+    this._resetScoringState();
 
-    /**
-     * Yaku name → bonus snapshot taken at the start of the current turn.
-     * Used to diff against post-turn evaluation: a yaku is "new" if its name
-     * was absent OR its bonus grew by >0.3.
-     * @type {Map<string, number>}
-     */
-    this._yakuBeforeTurn = new Set();
-
-    /** 1-based turn counter, incremented after each complete turn. */
-    this._turn = 0;
-
-    /**
-     * The most recently flipped deck card, exposed for the UI to display.
-     * @type {object|null}
-     */
-    this._lastDeckCard = null;
-
-    /** Running count of cards discarded (field full) this round. */
-    this._discardCount = 0;
-
-    /**
-     * Cards discarded during the current turn (cleared at turn start).
-     * Exposed in the playCard() return value so the UI can animate them.
-     * @type {object[]}
-     */
-    this._discardedThisTurn = [];
-
-    /**
-     * All cards discarded this round (field-full + player intentional).
-     * Accumulates across turns; reset by startRound().
-     * @type {object[]}
-     */
-    this._allDiscards = [];
-
-    /** Plays remaining this round (counts down from PLAYS_PER_ROUND). */
-    this._playsRemaining = GameRoundManager.PLAYS_PER_ROUND;
-
-    /** Discards remaining this round (counts down from MAX_DISCARDS). */
-    this._discardsRemaining = GameRoundManager.MAX_DISCARDS;
-
-    /**
-     * Groups of cards that were auto-captured at round start because the
-     * opening hand contained all 4 cards of the same month.
-     * Each entry is an array of 4 card objects.
-     * @type {object[][]}
-     */
-    this._naturalCaptures = [];
-
-    /**
-     * Running total of base capture points earned this round.
-     * Incremented immediately whenever cards are captured (both phases).
-     * Cards are worth their face `points` value (bright=20, animal=12, ribbon=10, plain=3).
-     */
-    this._basePoints = 0;
-
-    /**
-     * The finalScore recorded at the moment the player chose to push rather
-     * than bank.  Informational — used by the UI to show what is at risk.
-     */
-    this._atRiskScore = 0;
-
-    /**
-     * True while the player is exposed to the push penalty.
-     * Set by pushOn(); cleared the next time a new yaku is completed.
-     */
-    this._pushPenaltyActive = false;
-
-    /** Number of times the player has pushed this round. */
-    this._pushCount = 0;
-    /** Successful push depth (commitment-based curve index). */
-    this._pushDepth = 0;
-
-    /**
-     * True when the round would normally end (hand empty or plays exhausted)
-     * but a new yaku was also completed on that same turn.  The round-over
-     * transition is deferred until the player resolves the Bank/Push decision:
-     *   bankScore() → clears flag, moves to 'round_over' as usual.
-     *   pushOn()    → clears flag, resets plays/hand, continues play.
-     */
-    this._roundEndingAfterDecision = false;
-
-    /** Set by Dog consumable; suppresses the push penalty for this round. */
-    this._dogProtection = false;
-
-    /** Set by Pig consumable; doubles ki earned at round end. */
-    this._pigDoubleKi = false;
-
-    /**
-     * Style combos newly triggered on the most recent capture event.
-     * Read (and cleared) by GameScene via the lastStyleCombos getter.
-     * @type {{ id: string, name: string, bonus: number }[]}
-     */
-    this._lastStyleCombos = [];
-
-    /** Scoring step callback — set by GameScene via setScoringStepCallback(). */
+    /** Scoring step callback — set by GameScene via setScoringStepCallback().
+     *  NOT round state: a GameScene callback that must survive across rounds, so it is
+     *  set here only and never touched by _resetRoundState()/startRound(). */
     this._onScoringStep = null;
   }
 
@@ -313,6 +223,64 @@ export default class GameRoundManager {
 
   setScoringStepCallback(fn) { this._onScoringStep = fn; }
 
+  /**
+   * Reset all per-round state to round-start defaults. Called from BOTH the constructor
+   * (first-shape) and startRound() (every round) so the two field lists stay in sync —
+   * formerly drifted across the two sites (item 4 dedup). Plain field assignments only;
+   * the interleaved calls (_deck/_hand/_field/_capture.clear, _style.resetRound, the
+   * onRoundStart hooks) stay in startRound() at their existing positions. Does NOT touch
+   * _onScoringStep (a cross-round GameScene callback) or the scoring-state fields (those
+   * reset AFTER the onRoundStart hooks — see _resetScoringState).
+   */
+  _resetRoundState() {
+    this._lastEarthKiGain    = 0;          // Earth ki bonus — computed at round-end (_computeEarthKiBonus)
+    this._phase              = "idle";     // round phase: 'idle' | 'awaiting_deck' | 'round_over'
+    this._yakuBeforeTurn     = new Set();  // yaku names present at the start of the current turn
+    this._turn               = 0;          // 1-based turn counter
+    this._lastDeckCard       = null;       // most recently flipped deck card (UI)
+    this._discardCount       = 0;          // field-full discards this round
+    this._discardedThisTurn  = [];         // cards discarded this turn (UI animation)
+    this._allDiscards        = [];         // all cards discarded this round (field-full + intentional)
+    this._playsRemaining     = GameRoundManager.PLAYS_PER_ROUND;
+    this._discardsRemaining  = GameRoundManager.MAX_DISCARDS;
+    this._basePoints         = 0;          // running base capture points this round
+    this._naturalCaptures    = [];         // round-start all-4-of-a-month auto-captures
+    this._atRiskScore              = 0;     // finalScore recorded at push (UI: at-risk)
+    this._pushPenaltyActive        = false; // exposed to the push penalty
+    this._pushCount                = 0;     // times pushed this round
+    this._pushDepth                = 0;     // successful push depth (commitment curve index)
+    this._bullseyeInventory        = { bright: 0, animal: 0, ribbon: 0, plain: 0 }; // engine_bullseye rank tracker
+    this._roundEndingAfterDecision = false; // round-over deferred pending Bank/Push decision
+    this._dogProtection            = false; // Dog consumable: suppress push penalty this round
+    this._pigDoubleKi              = false; // Pig consumable: double round-end ki
+    this._goatActive               = false; // Goat consumable: +1 ki per capture
+    this._tigerPushActive          = false; // Tiger consumable: forced-push one-shot
+    this._roosterBonusThisRound    = 0;     // Rooster zodiac: +1 field slot this round
+    this._snakeThresholdMods       = {};    // Snake consumable: per-yaku threshold mods
+    this._lastStyleCombos          = [];    // style combos triggered on the most recent capture (UI)
+    this._nextDeckFlip             = null;  // peeked next deck card (reveal hexagram)
+    this._playsThisTurn            = 0;     // plays made in the current turn
+    this._requiredPlaysPerTurn     = applyHook('modifyPlaysPerTurn', 1, 1); // hex may raise; default 1
+  }
+
+  /**
+   * Reset per-round SCORING state. Split from _resetRoundState() because in startRound() this
+   * runs AFTER the onRoundStart hooks (the documented "onRoundStart fires after state reset,
+   * before scoring-state init" contract — SpiritEffects.js header), whereas _resetRoundState()
+   * runs before them. Called from the constructor (first-shape) and from startRound() at the
+   * post-hook position. (No onRoundStart hook reads these fields today — verified — but the
+   * split preserves the timing contract exactly rather than relying on that.)
+   */
+  _resetScoringState() {
+    this._runningScore      = 0;
+    this._cumulativePoints  = 0;     // capstone_nature: carries across captures
+    this._scoringEvents     = [];
+    this._eventCount        = 0;
+    this._captureEventCount = 0;
+    this._spentCardIds      = new Set();
+    this._lastHandPlayToEmptySlot = null;  // empty-slot play tracking (Fix D/E capture rules)
+  }
+
   // ── Public API ─────────────────────────────────────────────────────────────
 
   /**
@@ -327,43 +295,12 @@ export default class GameRoundManager {
    * @returns {this} for chaining
    */
   startRound() {
-    // Interest moved to round-end (computed inside calculateKiReward).
-
-    // Earth ki bonus moves to round end — see _computeEarthKiBonus().
-    this._lastEarthKiGain = 0;
-
     this._deck.resetWithCards(run.getDeck()).shuffle();
     this._hand.clear();
     this._field.clear();
     this._capture.clear();
 
-    this._phase              = "idle";
-    this._yakuBeforeTurn     = new Set();
-    this._turn               = 0;
-    this._lastDeckCard       = null;
-    this._discardCount       = 0;
-    this._discardedThisTurn  = [];
-    this._allDiscards        = [];
-    this._playsRemaining     = GameRoundManager.PLAYS_PER_ROUND;
-    this._discardsRemaining  = GameRoundManager.MAX_DISCARDS;
-    this._basePoints         = 0;
-    this._naturalCaptures    = [];
-    this._atRiskScore              = 0;
-    this._pushPenaltyActive        = false;
-    this._pushCount                = 0;
-    this._pushDepth                = 0;
-    this._bullseyeInventory        = { bright: 0, animal: 0, ribbon: 0, plain: 0 };
-    this._roundEndingAfterDecision = false;
-    this._dogProtection            = false;
-    this._pigDoubleKi              = false;
-    this._goatActive               = false;
-    this._tigerPushActive          = false;
-    this._roosterBonusThisRound    = 0;
-    this._snakeThresholdMods       = {};
-    this._lastStyleCombos          = [];
-    this._nextDeckFlip             = null;
-    this._playsThisTurn            = 0;
-    this._requiredPlaysPerTurn     = applyHook('modifyPlaysPerTurn', 1, 1);
+    this._resetRoundState();
     this._style.resetRound();
 
     // Hexagram round-start hook
@@ -379,16 +316,8 @@ export default class GameRoundManager {
     // ── Spirit round-start hooks ──────────────────────────────────────────
     this._fireSpiritHook('onRoundStart');
 
-    // ── Scoring state ─────────────────────────────────────────────────────
-    this._runningScore     = 0;
-    this._cumulativePoints = 0;  // capstone_nature: carries across captures
-    this._scoringEvents    = [];
-    this._eventCount       = 0;
-    this._captureEventCount = 0;
-    this._spentCardIds     = new Set();
-
-    // ── Empty-slot play tracking (for Fix D/E capture rules) ─────────────
-    this._lastHandPlayToEmptySlot = null;
+    // ── Scoring state (reset AFTER the onRoundStart hooks — see _resetScoringState) ──
+    this._resetScoringState();
 
     // Blessing patron bonuses.
     const _handSizeBonus    = run.countBlessingsByEffect('plus_hand_size');
