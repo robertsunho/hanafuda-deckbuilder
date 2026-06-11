@@ -149,6 +149,11 @@ drifted/stale copy) and keeps a single canonical source — the same single-sour
   completed task went, move it to `archive/phase4/` at that task's close-out (the close-out ritual),
   with a CLOSED status header. This keeps `process/` to the live set and prevents bloat.
   `PHASE4_STATE.md` is the live index of which docs are which.
+- **Phase-spanning registries are swept forward, not archived.** A *registry* doc (e.g.
+  `PHASE4_consolidation_candidates.md`) deliberately holds entries gated to a LATER phase, so it is not
+  "done" when its host phase closes. At phase close-out, sweep its next-phase-bound entries into the
+  next phase's planning rather than archiving the doc as complete — a phase-level step distinct from the
+  per-task close-out ritual (see PHASE4_STATE §6). Unfinished-by-design ≠ dropped.
 - **Investigations** (three-marks, yaku, cleanup-audit) are kept: they're the recon
   behind specific Phase 4 tasks (e.g. three-marks → F4.10 naming cleanup + F4.27;
   yaku → F4.8 + the two-scoring-paths debt in F4 Tier-equivalent work). Treat as

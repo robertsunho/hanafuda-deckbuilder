@@ -165,6 +165,11 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
   on `success` — inconsistent consume-on-blocked policy across families. Provisional Dog ruling (full
   hand → `success: false`, block-and-retain) revisited under H. Detail in
   `PHASE4_consolidation_candidates.md`.
+- **Candidate I — legendary/spirit structural decoupling** — NEW (2026-06-11), banked. The conceptual
+  separation is settled (`SPIRIT_SET_ITERATION_RULE.md` §2); the *code* still couples them (union getters,
+  `alch_pearl`→`addLegendarySpirit`, inline capstone scoring branches). **Recon Phase-4-runnable (informs
+  F4.24b); campaign Phase 5, sequenced with Candidate C** (same getter surface — C renames, I may split).
+  Detail in `PHASE4_consolidation_candidates.md`.
 - **Other consolidation candidates A/B/C/E** (OPEN) **/ F** (✅ RESOLVED — audit archived + [FIX] shipped
   under F4.20-FIX2) **/ G** (◐ architectural half shipped, UX half → Phase 5) — full status sweep in
   `PHASE4_consolidation_candidates.md` (each candidate now carries a SWEEP STATUS line).
@@ -208,6 +213,14 @@ context is a cache on top — a fresh conversation reloads from the durable docs
 1. Update this doc (§3 task stack, §4 banked threads).
 2. Move that category's task-scoped ledgers/recon/audits to `docs/archive/phase4/` (+ CLOSED header).
 3. Note any now-stale diagnostic; confirm `process/` holds only the live set.
+
+**At PHASE close-out (distinct from the per-block ritual above — different cadence, do NOT fold in):**
+before declaring the phase done, sweep `PHASE4_consolidation_candidates.md` for every entry gated to or
+banked for the next phase (SWEEP STATUS / phase lines naming Phase 5, "→ Phase 5", "gated on F4.24b"
+where that lands in P5, "Phase TBD", or an embedded Phase-5 note). **Collect these into the next phase's
+planning doc/entry rather than archiving them as completed.** The candidates doc is a phase-spanning
+registry (see its header note); unfinished-by-design entries must be carried forward deliberately, not
+silently dropped at the archive step.
 
 **HANDOFF TEMPLATE — paste at the start of a fresh conversation:**
 ```

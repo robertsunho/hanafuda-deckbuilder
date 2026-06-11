@@ -9,6 +9,16 @@ creep). Each is its own task with its own timing and risk. Recorded per the
 iterative-reorganization principle (D-F4.18b): notice it, write it down, scope it, don't let
 it derail current work.
 
+> **This doc is a candidate REGISTRY spanning Phase 4 AND Phase 5 — not a Phase-4 to-do list.** Each
+> entry carries its own phase gating (the per-entry **SWEEP STATUS** / phase line). Several are
+> deliberately gated to late Phase 4 or banked to Phase 5: Candidate C (gated on F4.24b), Candidate G's
+> UX-completion half (→ Phase 5), Candidate H (Phase TBD), Candidate I (campaign Phase 5), plus the
+> embedded Phase-5 notes (Wu Xing timing, Mirror/Memory slot-vs-adjacency, velocity magnitude).
+> **Not all entries here will close by Phase-4 end — that is by design, not slippage.** At Phase-4
+> close, the phase-level closeout sweep (PHASE4_STATE §6 / INFRASTRUCTURE_DECISIONS doc-lifecycle)
+> collects the Phase-5-bound entries into Phase-5 planning rather than treating them as dropped or done.
+> A task's phase is set by its dependencies, not by its presence in this doc.
+
 ---
 
 ## Background — the observation that surfaced these
@@ -457,6 +467,67 @@ standard before the standard exists. Revisit under H.
 - `D-F4-CONSUMABLES-TIER2` + `consumable_inventory_pass1.md` (the consumable dispatch map / the
   `useConsumable` badger note / F4.15 dispatch unification — H is adjacent to that path).
 - `sym_badger` (the counter whose firing IS the consumed-signal).
+
+---
+
+## Candidate I — Legendary / Spirit structural decoupling
+
+> **SWEEP STATUS (2026-06-11): NEW — BANKED. Recon Phase-4-runnable (informs F4.24b); campaign Phase 5,
+> sequenced with Candidate C.** Two-half framing (like Candidate G).
+
+**The thesis.** Legendaries emerged out of the spirit system, and the *conceptual* distinction is
+already settled and documented (`SPIRIT_SET_ITERATION_RULE.md` §2: separate category — own slot/array,
+no transcend, not chain members, foundation-influencing rather than chain participants). But the *code*
+still expresses legendaries as a sub-variety of spirit at several coupling points, so a change to one
+category can silently reach the other. This candidate asks: **can the two be decoupled structurally so
+the code reflects the already-decided distinction, and a change to spirit-set semantics can't reach
+legendary handling by accident (and vice versa)?** It does NOT reopen the conceptual question (settled).
+
+**Motivating evidence (concrete, recent):**
+1. **Union getters blur the boundary.** `activeSpirits` = `spirits + legendaries`; `scoringSpirits` =
+   `spirits + negatives + legendaries` (RunManager getters). Consumers of "things that score" pull both
+   categories through one accessor — spirit-set changes implicitly touch legendary handling.
+2. **`alch_pearl` crosses the boundary at creation.** A spirit-fusion-family consumable calls
+   `run.addLegendarySpirit(capstoneDef)` (`ConsumableEffects.js:~448`) — legendary creation reached from
+   the spirit/consumable path. This is exactly the entanglement that refuted the obs #14 caching
+   premise (the capstone set isn't round-invariant because a consumable can forge one mid-round; see
+   `D-F4-SCOPE` obs #14 won't-fix).
+3. **Inline capstone special-casing in the scoring loop.** `_addCapture` branches on
+   `capstone_yinyang/universe/nature` by id, inline (`GRM:~1422-1424` + downstream yin-yang / universe /
+   nature loops), because capstone *scoring behavior* isn't encapsulated in a legendary-category surface
+   the way spirit effects live in `SpiritEffects`. Legendaries have empty `SpiritEffects` stubs; their
+   real behavior is scattered (foundation influence + inline scoring branches).
+
+**Recon deliverable (read-only first — Phase-4-runnable, informs F4.24b's category narrative):**
+- Map every site that unions or branches across the spirit/legendary boundary: the union getters and
+  their consumers; inline `capstone_`/legendary-id branches; `addLegendarySpirit` / `canAddLegendary` /
+  `_legendarySpirits` touch-points; legendary-slot vs spirit-slot capacity logic.
+- Locate where legendary *behavior* lives today and assess whether it could be encapsulated into a
+  legendary-category surface (a "legendary effects" registry analogous to `SpiritEffects`), or whether
+  legendaries are too heterogeneous (5 in roster; capstones + others) for one surface.
+- Verdict: is there a clean structural decoupling, or are the categories intertwined at the data model
+  such that full separation costs more than the coupling it removes? (The recon decides — don't assume.)
+
+**Sequencing — coordinate with Candidate C (same getter surface).** Candidate C *renames* the union
+getters by intent; this candidate may *split* some of them. They overlap on the exact getter surface
+and must be sequenced together so they don't fight: **C is the vocabulary pass; I is the structural
+pass.** Likely order: I-recon first (decide what splits), then C names survivors — or run as one
+combined getter-surface pass. The campaign cannot safely execute until the structure stops moving (the
+same gating that holds B and C): the destination audit (D-F4-SCOPE) is *still reshaping* the
+`scoringSpirits`/capstone surfaces, so the [FIX] is Phase 5.
+
+**Scope guards / non-goals:**
+- Does NOT reopen the conceptual distinction (`SPIRIT_SET_ITERATION_RULE.md` §2 — settled; legendaries
+  are not chain members).
+- NOT the capstone timing/mechanics question (alch_pearl mid-round forging rules as-is per obs #14
+  won't-fix) — this is about where legendary *code* lives, not what the behavior is.
+- Legendary balance is separate Phase-5 balance work.
+
+**Cross-references:** `SPIRIT_SET_ITERATION_RULE.md` §2 (the settled separation this honors
+structurally); Candidate C (getter-surface vocabulary pass — sequence together); `D-F4-SCOPE` obs #14
+won't-fix (the alch_pearl entanglement that motivated this); F4.24b ARCHITECTURE.md (the legendary/
+spirit boundary is part of the category narrative — the recon informs it even though the campaign is P5);
+PHASE4_STATE §4 (banked headline pointing here).
 
 ---
 
