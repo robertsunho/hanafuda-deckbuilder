@@ -503,8 +503,16 @@ class RunManager {
     return { success: true, result: result.result };
   }
 
-  /** Initialize persistent state for stateful spirits. Mutates spirit in-place. */
-  /** Initialize state or elements for a spirit. Accumulators get elements array matching stackCount. */
+  /**
+   * Initialize persistent state/elements for a spirit (regular OR symbiont acquisition).
+   * Accumulators get an `elements` array sized to stackCount; stateful non-accumulators get their
+   * `state` object. Handles the full id union of both acquisition paths — formerly split across
+   * `_initSpiritState` (regular branch) + `_initSpiritElements` (symbiont branch), which shared a
+   * byte-identical accumulator branch and double-defined `game_catcher`. Routing to the two former
+   * methods was strictly by channel/category 'symbiont' (`_acquireSpiritStack`), so each id reaches
+   * exactly one path; `game_catcher` (channel 'gameplay') only ever takes the regular path — it
+   * appeared in both former methods defensively, with identical state. Mutates spirit in-place.
+   */
   _initSpiritState(spirit) {
     if (ACCUMULATOR_SPIRIT_IDS.has(spirit.id)) {
       if (!spirit.elements) {
@@ -514,10 +522,17 @@ class RunManager {
       }
       return;
     }
-    // Non-accumulator state init
-    if (spirit.id === 'game_catcher')        spirit.state = { catchesUsedThisRound: 0 };
-    if (spirit.id === 'decay_persimmon')      spirit.state = { remaining: 30 };
-    if (spirit.id === 'decay_pear')           spirit.state = { remaining: 150 };
+    // Non-accumulator state init (full union of the former regular + symbiont paths)
+    switch (spirit.id) {
+      case 'sym_caterpillar': spirit.state = { leafsEaten: 0 };          break;
+      case 'sym_crow':        spirit.state = {};                         break;
+      case 'sym_ducks':       spirit.state = { multValue: 0 };           break;
+      case 'sym_magpie':      spirit.state = {};                         break;
+      case 'sym_osprey':      spirit.state = { flipsUsedThisRound: 0 };  break;
+      case 'game_catcher':    spirit.state = { catchesUsedThisRound: 0 }; break;
+      case 'decay_persimmon': spirit.state = { remaining: 30 };          break;
+      case 'decay_pear':      spirit.state = { remaining: 150 };         break;
+    }
   }
 
   /**
@@ -584,32 +599,13 @@ class RunManager {
 
   _buildSymbiontSpirit(spiritDef, stackCount) {
     const spirit = { id: spiritDef.id, name: spiritDef.name, symbiont: true, stackCount, sellPriceBonus: 0 };
-    this._initSpiritElements(spirit);
+    this._initSpiritState(spirit);
     return spirit;
   }
 
   _freshAccumulatorElement(spiritId) {
     const initFn = ACCUMULATOR_INIT[spiritId];
     return initFn ? { ...initFn(), acquiredRound: this._round ?? 0 } : {};
-  }
-
-  /** Initialize state/elements for any spirit. Accumulators get elements array matching stackCount. */
-  _initSpiritElements(spirit) {
-    if (ACCUMULATOR_SPIRIT_IDS.has(spirit.id)) {
-      if (!spirit.elements) {
-        const count = spirit.stackCount ?? 1;
-        spirit.elements = [];
-        for (let i = 0; i < count; i++) spirit.elements.push(this._freshAccumulatorElement(spirit.id));
-      }
-      return;
-    }
-    // Non-accumulator init
-    if (spirit.id === 'sym_caterpillar') spirit.state = { leafsEaten: 0 };
-    else if (spirit.id === 'sym_crow')        spirit.state = {};
-    else if (spirit.id === 'sym_ducks')       spirit.state = { multValue: 0 };
-    else if (spirit.id === 'sym_magpie')      spirit.state = {};
-    else if (spirit.id === 'sym_osprey')      spirit.state = { flipsUsedThisRound: 0 };
-    else if (spirit.id === 'game_catcher')   spirit.state = { catchesUsedThisRound: 0 };
   }
 
   /** Add an accumulator element when stacking an existing spirit. */
