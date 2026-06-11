@@ -3,7 +3,7 @@
 > **The single authoritative "where are we in Phase 4" doc.** A fresh conversation reads THIS first.
 > It supersedes, as the *live* anchor, the archived `PHASE_4_ENTRY_BRIEF.md`, `PHASE_4_TASK_ORDERING.md`,
 > and `UPLOAD_MANIFEST.md` (those are retained as the Phase-4 bootstrap record, not current guidance).
-> Update at every category/block boundary (the close-out ritual). Last updated: 2026-06-07.
+> Update at every category/block boundary (the close-out ritual). Last updated: 2026-06-10.
 
 ---
 
@@ -79,24 +79,24 @@ Tier 3 — pipeline consolidation  ◀── IN PROGRESS
 │    D1 dedup (5 helpers; subsumes F4.38 + X1; byte-identical) + D2 F2.10c (hex on scoring
 │    retriggers, the one behavior change). Merge-vs-separate HALTED → Phase 5/F5.0. Held-seam
 │    shaped for F5.8. N2 hand-cap PROMOTED → Candidate D.
-├─ Candidate D — hand-capacity consolidation ....... ◀── NEXT (own recon)
-│    inherits N2 (stamp-draw card-leak). ~5 hand-growth sites w/ inconsistent cap rules + two
-│    competing cap fields (HandManager.maxSize vs GRM _handSizeCap, one likely vestigial).
-│    Fix pattern established: zodiac_horse's min(want, drawPile, availableSlots). Opens read-only.
-├─ Destination audit (D-F4-SCOPE Part 2) .......... GRM/RunManager intrinsic-org + import cycles #2/#3
-│    + _initSpiritState/_initSpiritElements twins (obs #13) + capstone-flag caching (obs #14). Feeds F4.24b.
+├─ Candidate D — hand-capacity consolidation ....... ✅ CLOSED (2026-06-10) — D-F4-HANDCAP-TIER3
+│    _drawIntoHand (one bug/8 sites, deck-integrity, hand-identical) + Osprey respects cap
+│    + _handSizeCap deleted. N2 resolved. Surfaced Candidate H (consumable-consumption).
+├─ Destination audit (D-F4-SCOPE Part 2) .......... ◀── NEXT — GRM/RunManager intrinsic-org + import
+│    cycles #2/#3 + _initSpiritState/_initSpiritElements twins (obs #13) + capstone caching (#14). Feeds F4.24b.
 ├─ F4.27 ........................................... util_past_life + sym_cuckoo_egg maturity/copy logic.
-└─ Named spirit hand-offs .......................... util_symbiosis/sym_algae summon (do LAST);
-     sym_ducks / engine_bullseye state-machines (need deck-flip / rank-inventory seams).
+└─ Named spirit hand-offs .......................... util_symbiosis/sym_algae summon (LAST); sym_ducks/engine_bullseye state-machines.
 ```
 
-**Immediate next action:** the **scoring-loop pass CLOSED** 2026-06-10 (D1 dedup + D2 F2.10c; record
-`D-F4-SCORING-TIER3`) — the marquee Tier-3 consolidation is done (subsumed X1 + F4.38). Next is
-**Candidate D — hand-capacity consolidation** (inherits N2, the stamp-draw card-leak): ~5 hand-growth
-sites with inconsistent cap rules + two competing cap fields (`HandManager.maxSize` vs GRM
-`_handSizeCap`, one likely vestigial). It opens with its own read-only recon (the two-cap-field question
-may need a Robert ruling on `sym_osprey`'s cap behavior). Then the destination audit, F4.27, named
-hand-offs. Merge-vs-separate (F5.0) and the Earth redesign (F5.8) stay Phase-5 banked.
+**Immediate next action:** **Candidate D — hand-capacity consolidation CLOSED** 2026-06-10 (record
+`D-F4-HANDCAP-TIER3`; commits `c9e22c2` E1, `a6dbca2` E1c, `2ec9cfb` E2). Shipped `_drawIntoHand`
+(one bug / eight instances, deck-integrity, hand-identical) + `sym_osprey` respecting the cap +
+`_handSizeCap` deletion; N2 resolved; surfaced **Candidate H** (consumable-consumption-consistency,
+banked recon-first — §4). Next Tier-3 item is the **destination audit (D-F4-SCOPE Part 2)** — the
+GRM/RunManager intrinsic-organization pass (displacement + intrinsic-org: import cycles #2/#3, the
+`_initSpiritState`/`_initSpiritElements` twins, capstone-flag caching) that feeds F4.24b; a natural
+fresh-conversation boundary (it may add its own recon doc when it runs). Then F4.27, named hand-offs.
+Merge-vs-separate (F5.0) and the Earth redesign (F5.8) stay Phase-5 banked.
 
 ---
 
@@ -110,7 +110,10 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
   (shipped); the deeper "do they reference a slot vs positional adjacency" cleanup is a separate task.
 - **Velocity exponential magnitude** — Phase-5 balance (D-F4.20-VELOCITY). Whether powerLevel scales
   inside the 1.5^x exponent; both branches currently consistent; change nothing till Phase 5.
-- **Osprey** — deck-flip interception GATE; needs a deck-flip seam that doesn't exist. Deferred.
+- **Osprey** — the deck-flip-interception → SpiritEffects **hook MIGRATION** (needs a deck-flip seam that
+  doesn't exist). Deferred. NOTE: the hand-cap GATE is now RESOLVED (`D-F4-HANDCAP-TIER3` E1c — Osprey
+  respects the cap, `_handSizeCap` deleted); only the in-place→hook migration remains banked here. The
+  two are distinct concerns in the same `_doDeckPhase` block — don't blur them.
 - **bullseye** — `_bullseyeInventory` state machine in GRM; minimal-lift or defer (not a clean counter).
 - **badger** — `onConsumableUsed` belongs to the consumable block, not the spirit wave. Folded there.
 - **GRM/RunManager destination audit** (D-F4-SCOPE Part 2) — late Tier 3; feeds F4.24b. Drain
@@ -147,12 +150,22 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
 - **Design-doc reconciliation (D-F4-DOCSYNC)** — reconcile-during-recon for stable areas (incremental);
   full F4.14 sweep deferred to the F4.24b companion slot (late, against stabilized code). Raised
   priority, code-stability trigger.
-- **Candidate D — hand-capacity consolidation** — NOW the active Tier-3 item (next after the
-  scoring-loop pass). Inherits **N2** (stamp-draw card-leak): ~5 hand-growth sites with inconsistent
-  cap rules + two competing cap fields (`HandManager.maxSize` vs GRM `_handSizeCap`, one likely
-  vestigial). Fix pattern: `zodiac_horse`'s `min(want, drawPile, availableSlots)`. Opens with its own
-  read-only recon. Detail in `PHASE4_consolidation_candidates.md`.
-- **Other consolidation candidates A/B/C/E/F** — in `PHASE4_consolidation_candidates.md`.
+- **Candidate D — hand-capacity consolidation — ✅ CLOSED 2026-06-10 (`D-F4-HANDCAP-TIER3`).** Shipped
+  `_drawIntoHand` (one bug / eight instances — deck-integrity, hand-identical) across the draw-pile leak
+  sites + a discard-clamped `zodiac_dog` + `sym_osprey` respecting the cap + deletion of the vestigial
+  `_handSizeCap` (`HandManager.maxSize` is the one true cap; NO cap rises — deals respect the cap). N2
+  resolved. Glory/negatives test expectations flipped to the [FIX] numbers.
+- **Candidate H — consumable-consumption / use-blocking consistency** — NEW, surfaced by Candidate D's
+  E1b (`zodiac_dog`). Recon-first (map + policy ruling before any campaign). The settled invariant: used
+  ⟺ spent ⟺ Badger increments (one event). The open question: under what circumstances is a consumable
+  NOT used, and are they all deliberate (blocked vs partial vs has-a-cost). Motivating finding: the
+  `element_` GameScene branch consumes UNCONDITIONALLY (even on `no_effect`) while `stamp_` only consumes
+  on `success` — inconsistent consume-on-blocked policy across families. Provisional Dog ruling (full
+  hand → `success: false`, block-and-retain) revisited under H. Detail in
+  `PHASE4_consolidation_candidates.md`.
+- **Other consolidation candidates A/B/C/E** (OPEN) **/ F** (✅ RESOLVED — audit archived + [FIX] shipped
+  under F4.20-FIX2) **/ G** (◐ architectural half shipped, UX half → Phase 5) — full status sweep in
+  `PHASE4_consolidation_candidates.md` (each candidate now carries a SWEEP STATUS line).
 
 ---
 
@@ -232,7 +245,7 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 - `SPIRIT_SET_ITERATION_RULE.md` — durable (the transcendence/spirit-set invariant; a rule, not a record).
 - `PHASE4_consolidation_candidates.md` — partially-live (banked threads incl. Candidate C).
 - `PHASE4_STATE.md` — this doc (live state).
-- *(no currently-active standing doc — Tier-2 is complete (F4.24a shipped) and the Tier-3 scoring-loop pass has closed; all their docs are archived below. The next Tier-3 item, Candidate D (hand-capacity consolidation), opens with its own read-only recon and will add its inventory doc here when it does.)*
+- *(no currently-active standing doc — Tier-2 is complete (F4.24a shipped) and the Tier-3 scoring-loop pass + Candidate D (hand-capacity) have both closed; all their docs are archived below. The next Tier-3 item, the destination audit (D-F4-SCOPE Part 2), opens with its own read-only recon and will add its recon doc here when it does.)*
 
 **`docs/` root:** `DESIGN_DOC_V5.md` — durable design source of truth.
 
@@ -251,6 +264,9 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 - **Scoring-loop pass (CLOSED 2026-06-10; record = DECISIONS_LOG `D-F4-SCORING-TIER3`):**
   `scoring_loop_inventory_pass1.md` (the §2 structural map + §5/§6 scope/seam — distilled into the
   entry; N2 promoted to Candidate D).
+- **Candidate D — hand-capacity (CLOSED 2026-06-10; record = DECISIONS_LOG `D-F4-HANDCAP-TIER3`):**
+  `hand_capacity_inventory_pass1.md` (the §2 corrected design model + §4 site inventory + §7 helper
+  contract — distilled into the entry; surfaced Candidate H).
 
 **`docs/archive/` root — pre-Phase-4 history (do not edit):**
 - `INFRASTRUCTURE_PLAN.md` (superseded by INFRASTRUCTURE_DECISIONS), `UPLOAD_MANIFEST.md`

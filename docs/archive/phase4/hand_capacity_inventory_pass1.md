@@ -1,5 +1,9 @@
 # Hand-Capacity Consolidation — Inventory & Triage (Pass 1)
 
+> **✅ CLOSED / ARCHIVED 2026-06-10.** Candidate D (hand-capacity consolidation) complete
+> (E1/E1b/E1c/E2). Durable record: DECISIONS_LOG `D-F4-HANDCAP-TIER3`. Surfaced Candidate H
+> (consumable-consumption-consistency). Retained as the pass record — **do not edit**.
+
 > Standing reference for **Candidate D** (Phase 4, Tier 3 — the item after the scoring-loop pass).
 > Seeded from the opening recon + the design rulings made in the kickoff discussion. Status: LIVE
 > during the pass; archive at pass close-out.
@@ -120,6 +124,17 @@ unless a logging need emerges.) RunManager stores no cap field; it only supplies
 with no RunManager change — but the consolidation must preserve those inputs unchanged.
 
 ## 8. Campaign plan ([PRESERVE]-for-hand throughout; deck-integrity [FIX])
+
+> **✅ FINAL — ALL SHIPPED (2026-06-10). Durable record: DECISIONS_LOG `D-F4-HANDCAP-TIER3`.**
+> - **E1** (commit `c9e22c2`): `_drawIntoHand` + 6 draw-pile leak sites routed. SHIPPED.
+> - **E1b** (with E1): `zodiac_dog` discard-pile clamp. SHIPPED. (Full-hand → `success: false`,
+>   block-and-retain — PROVISIONAL pending **Candidate H**, surfaced by this pass.)
+> - **E1c** (commit `a6dbca2`, isolated): `sym_osprey` respects the cap; `_handSizeCap` deleted. SHIPPED.
+> - **E2** (commit `2ec9cfb`): dead `maxSize:16` default removed; push redraw + Horse routed. SHIPPED.
+> - **Tests:** new `test/hand_capacity.test.js` (helper contract + Dog + both Osprey partitions); three
+>   Glory/negatives expectations flipped to the deck-integrity [FIX] numbers (`count` 2→1, deck −2→−1).
+>   Build green; suite 134 passed / 1 skipped.
+
 
 Re-read of the recon's [PRESERVE]/[FIX] labels under the corrected model: every leak fix is
 **[PRESERVE] for the HAND** (hand contents identical pre/post) and **[FIX] for the DECK** (turned-away

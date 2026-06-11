@@ -4183,3 +4183,82 @@ fixed in this pass — handed to Candidate D.**
 source — now subsumed); F2.10b / F2.10c (the retrigger-omission lineage); D-F4-DOCSYNC (the Earth §8.2.2
 fix); Candidate D (inherits N2); F5.0 (merge-vs-separate, deferred); F5.8 (Earth redesign — the seam is
 prepared). Pass doc `scoring_loop_inventory_pass1.md` ARCHIVED to `docs/archive/phase4/`.
+
+---
+
+## D-F4-HANDCAP-TIER3 — Candidate D: hand-capacity consolidation CLOSED (2026-06-10)
+
+**Status:** CLOSED. Tier-3 Candidate D (inherited N2 from the scoring-loop pass `D-F4-SCORING-TIER3`).
+Commits `c9e22c2` (E1), `a6dbca2` (E1c), `2ec9cfb` (E2); pushed.
+
+**Thesis + result.** The opening recon RESHAPED the candidate. The "two competing cap fields" framing
+was **REFUTED**: there is **one real cap** (`HandManager.maxSize`, reset every round at
+`GameRoundManager.startRound` from `modifyHandSize(HAND_SIZE + plus_hand_size)`) and **one vestigial
+field** (GRM `_handSizeCap`, never assigned anywhere — only read as `?? 99` in the Osprey gate). And the
+leak axis was BIGGER than N2's three stamp branches: **one bug, eight instances** — hand-growth sites
+doing `_hand.add(_deck.draw(n))`, where `DeckManager.draw(n)` SPLICES n out of the pile and
+`HandManager.add` then clamps to the cap, silently dropping the overflow → a **deck-leak** (card removed
+from the deck, never reaches the hand, lost for the round; the splice-then-drop hazard the F4.17 ledger
+first noted for Horse).
+
+**The corrected design model (Robert's rulings — durable).** Two independent blessings, neither crossing
+into the other: **`plus_hand_size`** (Scholar/Fukurokuju) raises the CAP — *headroom* for a non-deal draw
+(consumable/stamp/Osprey) to land after a full deal; **`plus_deal_count`** (Fisherman/Ebisu) raises DEAL
+QUANTITY but **deals still respect the cap** (its real value is on push deals, where the hand has room).
+They reach combined maximum only together. **NO cap rises** — a bonus deal exceeding the cap correctly
+yields a full hand and no more. This REVERSED an initial mis-framing ("cap rises to fit the bonus deal");
+recorded because the reversal is the actual ruling. The initial-deal "leak" the recon flagged is a
+**deck-integrity defect only** — the hand was always correct (capped at 8); the undealt card was being
+spliced-and-dropped instead of left in the deck.
+
+**The fix — `_drawIntoHand` (deck-integrity, hand-identical).** A canonical
+`_drawIntoHand(want) → { drawn, leftover }` on GRM draws only `min(want, drawPileSize, availableSlots)`,
+so turned-away cards STAY in the deck. **Hand behavior is byte-identical at every site**; only the deck
+retains the previously-leaked card. Each routed site is therefore **[PRESERVE]-for-hand / [FIX]-for-deck**.
+
+- **E1** (commit `c9e22c2`): added `_drawIntoHand`; routed the 6 draw-pile leak sites — initial deal,
+  stamp `fireDraw` ×3 (discard/capture/yaku), Glory `onCaptureComplete`, Rat-style consumable draw-2.
+- **E1b** (with E1): `zodiac_dog` retrieves from the **discard pile** (`_allDiscards`, LIFO splice), not
+  the draw pile, so the draw-pile helper does NOT fit it — given its own clamp
+  `min(2, discards.length, availableSlots)` BEFORE the splice. Its leak was a *permanent* discard-pile
+  loss (the discard pile has no per-round reset, unlike the draw pile which `resetWithCards` re-copies).
+  At a full hand Dog now returns `success: false` ("Hand is full") — block-and-retain, not consumed
+  (**PROVISIONAL pending Candidate H** — see below).
+- **E1c** (commit `a6dbca2`, ISOLATED — the ONE genuine behavior change): `sym_osprey` now respects the
+  cap. Gate changed from `length < (_handSizeCap ?? 99)` to `availableSlots > 0`. At a full hand the
+  deck-flip is NOT pulled to hand; it falls through to normal field placement (the existing else-path —
+  reaches the board, nothing lost). The deck card is already drawn at that point, so the manual
+  `add([deckCard])` stays (not the helper). The vestigial `_handSizeCap` was DELETED (one reader, no
+  writer). This is **only** the cap-gate fix in place — NOT the separately-banked Osprey-deck-flip-hook
+  migration (no deck-flip seam exists; the two are distinct concerns in the same code block).
+- **E2** (commit `2ec9cfb`, byte-identical tidy): deleted the dead `new HandManager({ maxSize: 16 })`
+  constructor default + stale "16 allows push accumulation" comment (`startRound` overwrites `maxSize`
+  before any add → honest `new HandManager()` / Infinity default); routed the push redraw (`pushOn`) +
+  Horse redraw through `_drawIntoHand` for uniformity (both already computed the same clamp). The
+  `game_catcher` site is NOT routed — it re-adds an intercepted *field* card, not a deck draw.
+
+**Verification.** Build green; full suite green (134 passed / 1 skipped). New `test/hand_capacity.test.js`
+proves the `_drawIntoHand` contract (full hand → draws nothing, deck untouched; one slot → draws 1, the
+rest stays; want > pile → clamps to pile), the Dog fix (full hand → discard pile retained; one slot →
+LIFO 1 retrieved, rest stays), and both Osprey partitions (room → intercept, `flipsUsed=1`, flip in hand;
+full → NOT intercepted, `flipsUsed=0`, flip on board). Three existing Glory/negatives expectations were
+flipped (`count` 2→1, deck −2→−1) as the deck-integrity proof: those tests ran a **full** hand (8/8) and
+asserted the *leak* numbers though only 1 card ever landed — at a full hand Glory's flat-2 intent lands
+only 1 and the previously-spliced 2nd card now stays in the deck (hand contents identical pre/post). The
+flat-2-vs-stacks property moved to assert the effect intent directly (the full-hand clamp erased the
+in-hand count signal).
+
+**Consumable-use invariant (Robert's ruling, 2026-06-10).** "used", "spent", and "Badger increments" are
+ONE event, never decided separately. If a consumable is used → it is spent → Badger counts it. If it is
+not used → not spent → Badger doesn't count it. `GRM.useConsumable` already encodes this (Badger
+increments iff `result.success !== false`). The open question is NOT *whether* Badger should track
+separately (it shouldn't) but *under what circumstances a consumable is not used, and whether they are
+all deliberate* — promoted to **Candidate H** (consumable-consumption / use-blocking consistency). E1b's
+Dog-at-full-hand `success: false` is **provisional** under that candidate.
+
+**Cross-references:** `D-F4-SCORING-TIER3` (N2 source — now resolved here); `D-F4.17` /
+`F4.17_campaign_ledger.md` (where Candidate D surfaced — the Horse/catcher splice-then-drop lesson
+`_drawIntoHand` generalizes); **Candidate H** (the consumable-consumption-consistency question this pass
+surfaced — `PHASE4_consolidation_candidates.md`); the separately-banked Osprey-deck-flip-hook migration
+(PHASE4_STATE §4 — untouched, distinct from the now-resolved hand-cap gate). Pass doc
+`hand_capacity_inventory_pass1.md` ARCHIVED to `docs/archive/phase4/`.

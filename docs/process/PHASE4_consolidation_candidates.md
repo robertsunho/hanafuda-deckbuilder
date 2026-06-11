@@ -30,6 +30,10 @@ genuine, separable consolidation opportunities:
 
 ## Candidate A — Effect-magnitude accessor unification
 
+> **SWEEP STATUS (2026-06-10): OPEN — no closing record.** Incidental adoption only (F4.17#1 routed
+> `econ_recycling` through `effectivePower`), but the codebase-wide standardization on one accessor was
+> never run as a named task. No DECISIONS_LOG entry closes it. Still a live candidate.
+
 **What:** Spirits currently read "how strong is this instance right now" in at least three
 inconsistent ways: `countStackedById(id)`, `effectivePower(spirit)`, and direct `stackCount`
 reads. These ARE the same question and the inconsistency is real seepage (the F4.20 audit
@@ -46,6 +50,11 @@ accessors before the structure stops moving = wasted churn).
 
 ## Candidate B — Accumulator-cluster abstraction
 
+> **SWEEP STATUS (2026-06-10): OPEN — deliberately late.** No closing record; explicitly gated "do it
+> when the transcendence system is otherwise stable." Candidate F (the accumulator negative-iteration
+> audit, now RESOLVED) read much of the machinery B would abstract over, so B can now be built against a
+> settled correctness baseline — but B itself is unstarted.
+
 **What:** `incrementPerElement` + `aggregateNumericState` + the transcendence snapshot
 (`snapshotCat1Linear` etc.) form a cluster used by many engine spirits with different keys
 (ship `cardsDiscarded`, lincoln `banks`, napoleon `pushFails`, ants `totalPlayed`, palace
@@ -61,6 +70,10 @@ abstraction is built against settled behavior.
 ---
 
 ## Candidate C — Codebase-wide naming / vocabulary cohesion
+
+> **SWEEP STATUS (2026-06-10): OPEN — deliberately late, gated on F4.24b.** No closing record; banked in
+> PHASE4_STATE §4 as the recurrence prophylactic for the wrong-spirit-set bug class. Explicitly
+> coordinated with the terminal ARCHITECTURE.md (name the architecture once it has stopped moving).
 
 **What:** (Robert's framing.) Even where two pieces of code stay separate, their NAMES should
 reflect when they're operating on the same underlying concept. The motivating example:
@@ -100,6 +113,14 @@ uses should be the vocabulary the code uses.
 ---
 
 ## Candidate D — Hand-capacity / hand-management consolidation
+
+> **SWEEP STATUS (2026-06-10): ✅ RESOLVED — record `D-F4-HANDCAP-TIER3`** (commits `c9e22c2` E1,
+> `a6dbca2` E1c, `2ec9cfb` E2). The recon RESHAPED the candidate: the "two competing cap fields" framing
+> was REFUTED (one real cap `HandManager.maxSize`; `_handSizeCap` was vestigial, now DELETED), and the
+> leak was one bug / eight instances. Shipped `_drawIntoHand` (deck-integrity, hand-identical) across the
+> draw-pile sites + a discard-clamped `zodiac_dog` + `sym_osprey` respecting the cap. Inherited N2
+> (resolved). Surfaced **Candidate H** (consumable-consumption-consistency). The provisional rule below
+> ("DECIDE the ONE cap field") landed: maxSize is the one cap; no cap rises (deals respect the cap).
 
 **Surfaced:** F4.17 step 5 (Horse / catcher / hand-cap deliberation), 2026-06-06.
 
@@ -148,6 +169,10 @@ revisited). Not urgent; no known active bug — the silent clamp makes the curre
 ---
 
 ## Candidate E — Field slot-model / slot-creation pipeline recon
+
+> **SWEEP STATUS (2026-06-10): OPEN — recon not yet run.** No closing record; the deliverable (a
+> `FieldManager` slot-model map + a verdict on whether a consolidation exists) has not been produced.
+> Independent of the GRM/RunManager destination audit (different file). Still a live recon-first candidate.
 
 **Status:** RECON-FIRST CANDIDATE. The deliverable is a MAP + a verdict on whether a
 consolidation even exists — NOT a campaign. Do not scope a campaign from fragments.
@@ -199,6 +224,17 @@ trap the discard recon caught with the stale hex_51 "bypasses everything" premis
 ---
 
 ## Candidate F — Accumulator-engine negative-iteration consistency audit
+
+> **SWEEP STATUS (2026-06-10): ✅ RESOLVED — both halves shipped.** AUDIT half CLOSED: archived
+> `docs/archive/phase4/F4.20_candidate_F_audit_findings.md` (CLOSED 2026-06-07) — determination: per the
+> locked F2.5 design, negatives are DESIGNED to keep accruing post-transcendence, so `allSpirits` is
+> correct and the `activeSpirits`-only Group-2 sites were bugged. [FIX] half SHIPPED under **F4.20-FIX /
+> F4.20-FIX2** (the F4.20 block is FULLY CLOSED 2026-06-07; PHASE4_STATE §3 lists "Candidate F audit +
+> getter recon" + "F4.20-FIX (neg accumulators)" + "F4.20-FIX2"). Code spot-verified 2026-06-10: every
+> flagged Group-2 site now iterates `run.allSpirits` — `engine_ship` (`_fireFieldDiscardHooks`),
+> `engine_moths` (`_fireWoodSlotCreatedHooks`), glacier, carbon, fossil, velocity, `sym_badger`,
+> `engine_missing_number`, `engine_bullseye`. (The fixes rode F4.20-FIX2 with inline comments rather than
+> a single dedicated record; the F4.20-FULLY-CLOSED status is the closing record.)
 
 **Status:** RECON-FIRST + CORRECTNESS audit. Unlike Candidate C (pure naming/vocabulary), this
 one has a BEHAVIORAL correctness answer hiding in it — a likely double-/half-counting scoring
@@ -275,6 +311,13 @@ carried forward a pre-existing inconsistency, now flagged for deliberate resolut
 ---
 
 ## Candidate G — Shrine card-enhancement application flow
+
+> **SWEEP STATUS (2026-06-10): ◐ PARTIALLY RESOLVED.** The **architectural half SHIPPED** — records
+> `D-G` (G1 deleted the 962-line dead shrine application cluster + Four Practices; G2 built the random-8
+> shrine application surface, superseding F4.2.a's no-application premise) + `D-F4-CONSUMABLES-TIER2`
+> (the block umbrella). The **UX-completion half remains, banked to Phase 5** (random-8 TUNING: subset
+> size, gating, family eligibility, cost-scaling — the SHAPE is shipped, the tuning is calibration). The
+> new shrine pickers are also flagged for F4.35 (picker unification). NOT closed.
 
 **Surfaced:** Consumable-block A1 (stamp migration), 2026-06-07 — observing that the shrine
 can apply *some* card enhancements (stamp selector, element booster path, chakra overlays) but
@@ -367,6 +410,56 @@ before the per-family `execute()` entries exist (would be abstracting over paths
 
 ---
 
+## Candidate H — Consumable-consumption / use-blocking consistency
+
+> **SWEEP STATUS (2026-06-10): NEW — OPEN.** Surfaced by Candidate D's E1b (`zodiac_dog`). Recon-first.
+
+**Status:** RECON-FIRST CANDIDATE (map + policy ruling before any campaign). Phase TBD by its recon —
+likely Tier-3 (a fragmentation/consistency cleanup, same family as D) but has a player-facing semantics
+ruling inside it.
+
+**The settled invariant (NOT in question).** used ⟺ spent ⟺ Badger increments — ONE event, never decided
+separately (Robert's ruling, 2026-06-10; recorded in `D-F4-HANDCAP-TIER3`). `GRM.useConsumable` already
+encodes it (Badger increments iff `result.success !== false`). The question is not *whether* Badger
+should track separately (it shouldn't).
+
+**The open question.** *Under what circumstances does a consumable NOT get used, and are they all
+deliberate?* Three buckets the recon must populate and the policy must name:
+- **(a) can't act at all** — no valid target, hand full, empty pile → the clean "not consumed, not
+  counted" case.
+- **(b) partial effect** — draw-2 draws 1 on a near-empty deck; Monkey captures but the hand can't
+  absorb the full discard → consumed or not?
+- **(c) deliberate cost** — Tiger's forced push, Amber's −1 field slot → consumed; the cost is the point,
+  NOT a blocked case.
+The policy must distinguish blocked vs partial vs has-a-cost.
+
+**The concrete motivating finding (the smoking gun).** The two consumption paths are INCONSISTENT today.
+In GameScene's card-target handler, the `element_` branch calls `run.consumeById(id)` **unconditionally**
+— it consumes even on `result.action === 'no_effect'` — while the `stamp_` branch only consumes
+`if (result.success)`. So a no-op element WASTES the item but a no-op stamp does not. Meanwhile the zodiac
+path (`GRM.useConsumable`) gates both consumption (caller-side, on success) and Badger on
+`success !== false`. Three families, (at least) two different consume-on-blocked policies — exactly the
+"every site reinvents the decision" smell. *(Recon should re-verify these branch behaviors against current
+source before scoping — they are the starting evidence, not a settled map.)*
+
+**Recon deliverable.** For every consumable, across BOTH consumption paths (`GRM.useConsumable` +
+GameScene `consumeById`), a table of {blocked/no-op/partial behavior → consumed? → Badger counted?}, then
+a determination: which are deliberate, which are accidental waste, which are inconsistent. Then Robert
+rules the policy and a [FIX] makes them uniform.
+
+**Provisional Dog ruling (record it).** E1b's `zodiac_dog`-at-full-hand `success: false` (block-and-retain
+— not consumed, Badger doesn't count) is **PROVISIONAL pending Candidate H** — kept because it's strictly
+better for the player and consistent with Dog's own empty-pile path, but NOT to be enshrined as the
+standard before the standard exists. Revisit under H.
+
+**Cross-references.**
+- `D-F4-HANDCAP-TIER3` (where it surfaced; the Badger invariant; the provisional Dog ruling).
+- `D-F4-CONSUMABLES-TIER2` + `consumable_inventory_pass1.md` (the consumable dispatch map / the
+  `useConsumable` badger note / F4.15 dispatch unification — H is adjacent to that path).
+- `sym_badger` (the counter whose firing IS the consumed-signal).
+
+---
+
 ## Cross-references
 - D-F4.18b (iterative-reorganization principle: reorg interleaves with design; name late)
 - F4.24b (prescriptive ARCHITECTURE.md, deliberately late — coordinate with Candidate C)
@@ -384,6 +477,10 @@ before the per-family `execute()` entries exist (would be abstracting over paths
   unification; architectural half = F4.15/this block, UX half = Phase 5)
 
 ## Banked: Waidan Grove-exit coupling in `_drawContinueButton` (from G1-fix, 2026-06-09)
+
+> **SWEEP STATUS (2026-06-10): OPEN — decision pending Waidan's fate.** No closing record; left AS-IS
+> (G1-fix restored it byte-for-byte). Resolves only when Waidan is cut (→ delete the block) or kept
+> (→ extract to an `onShrineExit` hook).
 
 `legend_waidan`'s Grove-exit effect (spawn a negative consumable per Waidan stack on shrine exit)
 is inlined inside ShrineScene `_drawContinueButton` — documented F4.20 Bucket-B seepage (no
