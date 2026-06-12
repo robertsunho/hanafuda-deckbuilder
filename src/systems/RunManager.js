@@ -209,7 +209,9 @@ class RunManager {
   static FLOW_DECAY_RATE = 0.95;
 
   /**
-   * Push outcome multipliers indexed by resolution depth.
+   * Push outcome multipliers indexed by resolution depth — the FLOW curve, indexed by GRM's
+   * `_pushDepth` (successful push depth). Distinct from GRM's `_pushCount`-indexed DEAL curve
+   * (_getNextPushDealCount, how many cards a push deals).
    * On bank: resolution depth = _pushDepth. On fail: depth = _pushDepth + 1.
    */
   static PUSH_CURVE = {

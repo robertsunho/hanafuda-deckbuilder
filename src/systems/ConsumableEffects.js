@@ -86,7 +86,7 @@ const _effects = {
     inputType: 'none',
     /** Remove push penalty for this round. */
     execute({ roundManager }) {
-      roundManager._dogProtection = true;
+      roundManager._pushPenaltyWaived = true;
       return { success: true, message: 'Rabbit: push penalty removed.' };
     },
   },

@@ -146,8 +146,8 @@ export default class GameRoundManager {
    */
   get naturalCaptures() { return this._naturalCaptures; }
 
-  /** True when the Dog consumable has nullified the push penalty. */
-  get dogProtection() { return this._dogProtection; }
+  /** True when zodiac_rabbit (Rabbit) has waived this round's push penalty. */
+  get pushPenaltyWaived() { return this._pushPenaltyWaived; }
 
   /** True when the Goat consumable is active (+1 ki per capture). */
   get goatActive()    { return this._goatActive; }
@@ -257,10 +257,10 @@ export default class GameRoundManager {
     this._basePoints         = 0;          // running base capture points this round
     this._naturalCaptures    = [];         // round-start all-4-of-a-month auto-captures
     this._pushPenaltyActive        = false; // exposed to the push penalty
-    this._pushCount                = 0;     // times pushed this round
-    this._pushDepth                = 0;     // successful push depth (commitment curve index)
+    this._pushCount                = 0;     // push ATTEMPTS this round — indexes the DEAL curve (_getNextPushDealCount: cards the next push deals)
+    this._pushDepth                = 0;     // successful push DEPTH — indexes the FLOW curve (RunManager getPushMultiplier/PUSH_CURVE: bank/fail mult). Distinct axis from _pushCount (attempts).
     this._bullseyeInventory        = { bright: 0, animal: 0, ribbon: 0, plain: 0 }; // engine_bullseye rank tracker
-    this._dogProtection            = false; // Dog consumable: suppress push penalty this round
+    this._pushPenaltyWaived        = false; // set by zodiac_rabbit (Rabbit): waive this round's push penalty
     this._goatActive               = false; // Goat consumable: +1 ki per capture
     this._tigerPushActive          = false; // Tiger consumable: forced-push one-shot
     this._roosterBonusThisRound    = 0;     // Rooster zodiac: +1 field slot this round
@@ -837,6 +837,8 @@ export default class GameRoundManager {
   /**
    * Returns the number of cards to deal on the next push in capture mode.
    * Push 1: +4, Push 2: +2, Push 3+: +1.
+   * The `_pushCount`-indexed DEAL curve — distinct from the `_pushDepth`-indexed FLOW curve
+   * (RunManager getPushMultiplier/PUSH_CURVE). Two axes: attempts (here) vs successful depth (flow).
    */
   _getNextPushDealCount() {
     const dealBonus = run.countBlessingsByEffect('plus_deal_count');
@@ -1098,7 +1100,7 @@ export default class GameRoundManager {
       if (_hexBank?.onBank) _hexBank.onBank(run);
       this._fireSpiritHook('onBank');
     }
-    if (trigger === 'natural' && this._pushPenaltyActive && !this._dogProtection) {
+    if (trigger === 'natural' && this._pushPenaltyActive && !this._pushPenaltyWaived) {
       run.onPushFailure(this._pushDepth);
       this._fireSpiritHook('onPushFailure');
     }
@@ -2124,7 +2126,7 @@ export default class GameRoundManager {
 
       // Round ends when hand is empty (no play counter in capture mode).
       const roundOver = this._hand.isEmpty();
-      const penaltyApplied = roundOver && this._pushPenaltyActive && !this._dogProtection;
+      const penaltyApplied = roundOver && this._pushPenaltyActive && !this._pushPenaltyWaived;
 
       const _forceAutoBank = !_disablesYaku && newYaku.length > 0 && applyHook('forceAutoBankOnYaku', false);
       const tigerTriggered = this._tigerPushActive && newYaku.length === 0;
