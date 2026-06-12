@@ -12,6 +12,7 @@ import { getFireFlatPoints, getMetalHeldMult, getEarthInterestRate,
          getWaterMult, getMeteoriteJackpotChance } from '../systems/HexagramEffects.js';
 import { getHexagram }              from '../data/hexagrams.js';
 import { getSpiritContrib, getElementContrib } from './shared/spiritTooltip.js';
+import { isPairInputType, computeSpiritEligibility, buildSpiritParams } from './shared/spiritTargetPicker.js';
 
 /** Resolve card → Phaser texture key (handles hex-duplicate suffix). */
 function _tex(card) { return card.baseImageId ?? card.id; }
@@ -2146,11 +2147,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   _showAlchemicalTargetPicker(cons, inputType) {
-    // Reuse the ShrineScene's _activateAlchemical pattern for spirit selection.
-    // Show a modal overlay listing eligible spirits from run.spirits.
+    // Show a modal overlay listing spirits from run.spirits. Eligibility (which spirits
+    // are valid for this inputType) is the shared per-inputType predicate (F4.35) — the
+    // same one the shrine uses, so ineligible spirits pre-filter (grey/non-interactive)
+    // in BOTH scenes. The effect's execute() is still the robust backstop. The picker
+    // SHELL (layout/object-tracking/feedback) is intentionally scene-specific.
     const spirits = run.spirits;
-    const isPair = inputType === 'spirit_pair' || inputType === 'spirit_pair_tier3';
+    const isPair = isPairInputType(inputType);
+    const eligible = computeSpiritEligibility(spirits, inputType);
     const selected = [];
+
+    if (eligible.filter(e => e.ok).length === 0) {
+      this._setStatus('No eligible spirits.');
+      this._renderAll();
+      return;
+    }
 
     const cx = 640, cy = 360;
     const W = 700, H = 400;
@@ -2167,29 +2178,27 @@ export class GameScene extends Phaser.Scene {
     const startX = cx - ((Math.min(spirits.length, perRow) - 1) * (sw + gap)) / 2;
     const startY = cy - 40;
 
-    const spiritBtns = [];
-    for (let i = 0; i < spirits.length; i++) {
-      const s = spirits[i];
+    for (const { s, i, ok } of eligible) {
       const col = i % perRow, row = Math.floor(i / perRow);
       const bx = startX + col * (sw + gap);
       const by = startY + row * (sh + gap + 12);
 
-      const btn = this.add.rectangle(bx, by, sw, sh, 0x0d1b2a)
-        .setStrokeStyle(1, 0x3a6a8a).setInteractive({ useHandCursor: true }).setDepth(51);
+      const btn = this.add.rectangle(bx, by, sw, sh, ok ? 0x0d1b2a : 0x0a0a14)
+        .setStrokeStyle(1, ok ? 0x3a6a8a : 0x222233).setDepth(51);
       objs.push(btn);
       objs.push(this.add.text(bx, by, s.name, {
-        fontSize: '8px', color: '#cce0ff', wordWrap: { width: sw - 4 }, align: 'center',
+        fontSize: '8px', color: ok ? '#cce0ff' : '#445566', wordWrap: { width: sw - 4 }, align: 'center',
       }).setOrigin(0.5).setDepth(51));
 
+      if (!ok) continue;
+      btn.setInteractive({ useHandCursor: true });
       btn.on('pointerdown', () => {
         if (selected.includes(i)) return;
         selected.push(i);
         btn.setStrokeStyle(2, 0xffcc44);
         if (!isPair || selected.length >= 2) {
           // Fire the alchemical
-          const params = isPair
-            ? { spiritIndices: selected }
-            : { spiritIndex: selected[0] };
+          const params = buildSpiritParams(isPair, selected);
           const effect = ConsumableEffects.get(cons.id);
           const result = effect.execute({ roundManager: this._round, params });
           if (result.success) {
@@ -2202,7 +2211,6 @@ export class GameScene extends Phaser.Scene {
           this._renderAll();
         }
       });
-      spiritBtns.push(btn);
     }
 
     // Cancel button
@@ -3639,34 +3647,6 @@ export class GameScene extends Phaser.Scene {
       }).setOrigin(0.5, 0));
     }
 
-    return objs;
-  }
-
-  // ── Ribbon stamp dot ──────────────────────────────────────────────────────
-
-  /**
-   * Create a small colored circle in the top-left corner of a card to indicate
-   * a ribbon stamp.  Returns null if the card has no stamp.
-   *
-   * @param {object} card   Card object (may have card.ribbonStamp)
-   * @param {number} cx     Horizontal centre of the card
-   * @param {number} cy     Vertical centre of the card
-   * @returns {Phaser.GameObjects.Arc|null}
-   */
-  /** Render a small hexagram symbol (6 bars) from a lines[] array. */
-  _renderHexagramSymbol(centerX, topY, lines, color = 0xccddee) {
-    const objs = [];
-    const W = 20, H = 2, SP = 4, GAP = 6;
-    for (let i = 5; i >= 0; i--) {
-      const y = topY + (5 - i) * (H + SP);
-      if (lines[i] === 1) {
-        objs.push(this.add.rectangle(centerX, y, W, H, color));
-      } else {
-        const hw = (W - GAP) / 2;
-        objs.push(this.add.rectangle(centerX - GAP / 2 - hw / 2, y, hw, H, color));
-        objs.push(this.add.rectangle(centerX + GAP / 2 + hw / 2, y, hw, H, color));
-      }
-    }
     return objs;
   }
 

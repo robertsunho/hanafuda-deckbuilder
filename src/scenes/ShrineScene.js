@@ -22,6 +22,7 @@ import ConsumableEffects                        from '../systems/ConsumableEffec
 import { applyHook }                            from '../systems/HexagramEffects.js';
 import { getHexagram }                          from '../data/hexagrams.js';
 import { getSpiritContrib, getElementContrib }   from './shared/spiritTooltip.js';
+import { isPairInputType, computeSpiritEligibility, buildSpiritParams } from './shared/spiritTargetPicker.js';
 import { getCardPoints }                        from '../systems/CardMutations.js';
 import { SPIRIT_FAN_LEFT, SPIRIT_FAN_W, SPIRIT_W as _SW,
          SPIRIT_IDEAL_GAP,
@@ -221,22 +222,6 @@ export class ShrineScene extends Phaser.Scene {
 
   // ── Left info panel ────────────────────────────────────────────────────────
 
-  /** Render a small hexagram symbol (6 bars) from a lines[] array. */
-  _renderHexagramSymbol(centerX, topY, lines, color = 0xccddee) {
-    const objs = [];
-    const W = 20, H = 2, SP = 4, GAP = 6;
-    for (let i = 5; i >= 0; i--) {
-      const y = topY + (5 - i) * (H + SP);
-      if (lines[i] === 1) {
-        objs.push(this.add.rectangle(centerX, y, W, H, color));
-      } else {
-        const hw = (W - GAP) / 2;
-        objs.push(this.add.rectangle(centerX - GAP / 2 - hw / 2, y, hw, H, color));
-        objs.push(this.add.rectangle(centerX + GAP / 2 + hw / 2, y, hw, H, color));
-      }
-    }
-    return objs;
-  }
 
   _drawInfoPanel() {
     const BOX_W = 149, BOX_X = INFO_X - 4, BOX_PAD = 6;
@@ -1116,8 +1101,10 @@ export class ShrineScene extends Phaser.Scene {
   // application premise. Mirrors GameScene's inputType dispatch MINUS zodiac (in-
   // round only). Pickers are built shrine-local with a fresh random-8 pool and no
   // _round context; TUNING (subset size, gating) is deferred to Phase 5.
-  // TODO(F4.35): unify these shrine pickers with GameScene's _activateCardTarget /
-  // _onCardTargetSelected / _showAlchemicalTargetPicker (Option A duplication).
+  // F4.35 dispositions (see tier4_scoping.md): the SPIRIT picker shares its selection logic with
+  // GameScene via shared/spiritTargetPicker.js (eligibility/isPair/params). The CARD pickers below
+  // stay document-and-contain — shrine random-8 modal grid vs GameScene's in-round live-board
+  // tinting are genuinely different widgets; unifying would relocate complexity, not reduce it.
 
   _dispatchConsumable(cons, idx) {
     const kind = ConsumableEffects.get(cons.id)?.inputType ?? 'none';
@@ -1137,7 +1124,8 @@ export class ShrineScene extends Phaser.Scene {
     return { cardId: card.id }; // chakra heart / throat
   }
 
-  // TODO(F4.35): unify with GameScene _activateCardTarget / _onCardTargetSelected.
+  // F4.35: document-and-contain (NOT unified) — this shrine random-8 modal grid and GameScene's
+  // _cardTargetMode in-round board-tinting are different widgets on different surfaces. See tier4_scoping.md.
   _showShrineCardPicker(cons, idx, kind) {
     const deck = run.getDeck();
     // Fresh random-8 per activation (re-draw each use; avoids stale-pool bugs).
@@ -1275,7 +1263,9 @@ export class ShrineScene extends Phaser.Scene {
     this._showShrineToast(`${cons.name} applied!`, true);
   }
 
-  // TODO(F4.35): unify with GameScene _showAlchemicalTargetPicker.
+  // F4.35: the selection LOGIC (eligibility predicate, isPair, params shape) is shared with
+  // GameScene._showAlchemicalTargetPicker via shared/spiritTargetPicker.js. The picker SHELL
+  // (modal chrome / row layout / _confirmObjs / _showShrineToast) stays scene-specific by design.
   _showShrineSpiritPicker(cons, idx) {
     const effect = ConsumableEffects.get(cons.id);
     if (!effect) return;
@@ -1290,23 +1280,11 @@ export class ShrineScene extends Phaser.Scene {
     }
 
     const inputType = effect.inputType;
-    const isPair    = inputType === 'spirit_pair' || inputType === 'spirit_pair_tier3';
+    const isPair    = isPairInputType(inputType);
     const spirits   = run.spirits;
     const selected  = [];
 
-    const eligible = spirits.map((s, i) => {
-      const def = getSpiritDef(s.id);
-      switch (inputType) {
-        case 'spirit_pair':                 return { s, i, ok: true };
-        case 'spirit_pair_tier3':           return { s, i, ok: def?.tier === 3 };
-        case 'spirit_single_fusion':        return { s, i, ok: def?.tier === 2 || def?.tier === 3 };
-        case 'spirit_single_stackable':     return { s, i, ok: (s.stackCount ?? 1) < 3 };
-        // Amber transcends at ANY stack count — a low-stack negative is weaker (powerLevel = stackCount)
-        // but freeing a slot now is the intended tradeoff; no stack gate. (F4.26-B: Amber-niche balance banked P5.)
-        case 'spirit_single_transcendable': return { s, i, ok: true };
-        default:                            return { s, i, ok: true };
-      }
-    });
+    const eligible = computeSpiritEligibility(spirits, inputType);
 
     if (eligible.filter(e => e.ok).length === 0) {
       this._buildUI();
@@ -1343,7 +1321,7 @@ export class ShrineScene extends Phaser.Scene {
         selected.push(i);
         card.setStrokeStyle(2, 0x44ff44);
         if (!isPair || selected.length >= 2) {
-          const params = isPair ? { spiritIndices: selected } : { spiritIndex: selected[0] };
+          const params = buildSpiritParams(isPair, selected);
           const result = effect.execute({ params });
           close();
           if (result.success) { run.consumeById(cons.id); logger.logConsumableUse(cons.name, 'used at shop'); }
