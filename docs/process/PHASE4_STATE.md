@@ -185,6 +185,14 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
   D-F4-SCORING-TIER3; the remaining spin-off is the balance-adjacent timing question (Snow dep / Ember
   break fire at round-end = next-round effect; decide if per-card post-scoring is intended). Robert
   rules; Phase-5-adjacent. See `D-F4-CONSUMABLES-TIER2`.
+- **F4.26-B balance follow-ups (Phase-5).** The F4.26 *mechanical* ruling — natural transcendence
+  `powerLevel = stackCount` (Option B, lossless / all-4-contribute) — **shipped 2026-06-12** (record
+  DECISIONS_LOG `F4.26`; one-line change at `RunManager.js:836`, tests updated 3→4, suite 151/1). The
+  accepted *tuning* consequences are banked: (1) **singleton-contribution re-tuning** (4× likely OP vs
+  the old 3×); (2) **copy-acquisition caps** (Cat-5 Past Life/Cuckoo now reach power-4 copies; also a
+  power-4 Cat-5 negative matures slower — denominator `powerLevel × 3`); (3) **Amber niche rethink**
+  (free natural transcendence now dominates Amber's slot-cost full-power). Mechanical done; balance is
+  Phase-5. Unblocked Tier-4 Wave B (F3.16/F4.37) + informs T4.2's negative-branch scope.
 - **F4.24a-surfaced ratify/cleanup (non-Tier-3, low-priority).** N1 — `engine_northern_lion` is the
   lone surviving `run.activeSpirits` accumulator (`GRM:2069`); one-line ratification that excluding
   transcended copies from `pushesWitnessed` is intended. N3 — `engine_lincoln` desc/behavior mismatch

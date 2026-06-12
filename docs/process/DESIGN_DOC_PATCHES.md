@@ -39,6 +39,16 @@
 - Sale refund formula for shop-bought negatives: `cost × 0.5 × powerLevel`
 - F4.13 (Phase 4) will formalize this further; the doc-side update describes current behavior
 
+### DP-02b: Transcendence powerLevel semantics (F4.26 — Option B)
+**Source:** F4.26 ruling (DECISIONS_LOG, 2026-06-12)
+**Issue:** Natural cascade transcendence previously created a Negative at `powerLevel = min(3, stackCount-1)`
+(= 3, the 4th stack consumed as catalyst), inconsistent with Amber's full-power transcend.
+**Patch:** §7 (transcendence): natural transcendence `powerLevel = stackCount` (all 4 contribute,
+**lossless** — free a slot, keep full power); natural and Amber transcendence are now unified at full
+power. (Amber's "full power for a permanent field slot" niche is now dominated by free natural
+transcendence — pending a Phase-5 rebalance; note the open item rather than documenting Amber as a
+distinct power tier.)
+
 ### DP-03: Per-element accumulator architecture
 **Source:** F1.8.b; DECISIONS_LOG.md line 2844
 **Issue:** Doc doesn't describe per-element state architecture.

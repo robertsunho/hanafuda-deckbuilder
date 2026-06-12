@@ -811,7 +811,8 @@ class RunManager {
    * Universal spirit-stack acquisition. Adds N stacks of spiritDef:
    *   - Merges into existing same-id non-negative spirit.
    *   - Creates a new entry if none exists (subject to slot validation).
-   *   - Cascade-transcends at stackCount 4: negative with powerLevel = min(3, count-1).
+   *   - Cascade-transcends at stackCount 4: negative with powerLevel = stackCount (all 4
+   *     contribute, lossless — F4.26 Option B; matches Amber's full-power transcend).
    *   - Iterates one stack at a time so cascade + re-stacking both work.
    *
    * @param {object} spiritDef    Spirit definition (must have id, name).
@@ -833,7 +834,7 @@ class RunManager {
         this._addAccumulatorElement(existing);
 
         if (existing.stackCount >= 4) {
-          const snapshotPower = Math.min(3, existing.stackCount - 1);
+          const snapshotPower = existing.stackCount;   // F4.26 Option B: all-4-contribute (lossless), matches Amber
           const aggregatedState = this._aggregateElementsForNegative(existing, snapshotPower);
           const idx = this._allSpirits.indexOf(existing);
           // [FIX] Transcendence PRESERVES chain position — replace the transcending spirit

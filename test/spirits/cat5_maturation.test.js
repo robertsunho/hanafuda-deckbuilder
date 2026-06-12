@@ -25,10 +25,11 @@ describe('C1 — transcend snapshot seeds numerator from rounds held', () => {
 
     const neg = run.allSpirits.find(s => s.id === 'util_past_life');
     expect(neg.isNegative).toBe(true);
-    expect(neg.powerLevel).toBe(3);
-    // 3 snapshotted elements, each held 3 rounds → numerator 9 (NOT 0, the old roundsHeld bug).
+    expect(neg.powerLevel).toBe(4); // F4.26 Option B: powerLevel = stackCount (all 4 contribute, lossless)
+    // 4 snapshotted elements (Option B): first 3 held 3 rounds, the 4th (catalyst) held 0 →
+    // numerator 9 (NOT 0, the old roundsHeld bug).
     expect(neg.state.numerator).toBe(9);
-    expect(neg.state.denominator).toBe(9); // powerLevel 3 × CAT5_MATURITY_ROUNDS 3
+    expect(neg.state.denominator).toBe(12); // powerLevel 4 × CAT5_MATURITY_ROUNDS 3
   });
 });
 
@@ -173,14 +174,15 @@ describe('#6 — transcend → hold → mature → sell fires the negative hatch
 
     const neg = run.allSpirits.find(s => s.id === 'sym_cuckoo_egg');
     expect(neg.isNegative).toBe(true);
-    // C1: seeded from rounds held — 3 elements each held 1 round → numerator 3, denom 9. Not yet mature.
+    // C1: seeded from rounds held — 4 elements (Option B, powerLevel 4): first 3 held 1 round, the
+    // 4th (catalyst) held 0 → numerator 3, denom 12 (powerLevel 4 × 3). Not yet mature.
     expect(neg.state.numerator).toBe(3);
     expect(neg.state.numerator < neg.state.denominator).toBe(true);
 
-    // C2: accrue through the real round-end dispatch until mature.
+    // C2: accrue through the real round-end dispatch until mature (denom 12 now → 9 accruals to 3+9=12).
     const grm = new GameRoundManager();
-    for (let i = 0; i < 6; i++) grm._fireSpiritHook('onRoundEnd');
-    expect(neg.state.numerator).toBe(9);
+    for (let i = 0; i < 9; i++) grm._fireSpiritHook('onRoundEnd');
+    expect(neg.state.numerator).toBe(12);
     expect(neg.state.numerator >= neg.state.denominator).toBe(true); // mature
 
     // C5 + C4: sell the matured negative → negative fusion hatches at copier powerLevel.

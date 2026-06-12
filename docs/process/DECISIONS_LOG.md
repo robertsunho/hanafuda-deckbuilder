@@ -4535,3 +4535,62 @@ cut) and the empty `// ── Snapshot ──` section header in GRM (a D0.12 `t
 **Cross-refs:** `D0.12` (the precedent that governed the gate); `tier5_reconciliation.md` (the registry —
 buckets B/C entries F4.1/F4.4/F4.5/F4.7/F4.10 now marked RESOLVED, groupings 1+2+3 EXECUTED);
 `PHASE4_COMPLETION_PLAN.md` (step 1 of 6, now done; step 2 — Tier-4 scoping — is next).
+
+---
+
+## F4.26 — Natural transcendence powerLevel: Option B (all-4-contribute / lossless) (2026-06-12)
+
+**Ruling (Robert):** **Option B.** Natural cascade transcendence sets the Negative's `powerLevel =
+stackCount` (= 4 at the 4-stack trigger), NOT `min(3, stackCount-1)` (= 3). Transcendence is now
+**lossless** — you earned 4 stacks, you keep all 4 — matching Amber's full-power transcend
+(`ConsumableEffects.js:396`, `target.stackCount`). Previously natural transcendence was a slot-for-power
+tax (free a slot, drop 4→3); B removes the tax.
+
+**Why B over A (design intent):** transcendence should be pure upside, not a slot-for-power tradeoff.
+Robert's call after extended deliberation (the F4.26 recon, in chat).
+
+**Premise correction (recorded so future readers don't misread B as a bug fix):** the original F4.26
+motivation — fix the floor-truncation wrinkle (OVERHAUL_PLAN ~:718) — was **MOOT**. Idea D (LOCKED
+2026-05-15) already retired the `Math.floor(aggregate/powerLevel)` formula; `snapshotCat1Linear`
+(`SpiritEffects.js:243-249`) sums the aggregate directly — verified zero floor-division in
+SpiritEffects/RunManager. So B is a **deliberate design buff**, not a correctness fix.
+
+**Mechanical change (shipped this session):** `RunManager.js:836` `Math.min(3, existing.stackCount - 1)`
+→ `existing.stackCount`; the adjacent JSDoc (`:814`) updated to the new semantics. The
+`slice(0, powerLevel)` in the snapshot fns now keeps all 4 elements, but the 4th was just pushed (fresh,
+~0 events) so the pre-transcend **aggregate is ~unchanged** — the real change is the **powerLevel VALUE
+(3→4)** that propagates to every `effectivePower` consumer.
+
+**Blast radius — all passive-follow (no consumer edits needed):** per-card scoring count (`GRM:434`),
+accumulator post-transcend accrual rate (`× powerLevel`, now ×4), scoring-log labels/numbers
+(`GRM:441/466/1496/1598`), ~15 tooltip sites, sell refund (`GameScene:948`), per-round caps
+(`countStackedById` — Osprey/Catcher), Cat-5 copy power (`_firePastLifeCopy`/`_fireCuckooHatch`). All
+read `effectivePower`; all shift 3→4 automatically. **No consumer was hand-edited.**
+
+**Tests updated 3→4 (the behavior-change proof):** only `test/spirits/cat5_maturation.test.js` asserted
+on naturally-cascade-transcended values — 2 tests: C1 (`powerLevel` 3→4; maturity `denominator` 9→12 =
+`powerLevel 4 × CAT5_MATURITY_ROUNDS 3`; numerator unchanged at 9 since the 4th element is held 0 rounds)
+and #6 (denom 9→12, so the accrual loop extended 6→9 round-ends to reach maturity 12). All other negative
+tests seed via `addSpiritDirect` with explicit powerLevel, so are unaffected by the natural-transcend
+change. Build green, suite 151/1.
+
+**Noted clean consequence (balance-adjacent, not tuned here):** a Cat-5 negative's maturity denominator
+scales with powerLevel (`powerLevel × 3`), so a power-4 transcended Past Life/Cuckoo matures **slower**
+(needs 12 round-equivalents vs 9). Direct math consequence of B, not a ripple — folded into the banked
+Cat-5 copy-acquisition balance item below.
+
+**Banked Phase-5 balance follow-ups (consequences Robert accepts — NOT part of this campaign):**
+1. **Singleton-contribution re-tuning** — at 4× instead of 3×, per-contribution base values are likely
+   overpowered; needs a balance pass (can't tune well until 4× is playtestable).
+2. **Copy-acquisition reconsideration** — Cat-5 propagates powerLevel into copies, so power-4 copies are
+   now reachable; copy-acquisition ease compounds harder. Needs a cap/balance look.
+3. **Amber niche rethink** — B makes free natural transcendence match Amber's full power, so Amber's
+   "full power for a permanent field slot" is now strictly dominated. Amber's niche needs rethinking.
+
+**Unblocks (Tier-4 Wave B):** T4.2 (engine migration — scope it knowing the negative-branch scaling
+carries powerLevel), F3.16 (scoring-log schema builds against power-4 numbers/labels), F4.37 (tooltips
+verify against power-4). Wave B is unblocked.
+
+**Cross-refs:** the F4.26 deliberation (in chat); Idea D (OVERHAUL_PLAN ~:784-829 — the retired-truncation
+precedent); Amber (`ConsumableEffects.js:396`, the consistency target); `tier4_scoping.md` (Wave B was
+gated on this ruling); `DESIGN_DOC_PATCHES.md` DP-02b (V6 reconciliation line).
