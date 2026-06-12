@@ -17,8 +17,8 @@
 | Bucket | Items |
 |---|---|
 | **A — ABSORBED / RESOLVED** | F4.2.a, F4.2.b, F4.6, F4.8, F4.9, F4.27, F4.30 |
-| **B — STILL-OPEN** | F4.1, F4.4, F4.5, F4.19, F4.21, F4.25, F4.26, F4.32, F4.35 |
-| **C — PARTIAL** | F4.7, F4.10, F4.28, F4.29, F4.31, F4.33 |
+| **B — STILL-OPEN** | ~~F4.1~~, ~~F4.4~~, ~~F4.5~~ (✅ DONE — step 1), F4.19, F4.21, F4.25, F4.26, F4.32, F4.35 |
+| **C — PARTIAL** | ~~F4.7~~, ~~F4.10~~ (✅ DONE — step 1), F4.28, F4.29, F4.31, F4.33 |
 
 Headline: **~⅓ absorbed by the consolidations** (the dead-code/duplication items the sequencing
 predicted would collapse), ~⅓ genuinely open small cleanups, ~⅓ partials where a consolidation took
@@ -83,19 +83,26 @@ Tier-5 chore. The *code* concern is absorbed.
 
 ## Bucket B — STILL-OPEN (with current location + size)
 
-### F4.1 — Dead method removal → **STILL-OPEN** (~0.5-1h; needs a keep/cut decision)
+### F4.1 — Dead method removal → **RESOLVED 2026-06-12** (F4-TIER5-STEP1, commit `7cf9c0f`)
+> Cut: the 5 dead loggers + `undoLastCapture` + `fullReset` (D0.12 gate ruled cut). Re-grepped
+> zero-caller at edit time; live `removeCardFromHand` untouched. _(Original disposition below.)_
 Genuinely-dead, zero-caller methods still present: `GameplayLogger.logCardEnhanced` (:365),
 `logCardEditionApplied` (:373), `logCardTranscended` (:385), `logShopOfferings` (:355),
 `printToConsole` (:529); `CaptureManager.undoLastCapture` (:202); `DeckManager.fullReset` (:144). No
 closure record, no `TODO(FX.Y)` rewire markers. Standalone. **Decision needed:** delete vs. retain as
 save/load (D0.12) infrastructure — confirm no future-feature intent before cutting.
 
-### F4.4 — Unused export → **STILL-OPEN** (~0.25h; decision)
+### F4.4 — Unused export → **RESOLVED 2026-06-12** (F4-TIER5-STEP1, commit `7cf9c0f`)
+> Cut `cardsByTag` (zero importers; ruling: remove — a future tag-affinity feature defines its own).
+> _(Original disposition below.)_
 `cards.js:896 export const cardsByTag` — zero importers across src/ (grep `import.*cardsByTag` empty).
 JSDoc hints a "future hexagram tag-affinity feature" but no task depends on it. Decision: remove or mark
 intent.
 
-### F4.5 — Accumulator removal → **STILL-OPEN** (~0.25h; decision)
+### F4.5 — Accumulator removal → **RESOLVED 2026-06-12** (F4-TIER5-STEP1, commit `7cf9c0f`)
+> Cut the `totalScore` getter + `_totalScore` init/accrue (zero readers; distinct from live
+> `totalScored`, untouched). `advanceRound` keeps `roundScore` as a documented no-op param.
+> _(Original disposition below.)_
 `RunManager._totalScore` (init :292, accrue :1236, getter `totalScore` :1101) — getter has ZERO callers.
 *(Distinct from per-spirit `totalScored`, which is live — don't conflate.)* Decision: remove vs. keep for
 a planned end-of-run summary surface.
@@ -148,7 +155,9 @@ pool); no `src/scenes/shared/` module exists for them (only `SpiritLayout.js` + 
 
 ## Bucket C — PARTIAL (what's done / what's left)
 
-### F4.7 — Comment corrections → **PARTIAL** (2+ stale remain; ~0.25h)
+### F4.7 — Comment corrections → **RESOLVED 2026-06-12** (F4-TIER5-STEP1, commit `3b2263c`)
+> Swept: StyleEngine 12→11; `advanceRound` JSDoc stale cumulative/decay clause dropped. (Folded with
+> F4.10 + N3 + obs #10 into the one comment sweep.) _(Original disposition below.)_
 Done: the Wayside/Grove comment (RunManager:206, matches D0.1), the destructive-cycle comment
 (HexagramEffects:423, matches D0.2), the GameplayLogger V4-field docstrings (already cleaned). **Still
 stale:** (1) `StyleEngine.js:4` "12 combos" — actual count is 11; (2) `RunManager.js:1230-1231`
@@ -156,7 +165,9 @@ stale:** (1) `StyleEngine.js:4` "12 combos" — actual count is 11; (2) `RunMana
 F4.10 stale-comment set and the lost-and-found GRM:642 item — fold all stale-comment fixes into one
 sweep.)*
 
-### F4.10 — Three Marks naming legacy cleanup → **PARTIAL**
+### F4.10 — Three Marks naming legacy cleanup → **RESOLVED 2026-06-12** (F4-TIER5-STEP1, commits `3b2263c`/`7cf9c0f`)
+> Cut dead `removeCardFromField`; relabeled the 6 stale "Three Marks"/"Non-being" comments → Wu Xing
+> element-targeting / Third Eye. Live `removeCardFromHand` kept. _(Original disposition below.)_
 Dead helper split: `GameRoundManager.removeCardFromField` (:869) is dead (zero callers — removable);
 `removeCardFromHand` (:860) is **LIVE** (Third Eye Chakra, `GameScene.js:1966`) — keep. Stale "Three
 Marks" comments persist at GameScene:198/2225, DeckManager:153, RunManager:1344, GRM:853, FieldManager:388.
@@ -202,28 +213,40 @@ Surfaced during Tier-2/3; most are already registered in `PHASE4_STATE.md` §4 (
 for a complete Tier-5 picture). Fold the comment/dead-code ones into the same sweeps as F4.7/F4.10/F4.1.
 
 - **"3 routed survivors"** (consumable-block close-out, §4): the `_drawLoadoutSlot`+`_confirmRelease` dead
-  release-confirm chain (ShrineScene); the dead `_renderHexagramSymbol` twin (GameScene+ShrineScene — also
-  **F4.35's** concern); the stale `RunManager.advanceRound` JSDoc (**= the F4.7 item**).
+  release-confirm chain (ShrineScene) — **✅ CUT step 1** (`7cf9c0f`); the dead `_renderHexagramSymbol`
+  twin (GameScene+ShrineScene) — **still open, F4.35's concern**; the stale `RunManager.advanceRound`
+  JSDoc (= the F4.7 item) — **✅ swept step 1** (`3b2263c`).
 - **N1** — `engine_northern_lion` is the lone surviving `run.activeSpirits` accumulator (`GRM:~2069`);
-  one-line ratification that excluding transcended copies from `pushesWitnessed` is intended.
-- **N3** — `engine_lincoln` desc/behavior mismatch (`SpiritEffects.js:~1103`; desc "bank without pushing"
-  but increments every bank) — D-F4-DOCSYNC-style doc fix.
-- **Obs #4** — `test-run.js:54` dead smoke-test.
-- **Obs #5** — RunManager duplicate `typeof window` debug blocks, one ungated.
-- **Obs #10** — `zodiac_rabbit` "Remove push penalty" description vs. the `_pushPenaltyWaived` field
-  (cosmetic naming; the field rename landed in F4.2.b, the description wording did not).
-- **GRM:642 stale comment** flagged during the destination audit (F4.7-class) — verify + fold into the
-  comment sweep.
+  one-line ratification that excluding transcended copies from `pushesWitnessed` is intended. _(Open.)_
+- **N3** — `engine_lincoln` desc/behavior mismatch — **✅ RESOLVED step 1** (`3b2263c`): the dangling
+  internal NOTE (it referenced a non-existent "bank without pushing" desc) was removed; the user-facing
+  description was already accurate, so no desc change.
+- **Obs #4** — `test-run.js:54` dead smoke-test — **✅ RESOLVED step 1** (`7cf9c0f`): whole file deleted.
+- **Obs #5** — RunManager duplicate `typeof window` debug blocks, one ungated — **✅ RESOLVED step 1**
+  (`7cf9c0f`): the ungated `window.__run` block cut; the DEV-gated `window.run` block kept.
+- **Obs #10** — `zodiac_rabbit` "Remove push penalty" vs. the `_pushPenaltyWaived` field — **✅ RESOLVED
+  step 1** (`3b2263c`): description + effect comment + result message aligned to "waive".
+- **GRM:642 stale comment** — **✅ already-corrected pre-step-1** (the "idle or round_over" text is gone;
+  confirmed at recon, no edit needed).
+- **NEW (surfaced by step 1) — `run.releaseSpirit` orphaned** (`RunManager.js:~691`): its sole caller, the
+  `_confirmRelease` release-confirm chain, was cut as dead code in `7cf9c0f`, leaving it zero-caller.
+  Candidate for a future dead-code pass — but "release a spirit" sounds load-bearing, so **verify it's
+  genuinely the dead shrine-release-UI path (no other path to spirit-release) before any cut**, not a live
+  mechanic. Not actioned (out of step-1 scope).
+- **NEW (surfaced by step 1) — empty `// ── Snapshot ──` section header** in `GameRoundManager.js` (a
+  leftover from D0.12's `toSnapshot` removal — a labeled section with nothing under it, now directly above
+  `// ── Private helpers ──`). Trivial tidy; fold into a future comment sweep. Not actioned.
 
 ---
 
-## Recommended groupings (for Robert's scope decision — not yet actioned)
+## Recommended groupings (for Robert's scope decision — groupings 1+2+3 ✅ EXECUTED 2026-06-12, step 1)
 
 1. **One-shot dead-code cut** (F4.1 + F4.10's `removeCardFromField` + lost-and-found dead methods/smoke-test)
-   — single decision: confirm no save/load intent, then delete. ~1h.
+   — single decision: confirm no save/load intent, then delete. ~1h. **✅ EXECUTED step 1 (`7cf9c0f`).**
 2. **One-shot comment sweep** (F4.7 + F4.10 comments + GRM:642 + N3 desc + obs #10 wording) — pure
-   doc-string corrections, zero behavior risk. ~0.5h.
+   doc-string corrections, zero behavior risk. ~0.5h. **✅ EXECUTED step 1 (`3b2263c`).**
 3. **Tiny-decision pair** (F4.4 `cardsByTag`, F4.5 `_totalScore`) — remove-or-document, ~0.5h together.
+   **✅ EXECUTED step 1 (`7cf9c0f`) — both removed.**
 4. **Verify-and-document** (F4.32 Silk scope, F4.28 stacking-pattern doc, F4.29 bypass sweep) — confirmation
    passes, optional rigor.
 5. **Design rulings (NOT cleanup)** — F4.26 (powerLevel Option A/B), F4.31/F4.38(a) (proc timing), F4.33
@@ -237,10 +260,10 @@ for a complete Tier-5 picture). Fold the comment/dead-code ones into the same sw
 
 The 6 groupings above, dispositioned:
 
-- **NEAR-TERM — the ~2h hygiene set (groupings 1 + 2 + 3).** The next concrete Tier-5 work: the one-shot
-  dead-code cut (1; gate: confirm no save/load intent before deleting), the one-shot comment sweep (2;
-  zero behavior risk), and the two tiny remove-or-document decisions (3). A candidate small campaign —
-  scoped separately when Robert greenlights it; not started by the reconciliation.
+- **NEAR-TERM — the ~2h hygiene set (groupings 1 + 2 + 3). ✅ EXECUTED 2026-06-12 (F4-TIER5-STEP1,
+  commits `3b2263c` comments / `7cf9c0f` deletions).** The gate resolved D0.12-governs (cut
+  `undoLastCapture`/`fullReset`); F4.4/F4.5 removed; comment sweep landed. Two orphans surfaced
+  (`run.releaseSpirit`, GRM Snapshot header) → lost-and-found. Step 2 (Tier-4 scoping) is now current.
 - **BANKED — grouping 4 (verify-and-document).** Optional rigor (F4.32 Silk scope, F4.28 stacking-pattern
   doc, F4.29 bypass sweep). This registry already records what's known; run only if the rigor is wanted.
 - **BANKED → Phase-5 design agenda — grouping 5 (design rulings, NOT cleanup).** F4.26 (powerLevel

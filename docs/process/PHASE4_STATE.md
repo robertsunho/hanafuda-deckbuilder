@@ -113,9 +113,11 @@ the symbiosis semantics were re-verified correct vs `D0.11` (no [FIX]). No src/ 
 2026-06-12) — which **supersedes the looser near-term/Tier-4/banked framing** that lived here. The steps,
 one line each (detail in the plan doc + the `tier5_reconciliation.md` §"Scope decision"):
 1. **Groupings 1+2+3 — near-term hygiene set** (~2h: dead-code cut + comment sweep + two tiny decisions).
-   **← CURRENT WORK** (opens with its own read-only recon).
+   **✅ DONE 2026-06-12** (record `F4-TIER5-STEP1`; commits `3b2263c` comments / `7cf9c0f` deletions;
+   build green, suite 151/1 unchanged; gate resolved D0.12-governs; two orphans —
+   `run.releaseSpirit`, GRM Snapshot header — folded into the `tier5_reconciliation.md` lost-and-found).
 2. **Tier 4 — UI/UX cleanup** (F4.35 scene-unification, F4.37/F4.36 tooltip recomb + declarative read,
-   F3.16 scoring log) — opens with Tier-4 *scoping*.
+   F3.16 scoring log) — opens with Tier-4 *scoping*. **← CURRENT WORK.**
 3. **Groupings 4/5/6 — their own heavier process**, split into (a) **design-rulings deliberation**
    (grouping 5 + F4.26 / F4.33-Part1 / F4.38(a) / **F4.32**) — **the V6 gate**, run first — and (b)
    **code refactors** (F4.25, F4.21, F4.28) after the rulings. (F4.29 stays optional/banked.)

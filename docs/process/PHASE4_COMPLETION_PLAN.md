@@ -23,8 +23,11 @@ Every doc is written against a settled state.
 
 1. **Groupings 1+2+3 — the near-term hygiene set** (~2h, mostly pure-subtraction/doc). Dead-code cut
    (gate: save/load-intent ruling on the zero-caller methods), comment sweep, the two tiny
-   remove-or-document decisions. Recon-first, then scope the cut/sweep campaign(s). **← CURRENT.**
-2. **Tier 4 — UI/UX cleanup.** F4.35 scene-unification, F4.37/F4.36 (tooltip recomb + declarative read),
+   remove-or-document decisions. Recon-first, then scope the cut/sweep campaign(s). **✅ DONE 2026-06-12**
+   (record `F4-TIER5-STEP1`; commits `3b2263c` comments / `7cf9c0f` deletions; build green, suite 151/1
+   unchanged; gate resolved D0.12-governs).
+2. **Tier 4 — UI/UX cleanup. ← CURRENT** (opens with Tier-4 *scoping*). F4.35 scene-unification,
+   F4.37/F4.36 (tooltip recomb + declarative read),
    F3.16 (scoring log). Currently a headline, not a task list — step 2 opens with Tier-4 *scoping*
    (a recon + breakdown) before execution. UI surface settled before the 4/5/6 rulings (some have
    UI-visible consequences cleaner to reason about post-UI-work).
@@ -53,6 +56,7 @@ of 4/5/6 stays intact as one process rather than cherry-picking "cheap" items fo
 sizing can't be trusted for items with design history.)
 
 ## Status
-Plan + dependency + the F4.32 correction. **Step 1 (groupings 1+2+3 hygiene) is the current work**, and
-opens with its own read-only recon. Per-step detail is scoped when each step is reached; nothing beyond
-step 1 is actioned by this doc.
+Plan + dependency + the F4.32 correction. **Step 1 (groupings 1+2+3 hygiene) is ✅ DONE** (2026-06-12,
+record `F4-TIER5-STEP1`, commits `3b2263c`/`7cf9c0f`). **Step 2 (Tier-4 UI/UX, opening with Tier-4
+scoping) is now current.** Per-step detail is scoped when each step is reached; nothing beyond step 2 is
+actioned by this doc.

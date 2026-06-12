@@ -4490,3 +4490,48 @@ counter wave that migrated the *clean* counters and explicitly deferred these); 
 Osprey bullet (ducks now co-banked there, sharing the deck-flip seam); `D-F4-SCOPE Part 2` (the accepted
 import cycles #1/#2 — same document-and-contain disposition); F4.24b (the terminal `ARCHITECTURE.md` —
 these contained round machines documented as intentional, not as missed migrations).
+
+---
+
+## F4-TIER5-STEP1 — Hygiene sweep (groupings 1+2+3: dead-code + comments + tiny removals): COMPLETE (2026-06-12)
+
+**Status:** CLOSED. Step 1 of the 6-step Phase-4 completion plan (`PHASE4_COMPLETION_PLAN.md`). Two
+commits, cleanly separated for bisecting; build green, suite 151 passed / 1 skipped unchanged across both.
+
+**What shipped:**
+
+- **`3b2263c` — comment sweep [PRESERVE]** (9 files, +13/−16, comment/string only):
+  F4.7a StyleEngine "12 combos" → 11; F4.7b `advanceRound` JSDoc (dropped the stale
+  cumulative-total / "decay Style Base toward 1.0" clause); the 7 F4.10 "Three Marks"/"Non-being"
+  relabels → Wu Xing element-targeting / Third Eye (GameScene ×2, DeckManager, RunManager, FieldManager,
+  GRM card-removal header + `removeCardFromHand` JSDoc); the N3 `engine_lincoln` dangling-NOTE removal
+  (it referenced a "bank without pushing" description that no longer exists — user-facing desc already
+  accurate); obs #10 `zodiac_rabbit` "Remove" → "waive" (description + effect comment + result message).
+- **`7cf9c0f` — dead-code cut [subtraction]** (8 files, −225, zero insertions):
+  5 dead loggers (`logShopOfferings`, `logCardEnhanced`, `logCardEditionApplied`, `logCardTranscended`,
+  `printToConsole`); `CaptureManager.undoLastCapture` + `DeckManager.fullReset` (gate ruled cut per
+  D0.12); `GRM.removeCardFromField` (dead twin — live `removeCardFromHand` untouched); the
+  `_drawLoadoutSlot` + `_confirmRelease` dead release-confirm chain (ShrineScene); `src/test-run.js`
+  (whole file — obsolete smoke test, called the removed `ScoringEngine.totalPoints`); the ungated
+  `window.__run` debug block (kept the DEV-gated `window.run`); `cardsByTag` (F4.4); the `totalScore`
+  getter + `_totalScore` init + accrue (F4.5).
+
+**Rulings applied:** Gate — **D0.12 governs** (`undoLastCapture`/`fullReset` are speculative zero-caller
+infra; Phase-5 builds undo/save-load clean against the then-current state shape). F4.4 — remove. F4.5 —
+remove getter AND accumulator (trivial rebuild, same D0.12 logic; distinct from the live per-spirit
+`totalScored`). Obs #10 — align to "waive." `advanceRound`'s `roundScore` param kept as a documented
+no-op (sole live caller GameScene:2851 still passes a meaningful value; not worth touching the round-end
+path to drop it).
+
+**Deletion safety:** every cut re-grepped zero-caller at edit time ([PRESERVE]-class rigor for a
+subtraction); post-cut grep confirmed all symbols gone; live twins (`removeCardFromHand`, `totalScored`)
+confirmed untouched.
+
+**Two orphans surfaced** (folded into `tier5_reconciliation.md` lost-and-found, NOT fixed — out of
+step-1 scope): `run.releaseSpirit` (RunManager:~691 — now orphaned, its sole caller `_confirmRelease`
+was cut; verify it's genuinely the dead shrine-release-UI path, not a live mechanic, before any future
+cut) and the empty `// ── Snapshot ──` section header in GRM (a D0.12 `toSnapshot`-removal leftover).
+
+**Cross-refs:** `D0.12` (the precedent that governed the gate); `tier5_reconciliation.md` (the registry —
+buckets B/C entries F4.1/F4.4/F4.5/F4.7/F4.10 now marked RESOLVED, groupings 1+2+3 EXECUTED);
+`PHASE4_COMPLETION_PLAN.md` (step 1 of 6, now done; step 2 — Tier-4 scoping — is next).
