@@ -528,7 +528,7 @@ export const SPIRIT_CATALOG = [
   {
     id: 'sym_snails', name: 'Snails',
     description: '+1 additive mult per card NOT played at round end. Permanent across run.',
-    tooltipBase:  {},
+    tooltipBase:  { mult: 1 },
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'fireflies',
     rarity: null, category: 'symbiont',
   },
@@ -563,7 +563,7 @@ export const SPIRIT_CATALOG = [
   {
     id: 'sym_badger', name: 'Badger',
     description: '+1 additive mult per consumable used (permanent across run).',
-    tooltipBase:  {},
+    tooltipBase:  { mult: 1 },
     channel: 'symbiont', cost: 0, tier: 0, sourceAnimal: 'december_fox',
     rarity: null, category: 'symbiont',
   },

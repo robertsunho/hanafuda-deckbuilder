@@ -302,25 +302,25 @@ function snapshotCat5Maturation(spirit, powerLevel) {
 
 export const NEGATIVE_SNAPSHOT = {
   // Cat 1 linear: additive-mult
-  sym_ants:              (s, p) => snapshotCat1Linear(s, p, 'totalPlayed',      0.5,  'addMult'),
-  sym_snails:            (s, p) => snapshotCat1Linear(s, p, 'totalUnplayed',    1,    'addMult'),
-  sym_badger:            (s, p) => snapshotCat1Linear(s, p, 'consumablesUsed',  1,    'addMult'),
-  engine_devotion:       (s, p) => snapshotCat1Linear(s, p, 'totalScored',      4,    'addMult'),
-  engine_habitat:        (s, p) => snapshotCat1Linear(s, p, 'totalScored',      2.5,  'addMult'),
-  engine_ceremony:       (s, p) => snapshotCat1Linear(s, p, 'totalScored',      2,    'addMult'),
-  engine_agriculture:    (s, p) => snapshotCat1Linear(s, p, 'totalScored',      1,    'addMult'),
-  engine_lincoln:        (s, p) => snapshotCat1Linear(s, p, 'banks',            0.1,  'addMult'),
-  engine_napoleon:       (s, p) => snapshotCat1Linear(s, p, 'pushFails',        0.2,  'addMult'),
-  engine_missing_number: (s, p) => snapshotCat1Linear(s, p, 'totalStacks',      5,    'addMult'),
+  sym_ants:              (s, p) => snapshotCat1Linear(s, p, 'totalPlayed',      _tb(s, 'mult', 0.5),  'addMult'),
+  sym_snails:            (s, p) => snapshotCat1Linear(s, p, 'totalUnplayed',    _tb(s, 'mult', 1),    'addMult'),
+  sym_badger:            (s, p) => snapshotCat1Linear(s, p, 'consumablesUsed',  _tb(s, 'mult', 1),    'addMult'),
+  engine_devotion:       (s, p) => snapshotCat1Linear(s, p, 'totalScored',      _tb(s, 'mult', 4),    'addMult'),
+  engine_habitat:        (s, p) => snapshotCat1Linear(s, p, 'totalScored',      _tb(s, 'mult', 2.5),  'addMult'),
+  engine_ceremony:       (s, p) => snapshotCat1Linear(s, p, 'totalScored',      _tb(s, 'mult', 2),    'addMult'),
+  engine_agriculture:    (s, p) => snapshotCat1Linear(s, p, 'totalScored',      _tb(s, 'mult', 1),    'addMult'),
+  engine_lincoln:        (s, p) => snapshotCat1Linear(s, p, 'banks',            _tb(s, 'mult', 0.1),  'addMult'),
+  engine_napoleon:       (s, p) => snapshotCat1Linear(s, p, 'pushFails',        _tb(s, 'mult', 0.2),  'addMult'),
+  engine_missing_number: (s, p) => snapshotCat1Linear(s, p, 'totalStacks',      _tb(s, 'mult', 5),    'addMult'),
   engine_northern_lion:  (s, p) => snapshotCat1Linear(s, p, 'pushesWitnessed',  1,    'addMult'),
 
   // Cat 1 linear: mult-mult
-  sym_algae:             (s, p) => snapshotCat1Linear(s, p, 'summonCount',     0.1,  'multiplyMult'),
-  engine_palace:         (s, p) => snapshotCat1Linear(s, p, 'cardsAdded',      0.5,  'multiplyMult'),
-  engine_ship:           (s, p) => snapshotCat1Linear(s, p, 'cardsDiscarded',  0.3,  'multiplyMult'),
-  engine_kintaro:        (s, p) => snapshotCat1Linear(s, p, 'goldsConsumed',   0.1,  'multiplyMult'),
-  engine_bullseye:       (s, p) => snapshotCat1Linear(s, p, 'qualifiedCount',  1.0,  'multiplyMult'),
-  legend_wuji:           (s, p) => snapshotCat1Linear(s, p, 'destroyed',       0.3,  'multiplyMult'),
+  sym_algae:             (s, p) => snapshotCat1Linear(s, p, 'summonCount',     _tb(s, 'mult', 0.1),  'multiplyMult'),
+  engine_palace:         (s, p) => snapshotCat1Linear(s, p, 'cardsAdded',      _tb(s, 'mult', 0.5),  'multiplyMult'),
+  engine_ship:           (s, p) => snapshotCat1Linear(s, p, 'cardsDiscarded',  _tb(s, 'mult', 0.3),  'multiplyMult'),
+  engine_kintaro:        (s, p) => snapshotCat1Linear(s, p, 'goldsConsumed',   _tb(s, 'mult', 0.1),  'multiplyMult'),
+  engine_bullseye:       (s, p) => snapshotCat1Linear(s, p, 'qualifiedCount',  _tb(s, 'mult', 1.0),  'multiplyMult'),
+  legend_wuji:           (s, p) => snapshotCat1Linear(s, p, 'destroyed',       _tb(s, 'mult', 0.3),  'multiplyMult'),
 
   // Cat 1 dual-key
   engine_glacier:  (s, p) => snapshotCat1Dual(s, p, 't1Procs', 0.2, 't2Procs', 0.4, 'multiplyMult'),
@@ -732,11 +732,11 @@ const _effects = {
   sym_algae: {
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * 0.1 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 0.1) * (spirit.powerLevel ?? 1);
         return t <= 1 ? null : { multiplyMult: t };
       }
       const total = aggregateNumericState(spirit, 'summonCount');
-      return total === 0 ? null : { multiplyMult: 1 + total * 0.1 };
+      return total === 0 ? null : { multiplyMult: 1 + total * _tb(spirit, 'mult', 0.1) };
     },
   },
 
@@ -749,11 +749,11 @@ const _effects = {
     },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 0.5 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 0.5) * (spirit.powerLevel ?? 1);
         return t === 0 ? null : { addMult: t };
       }
       const total = aggregateNumericState(spirit, 'totalPlayed');
-      return total === 0 ? null : { addMult: total * 0.5 };
+      return total === 0 ? null : { addMult: total * _tb(spirit, 'mult', 0.5) };
     },
   },
 
@@ -788,11 +788,11 @@ const _effects = {
     },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 1 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 1) * (spirit.powerLevel ?? 1);
         return t === 0 ? null : { addMult: t };
       }
       const total = aggregateNumericState(spirit, 'totalUnplayed');
-      return total === 0 ? null : { addMult: total * 1 };
+      return total === 0 ? null : { addMult: total * _tb(spirit, 'mult', 1) };
     },
   },
 
@@ -833,11 +833,11 @@ const _effects = {
   sym_badger: {
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 1 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 1) * (spirit.powerLevel ?? 1);
         return t === 0 ? null : { addMult: t };
       }
       const n = aggregateNumericState(spirit, 'consumablesUsed');
-      return n === 0 ? null : { addMult: n * 1 };
+      return n === 0 ? null : { addMult: n * _tb(spirit, 'mult', 1) };
     },
   },
 
@@ -1041,11 +1041,11 @@ const _effects = {
     },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 4 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 4) * (spirit.powerLevel ?? 1);
         return t === 0 ? null : { addMult: t };
       }
       const n = aggregateNumericState(spirit, 'totalScored');
-      return n === 0 ? null : { addMult: n * 4 };
+      return n === 0 ? null : { addMult: n * _tb(spirit, 'mult', 4) };
     },
   },
 
@@ -1055,11 +1055,11 @@ const _effects = {
     },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 2.5 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 2.5) * (spirit.powerLevel ?? 1);
         return t === 0 ? null : { addMult: t };
       }
       const n = aggregateNumericState(spirit, 'totalScored');
-      return n === 0 ? null : { addMult: n * 2.5 };
+      return n === 0 ? null : { addMult: n * _tb(spirit, 'mult', 2.5) };
     },
   },
 
@@ -1069,11 +1069,11 @@ const _effects = {
     },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 2 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 2) * (spirit.powerLevel ?? 1);
         return t === 0 ? null : { addMult: t };
       }
       const n = aggregateNumericState(spirit, 'totalScored');
-      return n === 0 ? null : { addMult: n * 2 };
+      return n === 0 ? null : { addMult: n * _tb(spirit, 'mult', 2) };
     },
   },
 
@@ -1083,11 +1083,11 @@ const _effects = {
     },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 1 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 1) * (spirit.powerLevel ?? 1);
         return t === 0 ? null : { addMult: t };
       }
       const n = aggregateNumericState(spirit, 'totalScored');
-      return n === 0 ? null : { addMult: n * 1 };
+      return n === 0 ? null : { addMult: n * _tb(spirit, 'mult', 1) };
     },
   },
 
@@ -1132,11 +1132,11 @@ const _effects = {
   engine_lincoln: {
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 0.1 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 0.1) * (spirit.powerLevel ?? 1);
         return t === 0 ? null : { addMult: t };
       }
       const n = aggregateNumericState(spirit, 'banks');
-      return n === 0 ? null : { addMult: n * 0.1 };
+      return n === 0 ? null : { addMult: n * _tb(spirit, 'mult', 0.1) };
     },
     // Migrated from GRM bankScore inline block (F4.18b #3).
     // Fires ONLY on explicit bank (via _fireSpiritHook('onBank') in bankScore).
@@ -1148,11 +1148,11 @@ const _effects = {
   engine_napoleon: {
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 0.2 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 0.2) * (spirit.powerLevel ?? 1);
         return t === 0 ? null : { addMult: t };
       }
       const n = aggregateNumericState(spirit, 'pushFails');
-      return n === 0 ? null : { addMult: n * 0.2 };
+      return n === 0 ? null : { addMult: n * _tb(spirit, 'mult', 0.2) };
     },
     // Migrated from GRM _finalizeTurn push-failure block (F4.18b #4).
     // Fires ONLY on natural round-over with active push penalty
@@ -1238,22 +1238,22 @@ const _effects = {
     },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * 5 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 0) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 5) * (spirit.powerLevel ?? 1);
         return t === 0 ? null : { addMult: t };
       }
       const n = aggregateNumericState(spirit, 'totalStacks');
-      return n === 0 ? null : { addMult: n * 5 };
+      return n === 0 ? null : { addMult: n * _tb(spirit, 'mult', 5) };
     },
   },
 
   engine_palace: {
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * 0.5 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 0.5) * (spirit.powerLevel ?? 1);
         return t <= 1 ? null : { multiplyMult: t };
       }
       const n = aggregateNumericState(spirit, 'cardsAdded');
-      return n === 0 ? null : { multiplyMult: 1 + n * 0.5 };
+      return n === 0 ? null : { multiplyMult: 1 + n * _tb(spirit, 'mult', 0.5) };
     },
   },
 
@@ -1268,11 +1268,11 @@ const _effects = {
     },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * 0.3 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 0.3) * (spirit.powerLevel ?? 1);
         return t <= 1 ? null : { multiplyMult: t };
       }
       const n = aggregateNumericState(spirit, 'cardsDiscarded');
-      return n === 0 ? null : { multiplyMult: 1 + n * 0.3 };
+      return n === 0 ? null : { multiplyMult: 1 + n * _tb(spirit, 'mult', 0.3) };
     },
   },
 
@@ -1298,11 +1298,11 @@ const _effects = {
     },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * 0.1 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 0.1) * (spirit.powerLevel ?? 1);
         return t <= 1 ? null : { multiplyMult: t };
       }
       const consumed = aggregateNumericState(spirit, 'goldsConsumed');
-      return consumed === 0 ? null : { multiplyMult: 1 + consumed * 0.1 };
+      return consumed === 0 ? null : { multiplyMult: 1 + consumed * _tb(spirit, 'mult', 0.1) };
     },
   },
 
@@ -1333,11 +1333,11 @@ const _effects = {
   engine_bullseye: {
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * 1.0 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 1.0) * (spirit.powerLevel ?? 1);
         return t <= 1 ? null : { multiplyMult: t };
       }
       const count = aggregateNumericState(spirit, 'qualifiedCount');
-      return count === 0 ? null : { multiplyMult: 1 + count * 1.0 };
+      return count === 0 ? null : { multiplyMult: 1 + count * _tb(spirit, 'mult', 1.0) };
     },
   },
 
@@ -1360,11 +1360,11 @@ const _effects = {
     },
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
-        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * 0.3 * (spirit.powerLevel ?? 1);
+        const t = (spirit.state?.preTranscendTotal ?? 1) + (spirit.state?.newEvents ?? 0) * _tb(spirit, 'mult', 0.3) * (spirit.powerLevel ?? 1);
         return t <= 1 ? null : { multiplyMult: t };
       }
       const destroyed = aggregateNumericState(spirit, 'destroyed');
-      return destroyed === 0 ? null : { multiplyMult: 1 + destroyed * 0.3 };
+      return destroyed === 0 ? null : { multiplyMult: 1 + destroyed * _tb(spirit, 'mult', 0.3) };
     },
   },
 
