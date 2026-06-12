@@ -193,6 +193,13 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
   power-4 Cat-5 negative matures slower — denominator `powerLevel × 3`); (3) **Amber niche rethink**
   (free natural transcendence now dominates Amber's slot-cost full-power). Mechanical done; balance is
   Phase-5. Unblocked Tier-4 Wave B (F3.16/F4.37) + informs T4.2's negative-branch scope.
+- **`tooltipBase` rename (Phase-5 semantic).** Wave A (F4.36 — T4.1/T4.2a/T4.2b) made `tooltipBase` the
+  canonical source of spirit scoring constants (effect code reads it via `_tb`; tooltip is now one
+  consumer, not the purpose) — so the name is a misnomer (scoring depending on a "tooltip" field reads
+  wrong). Rename to reflect "canonical scoring/tuning values" (+ the `_tb` accessor + reconsider keys like
+  `jackpotMult`, which is actually a `Math.pow` exponent base). Pure semantics, zero behavior. **Sequenced
+  AFTER Wave B** (F3.16/F4.37 may reshape the field — rename once, against the settled shape). Feeds Design
+  Doc V6 / `DESIGN_DOC_PATCHES.md` DP-65.
 - **F4.24a-surfaced ratify/cleanup (non-Tier-3, low-priority).** N1 — `engine_northern_lion` is the
   lone surviving `run.activeSpirits` accumulator (`GRM:2069`); one-line ratification that excluding
   transcended copies from `pushesWitnessed` is intended. N3 — `engine_lincoln` desc/behavior mismatch

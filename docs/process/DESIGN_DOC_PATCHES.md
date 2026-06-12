@@ -428,6 +428,20 @@ These can be documented either in the relevant per-system section (e.g., F3.5b i
 **Source:** F2.7; DECISIONS_LOG.md line 2863
 **Patch:** Document that mid-round mutations propagate immediately to scoring engine; field slot configuration recomputes on demand; Throat duplicate available same round.
 
+### DP-65: `tooltipBase` → scoring-values rename (Phase-5 semantic, post-Wave-B)
+**Source:** Wave A role-inversion (F4.36 — T4.1/T4.2a/T4.2b); banked 2026-06-12.
+**Issue:** `tooltipBase` now sources all spirit scoring constants — the effect code reads it via the `_tb`
+accessor in scoring calculations, and the tooltip is now just ONE consumer rather than the field's purpose.
+The name describes a downstream use, not what the field IS (a reader seeing `_tb(spirit, 'mult', 4)` inside
+a scoring formula would reasonably wonder why scoring depends on a "tooltip" field).
+**Patch (Phase 5, AFTER Wave B settles the field shape):** rename to reflect canonical scoring/tuning
+values (`scoringBase` / `baseValues` / `tuningValues` / `spiritBase` — pick in Phase 5); rename the `_tb`
+accessor to match; reconsider the internal keys under the new framing (`jackpotMult` is actually a
+`Math.pow` exponent base, not a mult — possibly its own rename). Behavior-preserving semantic cleanup, not
+a quick find-replace (it's a small naming cluster). Sequenced after Wave B because F3.16 (scoring-log
+schema redesign) and F4.37 (tooltip recomb) still read/may reshape this field — rename ONCE against the
+settled shape (the F4.24b / V6 "don't refactor against a churning state" discipline).
+
 ---
 
 ## Editorial rewrite scope (separate sub-effort, 6-10 hours)
