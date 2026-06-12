@@ -195,7 +195,7 @@ export class GameScene extends Phaser.Scene {
     this._expandedConsumable      = null;   // { displayIndex, cons, isNeg, objs[] }
 
     /**
-     * Active Three Marks targeting state, or null when not in mark mode.
+     * Active Wu Xing element/card-target state, or null when not targeting.
      * @type {{ id: string, index: number, step: 'select_source'|'select_target', sourceCard: object|null }|null}
      */
     this._cardTargetMode         = null;
@@ -2222,7 +2222,7 @@ export class GameScene extends Phaser.Scene {
   // ── Card targeting (in-round) ──────────────────────────────────────────────
 
   /**
-   * Enter mark mode for a Three Marks consumable.
+   * Enter card-target mode for a Wu Xing element_* consumable.
    * @param {object} cons  The consumable object from run.consumables.
    * @param {number} idx   Its index in the consumable inventory.
    */

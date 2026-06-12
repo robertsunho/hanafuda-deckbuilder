@@ -385,7 +385,7 @@ export default class FieldManager {
   /**
    * Remove a card from the field by its id.
    * If the containing slot becomes empty, the slot is nulled out (gap preserved).
-   * Used by Three Marks Non-being to remove a card targeted during a round.
+   * Used to remove a card targeted during a round.
    * @param {string} cardId
    * @returns {boolean} true if found and removed, false if not on the field.
    */

@@ -84,10 +84,10 @@ const _effects = {
 
   zodiac_rabbit: {
     inputType: 'none',
-    /** Remove push penalty for this round. */
+    /** Waive the push penalty for this round. */
     execute({ roundManager }) {
       roundManager._pushPenaltyWaived = true;
-      return { success: true, message: 'Rabbit: push penalty removed.' };
+      return { success: true, message: 'Rabbit: push penalty waived.' };
     },
   },
 

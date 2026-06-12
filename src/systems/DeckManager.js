@@ -150,7 +150,7 @@ export default class DeckManager {
   /**
    * Reset the draw pile using a caller-supplied array of card objects.
    * Shares the same object references — mutations to cards propagate to the
-   * caller's array automatically (used with RunManager._deck for Three Marks).
+   * caller's array automatically (used with RunManager._deck for element mutations).
    * @param {object[]} cards  The canonical deck array from RunManager.getDeck().
    * @returns {this} for chaining
    */

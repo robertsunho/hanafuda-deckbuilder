@@ -1227,9 +1227,8 @@ class RunManager {
   // ── Round advancement ──────────────────────────────────────────────────────
 
   /**
-   * Increment the round counter, add a completed round's score to the
-   * cumulative total, and decay Style Base toward 1.0.
-   * @param {number} [roundScore=0]  The final score from the completed round.
+   * Increment the round counter for the round just completed.
+   * @param {number} [roundScore=0]  Retained for call-site compatibility (unused).
    * @returns {this}
    */
   advanceRound(roundScore = 0) {
@@ -1341,7 +1340,7 @@ class RunManager {
 
   /**
    * Shallow copy of the canonical deck array.
-   * Card objects are shared references — mutations (Three Marks) propagate.
+   * Card objects are shared references — mutations (element enhancements) propagate.
    * @returns {object[]}
    */
   getDeck() { return [...this._deck]; }

@@ -850,11 +850,11 @@ export default class GameRoundManager {
     return applyHook('modifyCardsDealt', base, base, phase);
   }
 
-  // ── Three Marks helpers ────────────────────────────────────────────────────
+  // ── Card-removal helper ─────────────────────────────────────────────────────
 
   /**
    * Remove a card from the current hand by id.
-   * Used when Non-being targets a hand card during a round.
+   * Used when Third Eye targets a hand card during a round.
    * @param {string} cardId
    */
   removeCardFromHand(cardId) {

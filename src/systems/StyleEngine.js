@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // StyleEngine — detects style combos from the capture pile
 //
-// 12 combos trigger once per round each.  Detection is incremental: call
+// 11 combos trigger once per round each.  Detection is incremental: call
 // checkCombos() after every capture event with the full capture pile so
 // feedback is immediate rather than deferred to round end.
 //

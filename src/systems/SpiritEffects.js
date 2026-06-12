@@ -1128,8 +1128,6 @@ const _effects = {
     },
     // Migrated from GRM bankScore inline block (F4.18b #3).
     // Fires ONLY on explicit bank (via _fireSpiritHook('onBank') in bankScore).
-    // NOTE: description says "bank without pushing" but current behavior increments on
-    //   every bank regardless of push. Preserved as-is; reconcile separately (see ledger).
     onBank({ spirit }) {
       incrementPerElement(spirit, 'banks', 1);
     },
