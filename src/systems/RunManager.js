@@ -288,9 +288,6 @@ class RunManager {
     /** Current round number (1-based). */
     this._round = 1;
 
-    /** Cumulative score across all completed rounds. */
-    this._totalScore = 0;
-
     /**
      * Flow — the single persistent scoring multiplier for the run.
      * Starts at 1.0.  Modified by push outcomes and one-time style combo milestones.
@@ -1098,7 +1095,6 @@ class RunManager {
   // ── Run progression ────────────────────────────────────────────────────────
 
   get round()      { return this._round; }
-  get totalScore() { return this._totalScore; }
 
   /** Current act number (1-based, 6 total). */
   get act()        { return Math.floor((this._round - 1) / RunManager.ROUNDS_PER_ACT) + 1; }
@@ -1232,7 +1228,6 @@ class RunManager {
    * @returns {this}
    */
   advanceRound(roundScore = 0) {
-    this._totalScore += roundScore;
     this._round++;
     return this;
   }
@@ -1617,13 +1612,6 @@ export function getPushMultiplier(depth, outcome) {
 const run = new RunManager();
 export { RunManager };
 export default run;
-
-// ── Debug hook (dev only — remove in Phase 4 cleanup) ────────────────────────
-// Exposes the active run singleton on window for browser console diagnostics.
-if (typeof window !== 'undefined') {
-  window.__run = run;
-}
-
 
 // Dev-only: expose for browser console testing
 if (typeof window !== 'undefined' && import.meta.env.DEV) {

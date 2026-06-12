@@ -190,24 +190,6 @@ export default class CaptureManager {
   }
 
   /**
-   * Undo the most recent capture event — remove the last-logged cards from
-   * the pile and pop the log entry. Returns the un-captured cards so the
-   * caller can return them to wherever they came from.
-   *
-   * Only undoes one event at a time; call repeatedly to walk back further.
-   * Returns an empty array if the log is empty.
-   *
-   * @returns {object[]}
-   */
-  undoLastCapture() {
-    if (this._log.length === 0) return [];
-    const { cards } = this._log.pop();
-    for (const card of cards) this._cards.delete(card.id);
-    this._lastCaptured = [];
-    return cards;
-  }
-
-  /**
    * Reset the capture pile, log, and turn counter for the start of a new round.
    * @returns {this} for chaining
    */

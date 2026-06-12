@@ -350,28 +350,10 @@ class GameplayLogger {
     this._log(`  [FLOW] ${oldValue.toFixed(3)} → ${newValue.toFixed(3)} (${suffix}, ${reason})`);
   }
 
-  // ── Shop offerings ──────────────────────────────────────────────────────
-
-  logShopOfferings(sections) {
-    this._log('  Shop offerings:');
-    for (const section of sections) {
-      if (!section.items || section.items.length === 0) continue;
-      this._log(`    ${section.name}: ${section.items.map(i => `${i.name ?? i.id}(${i.cost ?? '?'}ki)`).join(', ')}`);
-    }
-  }
-
   // ── Card lifecycle ──────────────────────────────────────────────────────
-
-  logCardEnhanced(cardName, element, tier) {
-    this._log(`  [CARD ENHANCED] ${cardName} → ${tier} ${element}`);
-  }
 
   logCardStamped(cardName, stampId) {
     this._log(`  [CARD STAMPED] ${cardName} → ${stampId}`);
-  }
-
-  logCardEditionApplied(cardName, edition) {
-    this._log(`  [CARD EDITION] ${cardName} → ${edition}`);
   }
 
   logCardDestroyed(cardName, reason) {
@@ -380,10 +362,6 @@ class GameplayLogger {
 
   logCardAdded(cardName, source) {
     this._log(`  [CARD ADDED] ${cardName} (${source})`);
-  }
-
-  logCardTranscended(sourceName, targetName) {
-    this._log(`  [CARD TRANSCENDED] ${sourceName} → copy of ${targetName}`);
   }
 
   // ── Yaku thresholds ─────────────────────────────────────────────────────
@@ -521,13 +499,6 @@ class GameplayLogger {
       console.warn('[GameplayLogger] Clipboard copy failed:', e);
       return false;
     }
-  }
-
-  /**
-   * Log transcript to browser console.
-   */
-  printToConsole() {
-    console.log(this.getTranscript());
   }
 }
 

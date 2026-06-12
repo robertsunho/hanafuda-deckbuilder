@@ -137,17 +137,6 @@ export default class DeckManager {
   // ── Convenience helpers ────────────────────────────────────────────────────
 
   /**
-   * Restore the full 48-card set into the draw pile and clear the discard
-   * pile. Useful for starting a fresh game without creating a new instance.
-   * @returns {this} for chaining
-   */
-  fullReset() {
-    this._drawPile = [...ALL_CARDS];
-    this._discardPile = [];
-    return this;
-  }
-
-  /**
    * Reset the draw pile using a caller-supplied array of card objects.
    * Shares the same object references — mutations to cards propagate to the
    * caller's array automatically (used with RunManager._deck for element mutations).

@@ -889,18 +889,6 @@ export const cardsByType = cards.reduce((acc, card) => {
 }, {});
 
 /**
- * Cards grouped by tag. A single card may appear under multiple tags.
- * @type {Object.<string, typeof cards>}
- * @example cardsByTag.moon // Full Moon + Cuckoo with Crescent Moon
- */
-export const cardsByTag = cards.reduce((acc, card) => {
-  for (const tag of card.tags) {
-    (acc[tag] ??= []).push(card);
-  }
-  return acc;
-}, {});
-
-/**
  * Cards grouped by vertical axis: "air" | "land" (24 each).
  * @type {{ air: typeof cards, land: typeof cards }}
  */

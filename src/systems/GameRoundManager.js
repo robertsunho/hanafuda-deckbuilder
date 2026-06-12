@@ -861,15 +861,6 @@ export default class GameRoundManager {
     this._hand.removeMany([cardId]);
   }
 
-  /**
-   * Remove a card from the current field by id.
-   * Used when Non-being targets a field card during a round.
-   * @param {string} cardId
-   */
-  removeCardFromField(cardId) {
-    this._field.removeCardById(cardId);
-  }
-
   // ── Snapshot ───────────────────────────────────────────────────────────────
 
   // ── Private helpers ────────────────────────────────────────────────────────
