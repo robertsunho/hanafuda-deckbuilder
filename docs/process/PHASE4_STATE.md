@@ -116,9 +116,23 @@ velocity exponential magnitude, F5.0 (merge-vs-separate), F5.8 (Earth redesign),
 terminal `docs/ARCHITECTURE.md`). F4.24b is now substantially **un-blocked** — the major backbone
 consolidation (scoring-loop, hand-capacity, destination audit, named hand-offs) is done — but it still
 **stays late** per the late-write ruling: Phase-5 mechanic work will still generate new code, and
-ARCHITECTURE.md is written ONCE against the stabilized end-state. **Tier-4 scoping is the next planning
-step** (no defined Tier-4 task list exists yet beyond the §2 headline — F4.37/F4.36 tooltip recomb +
-declarative read, F3.16 scoring log).
+ARCHITECTURE.md is written ONCE against the stabilized end-state.
+
+**Tier 5 is now RECONCILED** (2026-06-11): the 22 cleanup items are walked against current source and
+bucketed in `tier5_reconciliation.md` (7 ABSORBED / 9 STILL-OPEN / 6 PARTIAL + a lost-and-found list).
+Robert scoped the registry's 6 recommended groupings (full disposition in that doc's §"Scope decision"):
+- **NEAR-TERM (the next concrete work — a ~2h hygiene set, mostly pure-subtraction/doc-only):** groupings
+  **1** (one-shot dead-code cut — F4.1 + F4.10 `removeCardFromField` + lost-and-found dead methods/smoke-
+  test; gate: confirm no save/load intent), **2** (one-shot comment sweep — F4.7 + F4.10 comments +
+  GRM:642 + N3 desc + obs #10 wording, zero behavior risk), **3** (tiny-decision pair — F4.4 `cardsByTag`,
+  F4.5 `_totalScore`, remove-or-document). A candidate small campaign, scoped separately when greenlit.
+- **In parallel / after — Tier-4 scoping** (UI/polish): F4.35 scene-unification lands here (per the
+  registry), plus the §2 headline items F4.37/F4.36 (tooltip recomb + declarative read) and F3.16
+  (scoring log). No defined Tier-4 task list yet beyond that headline.
+- **BANKED:** grouping **4** (verify-and-document rigor — F4.32/F4.28/F4.29, optional; registry already
+  records what's known), **5** (design rulings, NOT cleanup — F4.26/F4.31/F4.38(a)/F4.33-Part1/F4.30-half
+  → the Phase-5 design agenda), **6** (scheduled refactors — F4.21 ~4-7h before save-game, F4.25, F4.35 as
+  the Tier-4 scene-unification — each its own task when its slot comes).
 
 ---
 
@@ -289,8 +303,17 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 - `TEST_HARNESS_GOTCHAS.md` — durable (Vitest harness conventions).
 - `SPIRIT_SET_ITERATION_RULE.md` — durable (the transcendence/spirit-set invariant; a rule, not a record).
 - `PHASE4_consolidation_candidates.md` — partially-live (banked threads incl. Candidate C).
+- `tier5_reconciliation.md` — LIVE registry (the 22 Tier-5 cleanup items bucketed ABSORBED/OPEN/PARTIAL
+  post-Tier-3 + lost-and-found + Robert's scope decision on the 6 groupings; Tier-4/5 planning consults
+  it). Added 2026-06-11.
 - `PHASE4_STATE.md` — this doc (live state).
-- *(no currently-active standing doc — Tier-2 is complete (F4.24a shipped) and the Tier-3 scoring-loop pass, Candidate D (hand-capacity), the destination audit (D-F4-SCOPE Part 2), and F4.27 (Cat-5 maturation — Past Life / Cuckoo Egg) have all closed; their docs (where any) are archived below. F4.27 added NO standing doc — its recon stayed in chat and the durable record is the DECISIONS_LOG `F4.27` entry, so there is nothing to archive for it. The next and LAST Tier-3 item, the named spirit hand-offs (util_symbiosis/sym_algae summon + sym_ducks/engine_bullseye state-machines), WILL open with its own read-only recon and MAY add a standing doc when it runs.)*
+- *(The Tier-5 reconciliation registry (`tier5_reconciliation.md`, above) is the one currently-active
+  standing doc — the live Tier-4/5 working reference. All earlier task-scoped recons are CLOSED and
+  archived below: Tier-2 (F4.24a), the Tier-3 scoring-loop pass, Candidate D (hand-capacity), the
+  destination audit (D-F4-SCOPE Part 2), F4.27 (Cat-5 maturation), and the named spirit hand-offs
+  (F4.20-handoffs — document-and-contain, closed the LAST Tier-3 item; its recon + close-out stayed in
+  chat and the durable record is the DECISIONS_LOG `F4.20-handoffs` entry, so there is nothing to
+  archive for it). F4.27 likewise added no standing doc — record is DECISIONS_LOG `F4.27`.)*
 
 **`docs/` root:** `DESIGN_DOC_V5.md` — durable design source of truth.
 

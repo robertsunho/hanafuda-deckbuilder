@@ -230,3 +230,25 @@ for a complete Tier-5 picture). Fold the comment/dead-code ones into the same sw
    Part 1 (Festival cap), F4.30 "spirit reconsideration." Route to Phase-5 design, not the Tier-5 chore list.
 6. **Scheduled refactors** — F4.21 (spirit ID normalization, ~4-7h, before save-game), F4.25 (declarative
    formula), F4.35 (scene unification, Tier-4). Each its own task.
+
+---
+
+## Scope decision (2026-06-11, Robert)
+
+The 6 groupings above, dispositioned:
+
+- **NEAR-TERM — the ~2h hygiene set (groupings 1 + 2 + 3).** The next concrete Tier-5 work: the one-shot
+  dead-code cut (1; gate: confirm no save/load intent before deleting), the one-shot comment sweep (2;
+  zero behavior risk), and the two tiny remove-or-document decisions (3). A candidate small campaign —
+  scoped separately when Robert greenlights it; not started by the reconciliation.
+- **BANKED — grouping 4 (verify-and-document).** Optional rigor (F4.32 Silk scope, F4.28 stacking-pattern
+  doc, F4.29 bypass sweep). This registry already records what's known; run only if the rigor is wanted.
+- **BANKED → Phase-5 design agenda — grouping 5 (design rulings, NOT cleanup).** F4.26 (powerLevel
+  Option A/B), F4.31 / F4.38(a) (proc timing), F4.33 Part 1 (Festival cap), F4.30-half (Gankyil "spirit
+  reconsideration"). These need Robert's design call, not a code chore — they belong on the Phase-5
+  design agenda.
+- **BANKED → scheduled refactors — grouping 6.** F4.21 (spirit-ID normalization, ~4-7h, gated before
+  save-game), F4.25 (declarative formula), F4.35 (scene unification — lands in **Tier-4**, not the Tier-5
+  hygiene set). Each gets its own task/slot when it comes.
+
+Mirrored in `PHASE4_STATE.md` §3 "Immediate next action."
