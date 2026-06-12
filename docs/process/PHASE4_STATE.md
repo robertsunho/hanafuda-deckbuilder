@@ -92,18 +92,33 @@ Tier 3 — pipeline consolidation  ◀── IN PROGRESS
 │    C1 snapshot reseed from acquiredRound (dropped dead roundsHeld), C2 negative onRoundEnd increment, C3
 │    _freshNegativeState + _addPastLifeCopy null-state fix (dec.5), C4 source-aware _fireCuckooHatch (dec.7),
 │    C5 D3 shared fireCat5SaleEffects dispatch. Transcend-continuity gap CLOSED; +9 tests (was 0); 142→151.
-└─ Named spirit hand-offs .......................... ◀── NEXT (LAST Tier-3 item) — util_symbiosis/sym_algae summon (do LAST, highest-risk); sym_ducks/engine_bullseye state-machines.
+└─ Named spirit hand-offs .......................... ✅ CLOSED (2026-06-11) — see DECISIONS_LOG F4.20-handoffs.
+     Document-and-contain (no code migration): bullseye + util_symbiosis/sym_algae contained as intentional
+     GRM round machinery (over-summon trap + Algae transcend-timing coupling — migration would relocate not
+     reduce); sym_ducks co-banked with Osprey (shared deck-flip seam); symbiosis semantics confirmed correct
+     (no FIX, verified vs D0.11).
+
+══ TIER 3 COMPLETE (2026-06-11) ══ — pipeline consolidation closed; scoring-loop + hand-capacity + destination
+audit + F4.27 shipped; named hand-offs document-and-contained.
 ```
 
-**Immediate next action:** **F4.27 CLOSED** 2026-06-11 (record `F4.27`) — Campaigns A (`20d0673`,
-[PRESERVE] `isElementMature` centralization) + C (`22b1347`, [FIX] the negative Cat-5 maturation pipeline,
-5 steps/1 commit/9 tests) shipped and verified; the transcend-continuity gap for `util_past_life` +
-`sym_cuckoo_egg` is closed; it completes the last 2/29 accumulator conversions deferred from F2.5. The
-recon stayed in chat (no standing doc). Next — and now the **LAST Tier-3 item** — is the **named spirit
-hand-offs**: `util_symbiosis`/`sym_algae` summon (do LAST, highest-risk) + `sym_ducks`/`engine_bullseye`
-state-machines (which need deck-flip / rank-inventory seams). It opens with its **own read-only recon**
-and is **banked for a fresh session** as the high-risk finale. Merge-vs-separate (F5.0) and the Earth
-redesign (F5.8) stay Phase-5 banked.
+**Immediate next action:** **TIER 3 COMPLETE** 2026-06-11. The LAST Tier-3 item — the **named spirit
+hand-offs** — CLOSED **document-and-contain** (record `F4.20-handoffs`): `engine_bullseye` + the
+`util_symbiosis`/`sym_algae` summon block are contained as intentional GRM round machinery (the per-copy
+over-summon trap + the Algae transcend-timing coupling mean migration would *relocate* entanglement, not
+reduce it); `sym_ducks` is co-banked with Osprey (both need the same nonexistent deck-flip-outcome seam);
+the symbiosis semantics were re-verified correct vs `D0.11` (no [FIX]). No src/ changes — doc-only.
+
+Phase 4 now moves to **Tier 4 (UI/polish on the consolidated foundation)** and the **Phase-5 banked
+set**: Candidate C (getter renames), Candidate G-UX (random-8 tuning), Candidate H (consumable-
+consumption policy), Candidate I (legendary/spirit decoupling), F4.38(a) (Wu Xing timing ruling),
+velocity exponential magnitude, F5.0 (merge-vs-separate), F5.8 (Earth redesign), and **F4.24b** (the
+terminal `docs/ARCHITECTURE.md`). F4.24b is now substantially **un-blocked** — the major backbone
+consolidation (scoring-loop, hand-capacity, destination audit, named hand-offs) is done — but it still
+**stays late** per the late-write ruling: Phase-5 mechanic work will still generate new code, and
+ARCHITECTURE.md is written ONCE against the stabilized end-state. **Tier-4 scoping is the next planning
+step** (no defined Tier-4 task list exists yet beyond the §2 headline — F4.37/F4.36 tooltip recomb +
+declarative read, F3.16 scoring log).
 
 ---
 
@@ -117,11 +132,19 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
   (shipped); the deeper "do they reference a slot vs positional adjacency" cleanup is a separate task.
 - **Velocity exponential magnitude** — Phase-5 balance (D-F4.20-VELOCITY). Whether powerLevel scales
   inside the 1.5^x exponent; both branches currently consistent; change nothing till Phase 5.
-- **Osprey** — the deck-flip-interception → SpiritEffects **hook MIGRATION** (needs a deck-flip seam that
-  doesn't exist). Deferred. NOTE: the hand-cap GATE is now RESOLVED (`D-F4-HANDCAP-TIER3` E1c — Osprey
-  respects the cap, `_handSizeCap` deleted); only the in-place→hook migration remains banked here. The
-  two are distinct concerns in the same `_doDeckPhase` block — don't blur them.
-- **bullseye** — `_bullseyeInventory` state machine in GRM; minimal-lift or defer (not a clean counter).
+- **Osprey + sym_ducks (shared deck-flip seam)** — the Osprey deck-flip-interception → SpiritEffects
+  **hook MIGRATION** and the `sym_ducks` ±1 `multValue` migration (GRM ~1903 strand / ~1957 deck-flip-
+  match) BOTH need the same nonexistent deck-flip-outcome seam (`onDeckFlipResolved`-style, fired once
+  per flip in the resolver). When that seam is built, both ride it — so they're co-banked (ruled
+  `F4.20-handoffs`). Deferred. NOTE on Osprey: the hand-cap GATE is now RESOLVED (`D-F4-HANDCAP-TIER3`
+  E1c — Osprey respects the cap, `_handSizeCap` deleted); only the in-place→hook migration remains banked
+  here. NOTE on ducks: in-place is CORRECT code (F4.20-FIX2 made both sites iterate `allSpirits` so
+  transcended copies move) — this is a banked *stylistic* migration, not a deferred bug. The Osprey
+  hand-cap-gate and the hook migration are distinct concerns in the same `_doDeckPhase` block — don't
+  blur them.
+- **bullseye** — `_bullseyeInventory` state machine in GRM; **document-and-contain** (ruled
+  `F4.20-handoffs`): a round-scoped cross-rank ledger GRM owns, not a per-spirit counter. Intentional,
+  not deferred-migratable.
 - **badger** — `onConsumableUsed` belongs to the consumable block, not the spirit wave. Folded there.
 - **GRM/RunManager destination audit** (D-F4-SCOPE Part 2) — ✅ **CLOSED 2026-06-11** (record
   `D-F4-SCOPE Part 2`). All 6 recon items + 3 push/bank campaigns shipped; displacement sweep clean;

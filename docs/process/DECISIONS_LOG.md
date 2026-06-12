@@ -4420,3 +4420,73 @@ alch_pearl premise in the destination audit.
 `D-F4-CONSUMABLES-TIER2` + `D-F4.20` (the accumulator / Idea-D semantics F4.27 completes); F4.24b (the
 terminal `ARCHITECTURE.md` — F4.27's spirit-logic-migration pattern feeds it). The recon stayed in chat
 (no standing doc, per the OVERHAUL_PLAN F4.27 expectation) — this entry is the durable record.
+
+---
+
+## F4.20-handoffs — Named spirit hand-offs (util_symbiosis / engine_bullseye / sym_ducks): document-and-contain — TIER 3 COMPLETE (2026-06-11)
+
+**Status:** CLOSED, doc-only (no code migration). The LAST Tier-3 item. **Tier 3 is COMPLETE.**
+
+**Disposition + why it's a win, not a failure.** These three named spirits carried logic still resident
+in `GameRoundManager` (not `SpiritEffects`) and were deferred-because-hard since F4.20 ("do LAST,
+highest-risk"). A fresh read-only recon judged each independently and found **none is a clean migrate.**
+Per Phase 4's thesis — *reduce* entanglement, don't migrate-for-its-own-sake — forcing a migration here
+would **relocate** entanglement without reducing it (move the same coupling from GRM into SpiritEffects,
+plus invent seams). The honest close is documenting the irreducible GRM-resident round machinery as
+**intentional**, the same disposition as the accepted import cycles (#1/#2 in `D-F4-SCOPE Part 2`).
+Converting undescribed seepage into a recorded, reasoned decision IS the consolidation win for the
+deferred-because-hard finale.
+
+**Per-piece verdicts (Robert's rulings).**
+- **engine_bullseye → document-and-contain (Ruling 1).** `_bullseyeInventory` (GRM ~262) is a single
+  round-scoped ledger on GRM, NOT per-spirit state; the `while (all 4 ranks ≥ 1)` clear (GRM ~2084-2092)
+  couples four yaku ranks into one fire. It's round machinery bullseye *consumes*, not a counter it
+  *owns*. Migrating would force a shared cross-rank ledger into one spirit's state and have to answer
+  "where does it live across multiple bullseye copies?" — pure contortion, zero consolidation gain. The
+  scoring half (`applyEngine`, `SpiritEffects.js:314`) is already home; only the round-state machine
+  stays GRM-resident, by design.
+- **util_symbiosis / sym_algae → document-and-contain (Ruling 2).** Two load-bearing reasons, both
+  verified against source:
+  - **(a) The per-copy over-summon trap.** The summon block uses `countStackedById('util_symbiosis')`
+    (GRM ~1716) — the *aggregate* stack total across all copies. The only existing capture-time spirit
+    seam, `onCaptureComplete` (GRM ~1654), fires once *per copy* in `run.allSpirits`. A naive migration
+    into that seam would summon `aggregate × copy-count` symbionts. A correct migration needs a
+    once-per-capture-event-with-card-context seam that does NOT exist (`_fireSpiritHook` is once-per-event
+    but passes no `cards`; `onCaptureComplete` passes `cards` but fires per-copy). This is exactly the
+    "obvious migration hides a trap" risk the recon was told to watch for.
+  - **(b) Irreducible cross-spirit coupling.** `sym_algae`'s pre-increment/rollback (GRM ~1727-1756) is a
+    *second* spirit's logic interleaved around `util_symbiosis`'s single `addSymbiontSpirit` call: bump
+    pre-existing Algae elements → call (which can cascade-transcend Algae *inside* it, baking the
+    witnessing event into the negative's aggregation at the peel moment) → conditionally roll back on
+    summon failure. It is one transactional unit two independent hooks cannot express; a hook-shaped
+    version would have to embed Algae's logic inside util_symbiosis's handler — relocating the
+    entanglement, not reducing it. The transcend-timing requirement is intrinsic.
+- **sym_ducks → co-bank with Osprey (Ruling 3).** Mechanically trivial — two ±1 `multValue` mutations
+  (GRM ~1903 strand `-1`, ~1957 deck-flip-match `+1`) — but no deck-flip-outcome seam exists; migrating
+  needs an `onDeckFlipResolved`-style seam fired once per flip in the resolver. That is the SAME
+  nonexistent seam Osprey's banked deck-flip-interception migration needs. Building a hot-path seam for
+  two working lines is a poor trade; one future seam discharges both. Ducks in-place is **correct code**
+  (F4.20-FIX2 made both sites iterate `run.allSpirits` so transcended copies move too) — so this defers a
+  *stylistic* migration, not a fix. Co-banked into the §4 Osprey bullet in PHASE4_STATE.
+- **symbiosis semantics → confirmed correct, no [FIX] (Ruling 4).** Re-verified clause-by-clause against
+  `D0.11`: exactly one `ANIMAL_SYMBIONT_MAP[card.id]` lookup per captured animal (the map is strictly
+  1:1), summon at the `countStackedById` aggregate, no random selection, no multi-symbiont pool. The old
+  "N random symbionts per capture" bug was fixed in the F1.8.b wave, not deferred. The
+  `.filter(s => s.id === 'sym_algae')` is the Algae witnessing snapshot, not a selection antipattern.
+  Verifying before contain-ing — the no-bug finding was confirmed, not assumed.
+
+**What remains GRM-resident by design** (so a future reader / F4.24b knows these are intentional, not
+missed): `_bullseyeInventory` + `BULLSEYE_RANKS`/`YAKU_RANK` + the rank-clear machine (GRM ~75/262/
+2079-2092); the `util_symbiosis`/`sym_algae` capture-time summon block incl. the Algae pre-increment/
+rollback (GRM ~1713-1758); the `sym_ducks` ±1 `multValue` mutations (GRM ~1903/1957) — co-banked,
+awaiting the Osprey deck-flip seam.
+
+**Process note.** The recon's honest verdict ("most of this is document-and-contain") was the right call
+for the deferred-because-hard finale — and Ruling 4's semantics re-examination *confirmed* the no-bug
+finding clause-by-clause rather than accepting it on the recon's word. Verifying before contain-ing.
+
+**Cross-references:** `D0.11` (the symbiosis semantics ruling — confirmed implemented); `D-F4.20` (the
+counter wave that migrated the *clean* counters and explicitly deferred these); the PHASE4_STATE §4
+Osprey bullet (ducks now co-banked there, sharing the deck-flip seam); `D-F4-SCOPE Part 2` (the accepted
+import cycles #1/#2 — same document-and-contain disposition); F4.24b (the terminal `ARCHITECTURE.md` —
+these contained round machines documented as intentional, not as missed migrations).
