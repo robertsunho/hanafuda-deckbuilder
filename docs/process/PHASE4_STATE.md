@@ -87,18 +87,23 @@ Tier 3 — pipeline consolidation  ◀── IN PROGRESS
 │    won't-fix (aee4632); obs #13 init-unify (dfc1d6e); reset-dedup (b5c3985); _setPhase guardrail +8 tests
 │    (dc5deeb); push/bank Q3 vestigial delete (98db293) + Q2 seam decouple (04bc11e) + Q3 legibility (34c98a8).
 │    Displacement sweep clean (0 FIX). cycles #1/#2 accept-and-contain. Recon docs archived. Feeds F4.24b (stays late).
-├─ F4.27 ........................................... ◀── NEXT — util_past_life + sym_cuckoo_egg maturity/copy logic.
-└─ Named spirit hand-offs .......................... util_symbiosis/sym_algae summon (LAST); sym_ducks/engine_bullseye state-machines.
+├─ F4.27 ........................................... ✅ CLOSED (2026-06-11) — see DECISIONS_LOG F4.27.
+│    A: isElementMature centralization (4 sites, [PRESERVE], 20d0673). C: negative Cat-5 pipeline (22b1347) —
+│    C1 snapshot reseed from acquiredRound (dropped dead roundsHeld), C2 negative onRoundEnd increment, C3
+│    _freshNegativeState + _addPastLifeCopy null-state fix (dec.5), C4 source-aware _fireCuckooHatch (dec.7),
+│    C5 D3 shared fireCat5SaleEffects dispatch. Transcend-continuity gap CLOSED; +9 tests (was 0); 142→151.
+└─ Named spirit hand-offs .......................... ◀── NEXT (LAST Tier-3 item) — util_symbiosis/sym_algae summon (do LAST, highest-risk); sym_ducks/engine_bullseye state-machines.
 ```
 
-**Immediate next action:** the **destination audit (D-F4-SCOPE Part 2) CLOSED** 2026-06-11 (record
-`D-F4-SCOPE Part 2`) — all 6 recon items + 3 push/bank campaigns shipped (displacement sweep clean;
-intrinsic-org = items 3/4/5; push/bank = the 3 Q2/Q3 campaigns); both recon docs archived; it stabilized
-GRM/RunManager so F4.24b is now writable for them (F4.24b stays late). Next Tier-3 item is **F4.27**
-(`util_past_life` + `sym_cuckoo_egg` maturity/copy logic, locked F2.5 design), then the **named spirit
-hand-offs** (`util_symbiosis`/`sym_algae` summon — do LAST; `sym_ducks`/`engine_bullseye` state-machines,
-which need deck-flip / rank-inventory seams). Merge-vs-separate (F5.0) and the Earth redesign (F5.8) stay
-Phase-5 banked.
+**Immediate next action:** **F4.27 CLOSED** 2026-06-11 (record `F4.27`) — Campaigns A (`20d0673`,
+[PRESERVE] `isElementMature` centralization) + C (`22b1347`, [FIX] the negative Cat-5 maturation pipeline,
+5 steps/1 commit/9 tests) shipped and verified; the transcend-continuity gap for `util_past_life` +
+`sym_cuckoo_egg` is closed; it completes the last 2/29 accumulator conversions deferred from F2.5. The
+recon stayed in chat (no standing doc). Next — and now the **LAST Tier-3 item** — is the **named spirit
+hand-offs**: `util_symbiosis`/`sym_algae` summon (do LAST, highest-risk) + `sym_ducks`/`engine_bullseye`
+state-machines (which need deck-flip / rank-inventory seams). It opens with its **own read-only recon**
+and is **banked for a fresh session** as the high-risk finale. Merge-vs-separate (F5.0) and the Earth
+redesign (F5.8) stay Phase-5 banked.
 
 ---
 
@@ -262,7 +267,7 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 - `SPIRIT_SET_ITERATION_RULE.md` — durable (the transcendence/spirit-set invariant; a rule, not a record).
 - `PHASE4_consolidation_candidates.md` — partially-live (banked threads incl. Candidate C).
 - `PHASE4_STATE.md` — this doc (live state).
-- *(no currently-active standing doc — Tier-2 is complete (F4.24a shipped) and the Tier-3 scoring-loop pass, Candidate D (hand-capacity), and the destination audit (D-F4-SCOPE Part 2) have all closed; all their docs are archived below. The next Tier-3 item, F4.27 (util_past_life / sym_cuckoo_egg), is a contained spirit-logic task and is not expected to add a standing doc.)*
+- *(no currently-active standing doc — Tier-2 is complete (F4.24a shipped) and the Tier-3 scoring-loop pass, Candidate D (hand-capacity), the destination audit (D-F4-SCOPE Part 2), and F4.27 (Cat-5 maturation — Past Life / Cuckoo Egg) have all closed; their docs (where any) are archived below. F4.27 added NO standing doc — its recon stayed in chat and the durable record is the DECISIONS_LOG `F4.27` entry, so there is nothing to archive for it. The next and LAST Tier-3 item, the named spirit hand-offs (util_symbiosis/sym_algae summon + sym_ducks/engine_bullseye state-machines), WILL open with its own read-only recon and MAY add a standing doc when it runs.)*
 
 **`docs/` root:** `DESIGN_DOC_V5.md` — durable design source of truth.
 

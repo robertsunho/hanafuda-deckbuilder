@@ -4358,3 +4358,65 @@ does not trigger it.
 `D-F4-SCOPE / obs #14` (the won't-fix sub-record); `D-F4-SCORING-TIER3` + `D-F4-HANDCAP-TIER3` (sibling
 Tier-3 passes); F4.24b (the terminal doc this feeds). Recon docs `destination_audit_recon_pass1.md` +
 `pushbank_recon_pass1.md` ARCHIVED to `docs/archive/phase4/`.
+
+## F4.27 — Cat-5 maturation migration (Past Life + Cuckoo Egg): COMPLETE (2026-06-11)
+
+**Status:** CLOSED. Campaigns A + C shipped and verified against synced source. Completes the last
+**2/29** accumulator-spirit conversions deferred from F2.5 Phase B.6 — the **transcend-continuity gap for
+the Cat-5 meta-spirits is closed**. These two spirits no longer carry maturation logic scattered outside
+SpiritEffects, and a transcended (Negative) Past Life / Cuckoo Egg now matures and fires its copy/hatch
+on sale.
+
+**What it found & did.** The read-only recon verified the locked F2.5 Phase-B.6 spec (2026-05-23, 7
+design decisions + 4 implementation challenges) against CURRENT source. The spec was ~80% **relocated**
+but its design **intact**: the GameScene tooltip sites had moved to `spiritTooltip.js`; obs #13 (the
+destination audit) had unified the init path (`_initSpiritState`/`_freshAccumulatorElement`), and both
+spirits were already in `ACCUMULATOR_SPIRIT_IDS` with `NEGATIVE_SNAPSHOT` entries. Critically the recon
+found a **new bug the spec couldn't have known**: the negative path was inert **four compounding ways** —
+(1) a dead `roundsHeld` field the snapshot read but nothing wrote (always seeded `numerator: 0`); (2)
+empty `onRoundEnd` stubs (no per-round increment); (3) `numerator/denominator` consumed by nothing (the
+negative sell branch flat-refunded and returned); (4) two source-unaware methods (`_addPastLifeCopy`
+`state: null`, regular-only `_fireCuckooHatch`). Recon-first discipline caught that building from the
+spec alone would have left the gap open.
+
+**Commits.**
+- **Campaign A** — `isElementMature` centralization (`20d0673`). [PRESERVE]. The inline
+  `(run.round - acquiredRound) >= 3` maturity check deduped across 4 sites (2 GameScene sell + 2
+  `spiritTooltip`) into `isElementMature` + `CAT5_MATURITY_ROUNDS` in SpiritEffects. The `:475`
+  age-display calc left as-is (different output); sell-branch structure left intact for C.
+- **Campaign C** — negative Cat-5 maturation pipeline (`22b1347`). [FIX]. Built as one tested unit (5
+  steps, single commit):
+  - **C1** snapshot reseed: `snapshotCat5Maturation` seeds `numerator` from `run.round - acquiredRound`
+    (dropped the dead `roundsHeld` field — ruling D1), `denominator = powerLevel × CAT5_MATURITY_ROUNDS`.
+  - **C2** negative `onRoundEnd` increments `state.numerator += 1` each round (the folded-in former
+    "Campaign B"); regulars are a no-op (derive maturity from `acquiredRound`, D1).
+  - **C3** `_freshNegativeState(spiritId, powerLevel)` helper (NEGATIVE_SNAPSHOT over synthetic empty
+    elements) → fixed `_addPastLifeCopy`'s `state: null` (decision 5; fresh-zero parallel negative at
+    copier power, Option A).
+  - **C4** source-aware `_fireCuckooHatch` → a negative Cuckoo hatches a NEGATIVE Tier-2 fusion at the
+    copier's powerLevel (decision 7).
+  - **C5** the D3 shared `fireCat5SaleEffects` dispatch — both sell branches route through it; the
+    negative branch (previously inert) now fires copy/hatch on a matured sale. Regular path
+    [PRESERVE]-identical.
+  - **9 net-new tests** (`test/spirits/cat5_maturation.test.js`) — was ZERO coverage; suite 142 → 151.
+
+**Resolved rulings (Robert).** **D1** — `acquiredRound` = single source of truth; dropped the dead
+`roundsHeld`; negatives keep `{numerator, denominator}` seeded from `acquiredRound`. **D2** — locked
+decisions 5 & 7 stand (Option A fresh-zero negatives; negative Cuckoo → negative fusion at copier power).
+**D3** — both sell branches route through one shared sale-effects helper. **B-into-C fold** — because the
+negative `numerator` was consumed by nothing, a standalone Campaign B would have landed inert code, so
+the whole negative pipeline (snapshot → increment → consumption → source-aware creation) was built and
+tested as one unit in C.
+
+**Process note worth preserving.** The **recon-vs-reality gap**: the F2.5 spec predated all of Tier 2/3,
+so its `file:line` anchors were heavily stale AND it missed a bug introduced *after* it was written (the
+half-built `NEGATIVE_SNAPSHOT` Cat-5 wiring from a Tier-2 pass). **Verifying the spec against current
+source rather than implementing from it** is what surfaced the 4-way inertia and the missing 4th
+touch-point (the negative sell branch the 8-point scope list omitted). Same discipline that caught the
+alch_pearl premise in the destination audit.
+
+**Cross-references:** F2.5 (parent — F4.27 completes the last 2/29 accumulator conversions);
+`D-F4-SCOPE Part 2` (sibling pass whose obs #13 unified the init path A/C build on);
+`D-F4-CONSUMABLES-TIER2` + `D-F4.20` (the accumulator / Idea-D semantics F4.27 completes); F4.24b (the
+terminal `ARCHITECTURE.md` — F4.27's spirit-logic-migration pattern feeds it). The recon stayed in chat
+(no standing doc, per the OVERHAUL_PLAN F4.27 expectation) — this entry is the durable record.
