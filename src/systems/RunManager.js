@@ -1075,41 +1075,39 @@ class RunManager {
   // ── Flow system ────────────────────────────────────────────────────────────
 
   /**
-   * Called when the player completes a new yaku after pushing.
-   * Increments push depth — flow is not mutated until bank resolution.
-   * @param {object} [roundManager]  GRM instance for depth tracking.
+   * Called when the player completes a new yaku after pushing. Fires the hexagram onPushSuccess
+   * hook. The push-depth increment is owned by the caller (GRM owns the round-local _pushDepth) —
+   * flow is not mutated until bank/fail resolution.
    */
-  onPushSuccess(roundManager) {
-    if (roundManager) roundManager._pushDepth++;
+  onPushSuccess() {
     const effect = getActiveEffect();
     if (effect?.onPushSuccess) effect.onPushSuccess(this);
   }
 
   /**
-   * Called when the round ends after a push with no new yaku (push failure).
-   * Applies the failure multiplier from the push curve.
-   * @param {object} [roundManager]  GRM instance for depth lookup.
+   * Called when the round ends after a push with no new yaku (push failure). Applies the failure
+   * multiplier at depth+1 (the would-be depth of the in-flight failed push).
+   * @param {number} [depth]  Current resolved push depth; failure resolves at depth+1.
    */
-  onPushFailure(roundManager) {
-    if (roundManager) {
-      const depth = roundManager._pushDepth + 1;
-      const mult  = getPushMultiplier(depth, 'failure');
+  onPushFailure(depth) {
+    if (depth != null) {
+      const failDepth = depth + 1;
+      const mult  = getPushMultiplier(failDepth, 'failure');
       const oldFlow = this._flow;
       this._flow *= mult;
-      logger.logFlowChange(oldFlow, this._flow, `push failure (depth ${depth})`);
+      logger.logFlowChange(oldFlow, this._flow, `push failure (depth ${failDepth})`);
     }
     const effect = getActiveEffect();
     if (effect?.onPushFailure) effect.onPushFailure(this);
   }
 
   /**
-   * Called when the player banks. Applies the success multiplier from the
-   * push curve based on current push depth. At depth 0 the multiplier is 1.0.
-   * @param {object} [roundManager]  GRM instance for depth lookup.
+   * Called when the player banks. Applies the success multiplier from the push curve at the
+   * current push depth. At depth 0 the multiplier is 1.0.
+   * @param {number} [depth]  Current push depth (resolution depth on bank).
    */
-  onBank(roundManager) {
-    if (!roundManager) return;
-    const depth = roundManager._pushDepth;
+  onBank(depth) {
+    if (depth == null) return;
     const mult  = getPushMultiplier(depth, 'success');
     if (mult !== 1.0) {
       const oldFlow = this._flow;

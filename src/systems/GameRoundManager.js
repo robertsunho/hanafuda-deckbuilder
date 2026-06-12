@@ -1093,13 +1093,13 @@ export default class GameRoundManager {
   _endRound(trigger, ctx = {}) {
     // ── Trigger-specific prologue ─────────────────────────────────────
     if (trigger === 'banked') {
-      run.onBank(this);
+      run.onBank(this._pushDepth);
       const _hexBank = getActiveEffect();
       if (_hexBank?.onBank) _hexBank.onBank(run);
       this._fireSpiritHook('onBank');
     }
     if (trigger === 'natural' && this._pushPenaltyActive && !this._dogProtection) {
-      run.onPushFailure(this);
+      run.onPushFailure(this._pushDepth);
       this._fireSpiritHook('onPushFailure');
     }
 
@@ -2047,7 +2047,8 @@ export default class GameRoundManager {
       const pushSucceeded = this._pushPenaltyActive && newYaku.length > 0;
       if (pushSucceeded) {
         this._pushPenaltyActive = false;
-        run.onPushSuccess(this);  // increments _pushDepth + fires hexagram onPushSuccess
+        this._pushDepth++;        // GRM owns its round-local depth (was inside run.onPushSuccess)
+        run.onPushSuccess();      // now only fires the hexagram onPushSuccess hook
         // Bucket-T (F4.20): engine_northern_lion's pushesWitnessed is a shop-utility counter (drives
         // free rerolls), out of accumulator scope — intentionally in place, not seepage. See F4.16_F4.20_triage_ledger.md.
         for (const spirit of run.activeSpirits) {
