@@ -109,30 +109,36 @@ over-summon trap + the Algae transcend-timing coupling mean migration would *rel
 reduce it); `sym_ducks` is co-banked with Osprey (both need the same nonexistent deck-flip-outcome seam);
 the symbiosis semantics were re-verified correct vs `D0.11` (no [FIX]). No src/ changes — doc-only.
 
-Phase 4 now moves to **Tier 4 (UI/polish on the consolidated foundation)** and the **Phase-5 banked
-set**: Candidate C (getter renames), Candidate G-UX (random-8 tuning), Candidate H (consumable-
-consumption policy), Candidate I (legendary/spirit decoupling), F4.38(a) (Wu Xing timing ruling),
-velocity exponential magnitude, F5.0 (merge-vs-separate), F5.8 (Earth redesign), and **F4.24b** (the
-terminal `docs/ARCHITECTURE.md`). F4.24b is now substantially **un-blocked** — the major backbone
-consolidation (scoring-loop, hand-capacity, destination audit, named hand-offs) is done — but it still
-**stays late** per the late-write ruling: Phase-5 mechanic work will still generate new code, and
-ARCHITECTURE.md is written ONCE against the stabilized end-state.
+**The Phase-4 completion sequence is now the 6-step plan in `PHASE4_COMPLETION_PLAN.md`** (set
+2026-06-12) — which **supersedes the looser near-term/Tier-4/banked framing** that lived here. The steps,
+one line each (detail in the plan doc + the `tier5_reconciliation.md` §"Scope decision"):
+1. **Groupings 1+2+3 — near-term hygiene set** (~2h: dead-code cut + comment sweep + two tiny decisions).
+   **← CURRENT WORK** (opens with its own read-only recon).
+2. **Tier 4 — UI/UX cleanup** (F4.35 scene-unification, F4.37/F4.36 tooltip recomb + declarative read,
+   F3.16 scoring log) — opens with Tier-4 *scoping*.
+3. **Groupings 4/5/6 — their own heavier process**, split into (a) **design-rulings deliberation**
+   (grouping 5 + F4.26 / F4.33-Part1 / F4.38(a) / **F4.32**) — **the V6 gate**, run first — and (b)
+   **code refactors** (F4.25, F4.21, F4.28) after the rulings. (F4.29 stays optional/banked.)
+4. **Any remaining Phase-4 work** (stragglers steps 1-3 surface or defer).
+5. **Phase-4 close-out + Phase-5 restructuring/planning** (split the banked pile into the
+   design-resolution / feature-building / demo-prep sub-streams per `POST_AUDIT_DIRECTION.md`).
+6. **Design Doc V6 + `ARCHITECTURE.md` (F4.24b)** — written LAST, against settled mechanics (step-3
+   rulings folded in) + stabilized code; the gateposts to **Audit 2** (per `POST_AUDIT_DIRECTION.md`).
 
-**Tier 5 is now RECONCILED** (2026-06-11): the 22 cleanup items are walked against current source and
-bucketed in `tier5_reconciliation.md` (7 ABSORBED / 9 STILL-OPEN / 6 PARTIAL + a lost-and-found list).
-Robert scoped the registry's 6 recommended groupings (full disposition in that doc's §"Scope decision"):
-- **NEAR-TERM (the next concrete work — a ~2h hygiene set, mostly pure-subtraction/doc-only):** groupings
-  **1** (one-shot dead-code cut — F4.1 + F4.10 `removeCardFromField` + lost-and-found dead methods/smoke-
-  test; gate: confirm no save/load intent), **2** (one-shot comment sweep — F4.7 + F4.10 comments +
-  GRM:642 + N3 desc + obs #10 wording, zero behavior risk), **3** (tiny-decision pair — F4.4 `cardsByTag`,
-  F4.5 `_totalScore`, remove-or-document). A candidate small campaign, scoped separately when greenlit.
-- **In parallel / after — Tier-4 scoping** (UI/polish): F4.35 scene-unification lands here (per the
-  registry), plus the §2 headline items F4.37/F4.36 (tooltip recomb + declarative read) and F3.16
-  (scoring log). No defined Tier-4 task list yet beyond that headline.
-- **BANKED:** grouping **4** (verify-and-document rigor — F4.32/F4.28/F4.29, optional; registry already
-  records what's known), **5** (design rulings, NOT cleanup — F4.26/F4.31/F4.38(a)/F4.33-Part1/F4.30-half
-  → the Phase-5 design agenda), **6** (scheduled refactors — F4.21 ~4-7h before save-game, F4.25, F4.35 as
-  the Tier-4 scene-unification — each its own task when its slot comes).
+**The pinned dependency:** the grouping-4/5/6 design rulings (step 3a — they resolve open questions about
+*existing* mechanics) must land BEFORE the V6 reconciliation, else V6 documents mechanics whose
+definitions are still open. Chain: rulings → `DESIGN_DOC_PATCHES.md` → V6 → ARCHITECTURE.md → Audit 2.
+**F4.24b stays late** per the late-write ruling (it's step 6) — substantially un-blocked now (the major
+backbone consolidation is done), but written ONCE against the stabilized end-state.
+
+**Note — F4.32 reclassified:** the `tier5_reconciliation.md` "near-moot, confirm-and-document" sizing for
+F4.32 (Silk scope) is **stale** — it has open *design* questions + implementation issues, so it moves to
+the step-3a design-rulings stream, NOT the step-1 hygiene sweep. (See `PHASE4_COMPLETION_PLAN.md` §"F4.32
+correction.")
+
+**Tier 5 is RECONCILED** (2026-06-11): the 22 cleanup items are bucketed in `tier5_reconciliation.md`
+(7 ABSORBED / 9 STILL-OPEN / 6 PARTIAL + lost-and-found); Robert's grouping scope-call lives in that
+doc's §"Scope decision" and is sequenced by the 6-step plan above.
 
 ---
 
@@ -303,6 +309,8 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 - `TEST_HARNESS_GOTCHAS.md` — durable (Vitest harness conventions).
 - `SPIRIT_SET_ITERATION_RULE.md` — durable (the transcendence/spirit-set invariant; a rule, not a record).
 - `PHASE4_consolidation_candidates.md` — partially-live (banked threads incl. Candidate C).
+- `PHASE4_COMPLETION_PLAN.md` — durable (the 6-step Phase-4 completion sequence + the design-rulings→V6
+  dependency; supersedes the §3 next-action framing). Added 2026-06-12.
 - `POST_AUDIT_DIRECTION.md` — durable forward-declaration (the Audit-2 closing re-audit + the Phase-5-
   as-post-audit reframe; intent + dependencies + open forks, not a plan). Added 2026-06-11.
 - `tier5_reconciliation.md` — LIVE registry (the 22 Tier-5 cleanup items bucketed ABSORBED/OPEN/PARTIAL
