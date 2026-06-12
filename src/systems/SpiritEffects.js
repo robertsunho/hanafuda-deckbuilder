@@ -323,10 +323,10 @@ export const NEGATIVE_SNAPSHOT = {
   legend_wuji:           (s, p) => snapshotCat1Linear(s, p, 'destroyed',       _tb(s, 'mult', 0.3),  'multiplyMult'),
 
   // Cat 1 dual-key
-  engine_glacier:  (s, p) => snapshotCat1Dual(s, p, 't1Procs', 0.2, 't2Procs', 0.4, 'multiplyMult'),
-  engine_carbon:   (s, p) => snapshotCat1Dual(s, p, 't1Procs', 0.5, 't2Procs', 1.0, 'multiplyMult'),
-  engine_fossil:   (s, p) => snapshotCat1Dual(s, p, 't1Procs', 0.1, 't2Procs', 0.3, 'multiplyMult'),
-  engine_moths:    (s, p) => snapshotCat1Dual(s, p, 't1Procs', 0.3, 't2Procs', 0.6, 'multiplyMult'),
+  engine_glacier:  (s, p) => snapshotCat1Dual(s, p, 't1Procs', _tb(s, 't1Mult', 0.2), 't2Procs', _tb(s, 't2Mult', 0.4), 'multiplyMult'),
+  engine_carbon:   (s, p) => snapshotCat1Dual(s, p, 't1Procs', _tb(s, 't1Mult', 0.5), 't2Procs', _tb(s, 't2Mult', 1.0), 'multiplyMult'),
+  engine_fossil:   (s, p) => snapshotCat1Dual(s, p, 't1Procs', _tb(s, 't1Mult', 0.1), 't2Procs', _tb(s, 't2Mult', 0.3), 'multiplyMult'),
+  engine_moths:    (s, p) => snapshotCat1Dual(s, p, 't1Procs', _tb(s, 't1Mult', 0.3), 't2Procs', _tb(s, 't2Mult', 0.6), 'multiplyMult'),
 
   // Cat 1' exponential
   engine_velocity: (s, p) => snapshotCat1Exponential(s, p, 't2Procs'),
@@ -438,10 +438,10 @@ const _effects = {
       if (spirit.isNegative) {
         const arrays = spirit.state?.seenBrights ?? [];
         const sumLengths = arrays.reduce((s, arr) => s + (arr?.length ?? 0), 0);
-        return sumLengths === 0 ? null : { multiplyMult: 1 + sumLengths * 2 };
+        return sumLengths === 0 ? null : { multiplyMult: 1 + sumLengths * _tb(spirit, 'mult', 2) };
       }
       const n = aggregateArrayLength(spirit, 'seenBrights');
-      return n === 0 ? null : { multiplyMult: 1 + n * 2 };
+      return n === 0 ? null : { multiplyMult: 1 + n * _tb(spirit, 'mult', 2) };
     },
     onRoundEnd({ spirit }) {
       if (spirit.isNegative) {
@@ -464,10 +464,10 @@ const _effects = {
       if (spirit.isNegative) {
         const arrays = spirit.state?.seenAnimals ?? [];
         const sumLengths = arrays.reduce((s, arr) => s + (arr?.length ?? 0), 0);
-        return sumLengths === 0 ? null : { multiplyMult: 1.0 + sumLengths * 0.5 };
+        return sumLengths === 0 ? null : { multiplyMult: 1.0 + sumLengths * _tb(spirit, 'mult', 0.5) };
       }
       const n = aggregateArrayLength(spirit, 'seenAnimals');
-      return n === 0 ? null : { multiplyMult: 1.0 + n * 0.5 };
+      return n === 0 ? null : { multiplyMult: 1.0 + n * _tb(spirit, 'mult', 0.5) };
     },
   },
 
@@ -509,10 +509,10 @@ const _effects = {
       if (spirit.isNegative) {
         const arrays = spirit.state?.seenPlains ?? [];
         const sumLengths = arrays.reduce((s, arr) => s + (arr?.length ?? 0), 0);
-        return sumLengths === 0 ? null : { multiplyMult: 1.0 + sumLengths * 0.1 };
+        return sumLengths === 0 ? null : { multiplyMult: 1.0 + sumLengths * _tb(spirit, 'mult', 0.1) };
       }
       const n = aggregateArrayLength(spirit, 'seenPlains');
-      return n === 0 ? null : { multiplyMult: 1.0 + n * 0.1 };
+      return n === 0 ? null : { multiplyMult: 1.0 + n * _tb(spirit, 'mult', 0.1) };
     },
   },
 
@@ -943,13 +943,13 @@ const _effects = {
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
         const t = (spirit.state?.preTranscendTotal ?? 1) +
-                  (spirit.state?.newEvents1 ?? 0) * 0.2 * (spirit.powerLevel ?? 1) +
-                  (spirit.state?.newEvents2 ?? 0) * 0.4 * (spirit.powerLevel ?? 1);
+                  (spirit.state?.newEvents1 ?? 0) * _tb(spirit, 't1Mult', 0.2) * (spirit.powerLevel ?? 1) +
+                  (spirit.state?.newEvents2 ?? 0) * _tb(spirit, 't2Mult', 0.4) * (spirit.powerLevel ?? 1);
         return t <= 1 ? null : { multiplyMult: t };
       }
       const t1 = aggregateNumericState(spirit, 't1Procs');
       const t2 = aggregateNumericState(spirit, 't2Procs');
-      return (t1 === 0 && t2 === 0) ? null : { multiplyMult: 1 + (t1 * 0.2 + t2 * 0.4) };
+      return (t1 === 0 && t2 === 0) ? null : { multiplyMult: 1 + (t1 * _tb(spirit, 't1Mult', 0.2) + t2 * _tb(spirit, 't2Mult', 0.4)) };
     },
   },
 
@@ -957,13 +957,13 @@ const _effects = {
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
         const t = (spirit.state?.preTranscendTotal ?? 1) +
-                  (spirit.state?.newEvents1 ?? 0) * 0.5 * (spirit.powerLevel ?? 1) +
-                  (spirit.state?.newEvents2 ?? 0) * 1.0 * (spirit.powerLevel ?? 1);
+                  (spirit.state?.newEvents1 ?? 0) * _tb(spirit, 't1Mult', 0.5) * (spirit.powerLevel ?? 1) +
+                  (spirit.state?.newEvents2 ?? 0) * _tb(spirit, 't2Mult', 1.0) * (spirit.powerLevel ?? 1);
         return t <= 1 ? null : { multiplyMult: t };
       }
       const t1 = aggregateNumericState(spirit, 't1Procs');
       const t2 = aggregateNumericState(spirit, 't2Procs');
-      return (t1 === 0 && t2 === 0) ? null : { multiplyMult: 1 + (t1 * 0.5 + t2 * 1.0) };
+      return (t1 === 0 && t2 === 0) ? null : { multiplyMult: 1 + (t1 * _tb(spirit, 't1Mult', 0.5) + t2 * _tb(spirit, 't2Mult', 1.0)) };
     },
   },
 
@@ -975,15 +975,15 @@ const _effects = {
       if (spirit.isNegative) {
         const effectiveT2 = (spirit.state?.t2ProcsAtTranscend ?? 0) +
                             (spirit.state?.newT2Procs ?? 0) * (spirit.powerLevel ?? 1);
-        const t1Mult = ironCount * 0.1 * (spirit.powerLevel ?? 1);
-        const t2Mult = Math.pow(1.5, effectiveT2);
+        const t1Mult = ironCount * _tb(spirit, 'perIronMult', 0.1) * (spirit.powerLevel ?? 1);
+        const t2Mult = Math.pow(_tb(spirit, 'jackpotMult', 1.5), effectiveT2);
         if (t1Mult === 0 && effectiveT2 === 0) return null;
         return { multiplyMult: (1 + t1Mult) * t2Mult };
       }
       const t2 = aggregateNumericState(spirit, 't2Procs');
       const scaling = effectivePower(spirit);
-      const t1Mult = ironCount * 0.1 * scaling;
-      const t2Mult = Math.pow(1.5, t2);
+      const t1Mult = ironCount * _tb(spirit, 'perIronMult', 0.1) * scaling;
+      const t2Mult = Math.pow(_tb(spirit, 'jackpotMult', 1.5), t2);
       if (t1Mult === 0 && t2 === 0) return null;
       return { multiplyMult: (1 + t1Mult) * t2Mult };
     },
@@ -993,13 +993,13 @@ const _effects = {
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
         const t = (spirit.state?.preTranscendTotal ?? 1) +
-                  (spirit.state?.newEvents1 ?? 0) * 0.1 * (spirit.powerLevel ?? 1) +
-                  (spirit.state?.newEvents2 ?? 0) * 0.3 * (spirit.powerLevel ?? 1);
+                  (spirit.state?.newEvents1 ?? 0) * _tb(spirit, 't1Mult', 0.1) * (spirit.powerLevel ?? 1) +
+                  (spirit.state?.newEvents2 ?? 0) * _tb(spirit, 't2Mult', 0.3) * (spirit.powerLevel ?? 1);
         return t <= 1 ? null : { multiplyMult: t };
       }
       const t1 = aggregateNumericState(spirit, 't1Procs');
       const t2 = aggregateNumericState(spirit, 't2Procs');
-      return (t1 === 0 && t2 === 0) ? null : { multiplyMult: 1 + (t1 * 0.1 + t2 * 0.3) };
+      return (t1 === 0 && t2 === 0) ? null : { multiplyMult: 1 + (t1 * _tb(spirit, 't1Mult', 0.1) + t2 * _tb(spirit, 't2Mult', 0.3)) };
     },
   },
 
@@ -1019,13 +1019,13 @@ const _effects = {
     applyEngine({ spirit }) {
       if (spirit.isNegative) {
         const t = (spirit.state?.preTranscendTotal ?? 1) +
-                  (spirit.state?.newEvents1 ?? 0) * 0.3 * (spirit.powerLevel ?? 1) +
-                  (spirit.state?.newEvents2 ?? 0) * 0.6 * (spirit.powerLevel ?? 1);
+                  (spirit.state?.newEvents1 ?? 0) * _tb(spirit, 't1Mult', 0.3) * (spirit.powerLevel ?? 1) +
+                  (spirit.state?.newEvents2 ?? 0) * _tb(spirit, 't2Mult', 0.6) * (spirit.powerLevel ?? 1);
         return t <= 1 ? null : { multiplyMult: t };
       }
       const t1 = aggregateNumericState(spirit, 't1Procs');
       const t2 = aggregateNumericState(spirit, 't2Procs');
-      return (t1 === 0 && t2 === 0) ? null : { multiplyMult: 1 + (t1 * 0.3 + t2 * 0.6) };
+      return (t1 === 0 && t2 === 0) ? null : { multiplyMult: 1 + (t1 * _tb(spirit, 't1Mult', 0.3) + t2 * _tb(spirit, 't2Mult', 0.6)) };
     },
   },
 
