@@ -2958,19 +2958,6 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  _restartRound() {
-    this._closeCaptureOverlay();
-    this._closeYakuGuide();
-    this._clearObjs(this._overlayObjs);
-    this._selectedCardIds.clear();
-    this._selectedConsumableIndex = null;
-    this._cardTargetMode = null;
-
-    this._round.startRound();
-    this._afterRoundStart();
-    this._renderAll();
-  }
-
   // ── Capture yaku overlay ──────────────────────────────────────────────────
 
   _showCaptureYakuOverlay(result) {

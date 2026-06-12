@@ -82,6 +82,20 @@ export default class GameRoundManager {
   static FIELD_DEAL      = 8;   // cards dealt face-up to the field at deal time
   static MAX_DISCARDS    = 2;   // free discards available per round
 
+  /**
+   * Legal phase transitions. Keys are `from` phases; values are the `to` phases reachable from
+   * that `from` via a real code path (verified by the item-5 transition recon). Round (re)start is
+   * NOT here — _resetRoundState assigns `idle` directly (initialization, not a transition).
+   * `round_over` is a sink (exit only via reset, which bypasses _setPhase).
+   * @type {Record<string, string[]>}
+   */
+  static PHASE_TRANSITIONS = {
+    idle:          ['idle', 'awaiting_deck', 'round_over'],
+    awaiting_deck: ['idle', 'yaku_decision', 'round_over'],
+    yaku_decision: ['idle', 'round_over'],
+    round_over:    [],
+  };
+
   constructor() {
     this._deck    = new DeckManager();
     this._hand    = new HandManager(); // real cap set every round at startRound (modifyHandSize)
@@ -234,7 +248,7 @@ export default class GameRoundManager {
    */
   _resetRoundState() {
     this._lastEarthKiGain    = 0;          // Earth ki bonus — computed at round-end (_computeEarthKiBonus)
-    this._phase              = "idle";     // round phase: 'idle' | 'awaiting_deck' | 'round_over'
+    this._phase              = "idle";     // direct assign — reset is initialization, not a transition (bypasses _setPhase by design). Phases: 'idle' | 'awaiting_deck' | 'yaku_decision' | 'round_over'
     this._yakuBeforeTurn     = new Set();  // yaku names present at the start of the current turn
     this._turn               = 0;          // 1-based turn counter
     this._lastDeckCard       = null;       // most recently flipped deck card (UI)
@@ -279,6 +293,25 @@ export default class GameRoundManager {
     this._captureEventCount = 0;
     this._spentCardIds      = new Set();
     this._lastHandPlayToEmptySlot = null;  // empty-slot play tracking (Fix D/E capture rules)
+  }
+
+  /**
+   * Transition the round phase, validating the move against PHASE_TRANSITIONS. Throws on an illegal
+   * transition — a guardrail against control-flow bugs (a write that moves the machine into a state
+   * unreachable from the current one). Does NOT handle round (re)start: _resetRoundState assigns
+   * `idle` directly, since reset is initialization, not a transition.
+   * @param {'idle'|'awaiting_deck'|'yaku_decision'|'round_over'} to
+   */
+  _setPhase(to) {
+    const from = this._phase;
+    const legal = GameRoundManager.PHASE_TRANSITIONS[from];
+    if (!legal || !legal.includes(to)) {
+      throw new Error(
+        `Illegal phase transition: "${from}" → "${to}". ` +
+        `Legal from "${from}": [${(legal ?? []).join(', ') || 'none'}].`
+      );
+    }
+    this._phase = to;
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
@@ -576,7 +609,7 @@ export default class GameRoundManager {
     this._playsThisTurn++;
     const morePlays = this._playsThisTurn < this._requiredPlaysPerTurn && !this._hand.isEmpty();
 
-    this._phase = morePlays ? "idle" : "awaiting_deck";
+    this._setPhase(morePlays ? "idle" : "awaiting_deck");
 
     return {
       status:       morePlays ? "awaiting_play" : "awaiting_deck",
@@ -658,7 +691,7 @@ export default class GameRoundManager {
       this._scoring.evaluate(unspentAfterPush, this._getCaptureThresholds())
         .map(y => y.name)
     );
-    this._phase = "idle";
+    this._setPhase("idle");
     // Preview: if the next yaku succeeds we'll bank at depth+1; if it fails, depth+1 failure.
     const nextDepth = this._pushDepth + 1;
     return {
@@ -678,7 +711,7 @@ export default class GameRoundManager {
       throw new Error(`continuePlay() called while phase is "${this._phase}".`);
     }
     this._roundEndingAfterDecision = false;
-    this._phase = "idle";
+    this._setPhase("idle");
   }
 
   /**
@@ -1096,7 +1129,7 @@ export default class GameRoundManager {
     const _hexEnd = getActiveEffect();
     if (_hexEnd?.onRoundEnd) _hexEnd.onRoundEnd(this);
     this._fireSpiritHook('onRoundEnd');
-    this._phase = "round_over";
+    this._setPhase("round_over");
 
     return this._buildRoundEndResult(trigger, flow, ctx);
   }
@@ -2109,16 +2142,16 @@ export default class GameRoundManager {
 
       if ((newYaku.length > 0 && !_forceAutoBank) || tigerTriggered) {
         this._roundEndingAfterDecision = roundOver;
-        this._phase = "yaku_decision";
+        this._setPhase("yaku_decision");
       } else if (roundOver || _forceAutoBank) {
         const trigger = (_forceAutoBank && !roundOver) ? 'forced_auto_bank' : 'natural';
         return this._endRound(trigger, { penaltyApplied, newYaku, allYaku: yakuForDiff,
           yakuDisabled: !!_disablesYaku, tigerPush: false });
       } else if (_disablesYaku) {
         // Yaku disabled — offer free bank/continue each turn
-        this._phase = "yaku_decision";
+        this._setPhase("yaku_decision");
       } else {
-        this._phase = "idle";
+        this._setPhase("idle");
       }
 
       const status = (newYaku.length > 0 || tigerTriggered) ? "yaku_decision"
