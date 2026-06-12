@@ -149,9 +149,6 @@ export default class GameRoundManager {
   /** True when the Dog consumable has nullified the push penalty. */
   get dogProtection() { return this._dogProtection; }
 
-  /** True when the Pig consumable has queued a ki-reward double. */
-  get pigDoubleKi()   { return this._pigDoubleKi; }
-
   /** True when the Goat consumable is active (+1 ki per capture). */
   get goatActive()    { return this._goatActive; }
 
@@ -259,14 +256,11 @@ export default class GameRoundManager {
     this._discardsRemaining  = GameRoundManager.MAX_DISCARDS;
     this._basePoints         = 0;          // running base capture points this round
     this._naturalCaptures    = [];         // round-start all-4-of-a-month auto-captures
-    this._atRiskScore              = 0;     // finalScore recorded at push (UI: at-risk)
     this._pushPenaltyActive        = false; // exposed to the push penalty
     this._pushCount                = 0;     // times pushed this round
     this._pushDepth                = 0;     // successful push depth (commitment curve index)
     this._bullseyeInventory        = { bright: 0, animal: 0, ribbon: 0, plain: 0 }; // engine_bullseye rank tracker
-    this._roundEndingAfterDecision = false; // round-over deferred pending Bank/Push decision
     this._dogProtection            = false; // Dog consumable: suppress push penalty this round
-    this._pigDoubleKi              = false; // Pig consumable: double round-end ki
     this._goatActive               = false; // Goat consumable: +1 ki per capture
     this._tigerPushActive          = false; // Tiger consumable: forced-push one-shot
     this._roosterBonusThisRound    = 0;     // Rooster zodiac: +1 field slot this round
@@ -676,10 +670,8 @@ export default class GameRoundManager {
       throw new Error(`pushOn() called while phase is "${this._phase}".`);
     }
 
-    this._roundEndingAfterDecision = false;
     this._pushCount++;
 
-    this._atRiskScore       = this._runningScore;
     this._pushPenaltyActive = true;
     // Hand cards carry over; deal a fixed number of additional cards.
     const dealCount = this._getNextPushDealCount();
@@ -710,7 +702,6 @@ export default class GameRoundManager {
     if (this._phase !== "yaku_decision") {
       throw new Error(`continuePlay() called while phase is "${this._phase}".`);
     }
-    this._roundEndingAfterDecision = false;
     this._setPhase("idle");
   }
 
@@ -1125,7 +1116,6 @@ export default class GameRoundManager {
       this._capture.getAll(),
       this._style.getTriggeredCombos(), this._lastEnhancementEvents ?? []
     );
-    this._roundEndingAfterDecision = false;
     const _hexEnd = getActiveEffect();
     if (_hexEnd?.onRoundEnd) _hexEnd.onRoundEnd(this);
     this._fireSpiritHook('onRoundEnd');
@@ -1158,7 +1148,6 @@ export default class GameRoundManager {
       penaltyApplied:   ctx.penaltyApplied ?? false,
       pushCount:        this._pushCount,
       pushDepth:        this._pushDepth,
-      pigDoubleKi:      this._pigDoubleKi,
       turn:             this._turn,
       deckCard:         this._lastDeckCard,
       discarded:        [...this._discardedThisTurn],
@@ -2141,7 +2130,6 @@ export default class GameRoundManager {
       if (tigerTriggered) this._tigerPushActive = false; // consume one-shot flag
 
       if ((newYaku.length > 0 && !_forceAutoBank) || tigerTriggered) {
-        this._roundEndingAfterDecision = roundOver;
         this._setPhase("yaku_decision");
       } else if (roundOver || _forceAutoBank) {
         const trigger = (_forceAutoBank && !roundOver) ? 'forced_auto_bank' : 'natural';
@@ -2176,7 +2164,6 @@ export default class GameRoundManager {
         penaltyApplied,
         pushCount:        this._pushCount,
         pushDepth:        this._pushDepth,
-        pigDoubleKi:      this._pigDoubleKi,
         turn:             this._turn,
         deckCard:         this._lastDeckCard,
         discarded:        [...this._discardedThisTurn],
