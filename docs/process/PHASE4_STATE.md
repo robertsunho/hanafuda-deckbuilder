@@ -303,6 +303,8 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 - `TEST_HARNESS_GOTCHAS.md` — durable (Vitest harness conventions).
 - `SPIRIT_SET_ITERATION_RULE.md` — durable (the transcendence/spirit-set invariant; a rule, not a record).
 - `PHASE4_consolidation_candidates.md` — partially-live (banked threads incl. Candidate C).
+- `POST_AUDIT_DIRECTION.md` — durable forward-declaration (the Audit-2 closing re-audit + the Phase-5-
+  as-post-audit reframe; intent + dependencies + open forks, not a plan). Added 2026-06-11.
 - `tier5_reconciliation.md` — LIVE registry (the 22 Tier-5 cleanup items bucketed ABSORBED/OPEN/PARTIAL
   post-Tier-3 + lost-and-found + Robert's scope decision on the 6 groupings; Tier-4/5 planning consults
   it). Added 2026-06-11.
