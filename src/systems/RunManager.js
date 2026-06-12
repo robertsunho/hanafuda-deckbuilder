@@ -642,6 +642,27 @@ class RunManager {
   }
 
   /**
+   * Build the canonical transcended-negative object from a live regular spirit.
+   * Single source of truth for negative construction — BOTH natural cascade
+   * transcendence (_acquireSpiritStack) and Amber (alch_amber) call this so they
+   * can't drift. Aggregates `.elements` into negative state (falls back to null
+   * for non-accumulators) and carries acquiredRound/symbiont so Cat-5 maturation
+   * and symbiosis machinery keep working. sellPriceBonus resets to 0 (fresh
+   * negative), matching natural transcendence.
+   * @param {object} spirit      The live regular spirit being transcended.
+   * @param {number} powerLevel  Snapshot power (stackCount; F4.26 Option B).
+   */
+  _buildTranscendedNegative(spirit, powerLevel) {
+    return {
+      id: spirit.id, name: spirit.name,
+      stackCount: 1, isNegative: true, powerLevel,
+      state: this._aggregateElementsForNegative(spirit, powerLevel),
+      acquiredRound: this._round ?? 0,
+      symbiont: spirit.symbiont || undefined, sellPriceBonus: 0,
+    };
+  }
+
+  /**
    * Summon a spirit by id without spending ki (used by Cat zodiac).
    * Follows the same stacking/transcendence rules as buySpirit.
    * @param {string} spiritId
@@ -835,18 +856,12 @@ class RunManager {
 
         if (existing.stackCount >= 4) {
           const snapshotPower = existing.stackCount;   // F4.26 Option B: all-4-contribute (lossless), matches Amber
-          const aggregatedState = this._aggregateElementsForNegative(existing, snapshotPower);
           const idx = this._allSpirits.indexOf(existing);
           // [FIX] Transcendence PRESERVES chain position — replace the transcending spirit
           // IN PLACE at its index, not splice+push-to-end (the prior append relocated the
           // Negative to the chain end). Transcendence frees a slot, it must not move the
           // spirit. See SPIRIT_SET_ITERATION_RULE.md §1.
-          this._allSpirits.splice(idx, 1, {
-            id: spiritDef.id, name: spiritDef.name,
-            stackCount: 1, isNegative: true, powerLevel: snapshotPower,
-            state: aggregatedState, acquiredRound: this._round ?? 0,
-            symbiont: isSymbiont || undefined, sellPriceBonus: 0,
-          });
+          this._allSpirits.splice(idx, 1, this._buildTranscendedNegative(existing, snapshotPower));
           lastResult = 'transcended';
         } else {
           lastResult = 'stacked';

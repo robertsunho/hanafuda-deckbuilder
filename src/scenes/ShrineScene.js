@@ -1301,7 +1301,9 @@ export class ShrineScene extends Phaser.Scene {
         case 'spirit_pair_tier3':           return { s, i, ok: def?.tier === 3 };
         case 'spirit_single_fusion':        return { s, i, ok: def?.tier === 2 || def?.tier === 3 };
         case 'spirit_single_stackable':     return { s, i, ok: (s.stackCount ?? 1) < 3 };
-        case 'spirit_single_transcendable': return { s, i, ok: (s.stackCount ?? 1) >= 3 };
+        // Amber transcends at ANY stack count — a low-stack negative is weaker (powerLevel = stackCount)
+        // but freeing a slot now is the intended tradeoff; no stack gate. (F4.26-B: Amber-niche balance banked P5.)
+        case 'spirit_single_transcendable': return { s, i, ok: true };
         default:                            return { s, i, ok: true };
       }
     });

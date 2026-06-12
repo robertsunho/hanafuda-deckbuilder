@@ -393,12 +393,12 @@ const _effects = {
       if (!target) return { success: false };
       const mod = run._permanentFieldSlotMod ?? 0;
       if (FieldManager.MAX_SLOTS + mod - 1 < 1) return { success: false, message: 'Cannot reduce field slots below 1' };
-      const snapshotPower = target.stackCount ?? 1;
-      const inheritedState = target.state ?? null;
-      // [FIX] Transcendence PRESERVES chain position — replace IN PLACE at the target's index
-      // instead of remove + add-to-end (the prior path relocated the Negative to the chain end).
-      // See SPIRIT_SET_ITERATION_RULE.md §1.
-      run.replaceSpiritObj(target, { id: target.id, name: target.name, isNegative: true, stackCount: 1, powerLevel: snapshotPower, state: inheritedState });
+      // Build the negative through the canonical shared path (RunManager._buildTranscendedNegative) so
+      // Amber aggregates the spirit's accumulator .elements (was silently dropping them via a raw
+      // target.state read) and carries acquiredRound/symbiont. Amber transcends at ANY stack count
+      // (powerLevel = stackCount) — the weaker negative is its intended tradeoff. Chain position is
+      // preserved via replaceSpiritObj (in-place; SPIRIT_SET_ITERATION_RULE §1).
+      run.replaceSpiritObj(target, run._buildTranscendedNegative(target, target.stackCount ?? 1));
       run._permanentFieldSlotMod = mod - 1;
       if (roundManager) roundManager._recomputeFieldSlots();
       return { success: true, message: `${target.name} transcended! Field -1 slot.` };
