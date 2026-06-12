@@ -274,6 +274,14 @@ function snapshotArraysFromElements(spirit, powerLevel, key) {
   return { [key]: arrays };
 }
 
+// Cat-5 maturation: an element is mature 3+ rounds after acquisition. acquiredRound is the
+// single source of truth (ruling D1) — no separate roundsHeld field. Used by Past Life /
+// Cuckoo Egg sell activation + tooltips.
+export const CAT5_MATURITY_ROUNDS = 3;
+export function isElementMature(el, currentRound) {
+  return (currentRound - (el.acquiredRound ?? 0)) >= CAT5_MATURITY_ROUNDS;
+}
+
 function snapshotCat5Maturation(spirit, powerLevel, numKey, denomDefault) {
   const elements = spirit.elements.slice(0, powerLevel);
   const numerator = elements.reduce((s, el) => s + (el[numKey] ?? 0), 0);

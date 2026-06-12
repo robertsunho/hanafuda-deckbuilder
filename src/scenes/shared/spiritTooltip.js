@@ -3,7 +3,7 @@
 // Called from both GameScene and ShrineScene.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import SpiritEffects               from '../../systems/SpiritEffects.js';
+import SpiritEffects, { isElementMature } from '../../systems/SpiritEffects.js';
 import { getSpiritDef }            from '../../data/spirits.js';
 import run, {
   effectivePower,
@@ -381,7 +381,7 @@ export function getSpiritContrib(spirit, opts = {}) {
   if (spirit.id === 'util_past_life') {
     const elements = spirit.elements ?? [];
     const totalEl = elements.length;
-    const activated = elements.filter(el => (run.round - (el.acquiredRound ?? 0)) >= 3).length;
+    const activated = elements.filter(el => isElementMature(el, run.round)).length;
     lines.push(`Activated: ${activated}/${totalEl} (3-round hold each)`);
     if (activated > 0) {
       lines.push(`On sale: copies 1 random spirit at power ${activated}`);
@@ -470,7 +470,7 @@ export function getSpiritContrib(spirit, opts = {}) {
     if (elements.length === 0) {
       lines.push('Hatches in 3 rounds');
     } else {
-      const matureCount = elements.filter(el => (run.round - (el.acquiredRound ?? 0)) >= 3).length;
+      const matureCount = elements.filter(el => isElementMature(el, run.round)).length;
       if (elements.length === 1) {
         const age = run.round - (elements[0].acquiredRound ?? 0);
         lines.push(age >= 3 ? 'Mature \u2014 sell to hatch a Tier-2 fusion' : `Hatches in ${3 - age} round(s)`);

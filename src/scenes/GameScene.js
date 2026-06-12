@@ -5,7 +5,7 @@ import run, { RunManager, effectivePower, aggregateNumericState, aggregateArrayL
 import { getElementDef, getStampDef } from '../data/consumables.js';
 import { getSpiritDef }      from '../data/spirits.js';
 import logger                from '../systems/GameplayLogger.js';
-import SpiritEffects         from '../systems/SpiritEffects.js';
+import SpiritEffects, { isElementMature } from '../systems/SpiritEffects.js';
 import ConsumableEffects    from '../systems/ConsumableEffects.js';
 import { getCardPoints }     from '../systems/CardMutations.js';
 import { getFireFlatPoints, getMetalHeldMult, getEarthInterestRate,
@@ -1008,7 +1008,7 @@ export class GameScene extends Phaser.Scene {
     if (spirit.id === 'util_past_life' && spirit.elements) {
       const elementsBeingSold = spirit.elements.slice(-quantity);
       for (const el of elementsBeingSold) {
-        if ((run.round - (el.acquiredRound ?? 0)) >= 3) pastLifeActivated++;
+        if (isElementMature(el, run.round)) pastLifeActivated++;
       }
     }
 
@@ -1017,7 +1017,7 @@ export class GameScene extends Phaser.Scene {
     if (spirit.id === 'sym_cuckoo_egg' && spirit.elements) {
       const elementsBeingSold = spirit.elements.slice(-quantity);
       for (const el of elementsBeingSold) {
-        if ((run.round - (el.acquiredRound ?? 0)) >= 3) cuckooMatureStacks++;
+        if (isElementMature(el, run.round)) cuckooMatureStacks++;
       }
     }
 
