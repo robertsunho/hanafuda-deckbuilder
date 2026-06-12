@@ -1,5 +1,9 @@
 # GRM/RunManager Destination Audit — Recon (Pass 1)
 
+> **CLOSED 2026-06-11 — D-F4-SCOPE Part 2 complete.** Archived reference; do NOT edit. All 6 recon items
+> shipped (cycle #3 sever, obs #14 won't-fix, obs #13 init-unify, reset-dedup, `_setPhase` guardrail,
+> push/bank recon). Rulings + commit list in DECISIONS_LOG `D-F4-SCOPE Part 2`.
+
 > Standing reference for the **destination audit (D-F4-SCOPE Part 2)** — the late-Tier-3 GRM/RunManager
 > deep dive. Status: LIVE during the audit; archive at close-out. Read-only recon — **maps, does not fix.**
 > Companion to: DECISIONS_LOG `D-F4-SCOPE` (charter), `F4.24_inventory_pass2.md` (the end-of-Tier-2

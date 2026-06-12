@@ -4293,3 +4293,68 @@ silently-resolved; the per-capture read stays deliberately.
 gate caught it before any edit. The recon doc Part 3c carries a [CORRECTION] note; Part 4 item 2 is marked
 CLOSED/won't-fix. Next destination-audit campaign = obs #13 (spirit-init unification). Cross-ref: `D-F4-SCOPE`
 (charter); cycle #3 sever (commit `83d9920`, the prior sub-campaign).
+
+---
+
+## D-F4-SCOPE Part 2 — GRM/RunManager destination audit: COMPLETE (2026-06-11)
+
+**Status:** CLOSED. All 6 recon items + 3 push/bank campaigns shipped and verified against synced
+source. Both recon docs archived to `docs/archive/phase4/`.
+
+**What the audit found & did.** The destination-document audit (start at the GRM/RunManager sink, ask
+"what doesn't belong, and is what does belong organized?") split into displacement + intrinsic-org.
+- **Displacement sweep: CLEAN** — 0 genuine FIX-candidates; the "categories drained" premise (the
+  three Tier-2 category blocks) held. Nothing a record claimed drained was still mis-resident.
+- **Intrinsic-org: several small [PRESERVE] campaigns + one [FIX] guardrail.** The import cycles, the
+  dual spirit-init, the constructor/startRound reset drift, the implicit phase machine.
+- **Push/bank: structurally coherent** with one entanglement (the `_pushDepth` cross-call) + 3
+  vestigial fields — both resolved.
+
+**The work (commit list):**
+- **Item 1 — cycle #3 severed** (deleted the dead `ScoringEngine→SpiritEffects` import; added a cycle #2
+  accept-and-contain note). `83d9920`.
+- **Item 2 — obs #14 capstone-flag caching: WON'T-FIX** (`alch_pearl` forges capstones mid-round → the
+  per-capture `.some()` read is load-bearing; caching would be a silent behavior change). Logged at
+  `D-F4-SCOPE / obs #14`. `aee4632` (doc).
+- **Item 3 — obs #13 spirit-init unification** (`_initSpiritState` + `_initSpiritElements` merged; per-id
+  routing proof — strictly channel-routed, only `game_catcher` dual-reachable with identical state).
+  `dfc1d6e`.
+- **Item 4 — `_resetRoundState()` dedup** (constructor/startRound round-state init unified into
+  `_resetRoundState`/`_resetScoringState`; Case-B split preserving the `onRoundStart`-before-scoring-init
+  timing contract). `b5c3985`.
+- **Item 5 — `_setPhase()` guardrail [FIX]** (validating phase machine vs `PHASE_TRANSITIONS`; reset
+  bypasses by design; JSDoc 3→4 states; dead `_restartRound` deleted; +8 regression tests in
+  `phase_machine.test.js`). `dc5deeb`.
+- **Item 6 — push/bank dedicated recon** (`pushbank_recon_pass1.md`) → 3 campaigns:
+  - **Q3 vestigial deletion** — `_atRiskScore`, `_pigDoubleKi`, `_roundEndingAfterDecision` (all
+    write-only, dead through the GRM→result→scene seam) + their result-object keys. `98db293`.
+  - **Q2 seam decouple** — GRM owns/increments `_pushDepth`; `onPushSuccess/Failure/onBank` take `depth`
+    as a param. Removed the only cross-file write into GRM state. `04bc11e`.
+  - **Q3-cosmetic legibility** — `_pushCount`/`_pushDepth` two-axis docs (attempts/DEAL-curve vs
+    successes/FLOW-curve) + `_dogProtection`→`_pushPenaltyWaived` rename (obs #10; set by Rabbit, not
+    Dog). `34c98a8`.
+
+**Resolved rulings (Robert).** Push/bank **Q1** — keep both `_pushCount` (attempts/deal) and `_pushDepth`
+(successes/flow); two real axes, now documented. **Q2** — decouple the seam (done). **Q3** — delete the
+3 vestigial fields + do the legibility rename (done). **Q4** — `getPushMultiplier` stays in RunManager
+(run-economy). **obs #14** — won't-fix. **obs #13** — unified. *(These answer the open Q1–Q4 in the
+`pushbank_recon_pass1.md` Part-5 snapshot, which stays as-written — the pre-ruling questions are resolved
+here, not by rewriting the snapshot.)*
+
+**Process notes worth preserving.** (a) The **alch_pearl catch** — obs #14's Step-0 gate refuted an
+unverified "round-invariant loadout" recon premise *before* any edit (the verify-the-premise discipline
+working as a circuit-breaker, the same way the hand-capacity and hex_51 premises were caught). (b) The
+**obs #13 routing proof** and the **item-4 Case-B hook-timing** both *confirmed* the "obvious" invariant
+under tracing — the discipline isn't about expecting failure; it's about not knowing which way until you
+check (here, both held; obs #14 didn't).
+
+**F4.24b dovetail.** This audit is the recon that makes the terminal `ARCHITECTURE.md` (F4.24b) WRITABLE
+for GRM/RunManager — the two files are now stabilized: explicit/validated phase machine, deduped
+round-state init, decoupled push/bank seam, documented two-axis push counters, accepted/contained import
+cycles (#1, #2) with #3 severed. F4.24b itself stays LATE per `D-F4.24-ORDERING` — the audit feeds it,
+does not trigger it.
+
+**Cross-references:** `D-F4-SCOPE` (the charter, the displacement-vs-intrinsic-org framing);
+`D-F4-SCOPE / obs #14` (the won't-fix sub-record); `D-F4-SCORING-TIER3` + `D-F4-HANDCAP-TIER3` (sibling
+Tier-3 passes); F4.24b (the terminal doc this feeds). Recon docs `destination_audit_recon_pass1.md` +
+`pushbank_recon_pass1.md` ARCHIVED to `docs/archive/phase4/`.

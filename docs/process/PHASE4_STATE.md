@@ -82,23 +82,23 @@ Tier 3 — pipeline consolidation  ◀── IN PROGRESS
 ├─ Candidate D — hand-capacity consolidation ....... ✅ CLOSED (2026-06-10) — D-F4-HANDCAP-TIER3
 │    _drawIntoHand (one bug/8 sites, deck-integrity, hand-identical) + Osprey respects cap
 │    + _handSizeCap deleted. N2 resolved. Surfaced Candidate H (consumable-consumption).
-├─ Destination audit (D-F4-SCOPE Part 2) .......... ◀── IN PROGRESS — recon landed (destination_audit_recon_pass1.md).
-│    cycle #3 severed ✅ (83d9920); obs #14 capstone caching CLOSED won't-fix (alch_pearl forges capstones
-│    mid-round → per-capture read is load-bearing); obs #13 _initSpiritState/_initSpiritElements unification ◀ NEXT;
-│    cycle #2 accept-and-contain; reset-dedup, _phase machine, push/bank recon banked. Feeds F4.24b.
-├─ F4.27 ........................................... util_past_life + sym_cuckoo_egg maturity/copy logic.
+├─ Destination audit (D-F4-SCOPE Part 2) .......... ✅ CLOSED (2026-06-11) — see DECISIONS_LOG D-F4-SCOPE Part 2
+│    All 6 recon items + 3 push/bank campaigns shipped: cycle #3 sever (83d9920); obs #14 capstone caching
+│    won't-fix (aee4632); obs #13 init-unify (dfc1d6e); reset-dedup (b5c3985); _setPhase guardrail +8 tests
+│    (dc5deeb); push/bank Q3 vestigial delete (98db293) + Q2 seam decouple (04bc11e) + Q3 legibility (34c98a8).
+│    Displacement sweep clean (0 FIX). cycles #1/#2 accept-and-contain. Recon docs archived. Feeds F4.24b (stays late).
+├─ F4.27 ........................................... ◀── NEXT — util_past_life + sym_cuckoo_egg maturity/copy logic.
 └─ Named spirit hand-offs .......................... util_symbiosis/sym_algae summon (LAST); sym_ducks/engine_bullseye state-machines.
 ```
 
-**Immediate next action:** **Candidate D — hand-capacity consolidation CLOSED** 2026-06-10 (record
-`D-F4-HANDCAP-TIER3`; commits `c9e22c2` E1, `a6dbca2` E1c, `2ec9cfb` E2). Shipped `_drawIntoHand`
-(one bug / eight instances, deck-integrity, hand-identical) + `sym_osprey` respecting the cap +
-`_handSizeCap` deletion; N2 resolved; surfaced **Candidate H** (consumable-consumption-consistency,
-banked recon-first — §4). Next Tier-3 item is the **destination audit (D-F4-SCOPE Part 2)** — the
-GRM/RunManager intrinsic-organization pass (displacement + intrinsic-org: import cycles #2/#3, the
-`_initSpiritState`/`_initSpiritElements` twins, capstone-flag caching) that feeds F4.24b; a natural
-fresh-conversation boundary (it may add its own recon doc when it runs). Then F4.27, named hand-offs.
-Merge-vs-separate (F5.0) and the Earth redesign (F5.8) stay Phase-5 banked.
+**Immediate next action:** the **destination audit (D-F4-SCOPE Part 2) CLOSED** 2026-06-11 (record
+`D-F4-SCOPE Part 2`) — all 6 recon items + 3 push/bank campaigns shipped (displacement sweep clean;
+intrinsic-org = items 3/4/5; push/bank = the 3 Q2/Q3 campaigns); both recon docs archived; it stabilized
+GRM/RunManager so F4.24b is now writable for them (F4.24b stays late). Next Tier-3 item is **F4.27**
+(`util_past_life` + `sym_cuckoo_egg` maturity/copy logic, locked F2.5 design), then the **named spirit
+hand-offs** (`util_symbiosis`/`sym_algae` summon — do LAST; `sym_ducks`/`engine_bullseye` state-machines,
+which need deck-flip / rank-inventory seams). Merge-vs-separate (F5.0) and the Earth redesign (F5.8) stay
+Phase-5 banked.
 
 ---
 
@@ -118,8 +118,10 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
   two are distinct concerns in the same `_doDeckPhase` block — don't blur them.
 - **bullseye** — `_bullseyeInventory` state machine in GRM; minimal-lift or defer (not a clean counter).
 - **badger** — `onConsumableUsed` belongs to the consumable block, not the spirit wave. Folded there.
-- **GRM/RunManager destination audit** (D-F4-SCOPE Part 2) — late Tier 3; feeds F4.24b. Drain
-  categories first, then audit the emptied managers for displacement + intrinsic organization.
+- **GRM/RunManager destination audit** (D-F4-SCOPE Part 2) — ✅ **CLOSED 2026-06-11** (record
+  `D-F4-SCOPE Part 2`). All 6 recon items + 3 push/bank campaigns shipped; displacement sweep clean;
+  GRM/RunManager stabilized (explicit phase machine, deduped reset, decoupled push/bank seam) → F4.24b
+  writable for them (F4.24b stays late). Recon docs archived to `docs/archive/phase4/`.
 - **Candidate G — shrine card-enhancement application flow** — *architectural half SHIPPED*
   (G1 deleted the dead cluster, G2 built the random-8 shrine application surface; see DECISIONS_LOG
   `D-G`). **Remaining: the UX-completion polish → Phase 5** (random-8 TUNING: subset size, gating,
@@ -260,7 +262,7 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 - `SPIRIT_SET_ITERATION_RULE.md` — durable (the transcendence/spirit-set invariant; a rule, not a record).
 - `PHASE4_consolidation_candidates.md` — partially-live (banked threads incl. Candidate C).
 - `PHASE4_STATE.md` — this doc (live state).
-- *(no currently-active standing doc — Tier-2 is complete (F4.24a shipped) and the Tier-3 scoring-loop pass + Candidate D (hand-capacity) have both closed; all their docs are archived below. The next Tier-3 item, the destination audit (D-F4-SCOPE Part 2), opens with its own read-only recon and will add its recon doc here when it does.)*
+- *(no currently-active standing doc — Tier-2 is complete (F4.24a shipped) and the Tier-3 scoring-loop pass, Candidate D (hand-capacity), and the destination audit (D-F4-SCOPE Part 2) have all closed; all their docs are archived below. The next Tier-3 item, F4.27 (util_past_life / sym_cuckoo_egg), is a contained spirit-logic task and is not expected to add a standing doc.)*
 
 **`docs/` root:** `DESIGN_DOC_V5.md` — durable design source of truth.
 
@@ -282,6 +284,10 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 - **Candidate D — hand-capacity (CLOSED 2026-06-10; record = DECISIONS_LOG `D-F4-HANDCAP-TIER3`):**
   `hand_capacity_inventory_pass1.md` (the §2 corrected design model + §4 site inventory + §7 helper
   contract — distilled into the entry; surfaced Candidate H).
+- **Destination audit (D-F4-SCOPE Part 2) (CLOSED 2026-06-11; record = DECISIONS_LOG `D-F4-SCOPE Part 2`):**
+  `destination_audit_recon_pass1.md` (the displacement sweep + cycle classification + intrinsic-org map)
+  and `pushbank_recon_pass1.md` (the item-6 push/bank recon — a PRE-RULING snapshot; its Q1–Q4 answered
+  in the DECISIONS_LOG entry).
 
 **`docs/archive/` root — pre-Phase-4 history (do not edit):**
 - `INFRASTRUCTURE_PLAN.md` (superseded by INFRASTRUCTURE_DECISIONS), `UPLOAD_MANIFEST.md`

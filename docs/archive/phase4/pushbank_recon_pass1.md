@@ -1,5 +1,11 @@
 # Push/Bank Flow Subsystem — Recon (Pass 1)
 
+> **CLOSED 2026-06-11 — D-F4-SCOPE Part 2 complete.** Archived reference; do NOT edit. This is the
+> **PRE-RULING snapshot** — its Part-5 questions Q1–Q4 were open when written and are **ANSWERED** in
+> DECISIONS_LOG `D-F4-SCOPE Part 2` (Q1 keep both counters; Q2 decouple the seam; Q3 delete the 3
+> vestigial fields + the legibility rename; Q4 `getPushMultiplier` stays in RunManager). The 3 campaigns
+> that executed them: `98db293` (Q3 deletion), `04bc11e` (Q2 seam), `34c98a8` (Q3 legibility).
+
 > Standing reference for **item 6** of the destination audit (D-F4-SCOPE Part 2) — the charter-mandated
 > dedicated recon of the round's risk/reward flow engine. **Read-only map + ruling surface; no campaign
 > scoped until Robert rules.** Supersedes the seed inventory in `destination_audit_recon_pass1.md`
