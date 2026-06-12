@@ -5,7 +5,7 @@ import run, { RunManager, effectivePower, aggregateNumericState, aggregateArrayL
 import { getElementDef, getStampDef } from '../data/consumables.js';
 import { getSpiritDef }      from '../data/spirits.js';
 import logger                from '../systems/GameplayLogger.js';
-import SpiritEffects, { isElementMature } from '../systems/SpiritEffects.js';
+import SpiritEffects         from '../systems/SpiritEffects.js';
 import ConsumableEffects    from '../systems/ConsumableEffects.js';
 import { getCardPoints }     from '../systems/CardMutations.js';
 import { getFireFlatPoints, getMetalHeldMult, getEarthInterestRate,
@@ -991,6 +991,8 @@ export class GameScene extends Phaser.Scene {
       const mult   = effectivePower(spirit);
       const refund = Math.floor(cost * 0.5 * mult);
       run.removeSpirit(displayIndex);
+      // A matured negative Cat-5 (Past Life / Cuckoo) fires its copy/hatch on sale (ruling D3).
+      run.fireCat5SaleEffects(spirit);
       run.addKi(refund, `sold ${spirit.name} (negative)`);
       logger.logSpiritSold(spirit.name, refund, displayIndex);
       this._collapseStack();
@@ -1003,23 +1005,8 @@ export class GameScene extends Phaser.Scene {
     const refund = Math.floor(cost / 2 * quantity);
     const currentStack = spirit.stackCount ?? 1;
 
-    // Past Life activation: count matured elements among those being sold
-    let pastLifeActivated = 0;
-    if (spirit.id === 'util_past_life' && spirit.elements) {
-      const elementsBeingSold = spirit.elements.slice(-quantity);
-      for (const el of elementsBeingSold) {
-        if (isElementMature(el, run.round)) pastLifeActivated++;
-      }
-    }
-
-    // Cuckoo Egg activation: count matured elements among those being sold
-    let cuckooMatureStacks = 0;
-    if (spirit.id === 'sym_cuckoo_egg' && spirit.elements) {
-      const elementsBeingSold = spirit.elements.slice(-quantity);
-      for (const el of elementsBeingSold) {
-        if (isElementMature(el, run.round)) cuckooMatureStacks++;
-      }
-    }
+    // Capture the elements being sold BEFORE removal — the partial-sell pop destroys them.
+    const soldElements = spirit.elements ? spirit.elements.slice(-quantity) : null;
 
     if (quantity >= currentStack) {
       run.removeSpirit(displayIndex);
@@ -1030,15 +1017,8 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Fire Past Life copy effect after sale completes
-    if (pastLifeActivated > 0) {
-      run._firePastLifeCopy(pastLifeActivated);
-    }
-
-    // Fire Cuckoo Egg hatch after sale completes (slot freed by removal)
-    if (cuckooMatureStacks > 0) {
-      run._fireCuckooHatch(cuckooMatureStacks);
-    }
+    // Fire Cat-5 sale effects (Past Life copy / Cuckoo hatch) after removal frees the slot. Ruling D3.
+    run.fireCat5SaleEffects(spirit, { soldElements });
 
     run.addKi(refund, `sold ${spirit.name} \xD7${quantity}`);
     logger.logSpiritSold(spirit.name, refund, displayIndex);

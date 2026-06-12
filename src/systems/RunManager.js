@@ -19,7 +19,7 @@ import { getActiveEffect, applyHook }          from './HexagramEffects.js';
 // and even that leaves the run import. If ever cut, sever the light edge (RM→SpiritEffects, ~2
 // sites: NEGATIVE_SNAPSHOT + SpiritEffects.get), not the heavy one (~25 sites). See
 // docs/process/destination_audit_recon_pass1.md Part 2.
-import SpiritEffects, { NEGATIVE_SNAPSHOT }     from './SpiritEffects.js';
+import SpiritEffects, { NEGATIVE_SNAPSHOT, isElementMature }     from './SpiritEffects.js';
 import { getBlessingDef }                      from '../data/blessings.js';
 //
 //   import run from './systems/RunManager.js';
@@ -618,6 +618,21 @@ class RunManager {
     }
   }
 
+  /**
+   * Build category-appropriate zero-state for a freshly-created negative, using the spirit's
+   * NEGATIVE_SNAPSHOT against synthetic empty (zero-state) elements. Returns null for spirits
+   * without a snapshot entry (non-accumulator negatives keep null state, as before). Used by
+   * Past Life negative copies (decision 5) and negative Cuckoo hatches (decision 7) — both want
+   * a fresh, non-compounding negative, not the transcend-time aggregate.
+   */
+  _freshNegativeState(spiritId, powerLevel = 1) {
+    const snapshotFn = NEGATIVE_SNAPSHOT[spiritId];
+    if (!snapshotFn) return null;
+    const elements = [];
+    for (let i = 0; i < powerLevel; i++) elements.push(this._freshAccumulatorElement(spiritId));
+    return snapshotFn({ id: spiritId, elements }, powerLevel);
+  }
+
   /** Aggregate elements into a single state object for negative creation. */
   _aggregateElementsForNegative(spirit, powerLevel = 3) {
     if (!spirit.elements || spirit.elements.length === 0) return spirit.state ?? null;
@@ -713,7 +728,8 @@ class RunManager {
         id: target.id, name: target.name,
         symbiont: target.symbiont || undefined,
         stackCount: 1, isNegative: true, powerLevel,
-        acquiredRound: this._round ?? 0, state: null,
+        acquiredRound: this._round ?? 0,
+        state: this._freshNegativeState(target.id, powerLevel),
       });
       return;
     }
@@ -730,7 +746,7 @@ class RunManager {
    * @param {number} matureStacks  Number of mature elements hatching.
    * @returns {object|null} The hatched fusion def, or null if failed.
    */
-  _fireCuckooHatch(matureStacks) {
+  _fireCuckooHatch(matureStacks, source = {}) {
     if (matureStacks <= 0 || !this.canAddSpirit) return null;
     const fusions = SPIRIT_CATALOG.filter(s => s.category === 'fusion_t2');
     if (fusions.length === 0) return null;
@@ -740,12 +756,57 @@ class RunManager {
       this._forcedCuckooHatchTarget = null;
     }
     if (!target) target = fusions[Math.floor(Math.random() * fusions.length)];
-    this._acquireSpiritStack(target, matureStacks);
+    if (source.isNegative) {
+      // Negative Cuckoo hatches a NEGATIVE Tier-2 fusion at the copier's powerLevel (decision 7).
+      const powerLevel = source.powerLevel ?? 1;
+      const isSymbiont = target.channel === 'symbiont' || target.category === 'symbiont';
+      this.addSpiritDirect({
+        id: target.id, name: target.name,
+        stackCount: 1, isNegative: true, powerLevel,
+        state: this._freshNegativeState(target.id, powerLevel),
+        acquiredRound: this._round ?? 0,
+        symbiont: isSymbiont || undefined, sellPriceBonus: 0,
+      });
+    } else {
+      this._acquireSpiritStack(target, matureStacks);
+    }
     return target;
   }
 
   /** Debug: force the next Cuckoo Egg hatch target. */
   forceCuckooHatchTarget(fusionId) { this._forcedCuckooHatchTarget = fusionId; }
+
+  /**
+   * Fire Cat-5 maturation sale effects (Past Life copy / Cuckoo hatch) for a spirit being sold.
+   * The single dispatch both sell branches route through (ruling D3), source-aware:
+   *   - Regular source: fires once per mature element among those sold (count from acquiredRound).
+   *   - Negative source: fires once if numerator >= denominator, at the copier's powerLevel.
+   * Call AFTER the sold stacks are removed, so the freed slot is available to the copy/hatch.
+   * @param {object} spirit                      The spirit being sold (state survives removal via ref).
+   * @param {object} [opts]
+   * @param {object[]|null} [opts.soldElements]  Regulars: the elements being sold, captured BEFORE
+   *                                             removal (the partial-sell pop destroys them otherwise).
+   */
+  fireCat5SaleEffects(spirit, { soldElements = null } = {}) {
+    const id = spirit.id;
+    if (id !== 'util_past_life' && id !== 'sym_cuckoo_egg') return;
+
+    if (spirit.isNegative) {
+      const st = spirit.state;
+      if (!st || (st.numerator ?? 0) < (st.denominator ?? Infinity)) return;
+      const powerLevel = effectivePower(spirit);
+      if (id === 'util_past_life') this._firePastLifeCopy(powerLevel);
+      else this._fireCuckooHatch(1, { isNegative: true, powerLevel });
+      return;
+    }
+
+    if (!soldElements) return;
+    let matured = 0;
+    for (const el of soldElements) if (isElementMature(el, this.round)) matured++;
+    if (matured <= 0) return;
+    if (id === 'util_past_life') this._firePastLifeCopy(matured);
+    else this._fireCuckooHatch(matured);
+  }
 
   // ── Unified spirit mutation API ───────────────────────────────────────────
 

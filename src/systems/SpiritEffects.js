@@ -282,10 +282,13 @@ export function isElementMature(el, currentRound) {
   return (currentRound - (el.acquiredRound ?? 0)) >= CAT5_MATURITY_ROUNDS;
 }
 
-function snapshotCat5Maturation(spirit, powerLevel, numKey, denomDefault) {
+function snapshotCat5Maturation(spirit, powerLevel) {
   const elements = spirit.elements.slice(0, powerLevel);
-  const numerator = elements.reduce((s, el) => s + (el[numKey] ?? 0), 0);
-  const denominator = powerLevel * denomDefault;
+  const currentRound = run.round;
+  // Per-element held-rounds derived from acquiredRound (ruling D1 — the dead roundsHeld field
+  // is dropped). Seeds the negative's numerator with rounds already held at transcend time.
+  const numerator = elements.reduce((s, el) => s + Math.max(0, currentRound - (el.acquiredRound ?? 0)), 0);
+  const denominator = powerLevel * CAT5_MATURITY_ROUNDS;
   return { numerator, denominator };
 }
 
@@ -329,8 +332,8 @@ export const NEGATIVE_SNAPSHOT = {
   engine_banner:   (s, p) => snapshotArraysFromElements(s, p, 'seenRibbons'),
 
   // Cat 5 maturation
-  util_past_life:  (s, p) => snapshotCat5Maturation(s, p, 'roundsHeld', 3),
-  sym_cuckoo_egg:  (s, p) => snapshotCat5Maturation(s, p, 'roundsHeld', 3),
+  util_past_life:  (s, p) => snapshotCat5Maturation(s, p),
+  sym_cuckoo_egg:  (s, p) => snapshotCat5Maturation(s, p),
 };
 
 // ── Spirit effect registry ────────────────────────────────────────────────────
@@ -648,7 +651,16 @@ const _effects = {
 
   // ── Meta Spirits ─────────────────────────────────────────────────────────
 
-  util_past_life: {},  // sell-time duplication — handled in RunManager.releaseSpirit
+  util_past_life: {
+    // Sell-time duplication is dispatched in RunManager.fireCat5SaleEffects (ruling D3).
+    onRoundEnd({ spirit }) {
+      // Negatives accrue toward maturity each round (numerator >= denominator → mature).
+      // Regulars derive maturity from acquiredRound at sell time (ruling D1) — no increment.
+      if (spirit.isNegative && spirit.state) {
+        spirit.state.numerator = (spirit.state.numerator ?? 0) + 1;
+      }
+    },
+  },
 
   engine_memory: {
     onCardScored({ card, spirit, spirits }) {
@@ -699,7 +711,15 @@ const _effects = {
 
   sym_caterpillar: {},  // eats leaf cards
 
-  sym_cuckoo_egg:  {},  // countdown hatch
+  sym_cuckoo_egg: {
+    // Countdown hatch; sell-time hatch dispatched in RunManager.fireCat5SaleEffects (ruling D3).
+    onRoundEnd({ spirit }) {
+      // Negatives accrue toward maturity each round; regulars derive it from acquiredRound (D1).
+      if (spirit.isNegative && spirit.state) {
+        spirit.state.numerator = (spirit.state.numerator ?? 0) + 1;
+      }
+    },
+  },
 
   sym_algae: {
     applyEngine({ spirit }) {
