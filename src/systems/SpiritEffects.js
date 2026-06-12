@@ -62,6 +62,14 @@ import run, { effectivePower, aggregateNumericState, aggregateArrayLength,
                incrementPerElement, addUniqueToElements } from './RunManager.js';
 import { addCardBonusPoints } from './CardMutations.js';
 import { getStampDef } from '../data/consumables.js';
+import { getSpiritDef } from '../data/spirits.js';
+
+/**
+ * Read a declared base value from a spirit's canonical `tooltipBase` (the single
+ * source of truth the tooltip already reads). The fallback equals the legacy
+ * hardcoded constant, so a missing field can never change behavior. [F4.36a / T4.1]
+ */
+const _tb = (spirit, key, fallback) => getSpiritDef(spirit.id)?.tooltipBase?.[key] ?? fallback;
 
 /** Maps ribbon card IDs to the stamp color they generate for Festival. */
 const RIBBON_STAMP_MAP = {
@@ -80,9 +88,9 @@ const RIBBON_STAMP_MAP = {
 function monthPointAdd(months, flatAmt) {
   const set = new Set(months);
   return {
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
-      if (set.has(card.month)) return { addPoints: flatAmt };
+      if (set.has(card.month)) return { addPoints: _tb(spirit, 'points', flatAmt) };
       return null;
     },
   };
@@ -91,9 +99,9 @@ function monthPointAdd(months, flatAmt) {
 function monthMultAdd(months, bonusPerCard) {
   const set = new Set(months);
   return {
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
-      if (set.has(card.month)) return { addMult: bonusPerCard };
+      if (set.has(card.month)) return { addMult: _tb(spirit, 'mult', bonusPerCard) };
       return null;
     },
   };
@@ -102,9 +110,9 @@ function monthMultAdd(months, bonusPerCard) {
 function monthFusion(months, flatAmt, bonusPerCard) {
   const set = new Set(months);
   return {
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
-      if (set.has(card.month)) return { addPoints: flatAmt, addMult: bonusPerCard };
+      if (set.has(card.month)) return { addPoints: _tb(spirit, 'points', flatAmt), addMult: _tb(spirit, 'mult', bonusPerCard) };
       return null;
     },
   };
@@ -112,9 +120,9 @@ function monthFusion(months, flatAmt, bonusPerCard) {
 
 function verticalPointAdd(vertical, flatAmt) {
   return {
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
-      if (card.vertical === vertical) return { addPoints: flatAmt };
+      if (card.vertical === vertical) return { addPoints: _tb(spirit, 'points', flatAmt) };
       return null;
     },
   };
@@ -122,9 +130,9 @@ function verticalPointAdd(vertical, flatAmt) {
 
 function verticalMultAdd(vertical, bonusPerCard) {
   return {
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
-      if (card.vertical === vertical) return { addMult: bonusPerCard };
+      if (card.vertical === vertical) return { addMult: _tb(spirit, 'mult', bonusPerCard) };
       return null;
     },
   };
@@ -132,9 +140,9 @@ function verticalMultAdd(vertical, bonusPerCard) {
 
 function verticalFusion(vertical, flatAmt, bonusPerCard) {
   return {
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
-      if (card.vertical === vertical) return { addPoints: flatAmt, addMult: bonusPerCard };
+      if (card.vertical === vertical) return { addPoints: _tb(spirit, 'points', flatAmt), addMult: _tb(spirit, 'mult', bonusPerCard) };
       return null;
     },
   };
@@ -142,9 +150,9 @@ function verticalFusion(vertical, flatAmt, bonusPerCard) {
 
 function temporalPointAdd(temporal, flatAmt) {
   return {
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
-      if (card.temporal === temporal) return { addPoints: flatAmt };
+      if (card.temporal === temporal) return { addPoints: _tb(spirit, 'points', flatAmt) };
       return null;
     },
   };
@@ -152,9 +160,9 @@ function temporalPointAdd(temporal, flatAmt) {
 
 function temporalMultAdd(temporal, bonusPerCard) {
   return {
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
-      if (card.temporal === temporal) return { addMult: bonusPerCard };
+      if (card.temporal === temporal) return { addMult: _tb(spirit, 'mult', bonusPerCard) };
       return null;
     },
   };
@@ -162,9 +170,9 @@ function temporalMultAdd(temporal, bonusPerCard) {
 
 function temporalFusion(temporal, flatAmt, bonusPerCard) {
   return {
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
-      if (card.temporal === temporal) return { addPoints: flatAmt, addMult: bonusPerCard };
+      if (card.temporal === temporal) return { addPoints: _tb(spirit, 'points', flatAmt), addMult: _tb(spirit, 'mult', bonusPerCard) };
       return null;
     },
   };
@@ -388,29 +396,29 @@ const _effects = {
   // Point boost + additive mult per matching card being captured.
 
   rank_shine: {
-    onCardScored({ card }) {
-      if (card.type === 'bright') return { addPoints: 80, addMult: 8 };
+    onCardScored({ card, spirit }) {
+      if (card.type === 'bright') return { addPoints: _tb(spirit, 'points', 80), addMult: _tb(spirit, 'mult', 8) };
       return null;
     },
   },
 
   rank_oxygen: {
-    onCardScored({ card }) {
-      if (card.type === 'animal') return { addPoints: 50, addMult: 5 };
+    onCardScored({ card, spirit }) {
+      if (card.type === 'animal') return { addPoints: _tb(spirit, 'points', 50), addMult: _tb(spirit, 'mult', 5) };
       return null;
     },
   },
 
   rank_poem: {
-    onCardScored({ card }) {
-      if (card.type === 'ribbon') return { addPoints: 40, addMult: 4 };
+    onCardScored({ card, spirit }) {
+      if (card.type === 'ribbon') return { addPoints: _tb(spirit, 'points', 40), addMult: _tb(spirit, 'mult', 4) };
       return null;
     },
   },
 
   rank_salt: {
-    onCardScored({ card }) {
-      if (card.type === 'plain') return { addPoints: 20, addMult: 2 };
+    onCardScored({ card, spirit }) {
+      if (card.type === 'plain') return { addPoints: _tb(spirit, 'points', 20), addMult: _tb(spirit, 'mult', 2) };
       return null;
     },
   },
@@ -798,9 +806,9 @@ const _effects = {
   sym_osprey: {},  // first N deck flips go to hand
 
   sym_wolf: {
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.type !== 'bright') return null;
-      return { multiplyMult: 2 };
+      return { multiplyMult: _tb(spirit, 'mult', 2) };
     },
   },
 
@@ -839,80 +847,84 @@ const _effects = {
 
   cross_yang: {
     // Yang: Air ×2.0, Day ×2.0. Compounds: Air+Day cards score ×4.0.
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
+      const m = _tb(spirit, 'mult', 2.0);
       let mult = 1.0;
-      if (card.vertical === 'air')  mult *= 2.0;
-      if (card.temporal === 'day')  mult *= 2.0;
+      if (card.vertical === 'air')  mult *= m;
+      if (card.temporal === 'day')  mult *= m;
       return mult !== 1.0 ? { multiplyMult: mult } : null;
     },
   },
 
   cross_yin: {
     // Yin: Land ×2.0, Night ×2.0. Compounds: Land+Night cards score ×4.0.
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
+      const m = _tb(spirit, 'mult', 2.0);
       let mult = 1.0;
-      if (card.vertical === 'land')  mult *= 2.0;
-      if (card.temporal === 'night') mult *= 2.0;
+      if (card.vertical === 'land')  mult *= m;
+      if (card.temporal === 'night') mult *= m;
       return mult !== 1.0 ? { multiplyMult: mult } : null;
     },
   },
 
   cross_space: {
     // Space: Air ×2.0, Night ×2.0. Compounds: Air+Night cards score ×4.0.
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
+      const m = _tb(spirit, 'mult', 2.0);
       let mult = 1.0;
-      if (card.vertical === 'air')   mult *= 2.0;
-      if (card.temporal === 'night') mult *= 2.0;
+      if (card.vertical === 'air')   mult *= m;
+      if (card.temporal === 'night') mult *= m;
       return mult !== 1.0 ? { multiplyMult: mult } : null;
     },
   },
 
   cross_energy: {
     // Energy: Land ×2.0, Day ×2.0. Compounds: Land+Day cards score ×4.0.
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
+      const m = _tb(spirit, 'mult', 2.0);
       let mult = 1.0;
-      if (card.vertical === 'land')  mult *= 2.0;
-      if (card.temporal === 'day')   mult *= 2.0;
+      if (card.vertical === 'land')  mult *= m;
+      if (card.temporal === 'day')   mult *= m;
       return mult !== 1.0 ? { multiplyMult: mult } : null;
     },
   },
 
   cross_solstice: {
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
       const months = new Set([6, 7, 8, 12, 1, 2]);
-      if (months.has(card.month)) return { multiplyMult: 2.0 };
+      if (months.has(card.month)) return { multiplyMult: _tb(spirit, 'mult', 2.0) };
       return null;
     },
   },
 
   cross_equinox: {
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
       const months = new Set([3, 4, 5, 9, 10, 11]);
-      if (months.has(card.month)) return { multiplyMult: 2.0 };
+      if (months.has(card.month)) return { multiplyMult: _tb(spirit, 'mult', 2.0) };
       return null;
     },
   },
 
   cross_tropic: {
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
       const months = new Set([3, 4, 5, 6, 7, 8]);
-      if (months.has(card.month)) return { multiplyMult: 2.0 };
+      if (months.has(card.month)) return { multiplyMult: _tb(spirit, 'mult', 2.0) };
       return null;
     },
   },
 
   cross_arctic: {
-    onCardScored({ card }) {
+    onCardScored({ card, spirit }) {
       if (card.enhancement?.element === 'fire') return null;
       const months = new Set([9, 10, 11, 12, 1, 2]);
-      if (months.has(card.month)) return { multiplyMult: 2.0 };
+      if (months.has(card.month)) return { multiplyMult: _tb(spirit, 'mult', 2.0) };
       return null;
     },
   },
@@ -1310,7 +1322,7 @@ const _effects = {
   util_irrigation: {
     onCardScored({ card, spirit }) {
       if (card.type === 'plain') {
-        const bonus = 3 * effectivePower(spirit);
+        const bonus = _tb(spirit, 'points', 3) * effectivePower(spirit);
         addCardBonusPoints(card, bonus);
         return { addPoints: bonus };
       }
