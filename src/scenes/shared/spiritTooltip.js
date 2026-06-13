@@ -8,7 +8,6 @@ import { getSpiritDef }            from '../../data/spirits.js';
 import run, {
   effectivePower,
   aggregateNumericState,
-  aggregateArrayLength,
   aggregateUniqueCount,
   longestHeldValue,
 } from '../../systems/RunManager.js';
@@ -99,82 +98,43 @@ export function getSpiritContrib(spirit, opts = {}) {
 
   // ── Engine spirit (applyEngine) ───────────────────────────────────────
   if (fx?.applyEngine) {
+    // Architecture B (F4.37 C2): narration (uniqueCount, isNegative-aware) stays;
+    // VALUE derives from applyEngine. Both sub-branches shared the same narration,
+    // so they collapse. null/inert \u2192 identity \xD71.00.
     if (spirit.id === 'engine_radiance') {
-      if (spirit.isNegative) {
-        const arrays = spirit.state?.seenBrights ?? [];
-        const sumLengths = arrays.reduce((s, arr) => s + (arr?.length ?? 0), 0);
-        const uniqueCount = aggregateUniqueCount(spirit, 'seenBrights');
-        lines.push(`Unique brights: ${uniqueCount}/5  \u2192  \xD7${(1 + sumLengths * 2).toFixed(2)} mult`);
-      } else {
-        const sumLengths = aggregateArrayLength(spirit, 'seenBrights');
-        const uniqueCount = aggregateUniqueCount(spirit, 'seenBrights');
-        lines.push(`Unique brights: ${uniqueCount}/5  \u2192  \xD7${(1 + sumLengths * 2).toFixed(2)} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
+      lines.push(`Unique brights: ${aggregateUniqueCount(spirit, 'seenBrights')}/5  \u2192  \xD7${val.toFixed(2)} mult`);
     } else if (spirit.id === 'engine_wildlife') {
-      if (spirit.isNegative) {
-        const arrays = spirit.state?.seenAnimals ?? [];
-        const sumLengths = arrays.reduce((s, arr) => s + (arr?.length ?? 0), 0);
-        const uniqueCount = aggregateUniqueCount(spirit, 'seenAnimals');
-        lines.push(`Unique animals: ${uniqueCount}/9  \u2192  \xD7${(1 + sumLengths * 0.5).toFixed(2)} mult`);
-      } else {
-        const sumLengths = aggregateArrayLength(spirit, 'seenAnimals');
-        const uniqueCount = aggregateUniqueCount(spirit, 'seenAnimals');
-        lines.push(`Unique animals: ${uniqueCount}/9  \u2192  \xD7${(1 + sumLengths * 0.5).toFixed(2)} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
+      lines.push(`Unique animals: ${aggregateUniqueCount(spirit, 'seenAnimals')}/9  \u2192  \xD7${val.toFixed(2)} mult`);
     } else if (spirit.id === 'engine_banner') {
-      if (spirit.isNegative) {
-        const arrays = spirit.state?.seenRibbons ?? [];
-        const sumLengths = arrays.reduce((s, arr) => s + (arr?.length ?? 0), 0);
-        const uniqueCount = aggregateUniqueCount(spirit, 'seenRibbons');
-        lines.push(`Unique ribbons: ${uniqueCount}  \u2192  \xD7${(1 + sumLengths).toFixed(2)} mult`);
-      } else {
-        const sumLengths = aggregateArrayLength(spirit, 'seenRibbons');
-        const uniqueCount = aggregateUniqueCount(spirit, 'seenRibbons');
-        lines.push(`Unique ribbons: ${uniqueCount}  \u2192  \xD7${(1 + sumLengths).toFixed(2)} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
+      lines.push(`Unique ribbons: ${aggregateUniqueCount(spirit, 'seenRibbons')}  \u2192  \xD7${val.toFixed(2)} mult`);
     } else if (spirit.id === 'engine_plenty') {
-      if (spirit.isNegative) {
-        const arrays = spirit.state?.seenPlains ?? [];
-        const sumLengths = arrays.reduce((s, arr) => s + (arr?.length ?? 0), 0);
-        const uniqueCount = aggregateUniqueCount(spirit, 'seenPlains');
-        lines.push(`Unique plains: ${uniqueCount}  \u2192  \xD7${(1 + sumLengths * 0.1).toFixed(2)} mult`);
-      } else {
-        const sumLengths = aggregateArrayLength(spirit, 'seenPlains');
-        const uniqueCount = aggregateUniqueCount(spirit, 'seenPlains');
-        lines.push(`Unique plains: ${uniqueCount}  \u2192  \xD7${(1 + sumLengths * 0.1).toFixed(2)} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
+      lines.push(`Unique plains: ${aggregateUniqueCount(spirit, 'seenPlains')}  \u2192  \xD7${val.toFixed(2)} mult`);
     } else if (spirit.id === 'sym_algae') {
-      if (spirit.isNegative) {
-        const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 1) + ne * 0.1 * (spirit.powerLevel ?? 1);
-        lines.push(`Symbionts summoned: ${o + ne}  \u2192  \xD7${mult.toFixed(2)} mult`);
-      } else {
-        const agg = aggregateNumericState(spirit, 'summonCount');
-        lines.push(`Symbionts summoned: ${longestHeldValue(spirit, 'summonCount')}  \u2192  \xD7${(1 + agg * 0.1).toFixed(2)} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
+      const count = spirit.isNegative
+        ? (spirit.state?.oldestAtTranscend ?? 0) + (spirit.state?.newEvents ?? 0)
+        : longestHeldValue(spirit, 'summonCount');
+      lines.push(`Symbionts summoned: ${count}  \u2192  \xD7${val.toFixed(2)} mult`);
     } else if (spirit.id === 'sym_ants') {
-      if (spirit.isNegative) {
-        const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 0) + ne * 0.5 * (spirit.powerLevel ?? 1);
-        lines.push(`Cards played: ${o + ne}  \u2192  +${mult.toFixed(1)} mult`);
-      } else {
-        const agg = aggregateNumericState(spirit, 'totalPlayed');
-        lines.push(`Cards played: ${longestHeldValue(spirit, 'totalPlayed')}  \u2192  +${(agg * 0.5).toFixed(1)} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.addMult ?? 0;
+      const count = spirit.isNegative
+        ? (spirit.state?.oldestAtTranscend ?? 0) + (spirit.state?.newEvents ?? 0)
+        : longestHeldValue(spirit, 'totalPlayed');
+      lines.push(`Cards played: ${count}  \u2192  +${val.toFixed(1)} mult`);
     } else if (spirit.id === 'sym_ducks') {
       const v = spirit.state?.multValue ?? 0;
-      const stacks = effectivePower(spirit);
-      const mult = v === 0 ? 1 : (1 + v * 0.2 * stacks);
-      lines.push(`Net deck-flip matches: ${v}  \u2192  \xD7${mult.toFixed(2)} mult`);
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
+      lines.push(`Net deck-flip matches: ${v}  \u2192  \xD7${val.toFixed(2)} mult`);
     } else if (spirit.id === 'sym_snails') {
-      if (spirit.isNegative) {
-        const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 0) + ne * 1 * (spirit.powerLevel ?? 1);
-        lines.push(`Total unplayed: ${o + ne}  \u2192  +${mult} mult`);
-      } else {
-        const agg = aggregateNumericState(spirit, 'totalUnplayed');
-        lines.push(`Total unplayed: ${longestHeldValue(spirit, 'totalUnplayed')}  \u2192  +${agg} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.addMult ?? 0;
+      const count = spirit.isNegative
+        ? (spirit.state?.oldestAtTranscend ?? 0) + (spirit.state?.newEvents ?? 0)
+        : longestHeldValue(spirit, 'totalUnplayed');
+      lines.push(`Total unplayed: ${count}  \u2192  +${val} mult`);
     } else if (spirit.id === 'engine_glacier') {
       // Architecture B (F4.37 C1): narration counts stay; VALUE derives from
       // applyEngine (single source of truth). null/inert \u2192 identity \xD71.00.
@@ -188,103 +148,83 @@ export function getSpiritContrib(spirit, opts = {}) {
         lines.push(`Snow: ${t1}, Ice: ${t2}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
       }
     } else if (spirit.id === 'engine_carbon') {
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
       if (spirit.isNegative) {
         const ne1 = spirit.state?.newEvents1 ?? 0, ne2 = spirit.state?.newEvents2 ?? 0;
         const o = spirit.state?.oldestAtTranscend ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 1) + ne1 * 0.5 * (spirit.powerLevel ?? 1) + ne2 * 1.0 * (spirit.powerLevel ?? 1);
-        lines.push(`Ember + Charcoal: ${o + ne1 + ne2}  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
+        lines.push(`Ember + Charcoal: ${o + ne1 + ne2}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
       } else {
         const t1 = aggregateNumericState(spirit, 't1Procs'), t2 = aggregateNumericState(spirit, 't2Procs');
-        lines.push(`Ember: ${t1}, Charcoal: ${t2}  \u2192  \xD7${(1 + (t1 * 0.5 + t2 * 1.0)).toFixed(2)} mult-mult`);
+        lines.push(`Ember: ${t1}, Charcoal: ${t2}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
       }
     } else if (spirit.id === 'engine_velocity') {
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
       const ironCount = run.getDeck().filter(c =>
         c.enhancement?.element === 'metal' && c.enhancement?.tier === 'base'
       ).length;
       if (spirit.isNegative) {
         const effectiveT2 = (spirit.state?.t2ProcsAtTranscend ?? 0) + (spirit.state?.newT2Procs ?? 0) * (spirit.powerLevel ?? 1);
-        const mult = (1 + ironCount * 0.1 * (spirit.powerLevel ?? 1)) * Math.pow(1.5, effectiveT2);
-        lines.push(`Iron in deck: ${ironCount}, Meteorite procs: ${effectiveT2}  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
+        lines.push(`Iron in deck: ${ironCount}, Meteorite procs: ${effectiveT2}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
       } else {
         const t2 = aggregateNumericState(spirit, 't2Procs');
-        const sc = effectivePower(spirit);
-        const mult = (1 + ironCount * 0.1 * sc) * Math.pow(1.5, t2);
-        lines.push(`Iron in deck: ${ironCount}, Meteorite procs: ${t2}  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
+        lines.push(`Iron in deck: ${ironCount}, Meteorite procs: ${t2}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
       }
     } else if (spirit.id === 'engine_fossil') {
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
       if (spirit.isNegative) {
         const ne1 = spirit.state?.newEvents1 ?? 0, ne2 = spirit.state?.newEvents2 ?? 0;
         const o = spirit.state?.oldestAtTranscend ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 1) + ne1 * 0.1 * (spirit.powerLevel ?? 1) + ne2 * 0.3 * (spirit.powerLevel ?? 1);
-        lines.push(`Clay + Pottery: ${o + ne1 + ne2}  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
+        lines.push(`Clay + Pottery: ${o + ne1 + ne2}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
       } else {
         const t1 = aggregateNumericState(spirit, 't1Procs'), t2 = aggregateNumericState(spirit, 't2Procs');
-        lines.push(`Clay: ${t1}, Pottery: ${t2}  \u2192  \xD7${(1 + (t1 * 0.1 + t2 * 0.3)).toFixed(2)} mult-mult`);
+        lines.push(`Clay: ${t1}, Pottery: ${t2}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
       }
     } else if (spirit.id === 'engine_moths') {
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
       if (spirit.isNegative) {
         const ne1 = spirit.state?.newEvents1 ?? 0, ne2 = spirit.state?.newEvents2 ?? 0;
         const o = spirit.state?.oldestAtTranscend ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 1) + ne1 * 0.3 * (spirit.powerLevel ?? 1) + ne2 * 0.6 * (spirit.powerLevel ?? 1);
-        lines.push(`Slot creates + Silk: ${o + ne1 + ne2}  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
+        lines.push(`Slot creates + Silk: ${o + ne1 + ne2}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
       } else {
         const t1 = aggregateNumericState(spirit, 't1Procs'), t2 = aggregateNumericState(spirit, 't2Procs');
-        lines.push(`Slot creations: ${t1}, Silk avoidances: ${t2}  \u2192  \xD7${(1 + (t1 * 0.3 + t2 * 0.6)).toFixed(2)} mult-mult`);
+        lines.push(`Slot creations: ${t1}, Silk avoidances: ${t2}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
       }
     } else if (spirit.id === 'engine_devotion') {
-      if (spirit.isNegative) {
-        const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 0) + ne * 4 * (spirit.powerLevel ?? 1);
-        lines.push(`Brights scored: ${o + ne}  \u2192  +${mult} mult`);
-      } else {
-        const agg = aggregateNumericState(spirit, 'totalScored');
-        lines.push(`Brights scored: ${longestHeldValue(spirit, 'totalScored')}  \u2192  +${agg * 4} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.addMult ?? 0;
+      const count = spirit.isNegative
+        ? (spirit.state?.oldestAtTranscend ?? 0) + (spirit.state?.newEvents ?? 0)
+        : longestHeldValue(spirit, 'totalScored');
+      lines.push(`Brights scored: ${count}  \u2192  +${val} mult`);
     } else if (spirit.id === 'engine_habitat') {
-      if (spirit.isNegative) {
-        const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 0) + ne * 2.5 * (spirit.powerLevel ?? 1);
-        lines.push(`Animals scored: ${o + ne}  \u2192  +${mult.toFixed(1)} mult`);
-      } else {
-        const agg = aggregateNumericState(spirit, 'totalScored');
-        lines.push(`Animals scored: ${longestHeldValue(spirit, 'totalScored')}  \u2192  +${(agg * 2.5).toFixed(1)} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.addMult ?? 0;
+      const count = spirit.isNegative
+        ? (spirit.state?.oldestAtTranscend ?? 0) + (spirit.state?.newEvents ?? 0)
+        : longestHeldValue(spirit, 'totalScored');
+      lines.push(`Animals scored: ${count}  \u2192  +${val.toFixed(1)} mult`);
     } else if (spirit.id === 'engine_ceremony') {
-      if (spirit.isNegative) {
-        const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 0) + ne * 2 * (spirit.powerLevel ?? 1);
-        lines.push(`Ribbons scored: ${o + ne}  \u2192  +${mult} mult`);
-      } else {
-        const agg = aggregateNumericState(spirit, 'totalScored');
-        lines.push(`Ribbons scored: ${longestHeldValue(spirit, 'totalScored')}  \u2192  +${agg * 2} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.addMult ?? 0;
+      const count = spirit.isNegative
+        ? (spirit.state?.oldestAtTranscend ?? 0) + (spirit.state?.newEvents ?? 0)
+        : longestHeldValue(spirit, 'totalScored');
+      lines.push(`Ribbons scored: ${count}  \u2192  +${val} mult`);
     } else if (spirit.id === 'engine_agriculture') {
-      if (spirit.isNegative) {
-        const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 0) + ne * 1 * (spirit.powerLevel ?? 1);
-        lines.push(`Plains scored: ${o + ne}  \u2192  +${mult} mult`);
-      } else {
-        const agg = aggregateNumericState(spirit, 'totalScored');
-        lines.push(`Plains scored: ${longestHeldValue(spirit, 'totalScored')}  \u2192  +${agg} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.addMult ?? 0;
+      const count = spirit.isNegative
+        ? (spirit.state?.oldestAtTranscend ?? 0) + (spirit.state?.newEvents ?? 0)
+        : longestHeldValue(spirit, 'totalScored');
+      lines.push(`Plains scored: ${count}  \u2192  +${val} mult`);
     } else if (spirit.id === 'engine_lincoln') {
-      if (spirit.isNegative) {
-        const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 0) + ne * 0.1 * (spirit.powerLevel ?? 1);
-        lines.push(`Banks: ${o + ne}  \u2192  +${mult.toFixed(1)} mult`);
-      } else {
-        const agg = aggregateNumericState(spirit, 'banks');
-        lines.push(`Banks: ${longestHeldValue(spirit, 'banks')}  \u2192  +${(agg * 0.1).toFixed(1)} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.addMult ?? 0;
+      const count = spirit.isNegative
+        ? (spirit.state?.oldestAtTranscend ?? 0) + (spirit.state?.newEvents ?? 0)
+        : longestHeldValue(spirit, 'banks');
+      lines.push(`Banks: ${count}  \u2192  +${val.toFixed(1)} mult`);
     } else if (spirit.id === 'engine_napoleon') {
-      if (spirit.isNegative) {
-        const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 0) + ne * 0.2 * (spirit.powerLevel ?? 1);
-        lines.push(`Push fails: ${o + ne}  \u2192  +${mult.toFixed(1)} mult`);
-      } else {
-        const agg = aggregateNumericState(spirit, 'pushFails');
-        lines.push(`Push fails: ${longestHeldValue(spirit, 'pushFails')}  \u2192  +${(agg * 0.2).toFixed(1)} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.addMult ?? 0;
+      const count = spirit.isNegative
+        ? (spirit.state?.oldestAtTranscend ?? 0) + (spirit.state?.newEvents ?? 0)
+        : longestHeldValue(spirit, 'pushFails');
+      lines.push(`Push fails: ${count}  \u2192  +${val.toFixed(1)} mult`);
     } else if (spirit.id === 'decay_persimmon') {
       const n = spirit.state?.remaining ?? 0;
       const stacks = effectivePower(spirit);
@@ -294,32 +234,23 @@ export function getSpiritContrib(spirit, opts = {}) {
       const stacks = effectivePower(spirit);
       lines.push(`Remaining: +${n * stacks} pts (loses 5/round)`);
     } else if (spirit.id === 'engine_missing_number') {
-      if (spirit.isNegative) {
-        const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 0) + ne * 5 * (spirit.powerLevel ?? 1);
-        lines.push(`4-stacks scored: ${o + ne}  \u2192  +${mult} mult`);
-      } else {
-        const agg = aggregateNumericState(spirit, 'totalStacks');
-        lines.push(`4-stacks scored: ${longestHeldValue(spirit, 'totalStacks')}  \u2192  +${agg * 5} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.addMult ?? 0;
+      const count = spirit.isNegative
+        ? (spirit.state?.oldestAtTranscend ?? 0) + (spirit.state?.newEvents ?? 0)
+        : longestHeldValue(spirit, 'totalStacks');
+      lines.push(`4-stacks scored: ${count}  \u2192  +${val} mult`);
     } else if (spirit.id === 'engine_palace') {
-      if (spirit.isNegative) {
-        const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 1) + ne * 0.5 * (spirit.powerLevel ?? 1);
-        lines.push(`Cards added: ${o + ne}  \u2192  \xD7${mult.toFixed(2)} mult`);
-      } else {
-        const agg = aggregateNumericState(spirit, 'cardsAdded');
-        lines.push(`Cards added: ${longestHeldValue(spirit, 'cardsAdded')}  \u2192  \xD7${(1 + agg * 0.5).toFixed(2)} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
+      const count = spirit.isNegative
+        ? (spirit.state?.oldestAtTranscend ?? 0) + (spirit.state?.newEvents ?? 0)
+        : longestHeldValue(spirit, 'cardsAdded');
+      lines.push(`Cards added: ${count}  \u2192  \xD7${val.toFixed(2)} mult`);
     } else if (spirit.id === 'engine_ship') {
-      if (spirit.isNegative) {
-        const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 1) + ne * 0.3 * (spirit.powerLevel ?? 1);
-        lines.push(`Cards discarded: ${o + ne}  \u2192  \xD7${mult.toFixed(2)} mult`);
-      } else {
-        const agg = aggregateNumericState(spirit, 'cardsDiscarded');
-        lines.push(`Cards discarded: ${longestHeldValue(spirit, 'cardsDiscarded')}  \u2192  \xD7${(1 + agg * 0.3).toFixed(2)} mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
+      const count = spirit.isNegative
+        ? (spirit.state?.oldestAtTranscend ?? 0) + (spirit.state?.newEvents ?? 0)
+        : longestHeldValue(spirit, 'cardsDiscarded');
+      lines.push(`Cards discarded: ${count}  \u2192  \xD7${val.toFixed(2)} mult`);
     } else if (spirit.id === 'engine_surplus') {
       const ki = run?.ki ?? 0;
       lines.push(`Current ki: ${ki}  \u2192  +${Math.floor(ki / 3)} mult`);
@@ -333,28 +264,24 @@ export function getSpiritContrib(spirit, opts = {}) {
       }
       lines.push(`Free rerolls earned: ${n}`);
     } else if (spirit.id === 'engine_kintaro') {
-      if (spirit.isNegative) {
-        const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 1) + ne * 0.1 * (spirit.powerLevel ?? 1);
-        lines.push(`Gold consumed: ${o + ne}  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
-      } else {
-        const consumed = aggregateNumericState(spirit, 'goldsConsumed');
-        lines.push(`Gold consumed: ${longestHeldValue(spirit, 'goldsConsumed')}  \u2192  \xD7${(1 + consumed * 0.1).toFixed(2)} mult-mult`);
-      }
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
+      const count = spirit.isNegative
+        ? (spirit.state?.oldestAtTranscend ?? 0) + (spirit.state?.newEvents ?? 0)
+        : longestHeldValue(spirit, 'goldsConsumed');
+      lines.push(`Gold consumed: ${count}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
     } else if (spirit.id === 'engine_golden_toad') {
       const max = effectivePower(spirit);
       lines.push(`Applies Gold to up to ${max} non-edition card(s) per capture`);
     } else if (spirit.id === 'engine_bullseye') {
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
       if (spirit.isNegative) {
         const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 1) + ne * 1.0 * (spirit.powerLevel ?? 1);
-        lines.push(`Qualified rounds: ${o + ne}  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
+        lines.push(`Qualified rounds: ${o + ne}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
       } else {
         const count = aggregateNumericState(spirit, 'qualifiedCount');
-        const mult = 1 + count * 1.0;
         const inv = bullseyeInv;
         const progress = `${inv.bright}B/${inv.animal}A/${inv.ribbon}R/${inv.plain}P`;
-        lines.push(`Qualified rounds: ${count} (this round: ${progress})  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
+        lines.push(`Qualified rounds: ${count} (this round: ${progress})  \u2192  \xD7${val.toFixed(2)} mult-mult`);
       }
     } else if (spirit.id === 'util_waidan') {
       const stacks = effectivePower(spirit);
