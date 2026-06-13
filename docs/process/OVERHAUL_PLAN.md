@@ -4250,6 +4250,11 @@ To preserve single source of truth, the effect code must be updated to read from
 
 ### F4.37: Post-consolidation tooltip recomb across all spirits (added 2026-05-29 from F3.5b shipment observations)
 
+**STATUS: ✅ DONE 2026-06-13** (Architecture B — value derives from the effect; C1–C4). Scope item 5
+(verification checklist) shipped as `docs/process/tooltip_verification_checklist.md` + the headless
+`test/tooltip_value_equality.test.js` harness (93 cases). Full record: DECISIONS_LOG `F4.37`. Closes
+Wave B / Tier 4. The scope below is the original task definition (point-in-time).
+
 **Background:** F3.5b attempted to update tooltips for ~40 spirits in a single pass, ahead of the broader architectural consolidation (F4.16, F4.20, F4.24, F4.36). The shipment partially landed — many tooltips work correctly, but several have visible drift bugs that surfaced immediately during testing:
 
 - **decay_pear:** Base points scale with stack (`+150 → +300 at 2-stack`) but decay rate doesn't (`loses 5 per round` regardless of stack)

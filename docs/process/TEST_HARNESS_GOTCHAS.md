@@ -70,6 +70,23 @@ Clearly comment such a test as a deliberate white-box exercise of the branch.
   the pile first — over-drawing past hand room LOSES cards (drawn-then-dropped), so draw sites
   clamp to `availableSlots`.
 
+## Tooltip value-equality (F4.37)
+- **Parse the engine VALUE line by anchoring on the `→` arrow.** A spirit with an `onCardScored` ALSO
+  emits a per-card DESCRIPTION line (e.g. kintaro's "×0.1 mult-mult per Gold") with no arrow; a naive
+  `×N` regex grabs THAT instead of the engine value. Match `→\s*([×+])([\d.]+)` and take the LAST hit
+  (the engine block runs after the per-card block; out-of-block engines also emit a bare arrowless
+  fallback `×N mult`). Cost ~one debug cycle mid-C2 — front-loaded here.
+- **Speculative / absent cards aren't in `baseCards`.** `deckCardIds` must use real base cards —
+  `november_*_plain` (Nov has no plain) and speculative IDs throw "Unknown card id". Reuse the
+  16-card `DECK` constant in `tooltip_value_equality.test.js`.
+- **The engine value field VARIES (multiplyMult vs addMult).** Don't assume multiplyMult; read whichever
+  field the branch's `applyEngine` returns. `×` line → `multiplyMult`, identity 1; `+` line → `addMult`,
+  identity 0. `assertVE` infers it from the rendered symbol.
+- **Negatives via `addSpiritDirect`, regulars via `elements`.** A transcended Negative needs
+  `state: { key, preTranscendTotal, newEvents, oldestAtTranscend }` (+ `key1`/`key2` for dual-tier);
+  a regular accumulator needs `spirit.elements = [{ <stateKey>: n }]` (per-element, summed by
+  `aggregateNumericState`). Multi-stack = N elements.
+
 ## Escalation (when a test won't cooperate)
 See the standing "test-friction escalation rule" in the prompt boilerplate: if a test fails for
 HARNESS/CONSTRUCTION reasons (not a real defect in the shipped change) and ONE targeted fix

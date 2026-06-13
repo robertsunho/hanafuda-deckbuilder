@@ -118,6 +118,10 @@ one line each (detail in the plan doc + the `tier5_reconciliation.md` §"Scope d
    `run.releaseSpirit`, GRM Snapshot header — folded into the `tier5_reconciliation.md` lost-and-found).
 2. **Tier 4 — UI/UX cleanup** (F4.35 scene-unification, F4.37/F4.36 tooltip recomb + declarative read,
    F3.16 scoring log) — opens with Tier-4 *scoping*. **← CURRENT WORK.**
+   - **F4.36 ✅ DONE** (declarative `tooltipBase` read — Wave A). **F4.37 ✅ DONE 2026-06-13** (tooltip
+     recomb to Architecture B — value derives from the effect; closes Wave B; record DECISIONS_LOG
+     `F4.37`, checklist `tooltip_verification_checklist.md`, harness `test/tooltip_value_equality.test.js`
+     93 cases green). **F3.16 ✅ DONE** (scoring-log schema). Remaining Tier-4: **F4.35** scene-unification.
 3. **Groupings 4/5/6 — their own heavier process**, split into (a) **design-rulings deliberation**
    (grouping 5 + F4.26 / F4.33-Part1 / F4.38(a) / **F4.32**) — **the V6 gate**, run first — and (b)
    **code refactors** (F4.25, F4.21, F4.28) after the rulings. (F4.29 stays optional/banked.)
@@ -199,7 +203,20 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
   wrong). Rename to reflect "canonical scoring/tuning values" (+ the `_tb` accessor + reconsider keys like
   `jackpotMult`, which is actually a `Math.pow` exponent base). Pure semantics, zero behavior. **Sequenced
   AFTER Wave B** (F3.16/F4.37 may reshape the field — rename once, against the settled shape). Feeds Design
-  Doc V6 / `DESIGN_DOC_PATCHES.md` DP-65.
+  Doc V6 / `DESIGN_DOC_PATCHES.md` DP-65. **✅ NOW UNBLOCKED 2026-06-13** — Wave B is closed (F4.37 done);
+  F4.37 added `lossPerRound` reads but did NOT reshape the field, so the shape is settled. Ready for the
+  Phase-5 semantic rename.
+- **F4.37 carry-forward flags (recorded 2026-06-13; out of F4.37 scope).** Surfaced during C1–C3, deferred:
+  - **Double-render (display-dedup).** engine_wuji/dao/chi/tengu/feng_shui have `applyEngine` but aren't in
+    the engine-block id-chain, so each hits the block's generic fallback (a bare `×N mult` line) AND its
+    narrated legendary line — two lines, same value. Architecture B kept them consistent; the duplicate is a
+    pre-existing display-dedup cleanup. (`spiritTooltip.js` engine-block `else` + the legendary block.)
+  - **Dead tooltip branches.** econ_lucky_charm / econ_reward branches sit inside `if (fx?.applyEngine)` but
+    neither spirit has `applyEngine` → unreachable (their real display would need an unconditional branch,
+    like the coupon/piggybank/grace ones C3 added). Harmless; a cleanup item.
+  - **Decay balance (Phase-5 tuning).** C3 made decay loss scale per-member (a correct-per-ruling nerf —
+    2-stack Pear loses 10/round); the constant MAGNITUDES (pear 5, persimmon 3) may want Phase-5 retuning
+    now that they bite per-stack. No code change — a tuning flag (sits with the F4.26-B balance follow-ups).
 - **F4.24a-surfaced ratify/cleanup (non-Tier-3, low-priority).** N1 — `engine_northern_lion` is the
   lone surviving `run.activeSpirits` accumulator (`GRM:2069`); one-line ratification that excluding
   transcended copies from `pushesWitnessed` is intended. N3 — `engine_lincoln` desc/behavior mismatch

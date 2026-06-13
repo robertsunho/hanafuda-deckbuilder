@@ -4646,3 +4646,57 @@ labels, but no category implication (their prefixes carry no routing meaning), s
 **Cross-refs:** `tier5_reconciliation.md` F4.21 (now RESOLVED); `DESIGN_DOC_V5.md` spirit roster (IDs
 updated). Historical references in OVERHAUL_PLAN / PHASE4_STATE / PHASE4_consolidation_candidates were
 left as point-in-time records (they correctly describe past work under the old IDs).
+
+---
+
+## F4.37 — Post-consolidation tooltip recomb (Architecture B) — RESOLVED 2026-06-13
+
+**Status:** RESOLVED (closes F4.37; last Wave-B / Tier-4 piece).
+
+**Question:** F3.5b's ~40-spirit tooltip pass left visible drift (decay_pear "loses 5/round" regardless of
+stack; econ_coupon static "15%" at 2-stack; surplus ignoring stacks). Root cause was structural: the
+tooltip was a *third* hardcoded copy of each engine's scaling (after the effect and `tooltipBase`), with no
+enforced consistency. How to eliminate the drift class, not patch symptoms?
+
+**Decision — Architecture B (hybrid):** the tooltip keeps its input-count NARRATION but DERIVES the
+displayed VALUE from the effect (`applyEngine()` / a RunManager accessor / the effect fn) instead of
+hand-computing it. Drift-proof by construction — there is one formula, in the effect; the tooltip reads it.
+(Generalizes the pre-existing `spiritTooltip.js` fallback at the engine block's `else`.)
+
+**Per-member scaling sub-ruling (Robert):** per-member (per-stack) scaling is correct; **whichever layer
+doesn't reflect it is the bug.** Applied two ways in C3: decay loss was the bug (effect decremented flat —
+fixed the EFFECT to lose `lossPerRound × stacks`); surplus was the bug (tooltip ignored stacks — fixed the
+TOOLTIP to follow the already-correct ×stacks effect).
+
+**Four-campaign structure:**
+- **C1** — pilot Architecture B on engine_glacier (dual-tier, regular + Negative branches) + stand up the
+  headless value-equality harness (`test/tooltip_value_equality.test.js`). `[PRESERVE value]` — green
+  before + after proves the displayed value is unchanged.
+- **C2** — roll B across the engine-block cohort (~22 branches: dual-tier, exponential, accumulators,
+  linear-mult, linear-add). `[PRESERVE value]`. Net −73 LOC in spiritTooltip.js (third copy deleted).
+  Found one pre-existing drift (surplus) → STOP-and-reported, deferred to C3.
+- **C3** — the value-CHANGING / NEW tail: decay loss scaling `[FIX behavior]` (per the ruling);
+  surplus drift `[FIX display]`; coupon/piggybank/grace tooltip branches `[NEW]` reading RunManager
+  accessors (`couponDiscountPct`, `piggybankHandKiMult` — pure extractions) + grace's `applyKiBonus`;
+  and 6 out-of-block engines (wuji/dao/chi/tengu/feng_shui/sym_badger) migrated to B `[PRESERVE value]`.
+- **C4** — this close-out: the verification checklist, the harness gotchas, this entry, PHASE4_STATE DONE.
+
+**Why drift-proof beats reconcile:** patching each drifted tooltip treats symptoms while the cause (two
+implementations of one value) remains. B removes the second implementation. The harness (93 cases, green
+before + after every migration) is the automated guarantee; the checklist documents the manual render-layer
+layer.
+
+**Codebase changes:** `spiritTooltip.js` (all engine + out-of-block branches derive from the effect);
+`SpiritEffects.js` (decay onRoundEnd scales loss per-member, reads `lossPerRound` from `tooltipBase`);
+`RunManager.js` (two econ accessors, pure extractions). No score-math change beyond the two ruled `[FIX]`s.
+
+**Carry-forward (out of F4.37 scope — see PHASE4_STATE "on the horizon"):** (1) double-render of the 5
+out-of-block engines (fallback line + narrated line — display-dedup cleanup); (2) dead econ_lucky_charm /
+econ_reward tooltip branches (inside `if (fx?.applyEngine)` but no applyEngine — unreachable); (3) decay
+balance — stacked decay now bleeds per-member, the constant MAGNITUDES (5/3 per round) may want Phase-5
+retuning; (4) **DP-65 `tooltipBase` rename now UNBLOCKED** (Wave B closed — the field is the canonical
+scoring-constant source, not a tooltip field; Phase-5 semantic rename against the settled shape).
+
+**Cross-refs:** `tooltip_verification_checklist.md` (the procedure); `test/tooltip_value_equality.test.js`
+(the harness); `TEST_HARNESS_GOTCHAS.md` §"Tooltip value-equality"; OVERHAUL_PLAN F4.37 scope item 5;
+`tier4_scoping` / `PHASE4_COMPLETION_PLAN.md` step 2 (Tier-4 Wave B). F4.37 completes Wave B / Tier 4.
