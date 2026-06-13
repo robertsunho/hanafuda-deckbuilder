@@ -121,7 +121,12 @@ one line each (detail in the plan doc + the `tier5_reconciliation.md` §"Scope d
    - **F4.36 ✅ DONE** (declarative `tooltipBase` read — Wave A). **F4.37 ✅ DONE 2026-06-13** (tooltip
      recomb to Architecture B — value derives from the effect; closes Wave B; record DECISIONS_LOG
      `F4.37`, checklist `tooltip_verification_checklist.md`, harness `test/tooltip_value_equality.test.js`
-     93 cases green). **F3.16 ✅ DONE** (scoring-log schema). Remaining Tier-4: **F4.35** scene-unification.
+     93 cases green). **F3.16 ✅ DONE** (scoring-log schema). **F4.35 ✅ DONE 2026-06-13** (scene-picker
+     dedup: layout + picker-selection-logic SHARED (`SpiritLayout.js` / `spiritTargetPicker.js` + test),
+     hex-symbol twin deleted; card-picker shells + strip-tail + fan-out/sell-buttons document-and-contain
+     per Robert's ruling — record DECISIONS_LOG `F4.35`). **→ TIER 4 COMPLETE.** Phase-4 close-out tail
+     proceeds: Leg 2 = step-3a design-rulings deliberation (grp5 / F4.26 / F4.33a / F4.38a / F4.32), then
+     Leg 3 = step-3b refactors (F4.25 / F4.21 / F4.28). See `PHASE4_COMPLETION_PLAN.md`.
 3. **Groupings 4/5/6 — their own heavier process**, split into (a) **design-rulings deliberation**
    (grouping 5 + F4.26 / F4.33-Part1 / F4.38(a) / **F4.32**) — **the V6 gate**, run first — and (b)
    **code refactors** (F4.25, F4.21, F4.28) after the rulings. (F4.29 stays optional/banked.)
@@ -230,9 +235,11 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
 - **Waidan Grove-exit coupling** — `legend_waidan`'s effect is inline in ShrineScene
   `_drawContinueButton` (F4.20 Bucket-B seepage; no `onShrineExit` hook). If Waidan is cut → removal
   site; if it stays → extract to a hook. Decision pending Waidan's fate. (`PHASE4_consolidation_candidates.md`.)
-- **F4.35 — scene-rendering unification** inherits the new shrine pickers (`_showShrineCardPicker`/
-  `_showShrineSpiritPicker`, flagged `TODO(F4.35)`) for unification with GameScene's pickers, plus
-  the `_renderHexagramSymbol` dead twin.
+- **F4.35 — scene-rendering unification — ✅ DONE 2026-06-13** (record DECISIONS_LOG `F4.35`; closes
+  Tier 4). Picker SELECTION logic shared (`spiritTargetPicker.js` + test) + fan layout shared
+  (`SpiritLayout.js`); `_renderHexagramSymbol` dead twin deleted; card-picker shells + strip-tail +
+  fan-out/sell-buttons document-and-contain (divergent surfaces — drag/neighbor-lift only in GameScene;
+  no render-layer test net). Robert ratified the contain scope.
 - **Design-doc reconciliation (D-F4-DOCSYNC)** — reconcile-during-recon for stable areas (incremental);
   full F4.14 sweep deferred to the F4.24b companion slot (late, against stabilized code). Raised
   priority, code-stability trigger.

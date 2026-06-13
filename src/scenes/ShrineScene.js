@@ -407,6 +407,14 @@ export class ShrineScene extends Phaser.Scene {
   }
 
   // ── Spirit expansion in shrine ─────────────────────────────────────────────
+  // F4.35: document-and-contain (NOT unified) — this shrine fan-out (+ its sell buttons)
+  // and GameScene's _expandSpiritStack / _renderExpandedCard are the SAME concept (source
+  // card + ×2..N peek cards + sell + element tooltips) on divergent surfaces: GameScene
+  // caches _spiritFanPositions, lifts the source above neighbors, and carries drag-reorder
+  // plumbing the shrine lacks (click-to-expand only). A parameterized widget would carry
+  // drag config only one scene uses — relocating complexity, not reducing it — and there's
+  // no render-layer test net. The fan LAYOUT (computeFanPositions) + picker SELECTION logic
+  // ARE shared (SpiritLayout.js / spiritTargetPicker.js). See DECISIONS_LOG F4.35.
 
   _expandShrineSpirit(spirit, displayIndex) {
     if (this._expandedShrine && this._expandedShrine.displayIndex === displayIndex) {
@@ -1239,6 +1247,9 @@ export class ShrineScene extends Phaser.Scene {
       const action = result.action ?? 'no_effect';
       if (action === 'no_effect') { this._buildUI(); this._showShrineToast('No effect.', false); return; }
       let extra = '';
+      // F4.35: the strip→return-base core here is a near-twin of GameScene (~2305), differing
+      // only in the scene-specific feedback strings — document-and-contain (the genuinely-shared
+      // slice is ~6 lines; a helper would save little while each scene keeps its own messages).
       if (action === 'stripped' && result.returnedConsumable) {
         const rd = getElementDef(result.returnedConsumable);
         if (rd && run.canAddConsumable) {

@@ -4166,6 +4166,16 @@ This is a **latent bug**, not currently triggering in normal play (no shipped he
 
 ### F4.35: Scene rendering unification — GameScene ↔ ShrineScene shared module (added 2026-05-29 from F3.24 recon)
 
+**STATUS: ✅ DONE 2026-06-13** (closes Tier 4). RE-SCOPED from this original broad rendering-unification:
+the fan LAYOUT + constants (`shared/SpiritLayout.js`, `computeFanPositions`) and the picker SELECTION logic
+(`shared/spiritTargetPicker.js` + test) were EXTRACTED; the `_renderHexagramSymbol` twin was DELETED
+(Tier-5 dead-code pass). The remaining targets below — fan-out / peek-card rendering (`_expandSpiritStack`
+vs `_expandShrineSpirit`), the sell buttons, the card-picker shells, and the strip→return-base tail — are
+**document-and-contain** (Robert ruled 2026-06-13): same concept, divergent surfaces (drag-reorder +
+neighbor-lift in GameScene only), and no render-layer test net, so a parameterized widget would relocate
+complexity. Full record: DECISIONS_LOG `F4.35`. The scope below is the original task definition
+(point-in-time).
+
 **Background:** During F3.24 recon (cross-scene interaction consistency), recon revealed substantial byte-for-byte identical rendering code duplicated across GameScene and ShrineScene. Both scenes independently implement ~80% of the same rendering pipeline:
 
 - Spirit fan rendering (regulars + legendaries) with rotated SPIRITS/LEGENDARIES labels

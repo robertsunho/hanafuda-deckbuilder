@@ -4700,3 +4700,63 @@ scoring-constant source, not a tooltip field; Phase-5 semantic rename against th
 **Cross-refs:** `tooltip_verification_checklist.md` (the procedure); `test/tooltip_value_equality.test.js`
 (the harness); `TEST_HARNESS_GOTCHAS.md` §"Tooltip value-equality"; OVERHAUL_PLAN F4.37 scope item 5;
 `tier4_scoping` / `PHASE4_COMPLETION_PLAN.md` step 2 (Tier-4 Wave B). F4.37 completes Wave B / Tier 4.
+
+---
+
+## F4.35 — Scene-rendering / shrine-picker unification — RESOLVED 2026-06-13
+
+**Status:** RESOLVED (closes F4.35 — the last open Tier-4 item; **Tier 4 COMPLETE**). Leg 1 of the
+Phase-4 close-out tail. Docs-only close (verify-then-document); the one source touch was comment-only
+(recording the document-and-contain decisions at their code sites).
+
+**Question:** F4.35 (original entry 2026-05-29) scoped a broad GameScene↔ShrineScene rendering
+unification. By the Tier-4 re-scope (`tier4_scoping.md` Cluster 2) much was already done or re-judged as
+contain. What actually remained, and what's the correct close?
+
+**Disposition (the full F4.35 ledger, confirmed against source at `741f218`):**
+
+*Shared (extracted):*
+- **Fan layout + constants** → `shared/SpiritLayout.js` (`computeFanPositions`, SPIRIT_* constants); both
+  scenes import. Done pre-Tier-4.
+- **Spirit/alchemical picker SELECTION logic** → `shared/spiritTargetPicker.js` (`isPairInputType`,
+  `computeSpiritEligibility`, `buildSpiritParams`); both `GameScene._showAlchemicalTargetPicker` and
+  `ShrineScene._showShrineSpiritPicker` call the SAME module. Test-locked
+  (`test/consumables/spirit_target_picker.test.js`, 7 cases). The eligibility-gating asymmetry
+  tier4_scoping flagged (shrine gated, GameScene didn't) is RESOLVED — both now gate via the shared
+  predicate.
+
+*Resolved by deletion:*
+- **`_renderHexagramSymbol` twin** — was byte-identical across both scenes; removed entirely in the Tier-5
+  dead-code pass (it was dead). No longer a duplication.
+
+*Document-and-contain (recorded decision — NOT a gap):*
+- **Card-picker RENDERING shells** — shrine random-8 modal grid (`_showShrineCardPicker`) vs GameScene's
+  in-round live-board tinting (`_cardTargetMode`): genuinely different widgets on different surfaces.
+- **Strip→return-base tail** (`_finishCardConsumable` ~1242 ≈ GameScene ~2305) — near-twin; the
+  genuinely-shared core is ~6 lines, the divergence is scene-specific feedback strings. **Robert ruled
+  2026-06-13: contain** (a helper would save little; no render test net).
+- **Fan-out / peek-card rendering + sell buttons** (`_expandShrineSpirit`/`_collapseShrineStack` vs
+  GameScene `_expandSpiritStack`/`_renderExpandedCard`) — same concept, divergent surfaces (GameScene
+  caches fan positions, lifts the source above neighbors, carries drag-reorder plumbing the shrine lacks).
+  **Robert ruled 2026-06-13: contain** (a parameterized widget would carry drag config only one scene
+  uses — relocating complexity; no render-layer test net). The original entry's broad "rendering
+  unification" is thus re-scoped to: layout + picker-logic SHARED, the rest document-and-contain.
+
+**Why contain (the recurring judgment):** like the card pickers, the fan-out and strip-tail are the *same
+concept on divergent surfaces*. Forcing one parameterized widget trades duplication for config-soup and
+carries drag plumbing only GameScene needs. The selection LOGIC (which spirits are eligible, how selection
+reaches execute) is the part that must NOT drift — and that IS shared + tested. The render SHELLS diverge
+genuinely and have no test net to guard a [PRESERVE] merge → contain, document at the code site.
+
+**Safety model:** render-layer (not a scoring anchor). The shared picker logic is headless-test-locked; the
+contained shells are in-game-only (`[PENDING playtest]` spot-check: both pickers select/execute correctly;
+the fan-out expands/sells at 1/2/3 stacks). No behavior change in this close (comment-only source touch;
+build clean, suite 288/1 unchanged).
+
+**Codebase changes:** comment-only — F4.35 document-and-contain notes added at `ShrineScene._expandShrineSpirit`
+(fan-out) and the `_finishCardConsumable` strip-tail, completing the in-source record (the rendering-shell
+note at ~1127 and the picker-logic note at ~1266 already existed).
+
+**Cross-refs:** `tier4_scoping.md` Cluster 2 (Tier-4 re-scope); OVERHAUL_PLAN F4.35 (original broad entry,
+now marked DONE/re-scoped); `shared/spiritTargetPicker.js` + its test; `shared/SpiritLayout.js`. Tier 4 is
+now COMPLETE → the Phase-4 close-out tail proceeds to Leg 2 (the step-3a design-rulings deliberation).
