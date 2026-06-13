@@ -401,91 +401,16 @@ export default class GameRoundManager {
 
     if (this._onScoringStep) this._onScoringStep({ type: 'capture_start' });
 
-    const _fieldSpirits = run.scoringSpirits;
-    let points = 0;
-    let mult   = 1.0;
-    const _bd = { cards: [], heldEffects: [], engines: [] };
-
-    // ── Per-card scoring (enhancements + editions + hex + spirit onCardScored) ──
-    for (const card of fieldCards) {
-      const _cb = this._initCardBreakdown(card);
-      let cardPts = getCardPoints(card);
-      ({ cardPts, mult } = this._applyCardEnhancements(card, cardPts, mult, _cb.contributions));
-
-      const _hexFieldRes = this._applyHexCardScored(card, cardPts, mult);
-      cardPts = _hexFieldRes.cardPts;
-      mult    = _hexFieldRes.mult;
-      if (_hexFieldRes.mod) {
-        _cb.contributions.push({
-          source: `hexagram ${run.getHexagram()?.englishName ?? 'hex'}`,
-          addPoints: _hexFieldRes.mod.addPoints ?? 0, addMult: _hexFieldRes.mod.addMult ?? 0, multiplyMult: _hexFieldRes.mod.multiplyMult ?? 1,
-        });
-      }
-
-      for (const spirit of _fieldSpirits) {
-        const effect = SpiritEffects.get(spirit.id);
-        if (!effect?.onCardScored) continue;
-        const count = ACCUMULATOR_SPIRIT_IDS.has(spirit.id) ? 1 : effectivePower(spirit);
-        const r = effect.onCardScored({ card, spirit, spirits: _fieldSpirits });
-        if (r) {
-          if (r.addPoints)    cardPts += r.addPoints    * count;
-          if (r.addMult)      mult    += r.addMult      * count;
-          if (r.multiplyMult) mult    *= r.multiplyMult * count;
-          _cb.contributions.push({
-            source: `${spirit.name}${count > 1 ? ` \xD7${count}` : ''}`,
-            addPoints: (r.addPoints ?? 0) * count, addMult: (r.addMult ?? 0) * count,
-            multiplyMult: r.multiplyMult ?? 1,
-          });
-        }
-      }
-
-      points += cardPts;
-      _cb.totalCardPts = cardPts;
-      _bd.cards.push(_cb);
-      if (this._onScoringStep) {
-        this._onScoringStep({ type: 'card_points', card, cardPts, points, mult });
-      }
-    }
-
-    // ── Engine spirits (applyEngine — per scoring event) ──
-    for (const spirit of _fieldSpirits) {
-      const effect = SpiritEffects.get(spirit.id);
-      if (!effect?.applyEngine) continue;
-      const r = effect.applyEngine({ spirit, mult, points, spirits: _fieldSpirits, cards: fieldCards });
-      if (r) {
-        if (r.addPoints)    points += r.addPoints;
-        if (r.addMult)      mult   += r.addMult;
-        if (r.multiplyMult) mult   *= r.multiplyMult;
-        _bd.engines.push(this._engineBreakdownEntry(spirit, r));
-      }
-    }
-
-    const flow = run.flow;
-    const _hexCompute = getActiveEffect();
-    const fieldScore = this._computeCaptureScore(_hexCompute, points, mult, flow);
-    this._runningScore += fieldScore;
-
-    // ── Field scoring log (parity with capture scoring) ──
-    const _captureNum = ++this._captureEventCount;
-    logger.logCaptureScoring({
-      captureNumber: _captureNum, turn: this._turn, phase: 'field_end',
-      cardBreakdowns: _bd.cards,
-      captureLevel: { heldEffects: _bd.heldEffects, engineSpirits: _bd.engines },
-      totalPoints: points, totalMult: mult, flow,
-      captureScore: fieldScore, runningRoundTotal: this._runningScore,
-      customFormula: _hexCompute?.computeFinalScore ? 'hex computeFinalScore' : null,
-    });
-
-    if (this._onScoringStep) {
-      this._onScoringStep({
-        type: 'capture_complete', points, mult, flow, captureScore: fieldScore,
-        runningTotal: this._runningScore,
-      });
-    }
-    this._scoringEvents.push({
-      type: 'field_score', cards: fieldCards, capturePoints: points, mult, flow,
-      captureScore: fieldScore, runningTotal: this._runningScore,
-    });
+    // Field cards scored as a capture set via the shared scoring pipeline (Campaign 1 convergence):
+    // the field path now gains capstones (incl. nature) / onCardSeen / fire-twice / held-in-hand /
+    // retriggers / stack-hooks / glory-draw+stamps / the points-direct model — fixing the hex_01
+    // dead-build (onCardSeen accumulators were frozen + capstones no-op under score_field_at_round_end).
+    // Region K (capture-completion side-effects: onCardsCaptured/goat/caterpillar/symbiosis) is NOT
+    // applied to field cards this campaign — that's Campaign 2.
+    // NOTE (latent): J's glory-draw fires here, but its held-at-round-end payoff lands too late —
+    // _scoreFieldCards runs at _endRound AFTER _fireRoundEndUnplayedHooks already read the hand;
+    // surfacing that payoff needs a Phase-5 teardown reorder. This does NOT claim it works today.
+    this._scorePipeline(fieldCards, { phase: 'field_end', summaryType: 'field_score' });
   }
 
   /** Peek at the top card of the deck for the reveal hexagram. */
@@ -1365,7 +1290,21 @@ export default class GameRoundManager {
       return;
     }
 
-    {
+    this._scorePipeline(cards, { phase: this._phase, summaryType: 'capture' });
+    this._applyPostScoreCaptureEffects(cards);
+  }
+
+  /**
+   * The shared scoring pipeline (blocks B–J): setup + capstone flags, held-in-hand, the per-card
+   * loop (enhancements, hex, fire-twice × yin-yang × onCardScored with universe mirroring, onCardSeen),
+   * retriggers, stack-hooks, engine spirits, nature persist, finalize (log + summary), and the
+   * glory-draw / stamp completion. Called by _addCapture (captured cards, phase=this._phase,
+   * summaryType='capture') AND _scoreFieldCards (round-end field cards under score_field_at_round_end,
+   * phase='field_end', summaryType='field_score'). Region K (capture-completion side-effects) is NOT
+   * here — it stays in _addCapture via _applyPostScoreCaptureEffects.
+   * @returns {{points:number, mult:number, captureScore:number, captureNum:number, bd:object}}
+   */
+  _scorePipeline(cards, { phase, summaryType }) {
       // Cache spirit arrays for this capture (same object references as _allSpirits).
       const _activeSpirits  = run.activeSpirits;
       const _scoringSpirits = run.scoringSpirits;
@@ -1624,7 +1563,7 @@ export default class GameRoundManager {
       logger.logCaptureScoring({
         captureNumber: _captureNum,
         turn: this._turn,
-        phase: this._phase,
+        phase,
         cardBreakdowns: _bd.cards,
         captureLevel: { heldEffects: _bd.heldEffects, engineSpirits: _bd.engines },
         totalPoints: points,
@@ -1643,7 +1582,7 @@ export default class GameRoundManager {
       }
 
       this._scoringEvents.push({
-        type: 'capture', cards, capturePoints: points, mult, flow,
+        type: summaryType, cards, capturePoints: points, mult, flow,
         captureScore, runningTotal: this._runningScore,
       });
 
@@ -1679,8 +1618,18 @@ export default class GameRoundManager {
           if (fireCons) run.generateRandomConsumable();
         }
       }
-    }
 
+      return { points, mult, captureScore, captureNum: _captureNum, bd: _bd };
+  }
+
+  /**
+   * Region K — capture-completion side-effects, run ONLY for real captures (NOT round-end field
+   * scoring): card-reactive (onCardsCaptured uniqueness, goat ki, sym_caterpillar leaf-eating,
+   * util_symbiosis summoning) + capture-event (logCapture, style-combos, hexOnCaptureComplete).
+   * Kept out of _scorePipeline so the field path doesn't trigger them. (Campaign 2 shares the
+   * card-reactive subset onto field cards.)
+   */
+  _applyPostScoreCaptureEffects(cards) {
     run.onCardsCaptured(cards);
 
 
