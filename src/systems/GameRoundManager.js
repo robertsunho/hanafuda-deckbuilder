@@ -405,12 +405,16 @@ export default class GameRoundManager {
     // the field path now gains capstones (incl. nature) / onCardSeen / fire-twice / held-in-hand /
     // retriggers / stack-hooks / glory-draw+stamps / the points-direct model — fixing the hex_01
     // dead-build (onCardSeen accumulators were frozen + capstones no-op under score_field_at_round_end).
-    // Region K (capture-completion side-effects: onCardsCaptured/goat/caterpillar/symbiosis) is NOT
-    // applied to field cards this campaign — that's Campaign 2.
     // NOTE (latent): J's glory-draw fires here, but its held-at-round-end payoff lands too late —
     // _scoreFieldCards runs at _endRound AFTER _fireRoundEndUnplayedHooks already read the hand;
     // surfacing that payoff needs a Phase-5 teardown reorder. This does NOT claim it works today.
     this._scorePipeline(fieldCards, { phase: 'field_end', summaryType: 'field_score' });
+
+    // Campaign 2: field cards = a new capture set, so the card-REACTIVE effects fire on them —
+    // wildlife/plenty uniqueness, goat ki, sym_caterpillar eats leaf-enhanced FIELD cards
+    // (PERSISTENT deck deletion), util_symbiosis summons from FIELD animals (PERSISTENT roster add).
+    // The capture-EVENT effects (logCapture / style-combos / hexComplete) stay _addCapture-only.
+    this._applyCaptureCardEffects(fieldCards);
   }
 
   /** Peek at the top card of the deck for the reveal hexagram. */
@@ -1629,7 +1633,14 @@ export default class GameRoundManager {
    * Kept out of _scorePipeline so the field path doesn't trigger them. (Campaign 2 shares the
    * card-reactive subset onto field cards.)
    */
-  _applyPostScoreCaptureEffects(cards) {
+  /**
+   * Card-REACTIVE capture effects (region K, front): they react to WHICH cards were captured.
+   * Shared by _addCapture (captured cards) AND _scoreFieldCards (field cards as a new capture set
+   * under score_field_at_round_end). onCardsCaptured (wildlife/plenty uniqueness), sym_caterpillar
+   * (eats leaf-enhanced cards — PERSISTENT deleteCard + metamorphose), util_symbiosis (summons from
+   * animals — PERSISTENT roster add + Algae accrual + transcend cascade), goat ki.
+   */
+  _applyCaptureCardEffects(cards) {
     run.onCardsCaptured(cards);
 
 
@@ -1707,6 +1718,17 @@ export default class GameRoundManager {
 
     // Goat consumable: +1 ki per card captured.
     if (this._goatActive) run.addKi(cards.length, 'goat_capture');
+  }
+
+  /**
+   * Capture-EVENT side-effects (region K, back): telemetry + capture-pile reactions that fire ONLY
+   * for real captures, NOT round-end field scoring. logCapture (would mislabel the field pass as a
+   * 'capture'); style-combos (reads this._capture.getAll() — the pile field cards were NEVER added
+   * to → re-read/re-award hazard); hexOnCaptureComplete (inert under hex_01 — no onCaptureComplete).
+   * _addCapture calls this; _scoreFieldCards does NOT.
+   */
+  _applyPostScoreCaptureEffects(cards) {
+    this._applyCaptureCardEffects(cards);
 
     logger.logCapture(cards, 'capture');
 
