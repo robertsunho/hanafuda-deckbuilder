@@ -184,6 +184,21 @@ export function aggregateUniqueCount(spirit, key) {
   return spirit.state?.[key]?.length ?? 0;
 }
 
+// ── Economy value accessors ────────────────────────────────────────────────────
+// F4.37 C3: keep the coupon discount and piggybank hand-ki multiplier in ONE place,
+// read by BOTH the RunManager formulas (getEffectiveCost / calculateKiReward) AND the
+// spirit tooltips — so the displayed value can never drift from the applied one.
+
+/** econ_coupon: shop discount percentage for N stacks (stacks to 45% at 3). */
+export function couponDiscountPct(stacks) {
+  return stacks * 15;
+}
+
+/** econ_piggybank: hand-ki multiplier for N stacks (×2/×3/×4; ×1 when absent). */
+export function piggybankHandKiMult(stacks) {
+  return stacks > 0 ? 1 + stacks : 1;
+}
+
 // ── Card promotion helpers ────────────────────────────────────────────────────
 
 /** Ascending point order for card type promotion. */
@@ -359,7 +374,7 @@ class RunManager {
     // formula — intentionally in place, not seepage. See F4.16_F4.20_triage_ledger.md.
     const couponStacks = this.countStackedById('econ_coupon');
     if (couponStacks <= 0) return hexAdjusted;
-    const remainingPct = Math.max(0, 100 - couponStacks * 15);
+    const remainingPct = Math.max(0, 100 - couponDiscountPct(couponStacks));
     return Math.ceil(hexAdjusted * remainingPct / 100);
   }
 
@@ -1303,7 +1318,7 @@ class RunManager {
     // Bucket-B (F4.20): econ_piggybank's x(1+stacks) on handKi is a term in this RunManager-owned
     // ki-reward formula — intentionally in place, not seepage. See F4.16_F4.20_triage_ledger.md.
     const piggyStacks  = this.countStackedById('econ_piggybank');
-    const piggyMult    = piggyStacks > 0 ? (1 + piggyStacks) : 1;
+    const piggyMult    = piggybankHandKiMult(piggyStacks);
     let handKi         = pushFailed ? 0 : cardsInHand * piggyMult;
     handKi             = applyHook('modifyHandKi', handKi, handKi);
     const pushMult     = getPushMultiplier(pushDepth, outcome);

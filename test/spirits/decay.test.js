@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeRound, playRoundToEnd, equipSpiritWithState } from '../helpers.js';
+import SpiritEffects from '../../src/systems/SpiritEffects.js';
 
 // Deck that triggers Hikari yaku (bright capture) so bankScore() is reachable.
 const YAKU_DECK = [
@@ -94,5 +95,58 @@ describe('decay_pear — onRoundEnd decrement (F4.18b #2)', () => {
     grm.bankScore();
 
     expect(spirit.state.remaining).toBe(0); // Math.max(0, 3-5) = 0
+  });
+});
+
+// F4.37 C3 [FIX]: per-member loss scaling. The loss (not just the output) now
+// scales by stack count — a 2-stack Persimmon loses 6/round, a 2-stack Pear 10.
+// This is a deliberate behavior change (a correct-per-ruling nerf), so these
+// assertions flip from the 1-stack values above.
+describe('F4.37 C3 — decay loss scales per-member [FIX]', () => {
+  it('2-stack Persimmon loses 6/round (3 × 2), not 3', () => {
+    const { grm } = makeRound({ spirits: [{ id: 'decay_persimmon', stackCount: 2 }], deckCardIds: YAKU_DECK });
+    const spirit = equipSpiritWithState('decay_persimmon', { state: { remaining: 100 } });
+    // Output still scales as n × stacks (unchanged).
+    expect(SpiritEffects.get('decay_persimmon').applyEngine({ spirit }).addMult).toBe(200);
+
+    grm.playHandCards(['january_plain_1']);
+    grm.playDeckPhase();
+    grm.bankScore();
+
+    expect(spirit.state.remaining).toBe(94); // 100 - (3 × 2)
+  });
+
+  it('2-stack Persimmon clamps at 0 when remaining < scaled loss', () => {
+    const { grm } = makeRound({ spirits: [{ id: 'decay_persimmon', stackCount: 2 }], deckCardIds: YAKU_DECK });
+    const spirit = equipSpiritWithState('decay_persimmon', { state: { remaining: 4 } });
+
+    grm.playHandCards(['january_plain_1']);
+    grm.playDeckPhase();
+    grm.bankScore();
+
+    expect(spirit.state.remaining).toBe(0); // Math.max(0, 4 - 6) = 0, never negative
+  });
+
+  it('2-stack Pear loses 10/round (5 × 2), not 5', () => {
+    const { grm } = makeRound({ spirits: [{ id: 'decay_pear', stackCount: 2 }], deckCardIds: YAKU_DECK });
+    const spirit = equipSpiritWithState('decay_pear', { state: { remaining: 100 } });
+    expect(SpiritEffects.get('decay_pear').applyEngine({ spirit }).addPoints).toBe(200);
+
+    grm.playHandCards(['january_plain_1']);
+    grm.playDeckPhase();
+    grm.bankScore();
+
+    expect(spirit.state.remaining).toBe(90); // 100 - (5 × 2)
+  });
+
+  it('2-stack Pear clamps at 0 when remaining < scaled loss', () => {
+    const { grm } = makeRound({ spirits: [{ id: 'decay_pear', stackCount: 2 }], deckCardIds: YAKU_DECK });
+    const spirit = equipSpiritWithState('decay_pear', { state: { remaining: 8 } });
+
+    grm.playHandCards(['january_plain_1']);
+    grm.playDeckPhase();
+    grm.bankScore();
+
+    expect(spirit.state.remaining).toBe(0); // Math.max(0, 8 - 10) = 0
   });
 });

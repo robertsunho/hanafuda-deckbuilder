@@ -187,3 +187,69 @@ describe('F4.37 — single-key linear addMult engines', () => {
     });
   }
 });
+
+// ── C3 Part 2: engine_surplus tooltip follows the effect (×stacks) [FIX value] ─
+// Value-CHANGING (not PRESERVE): the old tooltip ignored stacks. assertVE asserts
+// the new tooltip === applyEngine; the explicit numbers pin the before→after flip.
+describe('F4.37 C3 — engine_surplus tooltip ×stacks [FIX]', () => {
+  it('2-stack, ki=6 → +4 mult (was +2; now matches applyEngine)', () => {
+    makeRound({ spirits: [{ id: 'engine_surplus', stackCount: 2 }], deckCardIds: DECK });
+    run._ki = 6;
+    const s = run.allSpirits.find(x => x.id === 'engine_surplus');
+    expect(SpiritEffects.get('engine_surplus').applyEngine({ spirit: s }).addMult).toBe(4); // floor(6/3)*2
+    expect(assertVE(s)).toBe(4);
+  });
+  it('1-stack, ki=6 → +2 mult (unchanged at 1-stack)', () => {
+    makeRound({ spirits: [{ id: 'engine_surplus', stackCount: 1 }], deckCardIds: DECK });
+    run._ki = 6;
+    expect(assertVE(run.allSpirits.find(x => x.id === 'engine_surplus'))).toBe(2);
+  });
+});
+
+// ── C3 Part 4: out-of-block engines migrated to B [PRESERVE value] ────────────
+// These hardcoded scaling that duplicated their applyEngine. Now derive it.
+// (They also render a bare fallback "×N mult" line with no arrow — assertVE
+// anchors on the arrow, so it targets the narrated legendary/symbiont line.)
+describe('F4.37 C3 Part 4 — wuji + badger (counter engines)', () => {
+  it('engine_wuji regular', () => {
+    assertVE(regular('engine_wuji', s => { s.elements = [{ destroyed: 4 }]; }));
+  });
+  it('engine_wuji zero → identity ×1.00', () => {
+    expect(assertVE(regular('engine_wuji', s => { s.elements = [{ destroyed: 0 }]; }))).toBe(1);
+  });
+  it('engine_wuji negative transcended', () => {
+    assertVE(negative({ id: 'engine_wuji', name: 'Wuji', isNegative: true, powerLevel: 2,
+      state: { key: 'destroyed', preTranscendTotal: 1.5, oldestAtTranscend: 0, newEvents: 2 } }));
+  });
+  it('sym_badger regular', () => {
+    assertVE(regular('sym_badger', s => { s.elements = [{ consumablesUsed: 3 }]; }));
+  });
+  it('sym_badger zero → identity +0', () => {
+    expect(assertVE(regular('sym_badger', s => { s.elements = [{ consumablesUsed: 0 }]; }))).toBe(0);
+  });
+  it('sym_badger negative', () => {
+    assertVE(negative({ id: 'sym_badger', name: 'Badger', isNegative: true, powerLevel: 2,
+      state: { key: 'consumablesUsed', preTranscendTotal: 0, oldestAtTranscend: 0, newEvents: 2 } }));
+  });
+});
+
+describe('F4.37 C3 Part 4 — dao/chi/tengu/feng_shui (run-state engines)', () => {
+  // Value derives from run state (deck / flow / spirit count / empty slots);
+  // assertVE confirms tooltip === applyEngine since both read the same run state.
+  it('engine_dao (unaltered deck count)', () => {
+    makeRound({ spirits: [{ id: 'engine_dao', stackCount: 1 }], deckCardIds: DECK });
+    assertVE(run.allSpirits.find(x => x.id === 'engine_dao'));
+  });
+  it('engine_chi (flow × stacks)', () => {
+    makeRound({ spirits: [{ id: 'engine_chi', stackCount: 2 }], deckCardIds: DECK });
+    assertVE(run.allSpirits.find(x => x.id === 'engine_chi'));
+  });
+  it('engine_tengu (spirit + negative count)', () => {
+    makeRound({ spirits: [{ id: 'engine_tengu', stackCount: 1 }], deckCardIds: DECK });
+    assertVE(run.allSpirits.find(x => x.id === 'engine_tengu'));
+  });
+  it('engine_feng_shui (empty slots)', () => {
+    makeRound({ spirits: [{ id: 'engine_feng_shui', stackCount: 1 }], deckCardIds: DECK });
+    assertVE(run.allSpirits.find(x => x.id === 'engine_feng_shui'));
+  });
+});

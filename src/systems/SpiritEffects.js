@@ -1166,7 +1166,8 @@ const _effects = {
   // Strong initial bonus that decreases each round. State decremented at round end.
 
   decay_persimmon: {
-    // state.remaining decays 3/round; stack multiplier on output only.
+    // Loss AND output both scale per-member (F4.37 C3 ruling): a 2-stack loses
+    // lossPerRound×2/round. lossPerRound lives in tooltipBase (single source).
     applyEngine({ spirit }) {
       const n = spirit.state?.remaining ?? 0;
       if (n === 0) return null;
@@ -1176,12 +1177,16 @@ const _effects = {
     // Migrated from GRM bank + natural inline decrement blocks (F4.18b #2).
     // Now also fires on the consumable-empty-hand path (was a bug omission).
     onRoundEnd({ spirit }) {
-      if (spirit.state) spirit.state.remaining = Math.max(0, spirit.state.remaining - 3);
+      if (spirit.state) {
+        const loss = _tb(spirit, 'lossPerRound', 3) * effectivePower(spirit);
+        spirit.state.remaining = Math.max(0, spirit.state.remaining - loss);
+      }
     },
   },
 
   decay_pear: {
-    // state.remaining decays 5/round; stack multiplier on output only.
+    // Loss AND output both scale per-member (F4.37 C3 ruling): a 2-stack loses
+    // lossPerRound×2/round. lossPerRound lives in tooltipBase (single source).
     applyEngine({ spirit }) {
       const n = spirit.state?.remaining ?? 0;
       if (n === 0) return null;
@@ -1190,7 +1195,10 @@ const _effects = {
     },
     // Migrated from GRM bank + natural inline decrement blocks (F4.18b #2).
     onRoundEnd({ spirit }) {
-      if (spirit.state) spirit.state.remaining = Math.max(0, spirit.state.remaining - 5);
+      if (spirit.state) {
+        const loss = _tb(spirit, 'lossPerRound', 5) * effectivePower(spirit);
+        spirit.state.remaining = Math.max(0, spirit.state.remaining - loss);
+      }
     },
   },
 

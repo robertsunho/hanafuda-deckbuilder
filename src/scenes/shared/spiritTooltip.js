@@ -10,6 +10,8 @@ import run, {
   aggregateNumericState,
   aggregateUniqueCount,
   longestHeldValue,
+  couponDiscountPct,
+  piggybankHandKiMult,
 } from '../../systems/RunManager.js';
 
 /**
@@ -228,11 +230,11 @@ export function getSpiritContrib(spirit, opts = {}) {
     } else if (spirit.id === 'decay_persimmon') {
       const n = spirit.state?.remaining ?? 0;
       const stacks = effectivePower(spirit);
-      lines.push(`Remaining: +${n * stacks} mult (loses 3/round)`);
+      lines.push(`Remaining: +${n * stacks} mult (loses ${_tb('lossPerRound') * stacks}/round)`);
     } else if (spirit.id === 'decay_pear') {
       const n = spirit.state?.remaining ?? 0;
       const stacks = effectivePower(spirit);
-      lines.push(`Remaining: +${n * stacks} pts (loses 5/round)`);
+      lines.push(`Remaining: +${n * stacks} pts (loses ${_tb('lossPerRound') * stacks}/round)`);
     } else if (spirit.id === 'engine_missing_number') {
       const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.addMult ?? 0;
       const count = spirit.isNegative
@@ -252,8 +254,12 @@ export function getSpiritContrib(spirit, opts = {}) {
         : longestHeldValue(spirit, 'cardsDiscarded');
       lines.push(`Cards discarded: ${count}  \u2192  \xD7${val.toFixed(2)} mult`);
     } else if (spirit.id === 'engine_surplus') {
+      // F4.37 C3 [FIX display]: derive from applyEngine (\u00d7stacks). The old
+      // tooltip ignored stacks \u2014 a multi-stack drift C2 flagged. Now follows
+      // the (already-correct) effect.
       const ki = run?.ki ?? 0;
-      lines.push(`Current ki: ${ki}  \u2192  +${Math.floor(ki / 3)} mult`);
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.addMult ?? 0;
+      lines.push(`Current ki: ${ki}  \u2192  +${val} mult`);
     } else if (spirit.id === 'util_northern_lion') {
       let n;
       if (spirit.isNegative) {
@@ -350,36 +356,31 @@ export function getSpiritContrib(spirit, opts = {}) {
   if (spirit.id === 'legend_gankyil') {
     lines.push('Auto-captures at 3-stack instead of 4-stack');
   } else if (spirit.id === 'engine_wuji') {
-    if (spirit.isNegative) {
-      const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-      const mult = (spirit.state?.preTranscendTotal ?? 1) + ne * 0.3 * (spirit.powerLevel ?? 1);
-      lines.push(`Cards destroyed: ${o + ne}  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
-    } else {
-      const destroyed = aggregateNumericState(spirit, 'destroyed');
-      lines.push(`Cards destroyed: ${longestHeldValue(spirit, 'destroyed')}  \u2192  \xD7${(1 + destroyed * 0.3).toFixed(2)} mult-mult`);
-    }
+    // F4.37 C3 Part 4: out-of-block engines migrated to Architecture B \u2014 value
+    // derives from applyEngine, narration retained. null/inert \u2192 identity \u00d71.00.
+    const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
+    const count = spirit.isNegative
+      ? (spirit.state?.oldestAtTranscend ?? 0) + (spirit.state?.newEvents ?? 0)
+      : longestHeldValue(spirit, 'destroyed');
+    lines.push(`Cards destroyed: ${count}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
   } else if (spirit.id === 'engine_dao') {
-    const deck = run.getDeck();
-    const n = deck.filter(c => !c.enhancement && !c.ribbonStamp && !c.edition && !c.promotionProgress).length;
-    const stacks = effectivePower(spirit);
-    const mult = 1 + n * 0.1 * stacks;
-    lines.push(`Unaltered in deck: ${n}  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
+    const n = run.getDeck().filter(c => !c.enhancement && !c.ribbonStamp && !c.edition && !c.promotionProgress).length;
+    const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
+    lines.push(`Unaltered in deck: ${n}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
   } else if (spirit.id === 'engine_chi') {
     const stacks = effectivePower(spirit);
-    const mult = run.flow * stacks;
-    lines.push(`Flow: ${run.flow.toFixed(2)} \xD7 ${stacks} stack(s)  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
+    const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
+    lines.push(`Flow: ${run.flow.toFixed(2)} \xD7 ${stacks} stack(s)  \u2192  \xD7${val.toFixed(2)} mult-mult`);
   } else if (spirit.id === 'engine_tengu') {
-    const stacks = effectivePower(spirit);
     const spiritCount = run.spirits.length + run.negativeSpirits.length;
-    const mult = 1 + 0.3 * spiritCount * stacks;
-    lines.push(`Spirits + negatives: ${spiritCount}  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
+    const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
+    lines.push(`Spirits + negatives: ${spiritCount}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
   } else if (spirit.id === 'engine_feng_shui') {
-    const stacks = effectivePower(spirit);
     const fengShuiSlotCount = run.spirits.filter(s => s.id === 'engine_feng_shui').length;
     const occupiedNonFengShui = run.spirits.length - fengShuiSlotCount;
     const emptySlots = run.spiritSlots - occupiedNonFengShui;
-    const mult = 1 + 0.5 * emptySlots * stacks;
-    lines.push(`Empty slots (FS-adjusted): ${emptySlots}  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
+    const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
+    lines.push(`Empty slots (FS-adjusted): ${emptySlots}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
   } else if (spirit.id === 'capstone_yinyang') {
     lines.push('Each spirit slot fires twice during scoring');
   } else if (spirit.id === 'capstone_universe') {
@@ -423,14 +424,24 @@ export function getSpiritContrib(spirit, opts = {}) {
   } else if (spirit.id === 'sym_garden') {
     lines.push('+0.2 additive mult per unique card in deck');
   } else if (spirit.id === 'sym_badger') {
-    if (spirit.isNegative) {
-      const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
-      const mult = (spirit.state?.preTranscendTotal ?? 0) + ne * 1 * (spirit.powerLevel ?? 1);
-      lines.push(`Consumables used: ${o + ne}  \u2192  +${mult} mult`);
-    } else {
-      const agg = aggregateNumericState(spirit, 'consumablesUsed');
-      lines.push(`Consumables used: ${longestHeldValue(spirit, 'consumablesUsed')}  \u2192  +${agg} mult`);
-    }
+    const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.addMult ?? 0;
+    const count = spirit.isNegative
+      ? (spirit.state?.oldestAtTranscend ?? 0) + (spirit.state?.newEvents ?? 0)
+      : longestHeldValue(spirit, 'consumablesUsed');
+    lines.push(`Consumables used: ${count}  \u2192  +${val} mult`);
+  }
+
+  // \u2500\u2500 Economy spirits (F4.37 C3) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // These have no applyEngine; the real value lives in RunManager / the effect.
+  // Read it from the SAME source (accessor / effect fn), never a hardcoded copy.
+  if (spirit.id === 'econ_coupon') {
+    lines.push(`${couponDiscountPct(effectivePower(spirit))}% shop discount`);
+  } else if (spirit.id === 'econ_piggybank') {
+    lines.push(`\xD7${piggybankHandKiMult(effectivePower(spirit))} hand ki`);
+  } else if (spirit.id === 'econ_grace') {
+    // applyKiBonus(ki, spirit) = ki \u00d7 (1 + stacks); feed ki=1 to read the multiplier.
+    const mult = fx?.applyKiBonus ? fx.applyKiBonus({ ki: 1, spirit }) : (1 + effectivePower(spirit));
+    lines.push(`\xD7${mult} running ki per combo`);
   }
 
   return lines.length > 0 ? lines.join('\n') : null;
