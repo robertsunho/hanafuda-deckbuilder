@@ -321,7 +321,7 @@ export function getSpiritContrib(spirit, opts = {}) {
     } else if (spirit.id === 'engine_surplus') {
       const ki = run?.ki ?? 0;
       lines.push(`Current ki: ${ki}  \u2192  +${Math.floor(ki / 3)} mult`);
-    } else if (spirit.id === 'engine_northern_lion') {
+    } else if (spirit.id === 'util_northern_lion') {
       let n;
       if (spirit.isNegative) {
         n = (spirit.state?.preTranscendTotal ?? 0) +
@@ -354,7 +354,7 @@ export function getSpiritContrib(spirit, opts = {}) {
         const progress = `${inv.bright}B/${inv.animal}A/${inv.ribbon}R/${inv.plain}P`;
         lines.push(`Qualified rounds: ${count} (this round: ${progress})  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
       }
-    } else if (spirit.id === 'legend_waidan') {
+    } else if (spirit.id === 'util_waidan') {
       const stacks = effectivePower(spirit);
       lines.push(`Sacred Grove exit: creates ${stacks} negative copy/copies of random consumable(s)`);
     } else if (spirit.id === 'util_festival') {
@@ -420,7 +420,7 @@ export function getSpiritContrib(spirit, opts = {}) {
   // ── Legendary + demoted rare tooltips ───────────────────────────────────
   if (spirit.id === 'legend_gankyil') {
     lines.push('Auto-captures at 3-stack instead of 4-stack');
-  } else if (spirit.id === 'legend_wuji') {
+  } else if (spirit.id === 'engine_wuji') {
     if (spirit.isNegative) {
       const o = spirit.state?.oldestAtTranscend ?? 0, ne = spirit.state?.newEvents ?? 0;
       const mult = (spirit.state?.preTranscendTotal ?? 1) + ne * 0.3 * (spirit.powerLevel ?? 1);
@@ -429,24 +429,24 @@ export function getSpiritContrib(spirit, opts = {}) {
       const destroyed = aggregateNumericState(spirit, 'destroyed');
       lines.push(`Cards destroyed: ${longestHeldValue(spirit, 'destroyed')}  \u2192  \xD7${(1 + destroyed * 0.3).toFixed(2)} mult-mult`);
     }
-  } else if (spirit.id === 'legend_dao') {
+  } else if (spirit.id === 'engine_dao') {
     const deck = run.getDeck();
     const n = deck.filter(c => !c.enhancement && !c.ribbonStamp && !c.edition && !c.promotionProgress).length;
     const stacks = effectivePower(spirit);
     const mult = 1 + n * 0.1 * stacks;
     lines.push(`Unaltered in deck: ${n}  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
-  } else if (spirit.id === 'legend_chi') {
+  } else if (spirit.id === 'engine_chi') {
     const stacks = effectivePower(spirit);
     const mult = run.flow * stacks;
     lines.push(`Flow: ${run.flow.toFixed(2)} \xD7 ${stacks} stack(s)  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
-  } else if (spirit.id === 'legend_tengu') {
+  } else if (spirit.id === 'engine_tengu') {
     const stacks = effectivePower(spirit);
     const spiritCount = run.spirits.length + run.negativeSpirits.length;
     const mult = 1 + 0.3 * spiritCount * stacks;
     lines.push(`Spirits + negatives: ${spiritCount}  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
-  } else if (spirit.id === 'legend_feng_shui') {
+  } else if (spirit.id === 'engine_feng_shui') {
     const stacks = effectivePower(spirit);
-    const fengShuiSlotCount = run.spirits.filter(s => s.id === 'legend_feng_shui').length;
+    const fengShuiSlotCount = run.spirits.filter(s => s.id === 'engine_feng_shui').length;
     const occupiedNonFengShui = run.spirits.length - fengShuiSlotCount;
     const emptySlots = run.spiritSlots - occupiedNonFengShui;
     const mult = 1 + 0.5 * emptySlots * stacks;
@@ -540,8 +540,8 @@ export function getElementContrib(spirit, elementIndex) {
     case 'engine_kintaro':     lines.push(`Golds consumed: ${el.goldsConsumed ?? 0}`); break;
     case 'engine_bullseye':    lines.push(`Qualified: ${el.qualifiedCount ?? 0}`); break;
     case 'engine_missing_number': lines.push(`4-stacks: ${el.totalStacks ?? 0}`); break;
-    case 'engine_northern_lion':  lines.push(`Pushes: ${el.pushesWitnessed ?? 0}`); break;
-    case 'legend_wuji':        lines.push(`Destroyed: ${el.destroyed ?? 0}`); break;
+    case 'util_northern_lion':  lines.push(`Pushes: ${el.pushesWitnessed ?? 0}`); break;
+    case 'engine_wuji':        lines.push(`Destroyed: ${el.destroyed ?? 0}`); break;
     case 'engine_glacier': case 'engine_carbon': case 'engine_fossil': case 'engine_moths':
       lines.push(`T1: ${el.t1Procs ?? 0}, T2: ${el.t2Procs ?? 0}`); break;
     case 'engine_velocity':    lines.push(`T2 procs: ${el.t2Procs ?? 0}`); break;

@@ -114,14 +114,21 @@ the inline `playDeckPhase` logic was never extracted into a reusable yaku-decisi
 **Coupled** to the deferred F4.18 capture-event work (issue #3 was explicitly deferred there). Not
 absorbed by any Tier-2/3 pass.
 
-### F4.21 — Spirit ID normalization → **STILL-OPEN, NOT a quick cleanup** (~4-7h; gated before save-game)
-Six demoted-rare spirits keep legacy `legend_` prefixes despite non-legendary categories: `legend_wuji`
-(engine_destruction), `legend_dao` (engine_deck), `legend_chi` (engine_flow), `legend_tengu`
-(engine_spirit_count), `legend_waidan` (utility_economy), `legend_feng_shui` (engine_slot). `legend_gankyil`
-correctly stays (still legendary). A rename touches every reference site (SpiritEffects, RunManager,
-ShrineScene Waidan refs, tooltips, tests) — a full system refactor, framed "before F5.2 (Save game)." The
-F2.1 channel-mismatch sub-fixes (`game_echo`, `util_past_life`) were already patched. **Flag:** size +
-save-game-ordering make this a scheduled refactor, not a fill-in chore.
+### F4.21 — Spirit ID normalization → **RESOLVED** (the 6 demoted rares + northern_lion)
+The 6 demoted-rare spirits were renamed off their legacy `legend_` prefixes to archetype-accurate
+prefixes matching their `category`: `legend_wuji`→`engine_wuji` (engine_destruction), `legend_dao`→
+`engine_dao` (engine_deck), `legend_chi`→`engine_chi` (engine_flow), `legend_tengu`→`engine_tengu`
+(engine_spirit_count), `legend_feng_shui`→`engine_feng_shui` (engine_slot), `legend_waidan`→`util_waidan`
+(utility_economy). Also `engine_northern_lion`→`util_northern_lion` (a `{}` shop-reroll utility, not a
+scoring engine). `legend_gankyil` correctly kept its prefix (still legendary). The rename flipped all
+~38 `src/` reference sites (def, SpiritEffects effect + NEGATIVE_SNAPSHOT keys, RunManager
+ACCUMULATOR_SPIRIT_IDS + init-state, tooltips, ShrineScene Grove-exit + reroll filters, GRM bucket-T
+check) — behavior-neutral (no prefix is parsed anywhere). Verified by grep-to-zero (the campaign was
+test-blind: zero tests referenced these IDs) plus a new `engine_wuji`/`engine_chi` regression test
+closing that coverage gap. Persistence was a clean break (no save-game keys these IDs — only
+`hanatu_beaten_hexagrams`). The earlier F2.1 channel-mismatch sub-fixes (`game_echo`, `util_past_life`)
+were already patched; the remaining cosmetic archetype-drift IDs (`engine_memory`, `game_mirror`, etc.)
+are a separate optional later campaign.
 
 ### F4.25 — Declarative spirit-formula refactor (three-place duplication) → **STILL-OPEN** (medium)
 The Cat-1 scaling constant still lives in 3 places per spirit: `ACCUMULATOR_INIT` (RunManager.js:51-80),

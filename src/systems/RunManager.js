@@ -39,10 +39,10 @@ export const ACCUMULATOR_SPIRIT_IDS = new Set([
   'engine_velocity',
   'engine_kintaro', 'engine_bullseye', 'engine_missing_number',
   'engine_ship', 'engine_napoleon',
-  'legend_wuji',
+  'engine_wuji',
   'engine_wildlife', 'engine_plenty',
   'engine_radiance', 'engine_banner',
-  'engine_northern_lion',
+  'util_northern_lion',
   'util_past_life',
   'sym_cuckoo_egg',
 ]);
@@ -69,12 +69,12 @@ const ACCUMULATOR_INIT = {
   engine_missing_number: () => ({ totalStacks: 0 }),
   engine_ship:     () => ({ cardsDiscarded: 0 }),
   engine_napoleon: () => ({ pushFails: 0 }),
-  legend_wuji:     () => ({ destroyed: 0 }),
+  engine_wuji:     () => ({ destroyed: 0 }),
   engine_wildlife: () => ({ seenAnimals: [] }),
   engine_plenty:   () => ({ seenPlains: [] }),
   engine_radiance: () => ({ seenBrights: [] }),
   engine_banner:   () => ({ seenRibbons: [] }),
-  engine_northern_lion: () => ({ pushesWitnessed: 0 }),
+  util_northern_lion: () => ({ pushesWitnessed: 0 }),
   util_past_life:  () => ({}),  // only acquiredRound
   sym_cuckoo_egg:  () => ({}),  // only acquiredRound; maturity = 3 rounds held
 };

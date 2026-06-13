@@ -1558,7 +1558,7 @@ These engines are tier-aware — base-tier enhancements give smaller increments 
 | `engine_palace` | Palace | +0.5 mult-mult per card added to deck (run-wide permanent) | 7 | uncommon |
 | `engine_ship` | Ship | +0.3 mult-mult per card discarded (run-wide permanent) | 6 | uncommon |
 | `engine_surplus` | Surplus | +1 additive mult per 3 ki currently owned (recalculated per capture) | 6 | uncommon |
-| `engine_northern_lion` | Northern Lion | Gains a free reroll each time you push successfully | 7 | uncommon |
+| `util_northern_lion` | Northern Lion | Gains a free reroll each time you push successfully | 7 | uncommon |
 | `engine_kintaro` | Kintaro | +0.1 mult-mult per Gold edition consumed (consumes Gold from scored cards, card remains) | 4 | uncommon |
 | `engine_golden_toad` | Golden Toad | Applies Gold edition to up to N scored cards per capture (N = stack count); skips cards with existing edition | 5 | uncommon |
 | `engine_irrigation` | Irrigation | Each plain captured permanently gains +3 points (stacks across captures) | 5 | uncommon |
@@ -1735,12 +1735,12 @@ These six spirits were originally classified as legendary in earlier development
 
 | ID | Name | Effect | Cost | Rarity |
 |---|---|---|---|---|
-| `legend_wuji` | Wuji | +0.3 mult-mult per destroyed card (run-wide permanent) | 8 | rare |
-| `legend_dao` | Dao | +0.1 mult-mult per unaltered card in deck (per stack) | 8 | rare |
-| `legend_chi` | Chi | multiplyMult equal to current flow value (additive across stacks) | 8 | rare |
-| `legend_tengu` | Tengu | +0.3 mult-mult per equipped spirit (regular + Negative, includes itself) | 8 | rare |
-| `legend_waidan` | Waidan | On Sacred Grove exit, creates a negative copy of a random consumable per stack | 8 | rare |
-| `legend_feng_shui` | Feng Shui | 1× base mult, +0.5 per empty spirit slot (ignores Feng Shui slots when counting) | 8 | rare |
+| `engine_wuji` | Wuji | +0.3 mult-mult per destroyed card (run-wide permanent) | 8 | rare |
+| `engine_dao` | Dao | +0.1 mult-mult per unaltered card in deck (per stack) | 8 | rare |
+| `engine_chi` | Chi | multiplyMult equal to current flow value (additive across stacks) | 8 | rare |
+| `engine_tengu` | Tengu | +0.3 mult-mult per equipped spirit (regular + Negative, includes itself) | 8 | rare |
+| `util_waidan` | Waidan | On Sacred Grove exit, creates a negative copy of a random consumable per stack | 8 | rare |
+| `engine_feng_shui` | Feng Shui | 1× base mult, +0.5 per empty spirit slot (ignores Feng Shui slots when counting) | 8 | rare |
 
 Notable mechanics:
 

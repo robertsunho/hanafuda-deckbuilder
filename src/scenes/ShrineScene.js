@@ -892,9 +892,9 @@ export class ShrineScene extends Phaser.Scene {
     }
 
     // ── Reroll button — always visible at fixed Y below purchase ──────────────
-    // engine_northern_lion: check for free rerolls (earned via pushes minus used).
+    // util_northern_lion: check for free rerolls (earned via pushes minus used).
     const _lionFree = run.allSpirits
-      .filter(s => s.id === 'engine_northern_lion')
+      .filter(s => s.id === 'util_northern_lion')
       .reduce((sum, s) => {
         let earned;
         if (s.isNegative) {
@@ -924,7 +924,7 @@ export class ShrineScene extends Phaser.Scene {
         if (_lionFree > 0) {
           // Consume one free reroll from the first lion that has available.
           for (const lion of run.allSpirits) {
-            if (lion.id !== 'engine_northern_lion') continue;
+            if (lion.id !== 'util_northern_lion') continue;
             let earned;
             if (lion.isNegative) {
               earned = (lion.state?.preTranscendTotal ?? 0) +
@@ -963,12 +963,12 @@ export class ShrineScene extends Phaser.Scene {
     btn.on('pointerover', () => btn.setFillStyle(0x2a6a3a));
     btn.on('pointerout',  () => btn.setFillStyle(0x1a4a2a));
     btn.on('pointerdown', () => {
-      // legend_waidan: Sacred Grove only — create negative consumable copies per stack.
+      // util_waidan: Sacred Grove only — create negative consumable copies per stack.
       // Bucket-B (F4.20): Sacred Grove exit is a scene-transition event (no spirit hook fires here) —
       // intentionally in place, not seepage. See F4.16_F4.20_triage_ledger.md.
       if (this._isGrove) {
         const waidanStacks = run.spirits
-          .filter(s => s.id === 'legend_waidan')
+          .filter(s => s.id === 'util_waidan')
           .reduce((sum, s) => sum + (s.stackCount ?? 1), 0);
         for (let i = 0; i < waidanStacks; i++) {
           const all = [...run._consumables, ...run._negativeConsumables];

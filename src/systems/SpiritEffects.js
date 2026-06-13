@@ -312,7 +312,7 @@ export const NEGATIVE_SNAPSHOT = {
   engine_lincoln:        (s, p) => snapshotCat1Linear(s, p, 'banks',            _tb(s, 'mult', 0.1),  'addMult'),
   engine_napoleon:       (s, p) => snapshotCat1Linear(s, p, 'pushFails',        _tb(s, 'mult', 0.2),  'addMult'),
   engine_missing_number: (s, p) => snapshotCat1Linear(s, p, 'totalStacks',      _tb(s, 'mult', 5),    'addMult'),
-  engine_northern_lion:  (s, p) => snapshotCat1Linear(s, p, 'pushesWitnessed',  1,    'addMult'),
+  util_northern_lion:  (s, p) => snapshotCat1Linear(s, p, 'pushesWitnessed',  1,    'addMult'),
 
   // Cat 1 linear: mult-mult
   sym_algae:             (s, p) => snapshotCat1Linear(s, p, 'summonCount',     _tb(s, 'mult', 0.1),  'multiplyMult'),
@@ -320,7 +320,7 @@ export const NEGATIVE_SNAPSHOT = {
   engine_ship:           (s, p) => snapshotCat1Linear(s, p, 'cardsDiscarded',  _tb(s, 'mult', 0.3),  'multiplyMult'),
   engine_kintaro:        (s, p) => snapshotCat1Linear(s, p, 'goldsConsumed',   _tb(s, 'mult', 0.1),  'multiplyMult'),
   engine_bullseye:       (s, p) => snapshotCat1Linear(s, p, 'qualifiedCount',  _tb(s, 'mult', 1.0),  'multiplyMult'),
-  legend_wuji:           (s, p) => snapshotCat1Linear(s, p, 'destroyed',       _tb(s, 'mult', 0.3),  'multiplyMult'),
+  engine_wuji:           (s, p) => snapshotCat1Linear(s, p, 'destroyed',       _tb(s, 'mult', 0.3),  'multiplyMult'),
 
   // Cat 1 dual-key
   engine_glacier:  (s, p) => snapshotCat1Dual(s, p, 't1Procs', _tb(s, 't1Mult', 0.2), 't2Procs', _tb(s, 't2Mult', 0.4), 'multiplyMult'),
@@ -1286,7 +1286,7 @@ const _effects = {
     },
   },
 
-  engine_northern_lion: {},  // utility — handled in shop reroll logic
+  util_northern_lion: {},  // utility — handled in shop reroll logic
 
   engine_kintaro: {
     onCardScored({ card, spirit }) {
@@ -1354,7 +1354,7 @@ const _effects = {
 
   // ── Demoted Rares ─────────────────────────────────────────────────────
 
-  legend_wuji: {
+  engine_wuji: {
     onCardDestroyed({ spirit }) {
       incrementPerElement(spirit, 'destroyed', 1);
     },
@@ -1368,7 +1368,7 @@ const _effects = {
     },
   },
 
-  legend_dao: {
+  engine_dao: {
     applyEngine({ spirit }) {
       const n = _countUnalteredCards(run.getDeck());
       const stacks = effectivePower(spirit);
@@ -1377,14 +1377,14 @@ const _effects = {
     },
   },
 
-  legend_chi: {
+  engine_chi: {
     applyEngine({ spirit }) {
       const stacks = effectivePower(spirit);
       return { multiplyMult: run.flow * stacks };
     },
   },
 
-  legend_tengu: {
+  engine_tengu: {
     applyEngine({ spirit }) {
       const stacks = effectivePower(spirit);
       const spiritCount = run.spirits.length + run.negativeSpirits.length;
@@ -1393,12 +1393,12 @@ const _effects = {
     },
   },
 
-  legend_waidan: {},  // Sacred Grove exit — handled in ShrineScene
+  util_waidan: {},  // Sacred Grove exit — handled in ShrineScene
 
-  legend_feng_shui: {
+  engine_feng_shui: {
     applyEngine({ spirit }) {
       const stacks = effectivePower(spirit);
-      const fengShuiSlotCount = run.spirits.filter(s => s.id === 'legend_feng_shui').length;
+      const fengShuiSlotCount = run.spirits.filter(s => s.id === 'engine_feng_shui').length;
       const occupiedNonFengShui = run.spirits.length - fengShuiSlotCount;
       const emptySlots = run.spiritSlots - occupiedNonFengShui;
       return { multiplyMult: 1 + 0.5 * emptySlots * stacks };

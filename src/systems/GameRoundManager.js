@@ -2050,10 +2050,10 @@ export default class GameRoundManager {
         this._pushPenaltyActive = false;
         this._pushDepth++;        // GRM owns its round-local depth (was inside run.onPushSuccess)
         run.onPushSuccess();      // now only fires the hexagram onPushSuccess hook
-        // Bucket-T (F4.20): engine_northern_lion's pushesWitnessed is a shop-utility counter (drives
+        // Bucket-T (F4.20): util_northern_lion's pushesWitnessed is a shop-utility counter (drives
         // free rerolls), out of accumulator scope — intentionally in place, not seepage. See F4.16_F4.20_triage_ledger.md.
         for (const spirit of run.activeSpirits) {
-          if (spirit.id === 'engine_northern_lion') {
+          if (spirit.id === 'util_northern_lion') {
             incrementPerElement(spirit, 'pushesWitnessed', 1);
           }
         }

@@ -4594,3 +4594,55 @@ verify against power-4). Wave B is unblocked.
 **Cross-refs:** the F4.26 deliberation (in chat); Idea D (OVERHAUL_PLAN ~:784-829 — the retired-truncation
 precedent); Amber (`ConsumableEffects.js:396`, the consistency target); `tier4_scoping.md` (Wave B was
 gated on this ruling); `DESIGN_DOC_PATCHES.md` DP-02b (V6 reconciliation line).
+
+---
+
+## Spirit ID rename — de-legendary the 6 demoted rares + northern_lion [PRESERVE]
+
+**Decision:** Renamed 7 mislabeled spirit IDs off prefixes that misdescribed their category, to
+archetype-accurate prefixes matching each spirit's `category` field (Robert ruled the scheme: archetype
+prefixes, `util_` not `utility_`):
+
+| old | new | category |
+|---|---|---|
+| `legend_wuji` | `engine_wuji` | engine_destruction |
+| `legend_dao` | `engine_dao` | engine_deck |
+| `legend_chi` | `engine_chi` | engine_flow |
+| `legend_tengu` | `engine_tengu` | engine_spirit_count |
+| `legend_feng_shui` | `engine_feng_shui` | engine_slot |
+| `legend_waidan` | `util_waidan` | utility_economy |
+| `engine_northern_lion` | `util_northern_lion` | utility (a `{}` shop-reroll utility, not a scoring engine) |
+
+`legend_gankyil` was NOT renamed — it is correctly legendary (`legendary: true`).
+
+**Why:** the 6 `legend_` rares were demoted from legendary long ago (already commented "Demoted Rares" in
+spirits.js) but never ID-migrated. The stale `legend_` prefix actively misled a recon into a phantom
+"legendary engine bug" — it assumed the `legend_` IDs meant `_legendarySpirits` routing (excluded from
+`_addCapture`'s `allSpirits` engine loop), when in fact classification keys off the `legendary` *flag*,
+not the ID, so the rares route as regulars and fire correctly. The IDs were the problem, not the engine
+loop.
+
+**[PRESERVE] — behavior byte-identical.** No prefix is parsed anywhere (`startsWith('legend_')` is empty
+repo-wide), so a rename changes only the `id` string. Flipped all ~38 `src/` sites per ID together: def,
+SpiritEffects effect key + `NEGATIVE_SNAPSHOT` key (wuji) + accumulator snapshot, RunManager
+`ACCUMULATOR_SPIRIT_IDS` + init-state registry (wuji, northern_lion), tooltips (contribution +
+element-display cases), ShrineScene Grove-exit (waidan) + reroll filters (northern_lion), GRM bucket-T
+check (northern_lion). The live `id ===` filters (feng_shui slot-count, waidan Grove-exit, northern_lion
+reroll/bucket-T) were the miss-one-and-silently-break sites.
+
+**Test-blind — verified by grep-to-zero, not green tests.** Zero tests referenced these IDs, so the suite
+only catches import/syntax breakage. Gate: `grep -rE` for each old id in `src/` returns zero;
+`legend_gankyil` still present. Added a regression test (`test/rename_regression.test.js`) pinning
+`engine_wuji` (the heaviest — triple-registry accumulator) + `engine_chi`, closing the coverage gap that
+produced the phantom-bug recon.
+
+**Persistence:** clean break — no save-game persists spirit IDs (only `hanatu_beaten_hexagrams` /
+`hanatu_first_run_complete` in localStorage). No alias map needed.
+
+**Out of scope (separate optional later campaign):** the cosmetic archetype-drift IDs (`engine_memory`,
+`game_mirror`, `util_past_life`, `game_echo`, `engine_applause`, `engine_golden_toad`) — wrong-archetype
+labels, but no category implication (their prefixes carry no routing meaning), so low priority.
+
+**Cross-refs:** `tier5_reconciliation.md` F4.21 (now RESOLVED); `DESIGN_DOC_V5.md` spirit roster (IDs
+updated). Historical references in OVERHAUL_PLAN / PHASE4_STATE / PHASE4_consolidation_candidates were
+left as point-in-time records (they correctly describe past work under the old IDs).

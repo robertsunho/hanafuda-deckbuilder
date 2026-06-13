@@ -954,7 +954,7 @@ export const SPIRIT_CATALOG = [
     category:    'engine_misc',
   },
   {
-    id:          'engine_northern_lion',
+    id:          'util_northern_lion',
     name:        'Northern Lion',
     description: 'Gains a free reroll each time you push successfully.',
     tooltipBase:  { rerolls: 1 },
@@ -1126,38 +1126,38 @@ export const SPIRIT_CATALOG = [
   // ── Demoted Rares (formerly Legendary) ────────────────────────────────────
 
   {
-    id: 'legend_wuji', name: 'Wuji',
+    id: 'engine_wuji', name: 'Wuji',
     description: '+0.3 mult-mult per destroyed card (permanent).',
     tooltipBase:  { mult: 0.3 },
     channel: 'multiplicative', cost: 8, tier: 1,
     rarity: 'rare', category: 'engine_destruction',
   },
   {
-    id: 'legend_dao', name: 'Dao',
+    id: 'engine_dao', name: 'Dao',
     description: '+0.1 mult-mult per unaltered card in deck (per stack).',
     channel: 'multiplicative', cost: 8, tier: 1,
     rarity: 'rare', category: 'engine_deck',
   },
   {
-    id: 'legend_chi', name: 'Chi',
+    id: 'engine_chi', name: 'Chi',
     description: 'multiplyMult equal to current flow value (additive across stacks).',
     channel: 'multiplicative', cost: 8, tier: 1,
     rarity: 'rare', category: 'engine_flow',
   },
   {
-    id: 'legend_tengu', name: 'Tengu',
+    id: 'engine_tengu', name: 'Tengu',
     description: '+0.3 mult-mult per equipped spirit (regular + negative, includes itself).',
     channel: 'multiplicative', cost: 8, tier: 1,
     rarity: 'rare', category: 'engine_spirit_count',
   },
   {
-    id: 'legend_waidan', name: 'Waidan',
+    id: 'util_waidan', name: 'Waidan',
     description: 'On Sacred Grove exit, creates a negative copy of a random consumable per stack.',
     channel: 'utility', cost: 8, tier: 1,
     rarity: 'rare', category: 'utility_economy',
   },
   {
-    id: 'legend_feng_shui', name: 'Feng Shui',
+    id: 'engine_feng_shui', name: 'Feng Shui',
     description: '1\u00D7 base mult, +0.5 per empty spirit slot (ignores Feng Shui slots when counting).',
     channel: 'multiplicative', cost: 8, tier: 1,
     rarity: 'rare', category: 'engine_slot',
