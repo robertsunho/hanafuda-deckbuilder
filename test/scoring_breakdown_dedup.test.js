@@ -23,6 +23,29 @@ const DECK = [
 const fresh = (id) => JSON.parse(JSON.stringify(baseCards.find(c => c.id === id)));
 const FOUR = () => ['january_plain_1', 'february_plain_1', 'march_plain_1', 'april_plain_1'].map(fresh);
 
+describe('_addCapture threading characterization (capstones + held + spirit) [PRESERVE]', () => {
+  // Pins the THREADED numbers (not just struct fields): held-in-hand metal mult, capstone
+  // universe mirroring + yin-yang 2x triggers, the points-direct model. Closes a coverage gap
+  // (the threading was previously untested) — the safety net for any scoring-pipeline refactor.
+  // Deterministic: Iron (base) held card has no Meteorite jackpot RNG.
+  it('totals are stable (188 pts × 17.5 mult × 1.0 flow = 3290)', () => {
+    const { grm } = makeRound({ spiritIds: ['rank_salt'], deckCardIds: DECK });
+    run.addLegendarySpirit({ id: 'capstone_universe', name: 'Universe' });
+    run.addLegendarySpirit({ id: 'capstone_yinyang', name: 'Yin-Yang' });
+    grm.hand.getAll()[0].enhancement = { element: 'metal', tier: 'base' }; // held Iron
+    const spy = vi.spyOn(logger, 'logCaptureScoring');
+
+    grm._addCapture(FOUR());
+
+    const p = spy.mock.calls[0][0];
+    // Golden values pinned from the pre-extraction baseline (flow 1.0 → 188 × 17.5 = 3290).
+    expect(p.totalPoints).toBe(188);
+    expect(p.totalMult).toBeCloseTo(17.5, 5);
+    expect(p.captureScore).toBe(3290);
+    spy.mockRestore();
+  });
+});
+
 describe('F3.16a — breakdown-struct characterization (logCaptureScoring payload)', () => {
   it('capture path: _initCardBreakdown fields + _engineBreakdownEntry (regular, stack 1)', () => {
     const { grm } = makeRound({ spiritIds: ['engine_missing_number'], deckCardIds: DECK });
