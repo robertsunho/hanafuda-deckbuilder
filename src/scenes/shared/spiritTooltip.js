@@ -176,14 +176,16 @@ export function getSpiritContrib(spirit, opts = {}) {
         lines.push(`Total unplayed: ${longestHeldValue(spirit, 'totalUnplayed')}  \u2192  +${agg} mult`);
       }
     } else if (spirit.id === 'engine_glacier') {
+      // Architecture B (F4.37 C1): narration counts stay; VALUE derives from
+      // applyEngine (single source of truth). null/inert \u2192 identity \xD71.00.
+      const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
       if (spirit.isNegative) {
         const ne1 = spirit.state?.newEvents1 ?? 0, ne2 = spirit.state?.newEvents2 ?? 0;
         const o = spirit.state?.oldestAtTranscend ?? 0;
-        const mult = (spirit.state?.preTranscendTotal ?? 1) + ne1 * 0.2 * (spirit.powerLevel ?? 1) + ne2 * 0.4 * (spirit.powerLevel ?? 1);
-        lines.push(`Snow + Ice: ${o + ne1 + ne2}  \u2192  \xD7${mult.toFixed(2)} mult-mult`);
+        lines.push(`Snow + Ice: ${o + ne1 + ne2}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
       } else {
         const t1 = aggregateNumericState(spirit, 't1Procs'), t2 = aggregateNumericState(spirit, 't2Procs');
-        lines.push(`Snow: ${t1}, Ice: ${t2}  \u2192  \xD7${(1 + (t1 * 0.2 + t2 * 0.4)).toFixed(2)} mult-mult`);
+        lines.push(`Snow: ${t1}, Ice: ${t2}  \u2192  \xD7${val.toFixed(2)} mult-mult`);
       }
     } else if (spirit.id === 'engine_carbon') {
       if (spirit.isNegative) {
