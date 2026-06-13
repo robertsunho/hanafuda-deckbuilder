@@ -31,9 +31,9 @@ describe('ID rename regression — renamed spirits still fire after legend_ → 
     grm._addCapture(FOUR());
 
     const payload = spy.mock.calls[0][0];
-    const eng = payload.captureLevel.engineSpirits.find(e => e.source.startsWith('engine_wuji'));
+    const eng = payload.captureLevel.engineSpirits.find(e => e.name === 'engine_wuji');
     expect(eng).toBeDefined();              // effect key + accumulator id resolved under the NEW id
-    expect(eng.source).toBe('engine_wuji (stack 1)');
+    expect(eng).toMatchObject({ kind: 'spirit', name: 'engine_wuji', power: 1, phase: 'engine' });
     expect(eng.multiplyMult).toBeCloseTo(1.6, 5); // 1 + destroyed(2) × 0.3
 
     spy.mockRestore();
@@ -46,7 +46,7 @@ describe('ID rename regression — renamed spirits still fire after legend_ → 
     grm._addCapture(FOUR());
 
     const payload = spy.mock.calls[0][0];
-    const eng = payload.captureLevel.engineSpirits.find(e => e.source.startsWith('engine_chi'));
+    const eng = payload.captureLevel.engineSpirits.find(e => e.name === 'engine_chi');
     expect(eng).toBeDefined();              // multiplyMult = flow × stacks (flow ≥ 0 → entry present)
     spy.mockRestore();
   });

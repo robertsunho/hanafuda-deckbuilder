@@ -14,6 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getWaterMult } from './HexagramEffects.js';
+import { formatContributionSource } from './scoringLabels.js';
 
 class GameplayLogger {
   constructor() {
@@ -390,7 +391,7 @@ class GameplayLogger {
       this._log(`  \u2022 ${cb.cardName} (${cb.meta})`);
       this._log(`      base points: ${cb.basePoints}`);
       for (const c of cb.contributions) {
-        this._log(`      + ${c.source}: ${this._fmtContrib(c)}`);
+        this._log(`      + ${formatContributionSource(c)}: ${this._fmtContrib(c)}`);
       }
       this._log(`      card contribution: ${cb.totalCardPts} pts`);
     }
@@ -402,7 +403,7 @@ class GameplayLogger {
     } else {
       this._log('  Held-in-hand:');
       for (const h of data.captureLevel.heldEffects) {
-        this._log(`    \u2022 ${h.source}: ${this._fmtContrib(h)}`);
+        this._log(`    \u2022 ${formatContributionSource(h)}: ${this._fmtContrib(h)}`);
       }
     }
     if (data.captureLevel.engineSpirits.length === 0) {
@@ -410,7 +411,7 @@ class GameplayLogger {
     } else {
       this._log('  Engine spirits:');
       for (const e of data.captureLevel.engineSpirits) {
-        this._log(`    \u2022 ${e.source}: ${this._fmtContrib(e)}`);
+        this._log(`    \u2022 ${formatContributionSource(e)}: ${this._fmtContrib(e)}`);
       }
     }
 
@@ -434,7 +435,7 @@ class GameplayLogger {
     this._log(`\u2500\u2500 Retrigger (${data.stampType} on ${data.cardName}) \u2500\u2500`);
     this._log(`  base points: ${data.basePoints}`);
     for (const c of data.contributions) {
-      this._log(`  + ${c.source}: ${this._fmtContrib(c)}`);
+      this._log(`  + ${formatContributionSource(c)}: ${this._fmtContrib(c)}`);
     }
     this._log(`  retrigger pts: ${data.retriggerPts}, mult: ${data.retriggerMult.toFixed(2)}`);
     this._log(`  score: ${data.retriggerScore.toLocaleString()}`);

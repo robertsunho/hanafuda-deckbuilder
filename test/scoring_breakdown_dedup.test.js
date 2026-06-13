@@ -69,16 +69,16 @@ describe('F3.16a — breakdown-struct characterization (logCaptureScoring payloa
     });
 
     // _engineBreakdownEntry output — missing_number fires at stack 1 → addMult 5.
-    const eng = payload.captureLevel.engineSpirits.find(e => e.source.startsWith('engine_missing_number'));
+    const eng = payload.captureLevel.engineSpirits.find(e => e.name === 'engine_missing_number');
     expect(eng).toEqual({
-      source: 'engine_missing_number (stack 1)',
+      kind: 'spirit', name: 'engine_missing_number', power: 1, phase: 'engine',
       addPoints: 0, addMult: 5, multiplyMult: 1,
     });
 
     spy.mockRestore();
   });
 
-  it('capture path: _engineBreakdownEntry labels a transcended copy (stack 4 = effectivePower)', () => {
+  it('capture path: _engineBreakdownEntry labels a transcended copy (power 4 = effectivePower)', () => {
     const { grm } = makeRound({ spiritIds: [], deckCardIds: DECK });
     run.addSpiritDirect({
       id: 'engine_missing_number', name: 'Missing Number', isNegative: true, stackCount: 1, powerLevel: 4,
@@ -89,10 +89,12 @@ describe('F3.16a — breakdown-struct characterization (logCaptureScoring payloa
     grm._addCapture(FOUR());
 
     const payload = spy.mock.calls[0][0];
-    const eng = payload.captureLevel.engineSpirits.find(e => e.source.startsWith('Missing Number'));
+    const eng = payload.captureLevel.engineSpirits.find(e => e.name === 'Missing Number');
     expect(eng).toBeDefined();
-    // powerLevel 4 → effectivePower 4 → "(stack 4)"; r passes through unchanged.
-    expect(eng.source).toBe('Missing Number (stack 4)');
+    // powerLevel 4 → effectivePower 4 → power: 4 (structured); r passes through unchanged.
+    expect(eng.kind).toBe('spirit');
+    expect(eng.power).toBe(4);
+    expect(eng.phase).toBe('engine');
     expect(eng.addPoints).toBe(0);
     expect(eng.multiplyMult).toBe(1);
     expect(typeof eng.addMult).toBe('number');
@@ -123,9 +125,9 @@ describe('F3.16a — breakdown-struct characterization (logCaptureScoring payloa
     });
 
     // _engineBreakdownEntry output — same shape on the field path.
-    const eng = payload.captureLevel.engineSpirits.find(e => e.source.startsWith('engine_missing_number'));
+    const eng = payload.captureLevel.engineSpirits.find(e => e.name === 'engine_missing_number');
     expect(eng).toEqual({
-      source: 'engine_missing_number (stack 1)',
+      kind: 'spirit', name: 'engine_missing_number', power: 1, phase: 'engine',
       addPoints: 0, addMult: 5, multiplyMult: 1,
     });
 

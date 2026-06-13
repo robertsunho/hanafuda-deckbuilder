@@ -1174,21 +1174,21 @@ export default class GameRoundManager {
     if (enh?.element === 'fire') {
       const _fp = getFireFlatPoints(enh.tier);
       cardPts += _fp;
-      contributions?.push({ source: `${enh.tier} Fire`, addPoints: _fp });
+      contributions?.push({ kind: 'enhancement', element: 'fire', tier: enh.tier, addPoints: _fp });
     }
     if (enh?.element === 'water') {
       const _wm = getWaterMult(enh.tier, enh.depLevel ?? 0);
       mult *= _wm;
-      contributions?.push({ source: `${enh.tier} Water (dep ${enh.depLevel ?? 0})`, multiplyMult: _wm });
+      contributions?.push({ kind: 'enhancement', element: 'water', tier: enh.tier, dep: enh.depLevel ?? 0, multiplyMult: _wm });
     }
     if (enh?.element === 'wood') {
       const _wdm = getWoodScoringMult(enh.tier);
       mult *= _wdm;
-      contributions?.push({ source: `${enh.tier} Wood`, multiplyMult: _wdm });
+      contributions?.push({ kind: 'enhancement', element: 'wood', tier: enh.tier, multiplyMult: _wdm });
     }
-    if (card.edition === 'gold')    { cardPts += 20; contributions?.push({ source: 'Gold edition', addPoints: 20 }); }
-    if (card.edition === 'crystal') { mult += 5;     contributions?.push({ source: 'Crystal edition', addMult: 5 }); }
-    if (card.edition === 'ghost')   { mult *= 1.5;   contributions?.push({ source: 'Ghost edition', multiplyMult: 1.5 }); }
+    if (card.edition === 'gold')    { cardPts += 20; contributions?.push({ kind: 'edition', edition: 'gold', addPoints: 20 }); }
+    if (card.edition === 'crystal') { mult += 5;     contributions?.push({ kind: 'edition', edition: 'crystal', addMult: 5 }); }
+    if (card.edition === 'ghost')   { mult *= 1.5;   contributions?.push({ kind: 'edition', edition: 'ghost', multiplyMult: 1.5 }); }
     return { cardPts, mult };
   }
 
@@ -1270,7 +1270,7 @@ export default class GameRoundManager {
    */
   _engineBreakdownEntry(spirit, r) {
     return {
-      source: `${spirit.name} (stack ${effectivePower(spirit)})`,
+      kind: 'spirit', name: spirit.name, power: effectivePower(spirit), phase: 'engine',
       addPoints: r.addPoints ?? 0,
       addMult: r.addMult ?? 0,
       multiplyMult: r.multiplyMult ?? 1,
@@ -1348,7 +1348,7 @@ export default class GameRoundManager {
           const _held = this._heldCardContribution(handCard);
           if (henh?.element === 'metal') {
             mult *= _held.multiplyMult;
-            if (_ht === 0) _bd.heldEffects.push({ source: `${henh.tier === 'upgraded' ? 'Meteorite' : 'Iron'} (${handCard.name})`, multiplyMult: _held.multiplyMult });
+            if (_ht === 0) _bd.heldEffects.push({ kind: 'held', element: 'metal', tier: henh.tier, cardName: handCard.name, multiplyMult: _held.multiplyMult });
             if (henh.tier === 'upgraded' && rollProbability(getMeteoriteJackpotChance(), 'meteorite_jackpot')) {
               run.addKi(30, 'meteorite_jackpot');
               // engine_velocity: +t2Procs per Meteorite jackpot.
@@ -1362,7 +1362,7 @@ export default class GameRoundManager {
             }
           } else if (henh?.element === 'earth') {
             mult *= _held.multiplyMult;
-            if (_ht === 0) _bd.heldEffects.push({ source: `${henh.tier === 'upgraded' ? 'Pottery' : 'Clay'} (${handCard.name})`, multiplyMult: _held.multiplyMult });
+            if (_ht === 0) _bd.heldEffects.push({ kind: 'held', element: 'earth', tier: henh.tier, cardName: handCard.name, multiplyMult: _held.multiplyMult });
           }
         }
       }
@@ -1386,7 +1386,7 @@ export default class GameRoundManager {
         if (_hexCardMod) {
           const _hexName = run.getHexagram()?.englishName ?? 'hexagram';
           _cb.contributions.push({
-            source: `hexagram ${_hexName}`,
+            kind: 'hexagram', name: _hexName,
             addPoints: _hexCardMod.addPoints ?? 0,
             addMult: _hexCardMod.addMult ?? 0,
             multiplyMult: _hexCardMod.multiplyMult ?? 1,
@@ -1449,7 +1449,7 @@ export default class GameRoundManager {
                   });
                 }
                 _cb.contributions.push({
-                  source: `spirit ${spirit.name} (power ${effectivePower(spirit)})`,
+                  kind: 'spirit', name: spirit.name, power: effectivePower(spirit), phase: 'onCardScored',
                   addPoints: r.addPoints ? r.addPoints * count : 0,
                   addMult: r.addMult ? r.addMult * count : 0,
                   multiplyMult: r.multiplyMult ? r.multiplyMult * count : 1,
