@@ -408,13 +408,7 @@ export default class GameRoundManager {
 
     // ── Per-card scoring (enhancements + editions + hex + spirit onCardScored) ──
     for (const card of fieldCards) {
-      const _cb = {
-        cardName: card.name ?? card.id,
-        meta: `${card.type}, month ${card.month}`,
-        basePoints: getCardPoints(card),
-        contributions: [],
-        totalCardPts: 0,
-      };
+      const _cb = this._initCardBreakdown(card);
       let cardPts = getCardPoints(card);
       ({ cardPts, mult } = this._applyCardEnhancements(card, cardPts, mult, _cb.contributions));
 
@@ -462,10 +456,7 @@ export default class GameRoundManager {
         if (r.addPoints)    points += r.addPoints;
         if (r.addMult)      mult   += r.addMult;
         if (r.multiplyMult) mult   *= r.multiplyMult;
-        _bd.engines.push({
-          source: `${spirit.name} (stack ${effectivePower(spirit)})`,
-          addPoints: r.addPoints ?? 0, addMult: r.addMult ?? 0, multiplyMult: r.multiplyMult ?? 1,
-        });
+        _bd.engines.push(this._engineBreakdownEntry(spirit, r));
       }
     }
 
@@ -1329,6 +1320,34 @@ export default class GameRoundManager {
     return null;
   }
 
+  /**
+   * Initial per-card breakdown struct, shared by _addCapture and _scoreFieldCards.
+   * Pure factory — the caller mutates `contributions`/`totalCardPts` as scoring proceeds.
+   */
+  _initCardBreakdown(card) {
+    return {
+      cardName: card.name ?? card.id,
+      meta: `${card.type}, month ${card.month}`,
+      basePoints: getCardPoints(card),
+      contributions: [],
+      totalCardPts: 0,
+    };
+  }
+
+  /**
+   * Engine-spirit breakdown entry, shared by _addCapture and _scoreFieldCards.
+   * `r` is the applyEngine return; the label reads effectivePower so transcended copies
+   * render their power. (Label format is F3.16b's concern — kept verbatim here.)
+   */
+  _engineBreakdownEntry(spirit, r) {
+    return {
+      source: `${spirit.name} (stack ${effectivePower(spirit)})`,
+      addPoints: r.addPoints ?? 0,
+      addMult: r.addMult ?? 0,
+      multiplyMult: r.multiplyMult ?? 1,
+    };
+  }
+
   _addCapture(cards) {
     if (this._onScoringStep) this._onScoringStep({ type: 'capture_start' });
 
@@ -1407,13 +1426,7 @@ export default class GameRoundManager {
 
       for (const card of cards) {
         // ── Per-card breakdown tracking ──
-        const _cb = {
-          cardName: card.name ?? card.id,
-          meta: `${card.type}, month ${card.month}`,
-          basePoints: getCardPoints(card),
-          contributions: [],
-          totalCardPts: 0,
-        };
+        const _cb = this._initCardBreakdown(card);
 
         // Base points (includes persistent mutations) + Wu Xing enhancement + edition math.
         let cardPts = getCardPoints(card);
@@ -1594,12 +1607,7 @@ export default class GameRoundManager {
                 points, mult, prevPts, prevMult,
               });
             }
-            _bd.engines.push({
-              source: `${spirit.name} (stack ${effectivePower(spirit)})`,
-              addPoints: r.addPoints ?? 0,
-              addMult: r.addMult ?? 0,
-              multiplyMult: r.multiplyMult ?? 1,
-            });
+            _bd.engines.push(this._engineBreakdownEntry(spirit, r));
           }
         }
       }
