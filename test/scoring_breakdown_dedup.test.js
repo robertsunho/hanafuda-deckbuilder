@@ -134,3 +134,22 @@ describe('F3.16a — breakdown-struct characterization (logCaptureScoring payloa
     spy.mockRestore();
   });
 });
+
+describe('F3.17 — retrigger surfacing (tagged inline contributions)', () => {
+  it('a retriggered card shows BOTH a first-pass and a phase:retrigger spirit contribution', () => {
+    const { grm } = makeRound({ spiritIds: ['rank_salt'], deckCardIds: DECK });
+    const spy = vi.spyOn(logger, 'logCaptureScoring');
+
+    const card = fresh('january_plain_1');
+    card.ribbonStamp = 'stamp_white'; // → _computeRetriggerCount 1 (card scores twice)
+    grm._addCapture([card]);
+
+    const contribs = spy.mock.calls[0][0].cardBreakdowns[0].contributions;
+    const salt = contribs.filter(c => c.kind === 'spirit' && c.name === 'rank_salt');
+    // Before F3.17 the retrigger pushed nothing → only the first pass appeared.
+    expect(salt.some(c => c.phase === 'onCardScored')).toBe(true);
+    expect(salt.some(c => c.phase === 'retrigger')).toBe(true);
+
+    spy.mockRestore();
+  });
+});

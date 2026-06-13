@@ -32,4 +32,17 @@ describe('formatContributionSource — derives the log label from structured fie
   it('hexagram: "hexagram Name"', () => {
     expect(formatContributionSource({ kind: 'hexagram', name: 'The Creative' })).toBe('hexagram The Creative');
   });
+
+  it('phase:retrigger appends a ", retrigger" / "(retrigger)" tag per kind (F3.17)', () => {
+    expect(formatContributionSource({ kind: 'spirit', name: 'Salt', power: 1, phase: 'retrigger' }))
+      .toBe('Salt (power 1, retrigger)');
+    expect(formatContributionSource({ kind: 'enhancement', element: 'fire', tier: 'base', phase: 'retrigger' }))
+      .toBe('base Fire (retrigger)');
+    expect(formatContributionSource({ kind: 'enhancement', element: 'water', tier: 'base', dep: 1, phase: 'retrigger' }))
+      .toBe('base Water (dep 1) (retrigger)');
+    expect(formatContributionSource({ kind: 'edition', edition: 'gold', phase: 'retrigger' }))
+      .toBe('Gold edition (retrigger)');
+    expect(formatContributionSource({ kind: 'hexagram', name: 'Qian', phase: 'retrigger' }))
+      .toBe('hexagram Qian (retrigger)');
+  });
 });

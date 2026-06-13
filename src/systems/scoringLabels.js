@@ -21,23 +21,27 @@ const HELD_MATERIAL = {
  *                    "Name (power N)" — was split "spirit Name (power N)" / "Name (stack N)").
  */
 export function formatContributionSource(c) {
+  const rt = c?.phase === 'retrigger'; // F3.17: tag re-scored contributions distinctly
   switch (c?.kind) {
     case 'spirit':
       // Unified across phases (onCardScored + engine). "power" is accurate for regular stacks AND
-      // transcended Negatives (effectivePower), unlike the old engine "(stack N)".
-      return `${c.name} (power ${c.power})`;
+      // transcended Negatives (effectivePower), unlike the old engine "(stack N)". Retrigger goes
+      // inside the parens for compactness.
+      return rt ? `${c.name} (power ${c.power}, retrigger)` : `${c.name} (power ${c.power})`;
     case 'enhancement': {
       const base = `${c.tier} ${_cap(c.element)}`;
-      return c.element === 'water' ? `${base} (dep ${c.dep ?? 0})` : base;
+      const s = c.element === 'water' ? `${base} (dep ${c.dep ?? 0})` : base;
+      return rt ? `${s} (retrigger)` : s;
     }
     case 'edition':
-      return `${_cap(c.edition)} edition`;
+      return rt ? `${_cap(c.edition)} edition (retrigger)` : `${_cap(c.edition)} edition`;
     case 'held': {
+      // Held-in-hand is capture-level (computed once in block C), never re-scored — no retrigger phase.
       const material = HELD_MATERIAL[c.element]?.[c.tier] ?? _cap(c.element);
       return `${material} (${c.cardName})`;
     }
     case 'hexagram':
-      return `hexagram ${c.name}`;
+      return rt ? `hexagram ${c.name} (retrigger)` : `hexagram ${c.name}`;
     default:
       return String(c?.kind ?? '?');
   }

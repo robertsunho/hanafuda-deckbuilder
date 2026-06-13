@@ -427,21 +427,6 @@ class GameplayLogger {
     this._log('\u2500'.repeat(54));
   }
 
-  /**
-   * Log a stamp retrigger scoring event.
-   */
-  logRetriggerScoring(data) {
-    this._log('');
-    this._log(`\u2500\u2500 Retrigger (${data.stampType} on ${data.cardName}) \u2500\u2500`);
-    this._log(`  base points: ${data.basePoints}`);
-    for (const c of data.contributions) {
-      this._log(`  + ${formatContributionSource(c)}: ${this._fmtContrib(c)}`);
-    }
-    this._log(`  retrigger pts: ${data.retriggerPts}, mult: ${data.retriggerMult.toFixed(2)}`);
-    this._log(`  score: ${data.retriggerScore.toLocaleString()}`);
-    this._log(`  Running round total: ${data.runningRoundTotal.toLocaleString()}`);
-  }
-
   _fmtContrib(c) {
     const parts = [];
     if (c.addPoints)    parts.push(`+${c.addPoints} pts`);

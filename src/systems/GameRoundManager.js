@@ -1169,26 +1169,26 @@ export default class GameRoundManager {
    * (it emits no per-contribution breakdown — preserved).
    * @returns {{cardPts:number, mult:number}}
    */
-  _applyCardEnhancements(card, cardPts, mult, contributions) {
+  _applyCardEnhancements(card, cardPts, mult, contributions, phase = 'onCardScored') {
     const enh = card.enhancement;
     if (enh?.element === 'fire') {
       const _fp = getFireFlatPoints(enh.tier);
       cardPts += _fp;
-      contributions?.push({ kind: 'enhancement', element: 'fire', tier: enh.tier, addPoints: _fp });
+      contributions?.push({ kind: 'enhancement', element: 'fire', tier: enh.tier, phase, addPoints: _fp });
     }
     if (enh?.element === 'water') {
       const _wm = getWaterMult(enh.tier, enh.depLevel ?? 0);
       mult *= _wm;
-      contributions?.push({ kind: 'enhancement', element: 'water', tier: enh.tier, dep: enh.depLevel ?? 0, multiplyMult: _wm });
+      contributions?.push({ kind: 'enhancement', element: 'water', tier: enh.tier, dep: enh.depLevel ?? 0, phase, multiplyMult: _wm });
     }
     if (enh?.element === 'wood') {
       const _wdm = getWoodScoringMult(enh.tier);
       mult *= _wdm;
-      contributions?.push({ kind: 'enhancement', element: 'wood', tier: enh.tier, multiplyMult: _wdm });
+      contributions?.push({ kind: 'enhancement', element: 'wood', tier: enh.tier, phase, multiplyMult: _wdm });
     }
-    if (card.edition === 'gold')    { cardPts += 20; contributions?.push({ kind: 'edition', edition: 'gold', addPoints: 20 }); }
-    if (card.edition === 'crystal') { mult += 5;     contributions?.push({ kind: 'edition', edition: 'crystal', addMult: 5 }); }
-    if (card.edition === 'ghost')   { mult *= 1.5;   contributions?.push({ kind: 'edition', edition: 'ghost', multiplyMult: 1.5 }); }
+    if (card.edition === 'gold')    { cardPts += 20; contributions?.push({ kind: 'edition', edition: 'gold', phase, addPoints: 20 }); }
+    if (card.edition === 'crystal') { mult += 5;     contributions?.push({ kind: 'edition', edition: 'crystal', phase, addMult: 5 }); }
+    if (card.edition === 'ghost')   { mult *= 1.5;   contributions?.push({ kind: 'edition', edition: 'ghost', phase, multiplyMult: 1.5 }); }
     return { cardPts, mult };
   }
 
@@ -1479,15 +1479,28 @@ export default class GameRoundManager {
       // ── Phase 1.5: Retriggers ──────────────────────────────────────────────
       for (let _ci = 0; _ci < cards.length; _ci++) {
         const card = cards[_ci];
+        // F3.17: surface retriggers in the same per-card breakdown (index-aligned: Phase 1 pushed
+        // one _cb per card in order). Re-scored contributions are tagged phase:'retrigger' so they're
+        // distinguishable from the first pass. Scoring math (points/mult) is UNCHANGED — pushes only.
+        const _rc = _bd.cards[_ci]?.contributions;
         const retriggerCount = this._computeRetriggerCount(card, 'capture', _ci === 0);
         for (let rt = 0; rt < retriggerCount; rt++) {
           // Shared enhancement/edition math, then hex onCardScored — same order as the first-pass
           // loop (B). F2.10c (D2): a retrigger scores the card the same way the first pass did, so the
-          // active season/axis hex multiplier applies per retrigger too. (`mod` discarded: C emits its
-          // own `retrigger` step event and no per-contribution breakdown — telemetry unchanged.)
+          // active season/axis hex multiplier applies per retrigger too.
           let cardPts = getCardPoints(card);
-          ({ cardPts, mult } = this._applyCardEnhancements(card, cardPts, mult, null));
-          ({ cardPts, mult } = this._applyHexCardScored(card, cardPts, mult));
+          ({ cardPts, mult } = this._applyCardEnhancements(card, cardPts, mult, _rc, 'retrigger'));
+          const _hexRt = this._applyHexCardScored(card, cardPts, mult);
+          cardPts = _hexRt.cardPts;
+          mult    = _hexRt.mult;
+          if (_hexRt.mod && _rc) {
+            _rc.push({
+              kind: 'hexagram', name: run.getHexagram()?.englishName ?? 'hexagram', phase: 'retrigger',
+              addPoints: _hexRt.mod.addPoints ?? 0,
+              addMult: _hexRt.mod.addMult ?? 0,
+              multiplyMult: _hexRt.mod.multiplyMult ?? 1,
+            });
+          }
           points += cardPts;
 
           if (this._onScoringStep) {
@@ -1514,6 +1527,12 @@ export default class GameRoundManager {
                   points, mult, prevPts, prevMult,
                 });
               }
+              _rc?.push({
+                kind: 'spirit', name: spirit.name, power: effectivePower(spirit), phase: 'retrigger',
+                addPoints: r.addPoints ? r.addPoints * count : 0,
+                addMult: r.addMult ? r.addMult * count : 0,
+                multiplyMult: r.multiplyMult ? r.multiplyMult * count : 1,
+              });
             }
           }
         }
