@@ -1356,10 +1356,6 @@ const _effects = {
     },
   },
 
-  // ── Unique Legendary ────────────────────────────────────────────────────
-
-  legend_gankyil: {},  // auto-capture at 3-stack — handled in FieldManager
-
   // ── Demoted Rares ─────────────────────────────────────────────────────
 
   engine_wuji: {

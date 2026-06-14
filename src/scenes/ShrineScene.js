@@ -142,26 +142,12 @@ export class ShrineScene extends Phaser.Scene {
 
     const offerings = [];
     for (let i = 0; i < count; i++) {
-      // Sacred Grove: 15% chance to offer a Legendary instead.
-      if (this._isGrove && Math.random() < 0.15) {
-        const leg = this._pickRandomLegendary();
-        if (leg) { offerings.push(leg); continue; }
-      }
-      // Normal spirit from pool.
       if (pool.length > 0) {
         const idx = Math.floor(Math.random() * pool.length);
         offerings.push(pool.splice(idx, 1)[0]);
       }
     }
     return offerings;
-  }
-
-  _pickRandomLegendary() {
-    const ownedIds = new Set(run.legendarySpirits.map(s => s.id));
-    // Capstones are Pearl-only, never shop-offered.
-    const available = SPIRIT_CATALOG.filter(s => s.legendary && !s.capstone && !ownedIds.has(s.id));
-    if (available.length === 0) return null;
-    return available[Math.floor(Math.random() * available.length)];
   }
 
   _generateDeckFixOfferings(count) {

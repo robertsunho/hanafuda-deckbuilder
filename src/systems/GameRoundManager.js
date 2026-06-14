@@ -355,11 +355,6 @@ export default class GameRoundManager {
     this._recomputeFieldSlots();
     this._field.setCaptureRule(applyHook('overridesCaptureRule', 'month'));
 
-    // Gankyil legendary: auto-capture at 3-stack instead of 4-stack.
-    // Bucket-B (F4.20): legend_gankyil's autoCaptureThreshold is a field state-machine concern —
-    // intentionally in place (structural, not a scoring hook), not seepage. See F4.16_F4.20_triage_ledger.md.
-    this._field.autoCaptureThreshold = run.activeSpirits.some(s => s.id === 'legend_gankyil') ? 3 : 4;
-
     const _baseHandSize   = applyHook('modifyHandSize', GameRoundManager.HAND_SIZE + _handSizeBonus, GameRoundManager.HAND_SIZE + _handSizeBonus);
     this._hand.maxSize    = _baseHandSize;
     const _initialDeal    = applyHook('modifyCardsDealt', _baseHandSize + _dealCountBonus, _baseHandSize + _dealCountBonus, 'initial');

@@ -1114,15 +1114,6 @@ export const SPIRIT_CATALOG = [
     category:    'retrigger',
   },
 
-  // ── Unique Legendary ────────────────────────────────────────────────────────
-
-  {
-    id: 'legend_gankyil', name: 'Gankyil',
-    description: 'Auto-capture activates at 3-stack instead of 4-stack.',
-    channel: 'utility', cost: 0, tier: 1,
-    rarity: 'legendary', category: 'legendary_unique', legendary: true,
-  },
-
   // ── Demoted Rares (formerly Legendary) ────────────────────────────────────
 
   {

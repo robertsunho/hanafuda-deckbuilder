@@ -350,9 +350,7 @@ export function getSpiritContrib(spirit, opts = {}) {
   }
 
   // ── Legendary + demoted rare tooltips ───────────────────────────────────
-  if (spirit.id === 'legend_gankyil') {
-    lines.push('Auto-captures at 3-stack instead of 4-stack');
-  } else if (spirit.id === 'engine_wuji') {
+  if (spirit.id === 'engine_wuji') {
     // F4.37 C3 Part 4: out-of-block engines migrated to Architecture B \u2014 value
     // derives from applyEngine, narration retained. null/inert \u2192 identity \u00d71.00.
     const val = fx.applyEngine({ spirit, mult: 1.0, points: 0, spirits })?.multiplyMult ?? 1;
