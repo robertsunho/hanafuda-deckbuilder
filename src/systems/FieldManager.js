@@ -43,7 +43,7 @@ export default class FieldManager {
      */
     this._slots = [];
     this._captureRule = 'month';
-    /** Auto-capture threshold (default 4; Gankyil legendary sets to 3). */
+    /** Auto-capture threshold: a slot auto-captures at this many cards (fixed at 4). */
     this.autoCaptureThreshold = 4;
   }
 
@@ -320,7 +320,7 @@ export default class FieldManager {
     if (slot) {
       slot.cards.push(card);
       const len = slot.cards.length;
-      // Only capture when the full set is assembled (4 normally, 3 with Gankyil).
+      // Only capture when the full set is assembled (4 cards).
       if (len >= this.autoCaptureThreshold) {
         const captured = [...slot.cards];
         this._nullify(slot);
