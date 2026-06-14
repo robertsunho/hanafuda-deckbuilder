@@ -884,6 +884,7 @@ export const SPIRIT_CATALOG = [
     tier:        1,
     rarity:      'uncommon',
     category:    'conditional',
+    tooltipBase: { mult: 2.0 },
   },
   {
     id:          'cond_dream',
@@ -894,16 +895,18 @@ export const SPIRIT_CATALOG = [
     tier:        1,
     rarity:      'uncommon',
     category:    'conditional',
+    tooltipBase: { mult: 2.0 },
   },
   {
     id:          'cond_hierarchy',
     name:        'Hierarchy',
-    description: '\xD71.5 mult per unique rank in capture (compounds).',
+    description: '\xD71.5 mult per unique rank in capture (compounds within a capture; stacks add linearly).',
     channel:     'multiplicative',
     cost:        7,
     tier:        1,
     rarity:      'uncommon',
     category:    'conditional',
+    tooltipBase: { mult: 1.5 },
   },
 
   // ── Counter Engine Spirits ────────────────────────────────────────────────
@@ -1127,6 +1130,7 @@ export const SPIRIT_CATALOG = [
     description: '+0.1 mult-mult per unaltered card in deck (per stack).',
     channel: 'multiplicative', cost: 8, tier: 1,
     rarity: 'rare', category: 'engine_deck',
+    tooltipBase: { mult: 0.1 },
   },
   {
     id: 'engine_chi', name: 'Chi',
@@ -1139,12 +1143,14 @@ export const SPIRIT_CATALOG = [
     description: '+0.3 mult-mult per equipped spirit (regular + negative, includes itself).',
     channel: 'multiplicative', cost: 8, tier: 1,
     rarity: 'rare', category: 'engine_spirit_count',
+    tooltipBase: { mult: 0.3 },
   },
   {
     id: 'engine_feng_shui', name: 'Feng Shui',
     description: '1\u00D7 base mult, +0.5 per empty spirit slot (ignores Feng Shui slots when counting).',
     channel: 'multiplicative', cost: 8, tier: 1,
     rarity: 'rare', category: 'engine_slot',
+    tooltipBase: { mult: 0.5 },
   },
 ];
 

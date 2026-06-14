@@ -1101,7 +1101,7 @@ const _effects = {
       const hasAir  = cards.some(c => c.enhancement?.element !== 'fire' && c.vertical === 'air');
       const hasLand = cards.some(c => c.enhancement?.element !== 'fire' && c.vertical === 'land');
       if (!hasAir || !hasLand) return null;
-      return { multiplyMult: Math.pow(2.0, effectivePower(spirit)) };
+      return { multiplyMult: _tb(spirit, 'mult', 2.0) * effectivePower(spirit) };
     },
   },
 
@@ -1111,7 +1111,7 @@ const _effects = {
       const hasDay   = cards.some(c => c.enhancement?.element !== 'fire' && c.temporal === 'day');
       const hasNight = cards.some(c => c.enhancement?.element !== 'fire' && c.temporal === 'night');
       if (!hasDay || !hasNight) return null;
-      return { multiplyMult: Math.pow(2.0, effectivePower(spirit)) };
+      return { multiplyMult: _tb(spirit, 'mult', 2.0) * effectivePower(spirit) };
     },
   },
 
@@ -1122,7 +1122,9 @@ const _effects = {
       const n = ranks.size;
       if (n === 0) return null;
       const stacks = effectivePower(spirit);
-      return { multiplyMult: Math.pow(1.5, n * stacks) };
+      // Per-capture rank diversity stays exponential (1.5^ranks — the spirit's actual
+      // effect); the STACK term is linear (× stacks), per the canonical stacking rule (F5.12).
+      return { multiplyMult: Math.pow(_tb(spirit, 'mult', 1.5), n) * stacks };
     },
   },
 
@@ -1377,7 +1379,7 @@ const _effects = {
       const n = _countUnalteredCards(run.getDeck());
       const stacks = effectivePower(spirit);
       if (n === 0) return null;
-      return { multiplyMult: 1 + n * 0.1 * stacks };
+      return { multiplyMult: 1 + n * _tb(spirit, 'mult', 0.1) * stacks };
     },
   },
 
@@ -1393,7 +1395,7 @@ const _effects = {
       const stacks = effectivePower(spirit);
       const spiritCount = run.spirits.length + run.negativeSpirits.length;
       if (spiritCount === 0) return null;
-      return { multiplyMult: 1 + 0.3 * spiritCount * stacks };
+      return { multiplyMult: 1 + _tb(spirit, 'mult', 0.3) * spiritCount * stacks };
     },
   },
 
@@ -1403,7 +1405,7 @@ const _effects = {
       const fengShuiSlotCount = run.spirits.filter(s => s.id === 'engine_feng_shui').length;
       const occupiedNonFengShui = run.spirits.length - fengShuiSlotCount;
       const emptySlots = run.spiritSlots - occupiedNonFengShui;
-      return { multiplyMult: 1 + 0.5 * emptySlots * stacks };
+      return { multiplyMult: 1 + _tb(spirit, 'mult', 0.5) * emptySlots * stacks };
     },
   },
 };
