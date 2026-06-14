@@ -5156,3 +5156,53 @@ NEGATIVE_SNAPSHOT keys); F2.5 (NEGATIVE_SNAPSHOT origin + the snapshot-helper ge
 beneficiary of the single-source, now confirmed available); F5.12 (the deferred cross-spirit stacking-
 consistency + tooltipBase-uniformity [FIX]); `SPIRIT_SET_ITERATION_RULE.md` §"Accumulator-spirit scoring
 pattern" (the canonical-pattern doc); PHASE4_consolidation_candidates.md "Candidate B" (now DROPPED).
+
+---
+
+## F5.12 — Conditional-stacking linearization + tooltipBase uniformity (2026-06-14)
+
+**Status:** RESOLVED. Phase-4 Leg-3 [FIX] (Robert's ruling) — surfaced by the F4.25/F4.28 stacking audit.
+Implements OVERHAUL_PLAN F5.12. Commit b6723d3 (code+test).
+
+**The canonical rule (established by audit):** multiplicative stacking is LINEAR — the per-card scoring
+loop scales `mult *= r.multiplyMult * count` (GameRoundManager Phase-1). Yang/Wolf/cross-fusions ride this
+and are the reference. Accumulators encode linear scaling via per-element aggregation + `× powerLevel`. The
+rares (dao/chi/tengu/feng_shui) self-apply linear `× stacks` in applyEngine — also correct.
+
+**The violators found:** (1) the 3 conditionals (horizon/dream/hierarchy) self-applied EXPONENTIAL
+`Math.pow(base, stacks)` — fixed here. (2) Mirror/Memory's `_scaleEngineOutput` applies `multiplyMult^n`
+when scaling a copied effect by the meta-spirit's own stacks (plus a possible double-dip with the copied
+target's own stacks) — a SEPARATE violator, deferred to its own recon (may go to Phase 5 spirit-correction
+if scope is large). NOT fixed here. Logged OVERHAUL_PLAN (banked, below the F5.12 entry).
+
+**The fix (conditionals → linear, singletons preserved):**
+- horizon/dream: `Math.pow(2.0, stacks)` → `_tb(s,'mult',2.0) × stacks`. Singleton ×2 (unchanged);
+  3-stack ×6 (was ×8).
+- hierarchy: `Math.pow(1.5, ranks × stacks)` → `Math.pow(_tb(s,'mult',1.5), ranks) × stacks`. Keeps the
+  per-capture rank-diversity exponent (the spirit's actual effect); linearizes only the stack term.
+  Singleton/4-rank ×5.0625 (unchanged); 1-stack/2-rank ×2.25 (rank diversity still compounds); 2-stack/
+  4-rank ×10.125 (was ×25.63); 3-stack/4-rank ×15.1875 (was ×130). Stays in applyEngine (reads capture
+  composition); stacking is an explicit `* effectivePower` inside the body. Gating (null when an axis is
+  missing) unchanged.
+
+**tooltipBase uniformity (single-source, folded in since these bodies were already being edited):** the 3
+conditionals + 3 rares (dao 0.1 / tengu 0.3 / feng_shui 0.5) gained `tooltipBase` + `_tb` reads —
+completing the single-source discipline every accumulator already follows (F4.36/F4.25). Rares =
+byte-identical [PRESERVE] (constant relocated, same fallback; their tooltip already derives the displayed
+value from `applyEngine` so it auto-tracks); conditionals' `_tb` value reflects the new linear formula.
+**`engine_chi`: NO tooltipBase added — it has no literal scaling constant** (pure `run.flow × stacks`),
+so there is nothing to single-source (recon confirmed; did not invent a field).
+
+**Behavior change (NOT [PRESERVE]).** Proof: new `test/spirits/conditional_stacking.test.js` pins the
+linear values (the conditionals were TEST-BLIND — zero prior test references; verified in recon). Rares
+[PRESERVE]-guarded (dao linear-per-stack relationship + the existing `tooltip_value_equality.test.js`
+dao/chi/tengu/feng_shui `assertVE` cases stayed green).
+
+**Verification:** build green; suite 311/1 (was 301/1; +10 tests). Singletons confirmed unchanged;
+3-stack horizon ×6 not ×8; 2-stack/4-rank hierarchy ×10.125 not ×25.63.
+
+**Cross-refs:** the F4.25/F4.28 audit (DECISIONS_LOG, same session — established the linear canonical rule
++ surfaced these violators); OVERHAUL_PLAN F5.12 (the task this closes); D0.6 (cross-fusion OR-logic —
+Yang's WITHIN-card ×4 compounding, distinct from stack-scaling, untouched); GameRoundManager Phase-1 loop
+(`r.multiplyMult * count` — the linear reference); the Mirror/Memory follow-up (banked, OVERHAUL_PLAN);
+`SPIRIT_SET_ITERATION_RULE.md` §"Accumulator-spirit scoring pattern". → DESIGN_DOC_PATCHES DP-75.

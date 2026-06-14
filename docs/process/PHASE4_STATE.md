@@ -155,11 +155,13 @@ one line each (detail in the plan doc + the `tier5_reconciliation.md` §"Scope d
      gap noted honestly). F4.25's declarative `formula:{}` sketch NOT built (solved problem); F4.28's
      canonical-pattern DOC written (`SPIRIT_SET_ITERATION_RULE.md` §"Accumulator-spirit scoring pattern").
      NO formula/scaling code change. **Candidate B ❌ DROPPED** (its drift problem is solved by `_tb`).
-     **Spin-off → F5.12:** the verification surfaced a real cross-spirit stacking inconsistency (3
-     conditionals stack `Math.pow(base,stacks)` exponentially vs. additive everywhere else; + the 4
-     live-state rares dao/chi/tengu/feng_shui lack tooltipBase) — Robert ruled this a dedicated [FIX]
-     campaign (fix to `base × stacks` + tooltipBase/_tb uniformity for the 7), out of the verify-done
-     scope. **F4.29 banked** (optional bypass sweep; not a known-broken gap).
+     **Spin-off → F5.12 ✅ DONE 2026-06-14** (`F5.12`, commit b6723d3): the verification surfaced a real
+     cross-spirit stacking inconsistency — the 3 conditionals (horizon/dream/hierarchy) stacked
+     `Math.pow(base,stacks)` exponentially vs. linear everywhere else. FIXED to `base × stacks` (hierarchy
+     keeps `1.5^ranks × stacks`); singletons unchanged; +10 tests (was test-blind); the 3 conditionals + 3
+     rares (dao/tengu/feng_shui) gained tooltipBase/_tb (chi has no literal constant). DP-75. **A second
+     violator carved out → F5.13 banked:** Mirror/Memory's `_scaleEngineOutput` `^n` copy-scaling (own
+     recon; likely Phase-5). **F4.29 banked** (optional bypass sweep; not a known-broken gap).
    - **Other-open: F4.19 (Monkey/Horse) — ruled DO-NOW 2026-06-14 (Robert), STILL OPEN.** The three
      F2.3-era issues (yaku detection on Monkey-completed yaku, round-end UI transition, Push/Bank surfacing)
      persist; the inline `playDeckPhase` logic was never extracted into a reusable yaku-decision-surfacing
@@ -188,13 +190,12 @@ doc's §"Scope decision" and is sequenced by the 6-step plan above.
 
 **Immediate next action (2026-06-14):** **Leg 2 COMPLETE; Leg 3 COMPLETE except F4.19.** F4.25 + F4.28
 ✅ verified-done (no code — single-source already met via `_tb`; Candidate B dropped; canonical-pattern
-doc written; spin-off [FIX] → F5.12). **The one remaining do-now item is F4.19 (Monkey/Horse).** Then the
-**rubric-writing seam:** `D-F4-DOCSYNC` sweep (first step) → V6 (fold in DP-66..74) →
+doc written; spin-off F5.12 [FIX] ✅ shipped). **The one remaining do-now item is F4.19 (Monkey/Horse).**
+Then the **rubric-writing seam:** `D-F4-DOCSYNC` sweep (first step) → V6 (fold in DP-66..75) →
 `ARCHITECTURE.md`/F4.24b → Gate 0 / Audit 2. The V6 author should cite `SPIRIT_SET_ITERATION_RULE.md`
 §"Accumulator-spirit scoring pattern" for the accumulator architecture. The DP worklist is substantial
-(**DP-66..74**, ready to feed V6); the `D-F4-DOCSYNC` sweep is the first rubric-seam step. **New Phase-5
-spin-off to sequence: F5.12** (cross-spirit stacking consistency [FIX]; candidate to run before V6 since it
-changes stacking semantics V6 documents — Robert's call).
+(**DP-66..75**, ready to feed V6); the `D-F4-DOCSYNC` sweep is the first rubric-seam step. **Banked
+spin-off: F5.13** (Mirror/Memory `^n` copy-scaling audit — carved out of F5.12; own recon, likely Phase-5).
 
 **Carry-forward flags (recorded 2026-06-14 closeout sweep — don't lose at the seam):**
 - **In-game render-layer checklist (PENDING).** F4.37 tooltips + F4.35 picker shells + this session's
@@ -325,11 +326,14 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
   solved by `_tb`; see DECISIONS_LOG `F4.25/F4.28`) **/ F** (✅ RESOLVED — audit archived + [FIX] shipped
   under F4.20-FIX2) **/ G** (◐ architectural half shipped, UX half → Phase 5) — full status sweep in
   `PHASE4_consolidation_candidates.md` (each candidate now carries a SWEEP STATUS line).
-- **F5.12 — cross-spirit stacking consistency [FIX]** (NEW 2026-06-14, surfaced by F4.25/F4.28 verification).
-  3 conditionals (`cond_horizon`/`dream`/`hierarchy`) stack `Math.pow(base,stacks)` EXPONENTIALLY vs.
-  additive everywhere else → fix to `base × stacks`; + the 4 live-state rares (`engine_dao`/`chi`/`tengu`/
-  `feng_shui`) get tooltipBase/_tb uniformity. Behavior change ([PRESERVE]-breaking). Sequencing TBD
-  (Robert): candidate before-V6 (changes stacking semantics V6 documents) or Phase-5 balance. OVERHAUL_PLAN F5.12.
+- **F5.12 — cross-spirit stacking consistency [FIX] — ✅ DONE 2026-06-14** (`F5.12`, commit b6723d3, DP-75).
+  The 3 conditionals (`cond_horizon`/`dream`/`hierarchy`) linearized (`Math.pow(base,stacks)` → `base ×
+  stacks`); 3 rares (dao/tengu/feng_shui) gained tooltipBase/_tb ([PRESERVE]); chi has no literal constant.
+  Suite 311/1 (+10). Singletons unchanged.
+- **F5.13 — Mirror/Memory `^n` copy-scaling audit** (NEW 2026-06-14, banked from F5.12 carve-out).
+  `_scaleEngineOutput` applies `multiplyMult^n` by the meta-spirit's own stacks (inconsistent with the
+  linear rule) + possible double-dip with the copied target's own stack-scaling. Own recon; behavior-
+  changing; likely Phase-5 spirit-correction. OVERHAUL_PLAN F5.13.
 
 ---
 

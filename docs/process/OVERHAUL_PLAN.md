@@ -4953,6 +4953,13 @@ negative-hatch); F5.8 (sibling Phase-5 design-resolution task); SPIRIT_SET_ITERA
 
 ### F5.12: Multiplicative-spirit stacking consistency + tooltipBase/_tb uniformity for non-accumulator scoring spirits (added 2026-06-14 from F4.25/F4.28 verification)
 
+> **✅ RESOLVED 2026-06-14 — see DECISIONS_LOG `F5.12`; commit b6723d3.** The 3 conditionals linearized
+> (`Math.pow(base,stacks)` → `base × stacks`; hierarchy keeps `1.5^ranks × stacks`); singletons unchanged;
+> new `test/spirits/conditional_stacking.test.js` (test-blind before); the 3 conditionals + 3 rares
+> (dao/tengu/feng_shui) gained `tooltipBase`+`_tb` ([PRESERVE] for rares); `engine_chi` has no literal
+> constant → no field. Suite 311/1. → DP-75. The Mirror/Memory `^n` exception was carved out (banked below).
+> _(Original scope preserved below.)_
+
 **Background:** The F4.25/F4.28 verification (DECISIONS_LOG `F4.25/F4.28`, 2026-06-14) confirmed the 28
 accumulators are single-sourced + stacking-validated, but surfaced 7 NON-accumulator scoring spirits with
 two coupled inconsistencies. Robert ruled these out of the verify-done campaign → this dedicated [FIX].
@@ -4984,6 +4991,30 @@ behavior), OR as a Phase-5 balance item. Flag at the next planning checkpoint.
 **Cross-references:** DECISIONS_LOG `F4.25/F4.28` (the verification that surfaced this); F4.28 (the parent
 stacking audit); `SPIRIT_SET_ITERATION_RULE.md` §"Accumulator-spirit scoring pattern" (the target pattern);
 F5.1 (balance retune); cross_yang / additive-multiplicative spirits (the consistency reference).
+
+### F5.13: Mirror/Memory `^n` copy-scaling audit (added 2026-06-14, banked from F5.12 carve-out)
+
+**Background:** F5.12 established the canonical LINEAR multiplicative-stacking rule and fixed the 3
+conditionals. A SEPARATE violator was carved out: `_scaleEngineOutput(result, n)` (`SpiritEffects.js:224`)
+applies `multiplyMult^n` (exponential) when Mirror/Memory scale a COPIED effect by the meta-spirit's own
+stack count `n` — inconsistent with the linear rule. Worse, there is a possible DOUBLE-DIP: the copied
+target's `applyEngine` already self-applies the target's own stack-scaling, and then `_scaleEngineOutput`
+re-scales by the Mirror/Memory stacks — so a stacked Mirror copying a stacked target may compound twice.
+
+**Scope (recon-first):** (1) map the four `_scaleEngineOutput` call sites (the Mirror + Memory `applyEngine`
+wrappers, `SpiritEffects.js` ~618/639/683/704); (2) determine the INTENDED semantics of "a stack-N Mirror
+copies a stack-M target" (linear in both? linear in Mirror, target-native in target?); (3) decide whether
+`multiplyMult^n` should become `× n` (linear) and whether the double-dip is real or already avoided;
+(4) [FIX] with numeric-equality proof per the F5.12 pattern (test-blind risk — check `tooltip_value_equality`
+Mirror/Memory coverage first).
+
+**Why deferred:** Mirror/Memory are the most entangled scoring spirits (targeting + retrigger + stacking);
+this needs its own recon, not a rider on F5.12. Likely Phase-5 spirit-correction if the semantics decision
+is large. Behavior-changing → its own campaign.
+
+**Cross-references:** F5.12 (the parent fix that carved this out); `_scaleEngineOutput` (the helper); D0.6
+(Memory/Mirror B-4 origin — established `_scaleEngineOutput`); `SPIRIT_SET_ITERATION_RULE.md`
+§"Accumulator-spirit scoring pattern" (notes `_scaleEngineOutput` is the retrigger-path helper).
 
 **Phase 5 total: 60-100+ hours, mostly external (art, audio) or playtesting.**
 

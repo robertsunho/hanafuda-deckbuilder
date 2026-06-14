@@ -590,6 +590,23 @@ full (no separate per-round cap)." Add a forward-note: "An explicit per-round ca
 is a SPECULATIVE Phase-5 balance task (F5.1); V6 documents current behavior." Keep the existing slot-gating
 note (V5:1645) — it is accurate; this DP makes explicit that the slot gate is the *only* cap.
 
+### DP-75: Canonical multiplicative-stacking rule is LINEAR + conditional descriptions
+**Source:** F5.12 conditional-stacking linearization (2026-06-14).
+**Issue:** V6 should state the canonical stacking rule and the conditionals' (now-fixed) math. Current code
+(post-F5.12): multiplicative stacking is LINEAR — the per-card scoring loop scales `mult *= multiplyMult ×
+count`; spirits that self-scale do so as `base × stacks`. The 3 conditionals were exponential
+(`Math.pow(base, stacks)`) and are now linear.
+**Patch (V6):** (1) In the scoring/stacking section, state the canonical rule: "Multiplicative spirits stack
+LINEARLY — a stack of N contributes N× the singleton mult contribution (not the singleton compounded N
+times). The per-card scoring loop (`mult *= multiplyMult × count`) is the reference; Yang/Wolf/cross-fusions
+and the accumulators all follow it." (2) Document the conditionals as `base × stacks`: Horizon/Dream =
+`2.0 × stacks`; **Hierarchy = `(1.5^ranks) × stacks`** — the `1.5^ranks` is WITHIN-CAPTURE rank diversity
+(the spirit's effect), the `× stacks` is the linear stack term. (3) `cond_hierarchy`'s in-game description
+was clarified (code, this campaign) from "(compounds)" to "(compounds within a capture; stacks add linearly)"
+so players don't read the rank-diversity exponent as a stacking exponent — V6 prose should match. (4) Note
+the SEPARATE Mirror/Memory `^n` copy-scaling exception is a known deviation under its own deferred recon
+(banked OVERHAUL_PLAN) — V6 should NOT yet claim Mirror/Memory are linear-consistent.
+
 ---
 
 ## Editorial rewrite scope (separate sub-effort, 6-10 hours)
