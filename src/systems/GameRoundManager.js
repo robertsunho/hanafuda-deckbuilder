@@ -60,7 +60,7 @@ import { getActiveEffect, applyHook,
   getEarthInterestRate, getWoodScoringMult, getEarthHeldMult,
 } from "./HexagramEffects.js";
 import { rollProbability } from "./RNGHook.js";
-import { getCardPoints }  from "./CardMutations.js";
+import { getCardPoints, isSilk }  from "./CardMutations.js";
 import logger           from "./GameplayLogger.js";
 import { SPIRIT_CATALOG, getSpiritDef, ANIMAL_SYMBIONT_MAP } from "../data/spirits.js";
 import { getProportionalYakuThreshold } from "../data/yakuThresholds.js";
@@ -1792,9 +1792,7 @@ export default class GameRoundManager {
    * @returns {boolean}
    */
   _strandHasSilk(cards) {
-    return cards.some(c =>
-      c.enhancement?.element === 'wood' && c.enhancement?.tier === 'upgraded'
-    );
+    return cards.some(isSilk);
   }
 
   /**

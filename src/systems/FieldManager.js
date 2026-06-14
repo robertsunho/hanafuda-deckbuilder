@@ -28,6 +28,8 @@
 //               position immediately and returns the 4 cards as `captured`.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { isSilk } from './CardMutations.js';
+
 export default class FieldManager {
   // The deal can produce up to 8 distinct-month slots (8 cards, all different
   // months), so MAX_SLOTS = 8 guarantees no deal card is ever discarded.
@@ -284,7 +286,18 @@ export default class FieldManager {
       return { matched: true, discarded: false, captured: null };
     }
 
-    // total === 3, or multi-card placement — leave as normal stack.
+    // Silk anti-strand (per-card, hand-play case): a strandable 3-stack containing
+    // Silk must NOT strand — mark it pending so the deck-flip phase resolves it as a
+    // capture (same timing as every other capture; nothing captures before the deck
+    // flip). Covers both sub-cases: 1-onto-2 and 2-onto-1 (both → total === 3). A
+    // non-Silk 3-stack still strands; a 2-card fresh placement (handled above via the
+    // empty-slot path, or total === 2) is not a strandable match — both stay normal.
+    if (total === 3 && target.cards.some(isSilk)) {
+      target.state = 'pending';
+      return { matched: true, discarded: false, captured: null };
+    }
+
+    // total === 3 non-Silk, or multi-card placement — leave as normal stack.
     return { matched: true, discarded: false, captured: null };
   }
 
