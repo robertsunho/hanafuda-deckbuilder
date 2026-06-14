@@ -500,6 +500,16 @@ Implementation note for V6/architecture: the decision lives in one shared predic
 contracts remain per-family adapters (element reports via `action`, others via `success`) — NOT
 normalized (consumable_inventory_pass1.md).
 
+### DP-71: Silk anti-strand scope (per-card, hand-play + deck-flip)
+**Source:** F4.32 (this session).
+**Issue:** §3.3 and §8.2.2 describe Silk as "immune to stranding" / "prevents stranding" without
+specifying scope. The implementation (pre-fix) only covered deck-flip stranding, not hand-play.
+**Patch (V6):** state Silk's scope precisely — Silk prevents stranding of any pending stack it is
+PART OF (per-card, not field-wide), in BOTH the deck-flip case and the hand-play case (a hand-
+formed 3-stack containing Silk resolves to a capture rather than stranding). The capture resolves
+in the deck-flip phase like all captures. A Silk card placed alone (or in a non-matching
+placement) is NOT auto-captured — it only resists stranding of a real pending stack.
+
 ---
 
 ## Editorial rewrite scope (separate sub-effort, 6-10 hours)

@@ -4897,3 +4897,47 @@ folded in; check 5 confirmed reachable zodiac failure). Commit 02cce5c.
 this finalizes); consumable_inventory_pass1.md (the per-family adapter ruling respected here);
 F4.15a/b (dispatch unification this builds tail-consistency on top of); DESIGN_DOC_V5 §8 consume
 policy undocumented → DESIGN_DOC_PATCHES.md DP-70; sym_badger tests.
+
+---
+
+## F4.32 — Silk anti-strand: hand-play 3-stack gap fixed (2026-06-14)
+
+**Status:** RESOLVED. Phase-4 Leg-3 [FIX] (Robert's ruling; F4.32 closed).
+
+**The gap:** Silk anti-stranding fired only in the deck-flip phase (two `_doDeckPhase` paths via
+`_strandHasSilk`). A HAND play that formed a strandable 3-card stack containing Silk was left
+`normal` (stranded) by `FieldManager.playHandCards` — no Silk check on that path. So a Silk card
+that was part of a hand-formed 3-stack stranded, waiting for a 4th card. (Both prior assessments
+were stale: B-10's "only deck-flip-lock" framing AND tier5's "near-moot, just document" — the
+hand-play path was never traced.)
+
+**Ruling (Robert):** Silk anti-strand scope is per-card (protects the stack it is in, NOT
+field-wide) AND covers the hand-play case. Timing: resolves in the deck-flip phase like every
+other capture (nothing captures before the deck flip) — so the fix marks the Silk 3-stack
+`pending`, and the existing deck-phase logic resolves it to a capture. Carve-out: a Silk card in a
+non-strandable placement (lone card, or 2 cards to an empty slot → 2-stack) stays `normal`, no
+auto-capture.
+
+**The fix:** in `FieldManager.playHandCards`, a `total === 3` stack containing Silk is now marked
+`pending` (was `normal`). Covers both sub-cases (1-onto-2 and 2-onto-1 → total 3). The deck phase
+then captures it in all three flip outcomes (same-month → 4-stack capture; different-month →
+`_strandHasSilk` 3-card capture; empty deck → pending capture) — verified, no deck-phase change
+needed. Non-Silk 3-stacks still strand; 2-card empty-slot placements stay normal (carve-out).
+
+**Consolidation:** extracted the Silk predicate to a shared `isSilk(card)` in
+`src/systems/CardMutations.js` (leaf module — zero imports, no cycle; already imported by GRM;
+FieldManager had zero imports so the new edge is clean). `_strandHasSilk` now `cards.some(isSilk)`
+([PRESERVE] — deck-phase behavior byte-identical). Removes the two-Silk-definition drift risk.
+(FieldManager's Leaf/Silk slot-bypass checks stay Wood-ANY — different mechanic, unchanged.)
+
+**Verification:** build green; suite 301/1 (+4 new tests). New
+test/field/silk_handplay_antistrand.test.js pins both hand-play sub-cases → pending; case (i)
+drives pending → different-month deck flip → capture + `_fireSilkAntiStrandHooks` (Moths t2 credit
+== 1, which also [PRESERVE]-guards the deck-phase `_strandHasSilk` path since no prior deck-phase
+Silk integration test existed); the non-Silk strand (no regression); the 2-to-empty carve-out
+(stays normal). Was test-blind (B-10 trail blocked at PostD2-3). Commit 6dc06d2.
+
+**Cross-refs:** F4.32 (OVERHAUL_PLAN — closed here); tier5_reconciliation F4.32 "near-moot"
+assessment (corrected — the hand-play path was the real gap); engine_moths onSilkAntiStrand
+(fires correctly via the deck-phase path the fix routes into); DESIGN_DOC_V5 §3.3 / §8.2.2 Silk
+scope → DESIGN_DOC_PATCHES.md DP-71; the deferred PostD2-4..11 Silk tests (now unblocked).
