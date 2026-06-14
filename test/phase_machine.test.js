@@ -4,8 +4,9 @@ import { makeRound, playRoundToEnd } from './helpers.js';
 // Item-5 guardrail: _setPhase() validates every round-phase transition against
 // GameRoundManager.PHASE_TRANSITIONS and throws on an illegal move. These tests prove
 // (a) the guard actually throws on a bad transition, and (b) every real gameplay exit
-// — the 8 legal pairs — passes through it without throwing. _resetRoundState bypasses
-// the setter by design (reset is initialization), so startRound never throws.
+// — the 9 legal pairs (F4.19 added idle → yaku_decision) — passes through it without
+// throwing. _resetRoundState bypasses the setter by design (reset is initialization), so
+// startRound never throws.
 
 // Reaches Hikari (bright capture january_crane) → yaku_decision is offered.
 const YAKU_DECK = [
@@ -28,12 +29,22 @@ const ALL_PLAINS_DECK = [
 ];
 
 describe('_setPhase — illegal-transition guard (item 5)', () => {
-  it('THROWS on an illegal transition from idle', () => {
+  it('THROWS on an illegal transition (awaiting_deck → awaiting_deck)', () => {
+    const { grm } = makeRound({ deckCardIds: YAKU_DECK });
+    grm.playHandCards(['january_plain_1']);   // idle → awaiting_deck (legal)
+    expect(grm.phase).toBe('awaiting_deck');
+    // awaiting_deck → awaiting_deck is NOT legal (→ idle / yaku_decision / round_over only).
+    expect(() => grm._setPhase('awaiting_deck')).toThrow(/Illegal phase transition/);
+    expect(grm.phase).toBe('awaiting_deck'); // phase unchanged after the throw
+  });
+
+  it('[F4.19 FIX] idle → yaku_decision is now LEGAL (a consumable can complete a yaku from idle)', () => {
     const { grm } = makeRound({ deckCardIds: ALL_PLAINS_DECK });
     expect(grm.phase).toBe('idle');
-    // idle → yaku_decision is NOT a legal pair (idle can only go to idle/awaiting_deck/round_over).
-    expect(() => grm._setPhase('yaku_decision')).toThrow(/Illegal phase transition/);
-    expect(grm.phase).toBe('idle'); // phase unchanged after the throw
+    // Pre-F4.19 this threw (Monkey bypassed yaku detection); now Monkey can complete a yaku
+    // from the player's turn → the round legally enters the decision. The visible [FIX] flip.
+    expect(() => grm._setPhase('yaku_decision')).not.toThrow();
+    expect(grm.phase).toBe('yaku_decision');
   });
 
   it('allows the idle → idle self-transition (multi-play turn)', () => {

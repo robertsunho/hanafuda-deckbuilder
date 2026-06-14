@@ -142,10 +142,15 @@ const _effects = {
       // identical to the old flat redraw.
       const { drawn } = roundManager._drawIntoHand(handSize);
 
-      if (roundManager._checkRoundEndOnEmptyHand()) {
-        return { success: true, message: 'Horse: deck exhausted, round ended.' };
-      }
-      return { success: true, message: `Horse: hand refreshed (${drawn.length} drawn).` };
+      // F4.19: route the empty-hand round-end through the shared coordinator (same push-aware
+      // 'natural' path the deck phase uses) instead of the fire-and-forget _checkRoundEndOnEmptyHand.
+      // With no capture there is no new yaku; the coordinator yields round_over iff the hand is
+      // empty (deck exhausted, refill couldn't fill), else ok. GameScene surfaces the status.
+      const captureResult = roundManager._processCaptureCompletion();
+      const message = captureResult.status === 'round_over'
+        ? 'Horse: deck exhausted, round ended.'
+        : `Horse: hand refreshed (${drawn.length} drawn).`;
+      return { success: true, message, captureResult };
     },
   },
 
@@ -185,15 +190,19 @@ const _effects = {
       // Stamp dispatch still fires inside _discardCard. actuallyDiscarded excludes rescues.
       const actuallyDiscarded = roundManager._discardCards(toDiscard, 'consumable');
 
-      // Empty-hand check — Monkey may have spent the player's last cards. Runs AFTER any
-      // catcher rescue so it sees the true post-rescue hand.
-      roundManager._checkRoundEndOnEmptyHand();
+      // F4.19: run the shared capture-completion coordinator (the deck phase's path) so a
+      // Monkey-completed yaku is detected → yaku_decision, a pending push resolves, and an
+      // emptied hand (Monkey may have spent the last cards; runs AFTER any catcher rescue)
+      // ends the round → round_over. Replaces the old fire-and-forget _checkRoundEndOnEmptyHand
+      // (whose round_over result was discarded). The status is surfaced by GameScene.
+      const captureResult = roundManager._processCaptureCompletion();
 
       return {
         success: true,
         message: `Monkey: captured ${cards.length} card(s), discarded ${actuallyDiscarded.length} from hand.`,
         capturedCards: cards,
         discardedCards: actuallyDiscarded,
+        captureResult,
       };
     },
   },

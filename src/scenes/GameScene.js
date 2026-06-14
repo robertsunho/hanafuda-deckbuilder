@@ -2123,6 +2123,10 @@ export class GameScene extends Phaser.Scene {
     if (consumableHadEffect(result)) run.consumeById(cons.id);
     this._setStatus(result.message ?? `Used ${cons.name}.`);
     this._renderAll();
+    // F4.19: a capture/empty-hand consumable (Monkey/Horse) carries a captureResult — surface
+    // its yaku-decision / end-screen the same way the deck phase does. Other consumables have
+    // no captureResult → no-op. Additive, after the Candidate-H consume decision above.
+    this._surfaceCaptureResult(result.captureResult);
     return result;
   }
 
@@ -2581,26 +2585,38 @@ export class GameScene extends Phaser.Scene {
   // ── Result dispatcher ─────────────────────────────────────────────────────
 
   _handleResult(result) {
+    // yaku_decision / round_over / banked → shared overlay surfacing (also used by the
+    // capture/empty-hand consumables, F4.19). 'ok' falls through to the deck-phase message.
+    if (this._surfaceCaptureResult(result)) return;
+    const nd = result.discarded.length;
+    if (nd > 0) {
+      this._setStatus(`${nd} card${nd > 1 ? 's' : ''} discarded (field full)  —  play your next card.`);
+    } else {
+      this._setStatus(`Deck: ${result.deckCard ? result.deckCard.name : '—'}  —  play your next card.`);
+    }
+    this._renderAll();
+  }
+
+  /**
+   * Surface a capture-completion result's decision/terminal overlays — the shared path for
+   * both the deck phase (_handleResult) and the capture/empty-hand consumables (F4.19).
+   * yaku_decision → _showYakuDecision; round_over/banked → _showEndScreen. Returns true if it
+   * owned the result; false for 'ok'/'idle'/no-result (caller handles its own status/render).
+   */
+  _surfaceCaptureResult(result) {
+    if (!result) return false;
     switch (result.status) {
-      case 'ok': {
-        const nd = result.discarded.length;
-        if (nd > 0) {
-          this._setStatus(`${nd} card${nd > 1 ? 's' : ''} discarded (field full)  —  play your next card.`);
-        } else {
-          this._setStatus(`Deck: ${result.deckCard ? result.deckCard.name : '—'}  —  play your next card.`);
-        }
-        this._renderAll();
-        break;
-      }
       case 'yaku_decision':
         this._renderAll();
         this._showYakuDecision(result);
-        break;
+        return true;
       case 'round_over':
       case 'banked':
         this._renderAll();
         this._showEndScreen(result);
-        break;
+        return true;
+      default:
+        return false;
     }
   }
 

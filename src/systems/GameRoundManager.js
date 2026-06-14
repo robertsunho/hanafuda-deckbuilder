@@ -90,7 +90,9 @@ export default class GameRoundManager {
    * @type {Record<string, string[]>}
    */
   static PHASE_TRANSITIONS = {
-    idle:          ['idle', 'awaiting_deck', 'round_over'],
+    // idle → yaku_decision: F4.19 — a capture-completing consumable (Monkey) can complete a
+    // yaku directly from the player's turn (no deck phase), so the round enters the decision.
+    idle:          ['idle', 'awaiting_deck', 'yaku_decision', 'round_over'],
     awaiting_deck: ['idle', 'yaku_decision', 'round_over'],
     yaku_decision: ['idle', 'round_over'],
     round_over:    [],
@@ -2010,7 +2012,19 @@ export default class GameRoundManager {
     this._turn++;
     this._playsThisTurn = 0;
     this._capture.recordTurn();
+    return this._processCaptureCompletion();
+  }
 
+  /**
+   * Capture-completion coordinator (extracted from _finalizeTurn, F4.19). Evaluates yaku,
+   * diffs for new completions, resolves a pending push, spends yaku cards, and decides the
+   * phase + canonical return shape. Shared by the deck phase (_finalizeTurn) AND the
+   * capture / empty-hand consumables (Monkey/Horse via ConsumableEffects) so a
+   * Monkey-completed yaku surfaces a yaku_decision and an emptied hand ends the round —
+   * uniformly, with the same push success/failure semantics (Robert's Unify ruling).
+   * Deck-phase-specific bookkeeping (turn counter, _inDeckPhase) stays in _finalizeTurn.
+   */
+  _processCaptureCompletion() {
     const _yakuThresholds = this._getCaptureThresholds();
     const yakuForDiff = this._scoring.evaluate(this._capture.getAll(), _yakuThresholds);
 
