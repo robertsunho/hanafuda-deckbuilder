@@ -1151,12 +1151,6 @@ export const SPIRIT_CATALOG = [
     rarity: 'rare', category: 'engine_spirit_count',
   },
   {
-    id: 'util_waidan', name: 'Waidan',
-    description: 'On Sacred Grove exit, creates a negative copy of a random consumable per stack.',
-    channel: 'utility', cost: 8, tier: 1,
-    rarity: 'rare', category: 'utility_economy',
-  },
-  {
     id: 'engine_feng_shui', name: 'Feng Shui',
     description: '1\u00D7 base mult, +0.5 per empty spirit slot (ignores Feng Shui slots when counting).',
     channel: 'multiplicative', cost: 8, tier: 1,

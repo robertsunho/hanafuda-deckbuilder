@@ -1401,8 +1401,6 @@ const _effects = {
     },
   },
 
-  util_waidan: {},  // Sacred Grove exit — handled in ShrineScene
-
   engine_feng_shui: {
     applyEngine({ spirit }) {
       const stacks = effectivePower(spirit);

@@ -289,9 +289,6 @@ export function getSpiritContrib(spirit, opts = {}) {
         const progress = `${inv.bright}B/${inv.animal}A/${inv.ribbon}R/${inv.plain}P`;
         lines.push(`Qualified rounds: ${count} (this round: ${progress})  \u2192  \xD7${val.toFixed(2)} mult-mult`);
       }
-    } else if (spirit.id === 'util_waidan') {
-      const stacks = effectivePower(spirit);
-      lines.push(`Sacred Grove exit: creates ${stacks} negative copy/copies of random consumable(s)`);
     } else if (spirit.id === 'util_festival') {
       const stacks = effectivePower(spirit);
       lines.push(`Generates a colored stamp on each ribbon capture (\xD7${stacks} per ribbon, slot-gated)`);
