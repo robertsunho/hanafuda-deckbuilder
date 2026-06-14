@@ -107,7 +107,12 @@ intent.
 *(Distinct from per-spirit `totalScored`, which is live — don't conflate.)* Decision: remove vs. keep for
 a planned end-of-run summary surface.
 
-### F4.19 — Monkey/Horse known issues → **STILL-OPEN** (coupled, est. 1-2h)
+### F4.19 — Monkey/Horse known issues → **RESOLVED 2026-06-14** (DECISIONS_LOG `F4.19`, commit 240790e)
+> All three issues fixed: extracted `_processCaptureCompletion` from `_finalizeTurn` (deck path
+> byte-identical) → Monkey runs yaku detection (#1) + Push/Bank surfaces (#3); GameScene's shared
+> `_surfaceCaptureResult` surfaces the consumable `captureResult` → round-over no longer soft-locks (#2).
+> #2b (stripped teardown) was already resolved by F4.18b. The F4.18 coupling did NOT block this — the
+> coordinator handles surfacing without the capture-event work. → DP-76. _(Original disposition below.)_
 zodiac_monkey (`ConsumableEffects.js:161-180`) + zodiac_horse (:121-140) are live, but the three F2.3-era
 issues (yaku detection on Monkey-completed yaku, round-end UI transition, Push/Bank surfacing) persist —
 the inline `playDeckPhase` logic was never extracted into a reusable yaku-decision-surfacing method.

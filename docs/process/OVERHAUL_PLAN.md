@@ -3292,6 +3292,14 @@ Implementation for Option B: extract the inline yaku-decision-surfacing logic fr
 
 ### F4.19: Monkey/Horse known issues — yaku detection, round-end UI transition, push/bank surfacing (added 2026-05-15 from F2.3 audit Monkey/Horse verification)
 
+> **✅ RESOLVED 2026-06-14 — see DECISIONS_LOG `F4.19`; commit 240790e.** Extracted
+> `_processCaptureCompletion` from `_finalizeTurn` (deck path byte-identical) so Monkey runs yaku
+> detection (#1) and Push/Bank surfaces (#3); GameScene's `_surfaceCaptureResult` surfaces the
+> consumable's `captureResult` → fixes the round-over soft-lock (#2). #2b (stripped teardown) was already
+> resolved by F4.18b. Robert ruled UNIFY on push semantics (consumable capture-completion = deck-phase
+> semantics). Phase machine gained `idle→yaku_decision`. Suite 318/1. → DP-76. **Closes the last do-now
+> Leg-3 item → Leg 3 complete.** _(Historical body preserved below.)_
+
 **Background:** During F2.3 audit Monkey/Horse mechanic-fix verification (May 15), Tests 1-5, 9, 10, 12 passed (Monkey scoring pipeline, Horse refill, basic dispatch). Tests 6, 7, 11 revealed deeper architectural gaps that were ruled out of scope for Phase 2.
 
 **Three related issues, all rooted in the same architecture problem:**

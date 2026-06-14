@@ -607,9 +607,18 @@ so players don't read the rank-diversity exponent as a stacking exponent — V6 
 the SEPARATE Mirror/Memory `^n` copy-scaling exception is a known deviation under its own deferred recon
 (banked OVERHAUL_PLAN) — V6 should NOT yet claim Mirror/Memory are linear-consistent.
 
----
-
-## Editorial rewrite scope (separate sub-effort, 6-10 hours)
+### DP-76: Monkey/Horse complete the round like deck play (yaku, push, round-end)
+**Source:** F4.19 capture-completion surfacing (2026-06-14).
+**Issue:** V6 should describe how the capture/empty-hand zodiacs interact with round flow. Current code
+(post-F4.19): a Monkey capture that completes a yaku offers the same yaku_decision (Bank/Push) as a
+deck-flip capture; a Monkey/Horse that empties the hand ends the round (full teardown); and mid-push,
+these resolve the push the same way deck play does (Monkey yaku = push success; empty-hand = push failure).
+**Patch (V6):** in the zodiac-consumable section (Monkey/Horse) and/or the round-flow/push section, state:
+"Monkey (capture a field slot) and Horse (refresh hand) resolve through the same capture-completion path as
+normal play — a yaku completed via Monkey offers Bank/Push, and emptying the hand/deck via Monkey/Horse ends
+the round. While a Push is pending, a Monkey-completed yaku succeeds the push and an emptied hand fails it,
+identically to deck play." Removes any implication (old behavior) that Monkey/Horse silently bypass the
+yaku/round-end flow.
 
 Eventually, ALL in-game descriptions should be cleanly rewritten by hand:
 - Spirit tooltips (all 100+ spirits)

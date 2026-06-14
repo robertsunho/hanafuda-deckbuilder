@@ -5206,3 +5206,66 @@ dao/chi/tengu/feng_shui `assertVE` cases stayed green).
 Yang's WITHIN-card ×4 compounding, distinct from stack-scaling, untouched); GameRoundManager Phase-1 loop
 (`r.multiplyMult * count` — the linear reference); the Mirror/Memory follow-up (banked, OVERHAUL_PLAN);
 `SPIRIT_SET_ITERATION_RULE.md` §"Accumulator-spirit scoring pattern". → DESIGN_DOC_PATCHES DP-75.
+
+---
+
+## F4.19 — Monkey/Horse capture-completion surfacing (2026-06-14)
+
+**Status:** RESOLVED. Phase-4 Leg-3 [FIX] (Robert's Scope-B + Unify rulings). **Closes the last
+do-now Leg-3 item → Leg 3 fully complete.** Commit 240790e (code+tests).
+
+**STEP-0 reproduction verdicts (verified vs current source — the F2.3-era issues, after F4.18b /
+scoring-loop / F4.27 / hand-capacity touched both spirits):**
+- **#1 Monkey-completed yaku — STILL BROKEN.** `zodiac_monkey.execute` called `_addCapture` (scoring) +
+  discard + `_checkRoundEndOnEmptyHand()` (return ignored) but NEVER ran the yaku-evaluate + new-yaku
+  diff (`_finalizeTurn`) → a Monkey-completed yaku was never detected/spent/surfaced.
+- **#2 round-over UI — engine-fixed, UI-broken.** F4.18b already routed `_checkRoundEndOnEmptyHand` →
+  `_endRound('consumable_empty_hand')` → the FULL teardown (flow decay, post-round enhancements, hooks,
+  `_setPhase('round_over')`). **The stripped-pipeline sub-worry (#2b) was already RESOLVED — scope
+  narrowed.** The gap: `_checkRoundEndOnEmptyHand` returns only a boolean (the round-end result is built
+  then DISCARDED), and GameScene's `_executeAndFinalize` read only `message`/`success` — never inspected
+  `status`, never called `_showEndScreen`/`_showYakuDecision` → the round soft-locked in the UI.
+- **#3 Push/Bank surfacing — STILL BROKEN** (same root as #1 — no detection → no yaku_decision → no
+  Push/Bank buttons).
+
+**The push-semantics ruling (Robert — Unify):** a capture-completing consumable resolves a *pending* push
+the SAME way deck play does — a Monkey-completed yaku mid-push counts as push SUCCESS, and Monkey/Horse
+emptying the hand mid-push counts as push FAILURE (trigger `'natural'`). The common case (no pending push)
+is behavior-identical either way. So the extracted coordinator is **source-agnostic** (no `fromConsumable`
+flag); Monkey/Horse get the deck path's exact semantics.
+
+**The fix:**
+- **Extracted `_processCaptureCompletion()`** from `_finalizeTurn` (GRM): the yaku-evaluate + new-yaku diff
+  + pushSucceeded/bullseye + yaku-card spend + phase decision + canonical return shape. `_finalizeTurn`
+  keeps the deck-specific preamble (`_inDeckPhase=false`, `_turn++`, `_playsThisTurn=0`, `recordTurn`) and
+  delegates. **Deck path BYTE-IDENTICAL** (the existing finalize/round-end tests stay green unchanged —
+  the [PRESERVE] net: round_end_unification, phase_machine, glory, counter_engines, hand_capacity, …).
+- **Monkey** now calls `_processCaptureCompletion()` after `_addCapture`+discard (dropping its separate
+  `_checkRoundEndOnEmptyHand`) and returns `{ …, captureResult }`. **Horse** routes its empty-hand
+  round-end through the same coordinator (no capture → no new yaku; round_over iff hand empty).
+- **GameScene:** factored the deck-phase status-switch into a shared `_surfaceCaptureResult(result)`
+  (`yaku_decision`→`_showYakuDecision`; `round_over`/`banked`→`_showEndScreen`; returns false for `ok`).
+  `_handleResult` uses it (deck-phase `'ok'` message preserved); `_executeAndFinalize` calls
+  `_surfaceCaptureResult(result.captureResult)` after the Candidate-H consume decision (additive; non-
+  capture consumables have no `captureResult` → no-op).
+- **Phase machine [FIX]:** added `idle → yaku_decision` to `PHASE_TRANSITIONS` (a consumable can complete a
+  yaku from the player's turn, no deck phase). `phase_machine.test.js`'s "throws from idle (→yaku_decision)"
+  assertion FLIPPED to "idle→yaku_decision is now legal" (the visible [FIX] proof) + the guard-throws case
+  re-pointed to `awaiting_deck→awaiting_deck`.
+- **`_checkRoundEndOnEmptyHand` retained** (no longer called by Monkey/Horse, but `crow.test.js` uses it as
+  a round-end test driver — not deleted).
+
+**Behavior change (NOT [PRESERVE]).** Proof: new `test/consumables/monkey_horse_capture_completion.test.js`
+(6 cases — Monkey-completed Tane → yaku_decision + scored; Monkey/Horse empty-hand → round_over with full
+teardown; Horse refill / Monkey-with-cards → ok) — these were test-blind. Deck path [PRESERVE]-guarded.
+
+**Round-over teardown disposition:** already complete (F4.18b routes through `_endRound`) — no teardown fix
+needed; only the discarded-result surfacing. The `'natural'` (push-aware) trigger now applies uniformly per
+the Unify ruling.
+
+**Verification:** build green; suite 318/1 (was 311/1; +7). 
+
+**Cross-refs:** F4.18b (round-end unification — pre-resolved #2b, the full `_endRound` teardown); D-F4-HANDCAP-
+TIER3 / Candidate H (`_executeAndFinalize` consume policy this builds surfacing on top of); the phase-machine
+guardrail (D-F4-SCOPE Part 2, `_setPhase` +8 tests — now 9 legal pairs); F2.3 audit Tests 6/7/11 (the
+original issues); crow.test.js (`_checkRoundEndOnEmptyHand` consumer). → DESIGN_DOC_PATCHES DP-76.

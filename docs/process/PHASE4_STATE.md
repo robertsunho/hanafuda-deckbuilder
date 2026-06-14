@@ -162,11 +162,13 @@ one line each (detail in the plan doc + the `tier5_reconciliation.md` §"Scope d
      rares (dao/tengu/feng_shui) gained tooltipBase/_tb (chi has no literal constant). DP-75. **A second
      violator carved out → F5.13 banked:** Mirror/Memory's `_scaleEngineOutput` `^n` copy-scaling (own
      recon; likely Phase-5). **F4.29 banked** (optional bypass sweep; not a known-broken gap).
-   - **Other-open: F4.19 (Monkey/Horse) — ruled DO-NOW 2026-06-14 (Robert), STILL OPEN.** The three
-     F2.3-era issues (yaku detection on Monkey-completed yaku, round-end UI transition, Push/Bank surfacing)
-     persist; the inline `playDeckPhase` logic was never extracted into a reusable yaku-decision-surfacing
-     method (`tier5_reconciliation.md` F4.19; ~1-2h; coupled to deferred F4.18 capture-event — issue #3
-     lives there). **The one remaining do-now Leg-3 item.**
+   - **Other-open: F4.19 (Monkey/Horse) — ✅ DONE 2026-06-14** (`F4.19`, commit 240790e, DP-76). Extracted
+     `_processCaptureCompletion` from `_finalizeTurn` (deck path byte-identical [PRESERVE]) so Monkey runs
+     yaku detection (#1) + Push/Bank surfaces (#3); GameScene's shared `_surfaceCaptureResult` surfaces the
+     consumable's `captureResult` → fixes the round-over soft-lock (#2; #2b's stripped-teardown worry was
+     already resolved by F4.18b). Robert ruled UNIFY (consumable capture-completion = deck-phase push
+     semantics; coordinator source-agnostic). Phase machine gained `idle→yaku_decision`. +7 tests (was
+     test-blind). **This was the last do-now Leg-3 item → Leg 3 fully complete.**
 4. **Any remaining Phase-4 work** (stragglers steps 1-3 surface or defer).
 5. **Phase-4 close-out + Phase-5 restructuring/planning** (split the banked pile into the
    design-resolution / feature-building / demo-prep sub-streams per `POST_AUDIT_DIRECTION.md`).
@@ -188,13 +190,14 @@ correction.")
 (7 ABSORBED / 9 STILL-OPEN / 6 PARTIAL + lost-and-found); Robert's grouping scope-call lives in that
 doc's §"Scope decision" and is sequenced by the 6-step plan above.
 
-**Immediate next action (2026-06-14):** **Leg 2 COMPLETE; Leg 3 COMPLETE except F4.19.** F4.25 + F4.28
-✅ verified-done (no code — single-source already met via `_tb`; Candidate B dropped; canonical-pattern
-doc written; spin-off F5.12 [FIX] ✅ shipped). **The one remaining do-now item is F4.19 (Monkey/Horse).**
-Then the **rubric-writing seam:** `D-F4-DOCSYNC` sweep (first step) → V6 (fold in DP-66..75) →
+**Immediate next action (2026-06-14):** **Leg 2 COMPLETE; Leg 3 COMPLETE.** F4.25 + F4.28 ✅ verified-done
+(single-source already met via `_tb`; Candidate B dropped; canonical-pattern doc; spin-off F5.12 [FIX]
+shipped); **F4.19 ✅ shipped** (Monkey/Horse capture-completion surfacing — the last do-now item). **All
+do-now Leg-3 items are done.** Next is the **rubric-writing seam:** `D-F4-DOCSYNC` sweep (first step) → V6
+(fold in DP-66..76) →
 `ARCHITECTURE.md`/F4.24b → Gate 0 / Audit 2. The V6 author should cite `SPIRIT_SET_ITERATION_RULE.md`
 §"Accumulator-spirit scoring pattern" for the accumulator architecture. The DP worklist is substantial
-(**DP-66..75**, ready to feed V6); the `D-F4-DOCSYNC` sweep is the first rubric-seam step. **Banked
+(**DP-66..76**, ready to feed V6); the `D-F4-DOCSYNC` sweep is the first rubric-seam step. **Banked
 spin-off: F5.13** (Mirror/Memory `^n` copy-scaling audit — carved out of F5.12; own recon, likely Phase-5).
 
 **Carry-forward flags (recorded 2026-06-14 closeout sweep — don't lose at the seam):**
