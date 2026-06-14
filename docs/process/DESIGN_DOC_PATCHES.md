@@ -471,6 +471,20 @@ acquisition table has a "Spirit Waidan — Negative copies of consumables on Sac
 author: the negative-consumables SYSTEM itself is NOT removed from the design — it is a Phase-5 build; only
 Waidan-as-its-source is cut. The general `addNegativeConsumable`/`_negativeConsumables` infra is retained.
 
+### DP-69: Alchemical fusion is one-operation-per-use + Pearl consumes components
+**Source:** F4-LEG3-CINNABAR-SINGLEOP (this session); D0.16 (Pearl consume).
+**Issue:** §8.6 / §8.6.1 (a) still says Pearl "preserves the components" / "effectively a
+duplicator" — STALE: Pearl consumes its inputs (D0.16, shipped). (b) Does not state the
+one-operation-per-use rule for any alchemical.
+**Patch for V6:**
+- §8.6 Pearl row: drop "Components preserved"; Pearl CONSUMES its two T3 inputs (one each).
+- §8.6.1: remove the "duplicator" framing; all fusion alchemicals consume inputs. To preserve
+  components, pre-stack via Jade/Mirror/Memory before fusing.
+- Add explicit one-op rule: each fusion alchemical performs exactly ONE operation per use
+  regardless of input stack depth — Cinnabar fuses one stack from each input (a 2-stack pair
+  yields one fusion + one leftover of each input); Mercury de-fuses one fusion stack; Pearl
+  consumes one of each T3 input to make one capstone.
+
 ---
 
 ## Editorial rewrite scope (separate sub-effort, 6-10 hours)

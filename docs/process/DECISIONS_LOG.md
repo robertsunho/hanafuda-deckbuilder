@@ -4809,3 +4809,36 @@ legend_ prefix as the lone true legendary — now cut); PHASE4_consolidation_can
 §12.2 15%-legendary-roll / §7.12 Waidan / §8.7 acquisition table → DESIGN_DOC_PATCHES.md
 DP-66/DP-67/DP-68; D0.5/D0.16 (historical Gankyil "only shop-offerable legendary" claims — left
 as point-in-time records per the no-rewrite-history convention; V6 prose must not inherit them).
+
+---
+
+## F4-LEG3-CINNABAR-SINGLEOP — One alchemical = one fusion (2026-06-13)
+
+**Status:** RESOLVED. Phase-4 Leg-3 [FIX] (Robert's ruling, design-rulings session).
+
+**Ruling:** One alchemical use = one fusion/de-fusion/capstone operation, regardless of
+input stack depth. Worked example: Cinnabar on a 2-stack Sun + 2-stack Atmosphere yields a
+SINGLETON cross_yang, leaving singleton Sun + singleton Atmosphere — NOT a 2-stack Yang with
+both inputs emptied.
+
+**Scope — Cinnabar only.** Recon confirmed Cinnabar was the LONE offender: it used
+`fusionStacks = Math.min(a.stackCount, b.stackCount)` and acquired that many fusions, emptying
+both inputs. Mercury (decrements fusion by 1, acquires each component once) and Pearl
+(decrements each input by 1, adds one capstone) ALREADY conform — verified, left untouched.
+The fix replaces Cinnabar's `Math.min` batching with a single-decrement / single-acquire form
+mirroring Pearl's pattern. Rollback-on-slot-failure restores +1 each. The pre-existing rollback
+property (element pops are NOT re-pushed on slot-failure rollback — pops happen before the slot
+check, same as Pearl) was left as-is per smallest-defensible-change; not introduced here.
+
+**Behavior change (NOT [PRESERVE]).** Proof: BRANCH-B — new regression test
+test/consumables/cinnabar_fusion.test.js pinning the single-op contract (the batching was
+previously test-blind; only Cinnabar test reference was dispatch_kind's inputType assertion).
+Test also guards the 1+1 common path (one fusion, both inputs consumed).
+
+**Verification:** build green; suite 290/1 (was 288/1 — +2 new Cinnabar tests). Singleton-pair
+path (1+1 → 1 fusion, both inputs consumed) confirmed unaffected. Commit 3727810.
+
+**Cross-refs:** D0.16 (Pearl-consumes-components ruling — the single-op precedent Cinnabar now
+matches); DESIGN_DOC_V5 §8.6/§8.6.1 (Pearl "components preserved" is stale AND the one-op rule
+is undocumented → DESIGN_DOC_PATCHES.md DP-69); F2.3 (the _acquireSpiritStack consolidation that
+Cinnabar routes through).
