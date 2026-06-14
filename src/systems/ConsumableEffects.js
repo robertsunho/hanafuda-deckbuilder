@@ -292,6 +292,7 @@ const _effects = {
       run.removeZeroStackSpirits();
       const acq = run._acquireSpiritStack(fusionDef, 1);
       if (!acq.success) return { success: false, message: acq.reason ?? 'Could not acquire fusion' };
+      run.notifyConsumableUsed();   // Candidate H: alchemical success counts for Badger (used ⟺ Badger)
       return { success: true, message: `Fused into ${fusionDef.name}!` };
     },
   },
@@ -324,6 +325,7 @@ const _effects = {
       const defB = getSpiritDef(recipe.input[1]);
       if (defA) run._acquireSpiritStack(defA, 1);
       if (defB) run._acquireSpiritStack(defB, 1);
+      run.notifyConsumableUsed();   // Candidate H: alchemical success counts for Badger (used ⟺ Badger)
       return { success: true, message: `De-fused into ${defA?.name} + ${defB?.name}` };
     },
   },
@@ -339,6 +341,7 @@ const _effects = {
       const targetDef = getSpiritDef(target.id) ?? target;
       const result = run._acquireSpiritStack(targetDef, 1);
       if (!result.success) return { success: false, message: result.reason ?? 'Could not add stack' };
+      run.notifyConsumableUsed();   // Candidate H: alchemical success counts for Badger (used ⟺ Badger)
       return { success: true, message: `${target.name} +1 stack` };
     },
   },
@@ -373,6 +376,7 @@ const _effects = {
           state: dupTarget.state ? JSON.parse(JSON.stringify(dupTarget.state)) : undefined,
           acquiredRound: run._round ?? 0,
         });
+        run.notifyConsumableUsed();   // Candidate H: alchemical success counts for Badger (used ⟺ Badger)
         return { success: true, message: `Duplicated ${dupTarget.name}` };
       }
 
@@ -381,6 +385,7 @@ const _effects = {
       const targetDef = getSpiritDef(dupTarget.id) ?? dupTarget;
       const result = run._acquireSpiritStack(targetDef, dupCount);
       if (!result.success) return { success: false, message: result.reason ?? 'Could not duplicate' };
+      run.notifyConsumableUsed();   // Candidate H: alchemical success counts for Badger (used ⟺ Badger)
       return { success: true, message: `Duplicated ${dupTarget.name}` };
     },
   },
@@ -402,6 +407,7 @@ const _effects = {
       run.replaceSpiritObj(target, run._buildTranscendedNegative(target, target.stackCount ?? 1));
       run._permanentFieldSlotMod = mod - 1;
       if (roundManager) roundManager._recomputeFieldSlots();
+      run.notifyConsumableUsed();   // Candidate H: alchemical success counts for Badger (used ⟺ Badger)
       return { success: true, message: `${target.name} transcended! Field -1 slot.` };
     },
   },
@@ -416,6 +422,7 @@ const _effects = {
       const pick = available[Math.floor(Math.random() * available.length)];
       run._addPastLifeCopy(pick);
       run._ki = Math.floor(run._ki / 2);
+      run.notifyConsumableUsed();   // Candidate H: alchemical success counts for Badger (used ⟺ Badger)
       return { success: true, message: `Summoned ${pick.name}! Ki halved.` };
     },
   },
@@ -447,6 +454,7 @@ const _effects = {
       if (b.elements && b.elements.length > 0) b.elements.pop();
       run.removeZeroStackSpirits();
       run.addLegendarySpirit(capstoneDef);
+      run.notifyConsumableUsed();   // Candidate H: alchemical success counts for Badger (used ⟺ Badger)
       return { success: true, message: `Created ${capstoneDef.name}!` };
     },
   },

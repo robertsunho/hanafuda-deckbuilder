@@ -13,6 +13,7 @@ import { getFireFlatPoints, getMetalHeldMult, getEarthInterestRate,
 import { getHexagram }              from '../data/hexagrams.js';
 import { getSpiritContrib, getElementContrib } from './shared/spiritTooltip.js';
 import { isPairInputType, computeSpiritEligibility, buildSpiritParams } from './shared/spiritTargetPicker.js';
+import { consumableHadEffect } from './shared/consumePolicy.js';
 
 /** Resolve card → Phaser texture key (handles hex-duplicate suffix). */
 function _tex(card) { return card.baseImageId ?? card.id; }
@@ -2116,7 +2117,10 @@ export class GameScene extends Phaser.Scene {
    */
   _executeAndFinalize(cons, params) {
     const result = this._round.useConsumable(cons, params);
-    run.consumeById(cons.id);
+    // Candidate H: consume iff a real effect happened — a failed zodiac (Dog at full
+    // hand, empty-slot Ox/Monkey) is a genuine fail → retained, and useConsumable's
+    // Badger gate already skipped it, so consume ⟺ Badger.
+    if (consumableHadEffect(result)) run.consumeById(cons.id);
     this._setStatus(result.message ?? `Used ${cons.name}.`);
     this._renderAll();
     return result;
@@ -2336,8 +2340,13 @@ export class GameScene extends Phaser.Scene {
         no_effect:    'No effect.',
       };
 
-      run.consumeById(id);
-      logger.logConsumableUse(consName, `${result.action} on ${card.id}`);
+      // Candidate H: a no-op element (same-element reapply, already-upgraded) does NOT
+      // consume — the handler already withheld Badger on `no_effect`, so consume ⟺ Badger.
+      // Matches ShrineScene._finishCardConsumable, which already early-returns on no_effect.
+      if (consumableHadEffect(result)) {
+        run.consumeById(id);
+        logger.logConsumableUse(consName, `${result.action} on ${card.id}`);
+      }
       this._cardTargetMode = null;
       this._setStatus(ACTION_MSG[result.action] ?? 'Done.');
       this._renderAll();
