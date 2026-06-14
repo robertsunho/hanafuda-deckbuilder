@@ -55,7 +55,7 @@ mechanism, NOT a spirit-chain event hook. (`_legendarySpirits` is a separate arr
 | **Scoring contribution** | `scoringSpirits` | regulars + Negatives + legendaries | Legendaries score even though they're not chain members. The Phase-1/Phase-2 scoring loops use this. |
 | **Adjacency / placement targeting** (Mirror's left neighbour; Memory's rightmost non-self) | the chain in TRUE PLACEMENT ORDER | regulars + Negatives, real left-to-right order | Negatives are valid targets AND targeters. ⚠ **Do NOT use `scoringSpirits`** — it REGROUPS (regulars→Negatives→legendaries) and scrambles adjacency. **PENDING VERIFICATION:** the exact getter (likely `allSpirits`) must be confirmed to match on-screen chain order before use — see the mirror/memory fix recon. |
 | **Slot / capacity** ("slots used / can I add one?") | `spirits` / `!isNegative` filter | regulars only | The ONE place excluding Negatives is correct — they don't take slots. `canAddSpirit` is the reference. |
-| **Structural presence of a legendary/capstone** ("is gankyil / a capstone present?") | `activeSpirits` acceptable | regulars + legendaries, no Negatives | Those entities can't be Negative anyway, so the exclusion is harmless here. |
+| **Structural presence of a legendary/capstone** ("is capstone_yinyang / a capstone present?") | `activeSpirits` acceptable | regulars + legendaries, no Negatives | Those entities can't be Negative anyway, so the exclusion is harmless here. |
 
 **Heuristic for call sites:** if you're iterating spirits to FIRE, SCORE, or TARGET and you reach
 for `activeSpirits`, stop — you almost certainly want `allSpirits` (chain) or `scoringSpirits`

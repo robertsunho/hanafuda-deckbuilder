@@ -442,16 +442,52 @@ a quick find-replace (it's a small naming cluster). Sequenced after Wave B becau
 schema redesign) and F4.37 (tooltip recomb) still read/may reshape this field — rename ONCE against the
 settled shape (the F4.24b / V6 "don't refactor against a churning state" discipline).
 
-### DP-66: §7.13 (Tier 1 Legendary — Gankyil) — REMOVE subsection
-**Source:** F4-LEG3-ROSTER-CUTS (Robert's ruling, 2026-06-13).
-**Issue:** `legend_gankyil` was cut entirely from code; the spirit no longer exists. §7.13 documents
-its "auto-capture at 3-stack instead of 4-stack" mechanic.
-**Patch (V6):** delete the §7.13 Gankyil subsection wholesale. Legendaries as a group are deferred to a
-Phase-5 design pass; the only `legendary: true` spirits remaining are the four capstones (Pearl-created,
-not shop-offered). Auto-capture is now fixed at 4 (FieldManager default; no spirit can lower it).
-See DECISIONS_LOG F4-LEG3-ROSTER-CUTS. NOTE for V6 author: D0.5/D0.16's historical "Gankyil = only
-shop-offerable legendary" claims are point-in-time records (no-rewrite-history convention) — V6 prose
-must NOT inherit them.
+### DP-66: Remove Gankyil EVERYWHERE in V5 + correct stale spirit counts
+**Source:** F4-LEG3-ROSTER-CUTS (Gankyil cut, Robert's ruling, 2026-06-13); extended by the Gankyil
+comment-sweep (2026-06-14), which found V5 residue far beyond §7.13.
+**Issue:** `legend_gankyil` was cut from code entirely; the spirit no longer exists. V5 references it in
+~10 places, and the spirit-count tables carry stale totals. The counts ALSO had a pre-existing +1
+over-count (independently found and corrected in `spirits.js`): the TRUE counts, verified against the
+current catalog (12 T0 + 78 T1 + 8 T2 + 8 T3 + 4 T4), are **110 total / 78 Tier 1**, NOT 113/81 and NOT
+the naive −2 of 111/79. Auto-capture is now fixed at 4 (FieldManager default; no spirit lowers it).
+
+**Patch (V6) — remove/correct ALL of (line numbers per 2026-06-14 grep; re-verify, V5 may drift):**
+- **§7.13 Tier 1 Legendary — Gankyil** (`:1754`–`:1771`) → DELETE the subsection wholesale.
+- **TOC entry** for §7.13 (`:88`) → remove the "7.13 Tier 1 Legendary — Gankyil" line.
+- **§ 3-card auto-capture** (`:777`, "3-card stack auto-capture (Gankyil spirit)") → DELETE the bullet;
+  auto-capture is fixed at 4, no spirit lowers it.
+- **§15.1 spirits intro** (`:1318`, "roster of **113 spirits**") → 110.
+- **§15.1 Wayside Shrine spirits** (`:1326`, "Tier 1, 81 spirits … and the Tier 1 legendary (Gankyil)")
+  → "Tier 1, 78 spirits"; remove the "and the Tier 1 legendary (Gankyil)" clause and the "Rarity ranges
+  common to legendary" tail (no Tier-1 legendary remains; demoted rares top out at rare).
+- **§ legendary slots prose** (`:1335`, "5 spirits total: Gankyil + 4 capstones") → "4 spirits total: the
+  4 capstones" (the 2 legendary slots now hold only the Pearl-created capstones).
+- **§ capstone mechanics** (`:1902`, "any combination of Gankyil + capstones") → "any combination of the
+  4 capstones".
+- **§15.2 catalog intro** (`:3555`, "The full 113 spirits across 17 categories") → 110; VERIFY the "17
+  categories" figure — removing the Tier-1-Legendary category may make it 16 (recount in the V6 pass).
+- **§15.2.1 Tier Summary table** (`:3562`/`:3567`): Tier 1 count `81 → 78`; in the Tier-1 Acquisition
+  cell remove "(Legendary 15% in Grove only)" → just "Wayside Shrine, Sacred Grove" (the 15% Grove roll
+  is removed — see DP-67); **TOTAL** `113 → 110`.
+- **§15.2.2 Tier-1-by-category table** (`:3582`–`:3586`): DELETE the "Tier 1 Legendary | 1 | Gankyil"
+  row (`:3583`); "Demoted Rares | 6 | …Waidan…" → "Demoted Rares | 5 | Wuji, Dao, Chi, Tengu, Feng Shui"
+  (`:3582`); recompute "**Sum (categorized)**" (`:3584`, was 82 → 80 after dropping Gankyil(1)+Waidan(1)).
+  ⚠ The categorized sum (80) STILL won't match the true Tier-1 count (78) — a residual +2 categorization
+  over-count predating the cuts. The `:3586` footnote blames `util_irrigation` (a "deprecated duplicate"
+  to be removed) for part of it — but `util_irrigation` STILL EXISTS in code (`src/data/spirits.js:989`)
+  as of 2026-06-14, so that cleanup never happened. **FLAG, do not assume:** the V6 pass must recount the
+  category rows against current code and reconcile the residual +2 (and decide util_irrigation's fate)
+  as its own item — do NOT just paper over it with a number.
+- **§ status/version table** (`:3821`, "Total spirits | 113 | 7") → 110.
+- **§ implementation status** (`:3882`, "Tier 1 spirits (81 total)") → 78.
+- **§ spirit-count expansion** (`:4086` Gankyil acquisition note → remove entirely; `:4244` "113 total …
+  81 Tier 1 (incl. Gankyil legendary)" → "110 total … 78 Tier 1", drop "(incl. Gankyil legendary)").
+
+**NOTE (no-rewrite-history):** DECISIONS_LOG / OVERHAUL_PLAN / tier5_reconciliation Gankyil mentions are
+historical point-in-time records — left as-is. This patch governs V5→V6 only. (Likewise V5's `:930`–`:931`
+"2.0 + 80 = 82.0" is a SCORING example, NOT a spirit count — do not touch.)
+**Cross-refs:** DP-67 (the 15% Grove legendary-roll removal — paired with the §15.2.1 acquisition-cell
+edit here); DP-68 (Waidan §7.12/§8.7 — the demoted-rares count change here is consistent with it).
 
 ### DP-67: §12.2 (Offering Generation, spirit quadrant) — REMOVE 15% legendary roll
 **Source:** F4-LEG3-ROSTER-CUTS Option 2 (Robert's ruling, 2026-06-13).
