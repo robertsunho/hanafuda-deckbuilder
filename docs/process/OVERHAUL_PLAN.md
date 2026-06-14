@@ -3772,6 +3772,14 @@ After these architectural cleanup tasks land, the catalogue can document the fin
 
 ### F4.25: Declarative spirit formula refactor — THREE-PLACE DUPLICATION (added 2026-05-22 from F2.5 design session; expanded 2026-05-22 from Phase B.1 implementation)
 
+> **✅ RESOLVED 2026-06-14 (verified-done) — see DECISIONS_LOG `F4.25/F4.28`.** GOAL MET, sketch NOT
+> built: the single-source the duplication targeted already exists — both `applyEngine` AND
+> `NEGATIVE_SNAPSHOT` read each scaling constant via `_tb(spirit, field, fallback)` (= tooltipBase), swept
+> there by F4.36. So tuning tooltipBase changes one place and both paths follow; the drift risk is gone.
+> The declarative `formula:{}` object below is NOT built (would re-architect a solved problem).
+> ACCUMULATOR_INIT retains only the state-KEY (shape, not value — benign). Canonical-pattern doc:
+> `SPIRIT_SET_ITERATION_RULE.md`. _(Historical body preserved below.)_
+
 **The duplication problem:**
 
 After F2.5 Phase B.1 ships, accumulator-spirit formula data is duplicated across **three** locations. Each place was added at a different point in the codebase's history with a different purpose, but they now redundantly encode the same information.
@@ -3975,6 +3983,15 @@ Forcing this work into F2.5 would:
 **Effort estimate:** 3-5 hours (less than originally projected for F2.5 B.6 because F4.24 will have established helpers and patterns).
 
 ### F4.28: Spirit stacking math audit + canonical pattern (added 2026-05-26 from Phase 2 testing observations)
+
+> **✅ RESOLVED 2026-06-14 (verified-done, accumulators) — see DECISIONS_LOG `F4.25/F4.28`.** The
+> accumulator stacking math is VALIDATED: D0.23's `_scaleEngineOutput` canonical helper + F4.37's
+> `test/tooltip_value_equality.test.js` (regular/negative/zero-identity equality, 25/28 accumulators —
+> gap noted) constitute the audit, mechanized + green. Canonical-pattern doc written
+> (`SPIRIT_SET_ITERATION_RULE.md`). **Spin-off:** the cross-spirit stacking INCONSISTENCY this audit
+> surfaced (conditionals `Math.pow(base,stacks)` exponential vs. additive everywhere else — Horizon/Dream/
+> Hierarchy below) is a real [FIX] → fix to `base × stacks` + tooltipBase/_tb uniformity for the 7
+> non-accumulator scoring spirits in a dedicated campaign: **F5.12.** _(Historical body preserved below.)_
 
 **Background:** During Phase 2 closeout testing, multiple spirits were observed stacking MULTIPLICATIVELY where players may expect ADDITIVE behavior. Examples surfaced in E2a-5/6/7 testing:
 - **Horizon:** 2-stack gives ×4, 3-stack gives ×8 (each stack member compounds the ×2 baseline)
@@ -4933,6 +4950,40 @@ playtest (the powerLevel-as-cost magnitude and the Jade/Mercury sub-rulings want
 
 **Cross-references:** DECISIONS_LOG "Negative-fusion handling" (2026-06-14); F4.27 decision 7 (Cuckoo
 negative-hatch); F5.8 (sibling Phase-5 design-resolution task); SPIRIT_SET_ITERATION_RULE.md.
+
+### F5.12: Multiplicative-spirit stacking consistency + tooltipBase/_tb uniformity for non-accumulator scoring spirits (added 2026-06-14 from F4.25/F4.28 verification)
+
+**Background:** The F4.25/F4.28 verification (DECISIONS_LOG `F4.25/F4.28`, 2026-06-14) confirmed the 28
+accumulators are single-sourced + stacking-validated, but surfaced 7 NON-accumulator scoring spirits with
+two coupled inconsistencies. Robert ruled these out of the verify-done campaign → this dedicated [FIX].
+
+**The 7 spirits:**
+- **3 conditionals** — `cond_horizon` / `cond_dream` / `cond_hierarchy` (`SpiritEffects.js` ~1098-1127):
+  stack EXPONENTIALLY via inline `Math.pow(base, effectivePower)`.
+- **4 live-state rares** — `engine_dao` / `engine_chi` / `engine_tengu` / `engine_feng_shui`
+  (`SpiritEffects.js` ~1375-1408): stack LINEARLY (`base × stacks` / `1 + x·stacks`) with BARE literal
+  constants (no `tooltipBase` / not `_tb`-sourced).
+
+**Part 1 — stacking consistency [FIX] (behavior change).** The conditional `Math.pow(base, stacks)`
+exponential stacking is a real inconsistency: every other multiplicative spirit stacks ADDITIVELY (e.g.
+cross_yang). Fix to `base × stacks` (additive), NOT `_scaleEngineOutput` (its `multiplyMult^n` is the
+exponential direction — wrong here). This is a [PRESERVE]-breaking numeric change → needs before/after
+numeric-equality proof per spirit + tooltip reconciliation (tooltips must show the additive math).
+Balance-adjacent (the magnitudes may want F5.1 retune once additive).
+
+**Part 2 — single-source uniformity.** Give all 7 spirits `tooltipBase` fields + route their constants
+through `_tb`, matching the accumulator pattern (`SPIRIT_SET_ITERATION_RULE.md` §"Accumulator-spirit
+scoring pattern"). Live-state engines have no snapshot (they read live state), so this is single-place
+already — the uniformity is for F5.1 tunability + tooltip-derivation parity, not drift-prevention.
+
+**Why deferred from F4.25/F4.28:** that campaign was scoped verify-done for the 28 accumulators (no formula
+change); this is a deliberate behavior [FIX] + balance-adjacent. **Sequencing (Robert's call):** candidate
+to run BEFORE the V6 seam (V6 documents stacking semantics — better to document the fixed additive
+behavior), OR as a Phase-5 balance item. Flag at the next planning checkpoint.
+
+**Cross-references:** DECISIONS_LOG `F4.25/F4.28` (the verification that surfaced this); F4.28 (the parent
+stacking audit); `SPIRIT_SET_ITERATION_RULE.md` §"Accumulator-spirit scoring pattern" (the target pattern);
+F5.1 (balance retune); cross_yang / additive-multiplicative spirits (the consistency reference).
 
 **Phase 5 total: 60-100+ hours, mostly external (art, audio) or playtesting.**
 

@@ -60,6 +60,15 @@ accessors before the structure stops moving = wasted churn).
 
 ## Candidate B — Accumulator-cluster abstraction
 
+> **SWEEP STATUS (2026-06-14): ❌ DROPPED — see DECISIONS_LOG `F4.25/F4.28`.** B's purpose was to solve
+> the accumulator scaling-VALUE drift problem (the three-place duplication F4.25 targeted). The
+> F4.25/F4.28 verification confirmed that drift problem is ALREADY SOLVED — `_tb(spirit, field, fallback)`
+> (= tooltipBase) is the single source both `applyEngine` and `NEGATIVE_SNAPSHOT` read. Building the
+> cluster abstraction now is complexity with no remaining problem. **Banked: revisit ONLY if a future
+> accumulator spirit proves the `_tb` approach insufficient** (not expected). The canonical pattern is
+> documented in `SPIRIT_SET_ITERATION_RULE.md` §"Accumulator-spirit scoring pattern". _(Original
+> 2026-06-10 SWEEP STATUS + body preserved below.)_
+
 > **SWEEP STATUS (2026-06-10): OPEN — deliberately late.** No closing record; explicitly gated "do it
 > when the transcendence system is otherwise stable." Candidate F (the accumulator negative-iteration
 > audit, now RESOLVED) read much of the machinery B would abstract over, so B can now be built against a

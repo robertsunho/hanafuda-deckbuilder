@@ -5089,3 +5089,70 @@ F4.33 "PARTIAL" (Part 1 now ratify-current — supersedes the 2026-06-11 Scope-d
 this sub-item; the broader cap *tuning* still lives in Phase 5); F5.1 (balance tuning home for an explicit
 cap); engine_banner / Stamp Festival loop (the synergy a cap would tune — DESIGN_DOC_V5 §"Stamp Festival
 Loop"); B-13/B-14 (PHASE_2_TESTING origin).
+
+---
+
+## F4.25 / F4.28 — verified-done via _tb single-source; Candidate B dropped (2026-06-14)
+
+**Status:** RESOLVED (verified-done). Phase-4 Leg-3 refactors — closed by VERIFICATION, not new code
+(the substantive work landed incrementally via F4.36/F4.21/F2.5/D0.23/F4.37). NO formula/scaling change.
+
+**The verification (5 checks, read-only, all-pass for the 28 accumulators):**
+- Check 1 (`_tb` single-source): the `NEGATIVE_SNAPSHOT` registry has exactly 28 entries = the 28
+  `ACCUMULATOR_SPIRIT_IDS`; for every one with a scaling arg (22), `applyEngine` reads the SAME
+  `tooltipBase` field via `_tb` with the SAME fallback as the snapshot. Scaling-free-but-consistent:
+  velocity (perIronMult/jackpotMult identical in both `applyEngine` branches), wildlife/plenty/radiance/
+  banner (arrays; scaling in one place), past_life/cuckoo_egg (Cat-5, no constant), `util_northern_lion`
+  (NO `applyEngine` — utility; snapshot bare-`1` vestigial). PASS.
+- Check 2 (fallback-drift crevice): every `applyEngine`↔snapshot fallback pair is IDENTICAL, so even where
+  `tooltipBase` relies on the fallback both call-sites resolve to the same value — the "tune tooltipBase,
+  snapshot's differing fallback diverges" crevice is closed by construction. PASS (no drift).
+- Check 5 (`ACCUMULATOR_INIT` third-place): every entry is a pure state-shape factory (`{key:0}`/`{key:[]}`/
+  `{}`); ZERO scaling values. The key-name duplication is benign (shape, not formula). PASS.
+- Check 3 (canonical stacking): `_scaleEngineOutput` is canonical for the RETRIGGER path only (Mirror/
+  Memory wrappers); accumulators scale via accumulation + baked `× powerLevel`. Surfaced a multi-pattern
+  reality (see below). Check 4 (coverage): 25/28 accumulators pinned by `tooltip_value_equality.test.js`;
+  3 uncovered with cause (northern_lion has no scoring output; the 2 Cat-5 are covered by F4.27).
+
+**F4.25 (declarative spirit-formula dedup) — GOAL MET, sketch NOT built.** The chartered deliverable was a
+single source of truth for each accumulator's scaling constant (the three-place duplication: ACCUMULATOR_INIT
+/ applyEngine / NEGATIVE_SNAPSHOT). Verification confirmed the VALUE single-source already exists: both
+applyEngine AND NEGATIVE_SNAPSHOT read each scaling constant via `_tb(spirit, field, fallback)` (= tooltipBase)
+— the F4.36 `_tb` accessor work swept the snapshot registry onto the same source. So the drift risk F4.25
+targeted (tune tooltipBase, forget the snapshot) cannot occur — both follow one source. The originally-sketched
+`formula: {type,key,scaling,base,mode}` declarative-object architecture is NOT built: it would re-architect a
+solved problem (the roadmap flagged its complexity-creep risk). ACCUMULATOR_INIT retains only the state-KEY
+name (shape, not value) — benign.
+
+**F4.28 (spirit stacking math audit) — VALIDATED by the existing harness + canonical helper.** D0.23 shipped
+`_scaleEngineOutput` (the canonical retrigger stack-scaling pattern: addMult×n, multiplyMult^n). F4.37 shipped
+`test/tooltip_value_equality.test.js` which pins regular/negative/zero-identity value-equality across the
+accumulators — this IS the comprehensive audit, mechanized + green. The canonical-pattern DOC is written this
+session (`SPIRIT_SET_ITERATION_RULE.md` §"Accumulator-spirit scoring pattern"). Coverage: 25/28 (gap noted
+honestly — northern_lion N/A; 2 Cat-5 via F4.27).
+
+**Check-3 multi-pattern finding → deferred [FIX] (Robert's ruling, NOT in this campaign's scope).** The
+verification found inline stack-scaling OUTSIDE the accumulator pattern, in 7 non-accumulator scoring spirits:
+3 conditionals (`cond_horizon`/`cond_dream`/`cond_hierarchy`, `Math.pow(base, stacks)` EXPONENTIAL) + 4
+live-state rares (`engine_dao`/`chi`/`tengu`/`feng_shui`, LINEAR `base×stacks`, bare literals / no tooltipBase).
+Robert ruled the conditional exponential stacking is a **real inconsistency** (every other multiplicative
+spirit stacks additively, e.g. Yang) → fix to `base × stacks` in a **dedicated [FIX] campaign** (NOT via
+`_scaleEngineOutput`, whose `^n` is the wrong direction); that same campaign gives all 7 `tooltipBase` + `_tb`
+for single-source uniformity. **Logged OVERHAUL_PLAN F5.12.** These 7 are explicitly NOT part of the
+verified-done 28 accumulators — out of F4.25/F4.28 scope.
+
+**Candidate B (accumulator-cluster abstraction) — DROPPED.** Its purpose was to solve the scaling-value drift
+problem; `_tb` solved it more lightly. Building the abstraction now is complexity with no remaining problem.
+Banked as "revisit ONLY if a future accumulator spirit proves the `_tb` approach insufficient" (not expected).
+
+**Why verified-done, not rebuilt:** [PRESERVE numeric] territory (scoring constants — the 188×17.5 anchor is
+downstream) — the safest close is the one that writes no formula code, and the work was genuinely already
+accomplished. Path A (verify + document) chosen over Path B (build the declarative architecture anyway) —
+Robert's ruling 2026-06-14.
+
+**Cross-refs:** F4.36 (the `_tb` accessor — the actual mechanism that met F4.25's goal); F4.21 (touched the
+NEGATIVE_SNAPSHOT keys); F2.5 (NEGATIVE_SNAPSHOT origin + the snapshot-helper generalization); D0.23
+(`_scaleEngineOutput`); F4.37 (`tooltip_value_equality.test.js` — the audit harness); F5.1 (balance tuning —
+beneficiary of the single-source, now confirmed available); F5.12 (the deferred cross-spirit stacking-
+consistency + tooltipBase-uniformity [FIX]); `SPIRIT_SET_ITERATION_RULE.md` §"Accumulator-spirit scoring
+pattern" (the canonical-pattern doc); PHASE4_consolidation_candidates.md "Candidate B" (now DROPPED).

@@ -145,22 +145,26 @@ one line each (detail in the plan doc + the `tier5_reconciliation.md` §"Scope d
      DP-69), negative-fusion (decided, build → F5.11; `Negative-fusion handling`, DP-73). *(F4.33-Part1 was a
      straggler — no closure record existed despite being a listed step-3a gate; the 2026-06-14 closeout sweep
      caught it and Robert ruled ratify-current to close the Leg-2 gate cleanly.)*
-   - **Leg 3 (step-3b refactors) — IN PROGRESS.** F4.21 ✅ (spirit-ID normalization — the 7-ID
-     engine_/util_ rename, `F4.21`, done). Rulings-driven Leg-3 code ✅ shipped + verified this session
+   - **Leg 3 (step-3b refactors) ✅ COMPLETE 2026-06-14.** F4.21 ✅ (spirit-ID normalization — the 7-ID
+     engine_/util_ rename, `F4.21`). Rulings-driven Leg-3 code ✅ shipped + verified this session
      (Waidan/Gankyil cuts efdd556/17fc5fe, Cinnabar single-op 3727810, Candidate H 02cce5c, Silk hand-play
-     6dc06d2). **F4.25 + F4.28 — ruled DO-NOW 2026-06-14 (Robert):** behavior-preserving refactors that
-     stabilize the formula code V6/ARCHITECTURE.md is written against — **must precede the rubric-writing
-     seam.** F4.25 = declarative spirit-formula dedup (the three-place duplication: `ACCUMULATOR_INIT`
-     `RunManager.js:51-80` / `NEGATIVE_SNAPSHOT` `SpiritEffects.js:295-337` / `applyEngine`, OPEN — never
-     touched by any Tier-2/3 consolidation). F4.28 = spirit-stacking math audit (PARTIAL — D0.23 took the
-     egregious cases + `_scaleEngineOutput` canonical helper; the comprehensive every-stackable audit + doc
-     pass remains; **overlaps Candidate B** — accumulator-cluster abstraction, same `ACCUMULATOR_INIT`/
-     `NEGATIVE_SNAPSHOT` surface as F4.25, so they sequence together). **F4.29 banked** (optional bypass
-     sweep — substantially absorbed by D-F4.20 hook infra; not a known-broken gap).
-   - **Other-open: F4.19 (Monkey/Horse) — ruled DO-NOW 2026-06-14 (Robert).** The three F2.3-era issues
-     (yaku detection on Monkey-completed yaku, round-end UI transition, Push/Bank surfacing) persist; the
-     inline `playDeckPhase` logic was never extracted into a reusable yaku-decision-surfacing method
-     (`tier5_reconciliation.md` F4.19; ~1-2h; coupled to deferred F4.18 capture-event — issue #3 lives there).
+     6dc06d2). **F4.25 + F4.28 ✅ verified-done** (`F4.25/F4.28`) — NOT rebuilt: the verification (5 checks)
+     confirmed the 28 accumulators are ALREADY single-sourced via `_tb` (= tooltipBase, swept there by
+     F4.36 — both `applyEngine` and `NEGATIVE_SNAPSHOT` read one source, no drift; `ACCUMULATOR_INIT` is
+     pure shape) and stacking-validated (`_scaleEngineOutput` + `tooltip_value_equality.test.js`, 25/28,
+     gap noted honestly). F4.25's declarative `formula:{}` sketch NOT built (solved problem); F4.28's
+     canonical-pattern DOC written (`SPIRIT_SET_ITERATION_RULE.md` §"Accumulator-spirit scoring pattern").
+     NO formula/scaling code change. **Candidate B ❌ DROPPED** (its drift problem is solved by `_tb`).
+     **Spin-off → F5.12:** the verification surfaced a real cross-spirit stacking inconsistency (3
+     conditionals stack `Math.pow(base,stacks)` exponentially vs. additive everywhere else; + the 4
+     live-state rares dao/chi/tengu/feng_shui lack tooltipBase) — Robert ruled this a dedicated [FIX]
+     campaign (fix to `base × stacks` + tooltipBase/_tb uniformity for the 7), out of the verify-done
+     scope. **F4.29 banked** (optional bypass sweep; not a known-broken gap).
+   - **Other-open: F4.19 (Monkey/Horse) — ruled DO-NOW 2026-06-14 (Robert), STILL OPEN.** The three
+     F2.3-era issues (yaku detection on Monkey-completed yaku, round-end UI transition, Push/Bank surfacing)
+     persist; the inline `playDeckPhase` logic was never extracted into a reusable yaku-decision-surfacing
+     method (`tier5_reconciliation.md` F4.19; ~1-2h; coupled to deferred F4.18 capture-event — issue #3
+     lives there). **The one remaining do-now Leg-3 item.**
 4. **Any remaining Phase-4 work** (stragglers steps 1-3 surface or defer).
 5. **Phase-4 close-out + Phase-5 restructuring/planning** (split the banked pile into the
    design-resolution / feature-building / demo-prep sub-streams per `POST_AUDIT_DIRECTION.md`).
@@ -182,13 +186,15 @@ correction.")
 (7 ABSORBED / 9 STILL-OPEN / 6 PARTIAL + lost-and-found); Robert's grouping scope-call lives in that
 doc's §"Scope decision" and is sequenced by the 6-step plan above.
 
-**Immediate next action (2026-06-14):** **Leg 2 COMPLETE; Leg 3 in progress.** Per Robert's closeout-sweep
-ruling — **(1) the remaining Leg-3 refactors F4.25 (declarative formula dedup) + F4.28 (stacking audit;
-sequenced with Candidate B) + F4.19 (Monkey/Horse) DO-NOW, THEN (2) the rubric-writing seam:**
-`D-F4-DOCSYNC` sweep (first step) → V6 (fold in DP-66..74) → `ARCHITECTURE.md`/F4.24b → Gate 0 / Audit 2.
-F4.25/F4.28 are behavior-preserving and run BEFORE the seam so V6/ARCHITECTURE.md document the consolidated
-end-state, not un-refactored code (the rationale for the do-now ruling). The DP worklist is substantial
-(**DP-66..74**, ready to feed V6); the `D-F4-DOCSYNC` sweep is the first rubric-seam step.
+**Immediate next action (2026-06-14):** **Leg 2 COMPLETE; Leg 3 COMPLETE except F4.19.** F4.25 + F4.28
+✅ verified-done (no code — single-source already met via `_tb`; Candidate B dropped; canonical-pattern
+doc written; spin-off [FIX] → F5.12). **The one remaining do-now item is F4.19 (Monkey/Horse).** Then the
+**rubric-writing seam:** `D-F4-DOCSYNC` sweep (first step) → V6 (fold in DP-66..74) →
+`ARCHITECTURE.md`/F4.24b → Gate 0 / Audit 2. The V6 author should cite `SPIRIT_SET_ITERATION_RULE.md`
+§"Accumulator-spirit scoring pattern" for the accumulator architecture. The DP worklist is substantial
+(**DP-66..74**, ready to feed V6); the `D-F4-DOCSYNC` sweep is the first rubric-seam step. **New Phase-5
+spin-off to sequence: F5.12** (cross-spirit stacking consistency [FIX]; candidate to run before V6 since it
+changes stacking semantics V6 documents — Robert's call).
 
 **Carry-forward flags (recorded 2026-06-14 closeout sweep — don't lose at the seam):**
 - **In-game render-layer checklist (PENDING).** F4.37 tooltips + F4.35 picker shells + this session's
@@ -315,9 +321,15 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
   `alch_pearl`→`addLegendarySpirit`, inline capstone scoring branches). **Recon Phase-4-runnable (informs
   F4.24b); campaign Phase 5, sequenced with Candidate C** (same getter surface — C renames, I may split).
   Detail in `PHASE4_consolidation_candidates.md`.
-- **Other consolidation candidates A/B/C/E** (OPEN) **/ F** (✅ RESOLVED — audit archived + [FIX] shipped
+- **Other consolidation candidates A/C/E** (OPEN) **/ B** (❌ DROPPED 2026-06-14 — its drift problem is
+  solved by `_tb`; see DECISIONS_LOG `F4.25/F4.28`) **/ F** (✅ RESOLVED — audit archived + [FIX] shipped
   under F4.20-FIX2) **/ G** (◐ architectural half shipped, UX half → Phase 5) — full status sweep in
   `PHASE4_consolidation_candidates.md` (each candidate now carries a SWEEP STATUS line).
+- **F5.12 — cross-spirit stacking consistency [FIX]** (NEW 2026-06-14, surfaced by F4.25/F4.28 verification).
+  3 conditionals (`cond_horizon`/`dream`/`hierarchy`) stack `Math.pow(base,stacks)` EXPONENTIALLY vs.
+  additive everywhere else → fix to `base × stacks`; + the 4 live-state rares (`engine_dao`/`chi`/`tengu`/
+  `feng_shui`) get tooltipBase/_tb uniformity. Behavior change ([PRESERVE]-breaking). Sequencing TBD
+  (Robert): candidate before-V6 (changes stacking semantics V6 documents) or Phase-5 balance. OVERHAUL_PLAN F5.12.
 
 ---
 
