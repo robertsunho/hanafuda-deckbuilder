@@ -564,6 +564,19 @@ in hand multiply mult") states the Earth mult channel unqualified — align it w
 boost_earth caveat for internal consistency. Also the §8.2 enhancement-summary line (V5:522, "held-in-
 hand mult contribution" for Earth) is terse/unqualified — optional polish.
 
+### DP-73: Negative spirits + fusion — document current (not fusable) + F5.11 forward-pointer
+**Source:** Negative-fusion gate close-out (2026-06-14).
+**Issue:** V6 should state how negatives interact with fusion. Current code: negatives are NOT fusable
+(fusion paths read run.spirits, the regulars-only getter — incidental exclusion). A negative-aware
+fusion redesign is decided but deferred (F5.11).
+**Patch (V6):** in the fusion / Wu Xing-alchemical section, state that in the current build NEGATIVE
+spirits cannot be used as Cinnabar/Pearl fusion inputs (only regular spirits fuse). Add a forward-note:
+"A negative-aware fusion redesign is planned (F5.11): negatives will be fusable — negative+regular →
+regular fusion, negative+negative → negative fusion at the lower powerLevel, with the negative's
+powerLevel decrementing per use. SPECULATIVE / Phase-5; magnitudes and the Mercury/Jade interactions
+are not yet finalized." Keep the (confirmed) Cuckoo negative-hatch description accurate: a transcended
+(negative) Cuckoo hatches a negative Tier-2 fusion; a regular Cuckoo hatches a regular one.
+
 ---
 
 ## Editorial rewrite scope (separate sub-effort, 6-10 hours)

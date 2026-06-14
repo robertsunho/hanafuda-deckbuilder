@@ -4980,3 +4980,77 @@ only, not a mult-channel correction. (Minor adjacent: the §5 held-in-hand list 
 spec); F4.34 (absorbed F4.31's structural half — getWaterMult SSOT, per-capture dep / round-end
 interest); scoring_loop_inventory_pass1.md §6 (the prepared seam); F5.1 (threshold tuning — F5.8 pairs
 with it, both playtest-gated); engine_fossil (proc-cadence rebalance under per-capture).
+
+---
+
+## Negative-fusion handling — design decided, build deferred to F5.11 (2026-06-14)
+
+**Status:** RESOLVED as defer-and-document. Phase-4 Leg-2 design-rulings gate. NO code change —
+current behavior (negatives not fusable) stands for Phase 4; the redesign is logged to F5.11.
+
+**Context:** "negative fusion handling" was the last open Leg-2 deep gate — working code from F4.27
+(the Cuckoo negative-hatch, decision 7) existed, but no explicit ruling governed whether a NEGATIVE
+spirit can be a Cinnabar/Pearl fusion INPUT. Current behavior: negatives are excluded by accident —
+the fusion paths read `run.spirits` (the !isNegative regulars-only getter; verified
+ConsumableEffects.js:270 Cinnabar / :436 Pearl), so negatives never reach the picker. No explicit
+guard; exclusion is incidental, not designed.
+
+**DECIDED design (Robert) — Cinnabar & Pearl negative fusion:**
+- **Cinnabar (T1→T2, T2→T3):**
+  - negative + regular → REGULAR fusion. The regular input decrements its stackCount (existing
+    behavior); the negative input decrements its powerLevel by 1.
+  - negative + negative → NEGATIVE fusion, at min(powerLevelA, powerLevelB). Both inputs decrement
+    powerLevel by 1.
+- **Pearl (T3→T4 capstone):** mirrors Cinnabar — regular + anything → REGULAR capstone; negative +
+  negative → NEGATIVE capstone. Capstones are non-stacking with NO powerLevel, so the min-powerLevel
+  clause does not apply to the output; inputs still decrement.
+- **powerLevel decrement floor:** a negative input decrements powerLevel by 1 per fusion use; at
+  powerLevel 0 the negative is REMOVED. So a negative survives exactly `powerLevel` fusions, then is
+  spent. (powerLevel-1 negative fused → removed = the singleton-consume special case.)
+- **State on decrement — non-issue today:** fusion-input spirits (foundations, fusions) are stateless
+  (`_freshNegativeState` → null; verified — they have no NEGATIVE_SNAPSHOT entry), so powerLevel--
+  needs NO state reconcile. **GUARD-NOTE:** if accumulator-bearing fusion inputs are ever introduced,
+  powerLevel-decrement must grow a per-category state-resize path (the 4-category reconcile problem
+  this design currently sidesteps).
+- **Rationale:** avoids the "transcendence locks a spirit out of fusion" feel-bad trap (a transcended
+  spirit stays usable); adds a second path to negative fusions (thematically consistent with the
+  Cuckoo negative-hatch, decision 7 — negatives beget negatives); powerLevel-as-cost (a power-4
+  negative fuses for the same yield as a power-1, its power "wasted") balances the new path.
+
+**Cuckoo negative-hatch (decision 7) — CONFIRMED, unchanged.** Clarified this session: `_fireCuckooHatch`
+is source-aware — a REGULAR Cuckoo hatches a REGULAR Tier-2 fusion (the common case); only a NEGATIVE
+Cuckoo (transcended, matured) hatches a NEGATIVE fusion at the copier's powerLevel. Not a chance roll —
+deterministic mirroring of the source's negative status. Robert confirmed the mirroring stands.
+
+**Architecture decided:** Approach 2 — the shared alchemical picker sources from `allSpirits` (not
+`run.spirits`), with per-inputType eligibility gating which spirits qualify. (Approach 1 — fusion-only
+source swap — rejected: it makes the picker juggle two source arrays keyed on inputType, breaking the
+clean index contract.)
+
+**DEFERRED to F5.11 (build + these OPEN sub-rulings):**
+- The picker-source overhaul (allSpirits + re-thread the picker→params→execute index contract across
+  both scenes + ConsumableEffects; update spirit_target_picker.test.js).
+- **Mercury + negatives (OPEN):** de-fusing a NEGATIVE fusion → two negative components at what
+  powerLevel? (mirror min-power? the fusion's own powerLevel? — needs a ruling, a parallel to the
+  Cinnabar/Pearl design.)
+- **Jade + negatives (OPEN):** can Jade raise a negative's powerLevel (upward mutation, the inverse of
+  fusion-decrement)? If yes, for ACCUMULATOR negatives this reintroduces the state-resize question
+  (Jade is not fusion-scoped — it targets all spirits). Needs a ruling + possibly its own state design.
+- **Amber / Sulfur (OPEN):** confirmed no fusion interaction. RECON NOTE: Amber IS picker-based
+  (`spirit_single_transcendable`, reads run.spirits[i]) — its sub-ruling is "are negatives selectable
+  for transcendence-of-a-negative at all?". Sulfur is PICKERLESS (`spirit_none`) and ALREADY sources
+  `run.allSpirits` (ConsumableEffects.js:353) for its random duplication — so it already includes
+  negatives and is NOT a picker concern; its only open question is whether that should remain.
+
+**Why deferred:** it's a picker overhaul + two new powerLevel-mutation mechanics (fusion-decrement,
+Jade-increment) + three per-alchemical negative-eligibility rulings — new design work, un-playtested,
+mid-Phase-4. Phase 4's thesis is consolidate/stabilize. Captured here so the decided design is durable.
+
+**V6 stance:** document CURRENT behavior — negatives are NOT fusable (the regulars-only `run.spirits`
+exclusion) — as the Phase-4 canonical state, with a forward-pointer to F5.11. V6 = audit rubric; it
+documents what the code IS. → DESIGN_DOC_PATCHES DP-73.
+
+**Cross-refs:** F4.27 / decision 7 (the Cuckoo negative-hatch, the existing negatives-beget-negatives
+path this design unifies with); spiritTargetPicker.js + spirit_target_picker.test.js (the picker the
+overhaul touches); SPIRIT_SET_ITERATION_RULE.md (the allSpirits/spirits/scoringSpirits three-way
+distinction the Approach-2 source change relies on); OVERHAUL_PLAN F5.11 (the deferred build task).

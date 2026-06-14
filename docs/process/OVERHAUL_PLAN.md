@@ -4892,6 +4892,48 @@ Robert wants to redesign this to fire **per capture** during scoring, mirroring 
 - F5.9 (Print attaches consumable to spirit — interacts with consumable acquisition)
 - Waidan spirit removal (current: legend_waidan in spirits.js with 8 ki cost, rare)
 
+### F5.11: Negative-aware alchemical picker + negative fusion/de-fusion/Jade (added 2026-06-14)
+
+**Background:** The negative-fusion design was decided in Phase-4 Leg-2 (DECISIONS_LOG 2026-06-14) but
+the BUILD was deferred — it's a picker overhaul plus new powerLevel-mutation mechanics, with several
+per-alchemical sub-rulings still open. This task carries the decided design + the open questions.
+
+**Decided (build to this):**
+- Cinnabar: neg+reg → regular fusion (regular decrements stackCount, negative decrements powerLevel);
+  neg+neg → negative fusion at min-powerLevel (both decrement). Pearl mirrors for capstones (reg+any →
+  regular capstone; neg+neg → negative capstone; no output powerLevel; inputs decrement).
+- powerLevel decrements by 1 per fusion use; at 0 the negative is removed (survives exactly powerLevel
+  fusions). Fusion inputs are stateless → powerLevel-- needs no state reconcile (GUARD: revisit if
+  accumulator-bearing fusion inputs are ever added).
+- Architecture: shared picker sources from `allSpirits`; per-inputType eligibility gates negatives.
+
+**Open sub-rulings (resolve before/during build):**
+1. **Mercury + negative fusion:** de-fuse a negative fusion → two negative components at what
+   powerLevel? (mirror min-power, or the fusion's powerLevel?)
+2. **Jade + negatives:** can Jade raise a negative's powerLevel? If yes → an upward powerLevel mutation;
+   for accumulator negatives it reintroduces per-category state-resize. Ruling + possible state design.
+3. **Amber / Sulfur:** confirm no fusion interaction; decide whether they're excluded from the
+   negative-inclusive picker entirely. (Recon note: Amber is picker-based; Sulfur is pickerless —
+   `spirit_none` — and already sources `run.allSpirits`, so it already includes negatives.)
+
+**Implementation surface (the deferred build):**
+- `spiritTargetPicker.js`: `computeSpiritEligibility` sources `allSpirits`; per-type eligibility decides
+  negative-ok per inputType (fusion: yes; Jade/Mercury/Amber/Sulfur: per the sub-rulings).
+- Re-thread the index contract: picker `selected` indices → `buildSpiritParams` → `execute`'s
+  `run.spirits[i]` reads must ALL switch to the same `allSpirits` source, in BOTH GameScene
+  (`_showAlchemicalTargetPicker`) and ShrineScene (`_showShrineSpiritPicker`), and in
+  `alch_cinnabar`/`alch_pearl`/`alch_mercury`/`alch_jade` execute.
+- `alch_cinnabar` / `alch_pearl`: implement the neg+reg / neg+neg routing + powerLevel-decrement +
+  min-powerLevel output + floor-to-removal.
+- Update `spirit_target_picker.test.js` (assumes `run.spirits` semantics) + add negative-fusion tests.
+
+**Why deferred from Phase 4:** picker overhaul + two new powerLevel-mutation mechanics + un-playtested
+per-alchemical rulings = new design work, against Phase-4's consolidate/stabilize thesis. Pairs with
+playtest (the powerLevel-as-cost magnitude and the Jade/Mercury sub-rulings want play data).
+
+**Cross-references:** DECISIONS_LOG "Negative-fusion handling" (2026-06-14); F4.27 decision 7 (Cuckoo
+negative-hatch); F5.8 (sibling Phase-5 design-resolution task); SPIRIT_SET_ITERATION_RULE.md.
+
 **Phase 5 total: 60-100+ hours, mostly external (art, audio) or playtesting.**
 
 ---
