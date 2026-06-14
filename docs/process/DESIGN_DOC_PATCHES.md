@@ -485,6 +485,21 @@ one-operation-per-use rule for any alchemical.
   yields one fusion + one leftover of each input); Mercury de-fuses one fusion stack; Pearl
   consumes one of each T3 input to make one capstone.
 
+### DP-70: Consumable-consumption policy (used ⟺ spent ⟺ Badger)
+**Source:** D-F4-LEG3-CANDIDATE-H (this session).
+**Issue:** the design doc does not state the consume policy: when a consumable is / isn't spent,
+and how that relates to the Badger counter.
+**Patch (V6):** document the policy in §8 (Consumables): a consumable is used / spent /
+Badger-counted whenever it produces any real effect, including PARTIAL effects (draw-2 draws 1,
+multi-target where some resolve) and DELIBERATE-COST effects (Amber −slot, Tiger forced push); it
+is NOT consumed only when it genuinely cannot act (no valid target, hand full, empty pile, no-op).
+"used", "spent", and "Badger counts" are ONE event, never decided separately — including
+alchemicals (which previously consumed without counting for Badger; fixed this session).
+Implementation note for V6/architecture: the decision lives in one shared predicate
+(`scenes/shared/consumePolicy.js` `consumableHadEffect`) consulted by every result-tail; result
+contracts remain per-family adapters (element reports via `action`, others via `success`) — NOT
+normalized (consumable_inventory_pass1.md).
+
 ---
 
 ## Editorial rewrite scope (separate sub-effort, 6-10 hours)

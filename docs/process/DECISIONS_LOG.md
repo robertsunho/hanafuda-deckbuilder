@@ -4842,3 +4842,58 @@ path (1+1 → 1 fusion, both inputs consumed) confirmed unaffected. Commit 37278
 matches); DESIGN_DOC_V5 §8.6/§8.6.1 (Pearl "components preserved" is stale AND the one-op rule
 is undocumented → DESIGN_DOC_PATCHES.md DP-69); F2.3 (the _acquireSpiritStack consolidation that
 Cinnabar routes through).
+
+---
+
+## D-F4-LEG3-CANDIDATE-H — Consumable-consumption consistency (2026-06-14)
+
+**Status:** RESOLVED. Phase-4 Leg-3 [FIX] (Robert's ruling; Candidate H closed).
+
+**Ruling:** used ⟺ spent ⟺ Badger (the locked 2026-06-10 invariant). A consumable is consumed
+whenever it produces ANY real effect — PARTIAL (bucket b) and deliberate-cost (bucket c) both
+consume; the ONLY non-consume is a genuine failure / can't-act-at-all (bucket a: no target, hand
+full, empty pile, no-op). Unified the consume decision across all result-tails so the policy
+changes as a group in future.
+
+**The fix:** a single shared "real-effect" predicate (`scenes/shared/consumePolicy.js`
+`consumableHadEffect`) consulted by every consume tail before `consumeById` — element:
+`action !== 'no_effect'`; all other families: `success !== false`. Extracted to a headless-safe
+shared module (not buried scene-local) so the policy is one place AND unit-testable.
+Fixed: (1) the GameScene element tail (`_onCardTargetSelected`) consumed UNCONDITIONALLY (even on
+`no_effect`) — a no-op element wasted the item AND violated the invariant (Badger correctly did
+NOT count it, so consume and count had diverged). (2) the zodiac tail (`_executeAndFinalize`)
+consumed unconditionally — check-5 finding: REACHABLE failure (Dog at full hand / empty-discard,
+empty-slot Ox/Monkey post-target return `success:false` through this path and were wrongly
+consumed). Both now gate on the predicate. Preserved: stamp/chakra/alchemical consume-gates
+(already on `success`); partial + deliberate-cost (return success/non-no_effect → consume).
+
+**Scope expansion (Robert's ruling mid-session — was out of the original campaign):** in-round
+AND shrine alchemicals (Cinnabar/Mercury/Jade/Sulfur/Amber/Lead/Pearl) consumed on success but
+fired Badger via NO path — they dispatch through `effect.execute()` directly, bypassing
+`GRM.useConsumable` (the zodiac Badger gate), and no alchemical handler called
+`notifyConsumableUsed`. So `used ⟺ Badger` did NOT hold for alchemicals. Folded in: added
+`run.notifyConsumableUsed()` to each alchemical handler's success return (8 sites across 7
+alchemicals; Sulfur has two success paths), handler-side exactly like element/chakra/stamp — the
+source-of-truth home. Alchemical-Badger now holds. (Third Eye already fires Badger via
+`run.deleteCard`; chakra_crown via its own `notifyConsumableUsed` — both confirmed, not gaps.)
+
+**Respected prior rulings (NOT relitigated):** result contracts stay per-family-adapter, NOT
+normalized (consumable_inventory_pass1.md — the element `action` taxonomy carries messaging info);
+dispatch stays as-is (F4.15a/b). The fix is the consume-decision + the alchemical Badger gap only.
+
+**Dog provisional → permanent:** zodiac_dog at full hand (`success:false`) is a genuine fail →
+not consumed, Badger doesn't count — now correct-by-policy under the unified predicate, not a
+special case.
+
+**Verification:** build green; suite 297/1 (was 290/1; +7 new tests). New
+test/consumables/consumption_policy.test.js pins the predicate verdicts (element no_effect the
+sole element non-consume; success:false the sole other non-consume; partial/deliberate-cost
+consume) + that the engine Badger increment AGREES with the predicate per family — the
+element-no-op case (was test-blind), the alchemical fold-in, and Dog-at-full-hand retain.
+STEP-0 table + 5 checks reported in-session (check 3 surfaced the alchemical-Badger gap →
+folded in; check 5 confirmed reachable zodiac failure). Commit 02cce5c.
+
+**Cross-refs:** D-F4-HANDCAP-TIER3 (the used⟺spent⟺Badger invariant + Dog provisional ruling
+this finalizes); consumable_inventory_pass1.md (the per-family adapter ruling respected here);
+F4.15a/b (dispatch unification this builds tail-consistency on top of); DESIGN_DOC_V5 §8 consume
+policy undocumented → DESIGN_DOC_PATCHES.md DP-70; sym_badger tests.
