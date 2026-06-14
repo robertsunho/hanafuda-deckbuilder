@@ -205,7 +205,11 @@ effect) vs. per-card-post-scoring is intended — is **F4.38(a)**, an explicit b
 design ruling (see `D-F4-CONSUMABLES-TIER2`). So the structural half is absorbed; the timing half is a
 ruling, not cleanup.
 
-### F4.33 — Festival cap + threshold scaling → **PARTIAL**
+### F4.33 — Festival cap + threshold scaling → **RESOLVED 2026-06-14** (DECISIONS_LOG `F4.33-Part1`)
+> Part 1 (Festival cap) ratified-current (Robert): the inventory-slot gate IS the cap; an explicit
+> per-round cap/cooldown is a Phase-5/F5.1 balance task. NO code change. → DP-74. This supersedes the
+> 2026-06-11 Scope-decision Phase-5 banking of the *sub-item* (the cap-existence question is closed;
+> only the cap *tuning* remains in Phase 5). _(Original disposition below.)_
 Done (Part 2): proportional yaku-threshold scaling exists — `getProportionalYakuThreshold(rankCount,
 deckSize)` (`data/yakuThresholds.js`), so thresholds aren't locked to a 48-card deck. **Left (Part 1):**
 `util_festival` (`SpiritEffects.js:524-538`) gates stamp generation only by inventory slots

@@ -5054,3 +5054,38 @@ documents what the code IS. → DESIGN_DOC_PATCHES DP-73.
 path this design unifies with); spiritTargetPicker.js + spirit_target_picker.test.js (the picker the
 overhaul touches); SPIRIT_SET_ITERATION_RULE.md (the allSpirits/spirits/scoringSpirits three-way
 distinction the Approach-2 source change relies on); OVERHAUL_PLAN F5.11 (the deferred build task).
+
+---
+
+## F4.33-Part1 — Festival per-round cap: ratify current (no cap), cap → Phase 5 (2026-06-14)
+
+**Status:** RESOLVED (as ratify-current). Phase-4 Leg-2 design-rulings gate. NO code change.
+
+**Why logged now:** the Leg-2/Leg-3 closeout sweep (2026-06-14) found this gate had NO closure record
+despite being listed as a step-3a V6-gate item (`PHASE4_COMPLETION_PLAN.md` / `PHASE4_STATE.md` §3). The
+docs contradicted: `tier5_reconciliation.md` had already routed it to the Phase-5 design agenda
+(Scope decision, 2026-06-11), but the completion plan still listed it as a Leg-2 gate. This record
+resolves the contradiction so V6 has a definite Festival semantics to document.
+
+**Ruling (Robert):** Festival's CURRENT behavior is canonical for Phase 4 — `util_festival`
+(`SpiritEffects.js:532-543`, `onCardScored`) generates `Math.min(effectivePower(spirit), freeSlots)`
+stamps per ribbon scored, where `freeSlots = run.maxConsumableSlots - run.consumables.length`. The
+**inventory-slot gate IS the cap**: generation stops the moment consumable slots are full (3 by default),
+so there is no unbounded-generation bug — the "no per-round cap" framing (B-13) overstated the risk. An
+explicit per-round cap / cooldown / scale-down is a **balance decision deferred to Phase 5** (F5.1-adjacent),
+not a Phase-4 fix.
+
+**Scope note — Part 2 was never the open half.** F4.33-Part-2 (proportional yaku-threshold deck-size
+scaling) already shipped: `getProportionalYakuThreshold(rankCount, deckSize)` in `data/yakuThresholds.js`
+(tier5 Bucket-C). Only Part 1 (the Festival cap) was the open gate, and it is ratify-current.
+
+**V6 stance:** document CURRENT behavior as canonical — Festival generates one stamp per stack per ribbon
+captured, hard-gated by free consumable-inventory slots (no separate per-round cap) — with a forward-note
+that a per-round cap/cooldown is a SPECULATIVE Phase-5 balance task (F5.1). V6 = audit rubric; it documents
+what the code IS. → DESIGN_DOC_PATCHES DP-74.
+
+**Cross-refs:** OVERHAUL_PLAN F4.33 (Part 1 closed here; Part 2 already shipped); tier5_reconciliation.md
+F4.33 "PARTIAL" (Part 1 now ratify-current — supersedes the 2026-06-11 Scope-decision Phase-5 banking of
+this sub-item; the broader cap *tuning* still lives in Phase 5); F5.1 (balance tuning home for an explicit
+cap); engine_banner / Stamp Festival loop (the synergy a cap would tune — DESIGN_DOC_V5 §"Stamp Festival
+Loop"); B-13/B-14 (PHASE_2_TESTING origin).

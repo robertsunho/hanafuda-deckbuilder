@@ -3,7 +3,7 @@
 > **The single authoritative "where are we in Phase 4" doc.** A fresh conversation reads THIS first.
 > It supersedes, as the *live* anchor, the archived `PHASE_4_ENTRY_BRIEF.md`, `PHASE_4_TASK_ORDERING.md`,
 > and `UPLOAD_MANIFEST.md` (those are retained as the Phase-4 bootstrap record, not current guidance).
-> Update at every category/block boundary (the close-out ritual). Last updated: 2026-06-10.
+> Update at every category/block boundary (the close-out ritual). Last updated: 2026-06-14.
 
 ---
 
@@ -102,7 +102,7 @@ Tier 3 — pipeline consolidation  ◀── IN PROGRESS
 audit + F4.27 shipped; named hand-offs document-and-contained.
 ```
 
-**Immediate next action:** **TIER 3 COMPLETE** 2026-06-11. The LAST Tier-3 item — the **named spirit
+**Tier-3 close (historical, 2026-06-11):** **TIER 3 COMPLETE**. The LAST Tier-3 item — the **named spirit
 hand-offs** — CLOSED **document-and-contain** (record `F4.20-handoffs`): `engine_bullseye` + the
 `util_symbiosis`/`sym_algae` summon block are contained as intentional GRM round machinery (the per-copy
 over-summon trap + the Algae transcend-timing coupling mean migration would *relocate* entanglement, not
@@ -125,8 +125,9 @@ one line each (detail in the plan doc + the `tier5_reconciliation.md` §"Scope d
      dedup: layout + picker-selection-logic SHARED (`SpiritLayout.js` / `spiritTargetPicker.js` + test),
      hex-symbol twin deleted; card-picker shells + strip-tail + fan-out/sell-buttons document-and-contain
      per Robert's ruling — record DECISIONS_LOG `F4.35`). **→ TIER 4 COMPLETE.** Phase-4 close-out tail
-     proceeds: Leg 2 = step-3a design-rulings deliberation (grp5 / F4.26 / F4.33a / F4.38a / F4.32), then
-     Leg 3 = step-3b refactors (F4.25 / F4.21 / F4.28). See `PHASE4_COMPLETION_PLAN.md`.
+     proceeds: Leg 2 = step-3a design-rulings deliberation (grp5 / F4.26 / F4.33a / F4.38a / F4.32) **✅ COMPLETE
+     2026-06-14**, then Leg 3 = step-3b refactors (F4.25 / F4.21 / F4.28) **— F4.21 done; F4.25 + F4.28 ruled
+     DO-NOW (step 3 below).** See `PHASE4_COMPLETION_PLAN.md`.
 3. **Groupings 4/5/6 — their own heavier process**, split into (a) **design-rulings deliberation**
    (grouping 5 + F4.26 / F4.33-Part1 / F4.38(a) / **F4.32**) — **the V6 gate**, run first — and (b)
    **code refactors** (F4.25, F4.21, F4.28) after the rulings. (F4.29 stays optional/banked.)
@@ -135,6 +136,31 @@ one line each (detail in the plan doc + the `tier5_reconciliation.md` §"Scope d
      offering machinery removed (Option 2; legendaries deferred to a Phase-5 group design pass). Waidan
      also cut in the same leg. Record DECISIONS_LOG `F4-LEG3-ROSTER-CUTS`; commits efdd556 (Waidan) /
      17fc5fe (Gankyil); V5 drift banked as DP-66/67/68 in `DESIGN_DOC_PATCHES.md`.
+   - **Leg 2 (step-3a design rulings) ✅ COMPLETE 2026-06-14** — all V6-gating mechanics resolved; doc drift
+     banked DP-66..74. Closure records: Grouping 5 ✅ (`F4-LEG3-ROSTER-CUTS`), F4.26 ✅ (Option B, `F4.26`,
+     2026-06-12), F4.33-Part1 ✅ (Festival cap **ratified-current** — slot-gate is the cap; explicit cap →
+     Phase-5/F5.1; `F4.33-Part1`, DP-74), F4.38a/F4.31 ✅ (Clay/Pottery round-end canonical, redesign → F5.8;
+     `F4.31/F4.38a`, DP-72), F4.32 ✅ (Silk hand-play [FIX]; `F4.32`, DP-71). **Surfaced-and-closed this
+     session:** Candidate H (`D-F4-LEG3-CANDIDATE-H`, DP-70), Cinnabar single-op (`F4-LEG3-CINNABAR-SINGLEOP`,
+     DP-69), negative-fusion (decided, build → F5.11; `Negative-fusion handling`, DP-73). *(F4.33-Part1 was a
+     straggler — no closure record existed despite being a listed step-3a gate; the 2026-06-14 closeout sweep
+     caught it and Robert ruled ratify-current to close the Leg-2 gate cleanly.)*
+   - **Leg 3 (step-3b refactors) — IN PROGRESS.** F4.21 ✅ (spirit-ID normalization — the 7-ID
+     engine_/util_ rename, `F4.21`, done). Rulings-driven Leg-3 code ✅ shipped + verified this session
+     (Waidan/Gankyil cuts efdd556/17fc5fe, Cinnabar single-op 3727810, Candidate H 02cce5c, Silk hand-play
+     6dc06d2). **F4.25 + F4.28 — ruled DO-NOW 2026-06-14 (Robert):** behavior-preserving refactors that
+     stabilize the formula code V6/ARCHITECTURE.md is written against — **must precede the rubric-writing
+     seam.** F4.25 = declarative spirit-formula dedup (the three-place duplication: `ACCUMULATOR_INIT`
+     `RunManager.js:51-80` / `NEGATIVE_SNAPSHOT` `SpiritEffects.js:295-337` / `applyEngine`, OPEN — never
+     touched by any Tier-2/3 consolidation). F4.28 = spirit-stacking math audit (PARTIAL — D0.23 took the
+     egregious cases + `_scaleEngineOutput` canonical helper; the comprehensive every-stackable audit + doc
+     pass remains; **overlaps Candidate B** — accumulator-cluster abstraction, same `ACCUMULATOR_INIT`/
+     `NEGATIVE_SNAPSHOT` surface as F4.25, so they sequence together). **F4.29 banked** (optional bypass
+     sweep — substantially absorbed by D-F4.20 hook infra; not a known-broken gap).
+   - **Other-open: F4.19 (Monkey/Horse) — ruled DO-NOW 2026-06-14 (Robert).** The three F2.3-era issues
+     (yaku detection on Monkey-completed yaku, round-end UI transition, Push/Bank surfacing) persist; the
+     inline `playDeckPhase` logic was never extracted into a reusable yaku-decision-surfacing method
+     (`tier5_reconciliation.md` F4.19; ~1-2h; coupled to deferred F4.18 capture-event — issue #3 lives there).
 4. **Any remaining Phase-4 work** (stragglers steps 1-3 surface or defer).
 5. **Phase-4 close-out + Phase-5 restructuring/planning** (split the banked pile into the
    design-resolution / feature-building / demo-prep sub-streams per `POST_AUDIT_DIRECTION.md`).
@@ -155,6 +181,26 @@ correction.")
 **Tier 5 is RECONCILED** (2026-06-11): the 22 cleanup items are bucketed in `tier5_reconciliation.md`
 (7 ABSORBED / 9 STILL-OPEN / 6 PARTIAL + lost-and-found); Robert's grouping scope-call lives in that
 doc's §"Scope decision" and is sequenced by the 6-step plan above.
+
+**Immediate next action (2026-06-14):** **Leg 2 COMPLETE; Leg 3 in progress.** Per Robert's closeout-sweep
+ruling — **(1) the remaining Leg-3 refactors F4.25 (declarative formula dedup) + F4.28 (stacking audit;
+sequenced with Candidate B) + F4.19 (Monkey/Horse) DO-NOW, THEN (2) the rubric-writing seam:**
+`D-F4-DOCSYNC` sweep (first step) → V6 (fold in DP-66..74) → `ARCHITECTURE.md`/F4.24b → Gate 0 / Audit 2.
+F4.25/F4.28 are behavior-preserving and run BEFORE the seam so V6/ARCHITECTURE.md document the consolidated
+end-state, not un-refactored code (the rationale for the do-now ruling). The DP worklist is substantial
+(**DP-66..74**, ready to feed V6); the `D-F4-DOCSYNC` sweep is the first rubric-seam step.
+
+**Carry-forward flags (recorded 2026-06-14 closeout sweep — don't lose at the seam):**
+- **In-game render-layer checklist (PENDING).** F4.37 tooltips + F4.35 picker shells + this session's
+  behavior changes (Gankyil/Waidan cuts, Silk hand-play auto-capture, Candidate-H consume-policy +
+  alchemical-Badger) need an in-game targeted-verification pass — rides **Gate 0**. (Tests cover the engine
+  logic; in-game still covers rendering/UX.)
+- **util_irrigation residual (DP-66).** The categorized spirit-count is +2 over-counted; the V5 §3586
+  footnote blames `util_irrigation` (a "deprecated duplicate to be removed") but it STILL EXISTS at
+  `spirits.js:989`. → V6-pass reconciliation item / possible small cleanup (decide its fate during the seam).
+- **Badger balance note (Candidate H).** Alchemicals now fire Badger (the fold-in), so alchemical-heavy
+  builds reach higher Badger counts — a Phase-5 tuning input that compounds with the Cinnabar single-op
+  change. (No code; tuning flag.)
 
 ---
 
@@ -195,10 +241,11 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
   `_fireHexOnCaptureComplete`). **F4.38 SUBSUMED** (Wu Xing scoring triad → `_applyCardEnhancements`,
   one home). **N2 PROMOTED → Candidate D** (the hand-cap card-leak is one instance of the broader
   hand-capacity fragmentation; gets its own recon). Held-from-hand seam shaped for F5.8.
-- **F4.38(a) — Wu Xing TIMING design-ruling (still banked).** The structural dedup (b) shipped in
-  D-F4-SCORING-TIER3; the remaining spin-off is the balance-adjacent timing question (Snow dep / Ember
-  break fire at round-end = next-round effect; decide if per-card post-scoring is intended). Robert
-  rules; Phase-5-adjacent. See `D-F4-CONSUMABLES-TIER2`.
+- **F4.38(a) — Wu Xing TIMING design-ruling — ✅ RESOLVED 2026-06-14** (record `F4.31/F4.38a`; closed
+  jointly with F4.31). The structural dedup (b) shipped in D-F4-SCORING-TIER3; the timing half (Snow dep /
+  Ember break / Clay/Pottery firing at round-end) is **ratified round-end-canonical for Phase 4**, with the
+  per-capture redesign logged speculative to **F5.8** (Earth) — see DP-72. The balance-adjacent retuning
+  rides F5.8/F5.1; the *ruling* is closed. (Was "still banked"; corrected here.)
 - **F4.26-B balance follow-ups (Phase-5).** The F4.26 *mechanical* ruling — natural transcendence
   `powerLevel = stackCount` (Option B, lossless / all-4-contribute) — **shipped 2026-06-12** (record
   DECISIONS_LOG `F4.26`; one-line change at `RunManager.js:836`, tests updated 3→4, suite 151/1). The

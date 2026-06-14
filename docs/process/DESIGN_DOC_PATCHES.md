@@ -577,6 +577,19 @@ powerLevel decrementing per use. SPECULATIVE / Phase-5; magnitudes and the Mercu
 are not yet finalized." Keep the (confirmed) Cuckoo negative-hatch description accurate: a transcended
 (negative) Cuckoo hatches a negative Tier-2 fusion; a regular Cuckoo hatches a regular one.
 
+### DP-74: Festival per-round cap — document slot-gating as the cap + F5.1 forward-pointer
+**Source:** F4.33-Part1 gate close-out (2026-06-14, ratify-current).
+**Issue:** V6 must state Festival's generation limit. Current code: `util_festival` generates one stamp
+per stack per ribbon captured, capped only by free consumable-inventory slots — no separate per-round cap.
+B-13 flagged "no per-round cap" as a balance risk; ruled ratify-current (the slot gate IS the cap; an
+explicit cap is Phase-5/F5.1).
+**Patch (V6):** in the Festival spirit entry (§7.x ribbon-rank table / §"Stamp Festival Loop"), state the
+current rule: "Festival generates a stamp of the captured ribbon's color, one per stack, per ribbon
+captured — generation is hard-gated by free consumable-inventory slots and stops when the inventory is
+full (no separate per-round cap)." Add a forward-note: "An explicit per-round cap / cooldown / scale-down
+is a SPECULATIVE Phase-5 balance task (F5.1); V6 documents current behavior." Keep the existing slot-gating
+note (V5:1645) — it is accurate; this DP makes explicit that the slot gate is the *only* cap.
+
 ---
 
 ## Editorial rewrite scope (separate sub-effort, 6-10 hours)
