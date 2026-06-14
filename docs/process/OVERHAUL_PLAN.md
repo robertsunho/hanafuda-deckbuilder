@@ -4752,6 +4752,19 @@ After all above, full bugtesting pass with cleanup catalog cross-check.
 
 Robert wants to redesign this to fire **per capture** during scoring, mirroring Iron/Meteorite's held-in-hand mult pattern but contributing flat ki instead of multiplicative mult.
 
+**Robert's intended spec (2026-06-14 — SPECULATIVE, magnitudes pending playtest):**
+- **Clay:** +3 flat ki per scoring event while held in hand (replaces the round-end 10%-of-ki model).
+- **Pottery:** +3 flat ki + 1 interest per scoring event while held (replaces round-end 20%-of-ki).
+- "Interest" definition is OPEN: +1 to the round-start interest rate (percentage points), vs +1 flat
+  ki to interest, vs a one-time +1 — to be resolved with the magnitude tuning. The current mechanic
+  has no per-card interest-rate concept, so this introduces one.
+- Populates the prepared `addKi` / `addInterest` channels in the held-from-hand contribution seam
+  (scoring_loop_inventory_pass1.md §6) — F5.8 is "populate + tune," not "restructure."
+- **Magnitude caveat (why 3 is provisional):** flat-3/capture is balance-equivalent to the current
+  10%-of-ki only near ~150 ki; it is ~3× stronger at low ki and far weaker at high ki. "3" is a
+  starting point for playtest, not a fixed value. Pairs with F5.1 (both need playtest data).
+- Closes the F4.31/F4.38a gate's deferred half (DECISIONS_LOG 2026-06-14).
+
 **Implications of redesign:**
 
 1. **Magnitude rebalance.** Current Clay = 10% of current ki at round end. Under per-capture model, 10% per capture × 5+ captures = 50%+ effective rate. Likely needs to drop to ~2% per capture, or use a flat-ki formula instead of percentage-based.

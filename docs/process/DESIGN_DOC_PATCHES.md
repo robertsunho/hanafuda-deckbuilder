@@ -546,6 +546,24 @@ formed 3-stack containing Silk resolves to a capture rather than stranding). The
 in the deck-flip phase like all captures. A Silk card placed alone (or in a non-matching
 placement) is NOT auto-captured — it only resists stranding of a real pending stack.
 
+### DP-72: Earth (Clay/Pottery) — document round-end as canonical + F5.8 forward-pointer
+**Source:** F4.31/F4.38a gate close-out (2026-06-14).
+**Issue:** V6 must state Earth's timing. Current code = round-end % interest; an intended per-capture
+flat-ki redesign is logged (speculative) as F5.8.
+**Patch (V6):** §8.2.2 Clay/Pottery — document CURRENT behavior as canonical: round-end ki interest
+(Clay 10% / Pottery 20% of current ki per Earth card held at round end), feeds Fossil. Add a forward-
+note: "A per-capture flat-ki redesign (Clay +3 ki/scoring, Pottery +3 ki +1 interest/scoring) is a
+planned but SPECULATIVE Phase-5 change (F5.8); magnitudes pending playtest. V6 documents current
+behavior; F5.8 will update this section when built." Keep the existing (already-reconciled) note that
+the held-in-hand mult channel is ×1.0 except under boost_earth (hex_15).
+**Note:** §8.2.2's mult-channel overstatement flagged by scoring_loop_inventory_pass1.md §7 is ALREADY
+fixed in V5 — line 2043 already qualifies the ×1.0 / boost_earth (hex_15) gating AND already forward-
+points to F5.8. So this DP is the forward-pointer only; NO mult-channel correction needed in §8.2.2.
+ADJACENT (outside §8.2.2, for the V6 author): the §5 held-in-hand list (V5:857, "Earth-enhanced cards
+in hand multiply mult") states the Earth mult channel unqualified — align it with §8.2.2's ×1.0-except-
+boost_earth caveat for internal consistency. Also the §8.2 enhancement-summary line (V5:522, "held-in-
+hand mult contribution" for Earth) is terse/unqualified — optional polish.
+
 ---
 
 ## Editorial rewrite scope (separate sub-effort, 6-10 hours)

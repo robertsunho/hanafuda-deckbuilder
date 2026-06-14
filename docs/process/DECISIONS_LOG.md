@@ -4941,3 +4941,42 @@ Silk integration test existed); the non-Silk strand (no regression); the 2-to-em
 assessment (corrected — the hand-play path was the real gap); engine_moths onSilkAntiStrand
 (fires correctly via the deck-phase path the fix routes into); DESIGN_DOC_V5 §3.3 / §8.2.2 Silk
 scope → DESIGN_DOC_PATCHES.md DP-71; the deferred PostD2-4..11 Silk tests (now unblocked).
+
+---
+
+## F4.31/F4.38a — Clay/Pottery timing: confirm round-end, defer redesign to F5.8 (2026-06-14)
+
+**Status:** RESOLVED (as defer-and-document). Phase-4 Leg-2 design-rulings gate. NO code change.
+
+**Ruling:** Clay/Pottery's CURRENT timing is correct and intentional for Phase 4 — round-end ki
+interest (`_computeEarthKiBonus`): per Earth card held in hand at round end, rate += interest rate
+(Clay 10% / Pottery 20%), credited as floor(current_ki × rate); Fossil procs once per Earth card at
+round-end (t1Procs Clay / t2Procs Pottery), retrigger-aware via the _heldTriggers loop. Matches
+DESIGN_DOC_V5 §8.2.2. This closes the F4.31/F4.38a "timing" gate (F4.31's structural half was already
+absorbed by F4.34; only the timing intent remained, and it is: round-end is canonical for Phase 4).
+
+**Intended redesign — SPECULATIVE, logged to F5.8, NOT decided:** Robert intends to move Earth to
+PER-CAPTURE flat ki — Clay → 3 flat ki per scoring event when held; Pottery → 3 flat ki + 1 interest
+per scoring event. This is captured in OVERHAUL_PLAN F5.8 as a sharpened spec, but flagged speculative:
+the magnitude (3) and the "Pottery +1 interest" definition (rate bump vs flat ki) need playtest
+calibration, and the change flips Earth's archetype (round-end % → ki-banking synergy; per-capture flat
+→ high-capture synergy) and rebalances Fossil's proc cadence (round-end-per-card → per-capture). All
+playtest-gated → Phase 5.
+
+**Why deferred, not built now:** balance change, uncalibratable without play; Phase 4's thesis is
+consolidate/stabilize, not add design. The scoring-loop D1 work already PREPARED THE SEAM
+(`{ multiplyMult?, addKi?, addInterest? }`, addKi/addInterest latent) so F5.8 is "populate channels +
+tune," not "restructure."
+
+**V6 stance:** document CURRENT (round-end %) behavior as canonical, with a forward-pointer to the
+speculative F5.8 per-capture redesign — keeps V6 reconciled with the actual code (V6 is the Gate-0
+audit rubric; it must describe what the code IS, not the intended redesign). → DESIGN_DOC_PATCHES DP-72.
+Recon note (2026-06-14): §8.2.2 is ALREADY reconciled (it qualifies the held-in-hand mult channel as
+×1.0 except under boost_earth/hex_15, and already forward-points to F5.8) → DP-72 is the forward-pointer
+only, not a mult-channel correction. (Minor adjacent: the §5 held-in-hand list at V5:857 still says
+"Earth-enhanced cards in hand multiply mult" unqualified — flagged for the V6 author, outside this DP.)
+
+**Cross-refs:** F5.8 (OVERHAUL_PLAN — the redesign task, now sharpened with Robert's 3-ki/3-ki+interest
+spec); F4.34 (absorbed F4.31's structural half — getWaterMult SSOT, per-capture dep / round-end
+interest); scoring_loop_inventory_pass1.md §6 (the prepared seam); F5.1 (threshold tuning — F5.8 pairs
+with it, both playtest-gated); engine_fossil (proc-cadence rebalance under per-capture).
