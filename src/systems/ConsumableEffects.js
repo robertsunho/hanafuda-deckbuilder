@@ -277,19 +277,20 @@ const _effects = {
       if (!fusionDef || (fusionDef.tier !== 2 && fusionDef.tier !== 3)) {
         return { success: false, message: 'Selected spirits cannot be fused into Tier 2/3' };
       }
-      const fusionStacks = Math.min(a.stackCount ?? 1, b.stackCount ?? 1);
-      a.stackCount = (a.stackCount ?? 1) - fusionStacks;
-      b.stackCount = (b.stackCount ?? 1) - fusionStacks;
-      if (a.elements) for (let i = 0; i < fusionStacks && a.elements.length > 0; i++) a.elements.pop();
-      if (b.elements) for (let i = 0; i < fusionStacks && b.elements.length > 0; i++) b.elements.pop();
+      // One Cinnabar = one fusion (Robert's ruling). Decrement each input by 1, acquire
+      // one fusion stack — regardless of input stack depth. Pearl/Mercury already do this.
+      a.stackCount = (a.stackCount ?? 1) - 1;
+      b.stackCount = (b.stackCount ?? 1) - 1;
+      if (a.elements && a.elements.length > 0) a.elements.pop();
+      if (b.elements && b.elements.length > 0) b.elements.pop();
       const freed = (a.stackCount <= 0 ? 1 : 0) + (b.stackCount <= 0 ? 1 : 0);
       const slotsAfter = (run.spiritSlots - spirits.length) + freed;
       if (slotsAfter < 1) {
-        a.stackCount += fusionStacks; b.stackCount += fusionStacks;
+        a.stackCount += 1; b.stackCount += 1;   // rollback the single decrement
         return { success: false, message: 'No spirit slot for fusion result' };
       }
       run.removeZeroStackSpirits();
-      const acq = run._acquireSpiritStack(fusionDef, fusionStacks);
+      const acq = run._acquireSpiritStack(fusionDef, 1);
       if (!acq.success) return { success: false, message: acq.reason ?? 'Could not acquire fusion' };
       return { success: true, message: `Fused into ${fusionDef.name}!` };
     },
