@@ -442,6 +442,35 @@ a quick find-replace (it's a small naming cluster). Sequenced after Wave B becau
 schema redesign) and F4.37 (tooltip recomb) still read/may reshape this field — rename ONCE against the
 settled shape (the F4.24b / V6 "don't refactor against a churning state" discipline).
 
+### DP-66: §7.13 (Tier 1 Legendary — Gankyil) — REMOVE subsection
+**Source:** F4-LEG3-ROSTER-CUTS (Robert's ruling, 2026-06-13).
+**Issue:** `legend_gankyil` was cut entirely from code; the spirit no longer exists. §7.13 documents
+its "auto-capture at 3-stack instead of 4-stack" mechanic.
+**Patch (V6):** delete the §7.13 Gankyil subsection wholesale. Legendaries as a group are deferred to a
+Phase-5 design pass; the only `legendary: true` spirits remaining are the four capstones (Pearl-created,
+not shop-offered). Auto-capture is now fixed at 4 (FieldManager default; no spirit can lower it).
+See DECISIONS_LOG F4-LEG3-ROSTER-CUTS. NOTE for V6 author: D0.5/D0.16's historical "Gankyil = only
+shop-offerable legendary" claims are point-in-time records (no-rewrite-history convention) — V6 prose
+must NOT inherit them.
+
+### DP-67: §12.2 (Offering Generation, spirit quadrant) — REMOVE 15% legendary roll
+**Source:** F4-LEG3-ROSTER-CUTS Option 2 (Robert's ruling, 2026-06-13).
+**Issue:** §12.2 states "Sacred Grove: 15% chance per slot to roll a Tier 1 Legendary instead." The 15%
+Grove roll + `_pickRandomLegendary` machinery was removed from the shop (Option 2).
+**Patch (V6):** remove the 15%-legendary-roll rule. The Sacred Grove spirit quadrant now offers the same
+tier-1-non-legendary pool as Wayside (more slots only, no legendary chance). NOTE for V6 author: legendary
+*offering* is deferred to the Phase-5 shop revamp ("rebuilt fresh after the larger shop reorganization") —
+this is a deferral, not a permanent removal of the concept from the design. Buy-side legendary purchase
+routing + `addLegendarySpirit`/`canAddLegendary` + the capstone/Pearl path remain live (dormant) infra.
+
+### DP-68: §7.12 (demoted rares prose) + §8.7 (acquisition-paths table) — REMOVE Waidan
+**Source:** F4-LEG3-ROSTER-CUTS (Robert's ruling, 2026-06-13).
+**Issue:** `util_waidan` was cut entirely. §7.12 has a Waidan bullet in the demoted-rares prose; §8.7's
+acquisition table has a "Spirit Waidan — Negative copies of consumables on Sacred Grove exit" row.
+**Patch (V6):** remove the Waidan bullet from §7.12 and the Waidan acquisition row from §8.7. NOTE for V6
+author: the negative-consumables SYSTEM itself is NOT removed from the design — it is a Phase-5 build; only
+Waidan-as-its-source is cut. The general `addNegativeConsumable`/`_negativeConsumables` infra is retained.
+
 ---
 
 ## Editorial rewrite scope (separate sub-effort, 6-10 hours)

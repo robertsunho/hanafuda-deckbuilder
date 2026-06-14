@@ -130,6 +130,11 @@ one line each (detail in the plan doc + the `tier5_reconciliation.md` §"Scope d
 3. **Groupings 4/5/6 — their own heavier process**, split into (a) **design-rulings deliberation**
    (grouping 5 + F4.26 / F4.33-Part1 / F4.38(a) / **F4.32**) — **the V6 gate**, run first — and (b)
    **code refactors** (F4.25, F4.21, F4.28) after the rulings. (F4.29 stays optional/banked.)
+   - **Grouping 5 ✅ CLOSED 2026-06-13** (Leg-3 roster cuts): its only remaining sub-item was the
+     Gankyil keep/cut question. Robert ruled CUT — Gankyil removed + the shop's random-legendary
+     offering machinery removed (Option 2; legendaries deferred to a Phase-5 group design pass). Waidan
+     also cut in the same leg. Record DECISIONS_LOG `F4-LEG3-ROSTER-CUTS`; commits efdd556 (Waidan) /
+     17fc5fe (Gankyil); V5 drift banked as DP-66/67/68 in `DESIGN_DOC_PATCHES.md`.
 4. **Any remaining Phase-4 work** (stragglers steps 1-3 surface or defer).
 5. **Phase-4 close-out + Phase-5 restructuring/planning** (split the banked pile into the
    design-resolution / feature-building / demo-prep sub-streams per `POST_AUDIT_DIRECTION.md`).
@@ -232,9 +237,11 @@ Headlines here; the full banked-thread detail lives in `PHASE4_consolidation_can
   `_drawLoadoutSlot`+`_confirmRelease` dead release-confirm chain (ShrineScene), the dead
   `_renderHexagramSymbol` twin (GameScene + ShrineScene), the stale `RunManager.advanceRound:1166`
   JSDoc ("decay Style Base" — code no longer does it).
-- **Waidan Grove-exit coupling** — `legend_waidan`'s effect is inline in ShrineScene
-  `_drawContinueButton` (F4.20 Bucket-B seepage; no `onShrineExit` hook). If Waidan is cut → removal
-  site; if it stays → extract to a hook. Decision pending Waidan's fate. (`PHASE4_consolidation_candidates.md`.)
+- **Waidan Grove-exit coupling — ✅ RESOLVED-BY-CUT 2026-06-13** (record DECISIONS_LOG
+  `F4-LEG3-ROSTER-CUTS`; commit efdd556). Waidan was CUT entirely (Robert's ruling — negative-consumables
+  system is a Phase-5 build that supersedes it), so the inline `_drawContinueButton` effect was deleted
+  rather than extracted to a hook. The banked "cut → removal site / stays → extract to a hook" fork
+  resolved on the cut branch. (`PHASE4_consolidation_candidates.md`.)
 - **F4.35 — scene-rendering unification — ✅ DONE 2026-06-13** (record DECISIONS_LOG `F4.35`; closes
   Tier 4). Picker SELECTION logic shared (`spiritTargetPicker.js` + test) + fan layout shared
   (`SpiritLayout.js`); `_renderHexagramSymbol` dead twin deleted; card-picker shells + strip-tail +

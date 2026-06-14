@@ -4760,3 +4760,52 @@ note at ~1127 and the picker-logic note at ~1266 already existed).
 **Cross-refs:** `tier4_scoping.md` Cluster 2 (Tier-4 re-scope); OVERHAUL_PLAN F4.35 (original broad entry,
 now marked DONE/re-scoped); `shared/spiritTargetPicker.js` + its test; `shared/SpiritLayout.js`. Tier 4 is
 now COMPLETE → the Phase-4 close-out tail proceeds to Leg 2 (the step-3a design-rulings deliberation).
+
+---
+
+## F4-LEG3-ROSTER-CUTS — Waidan + Gankyil removed (2026-06-13)
+
+**Status:** RESOLVED. Two Phase-4 Leg-3 roster cuts (Robert's rulings, design-rulings session).
+
+**Waidan (util_waidan) — CUT, no replacement.** Rationale: the negative-consumables
+SYSTEM is a Phase-5 build that supersedes Waidan's Grove-exit mechanic (spawn a negative
+consumable per stack on Sacred Grove exit). Waidan was a placeholder; removed ahead of the
+real system. FOUR sites (recon found a 4th the plan missed — Robert ruled to fold it into the
+cut): spirits.js catalog entry, SpiritEffects stub, ShrineScene _drawContinueButton Grove-exit
+block (the F4.20 Bucket-B inline seepage — its removal also closes the banked "Waidan Grove-exit
+coupling in _drawContinueButton" thread, which was gated on Waidan's fate), and the spiritTooltip
+Waidan arm (`util_waidan` else-if narration — STEP-0 check-B finding, would have been dead code).
+General addNegativeConsumable/_negativeConsumables infra RETAINED (not Waidan-specific; Phase-5
+negative-consumables build will use it). Commit efdd556.
+
+**Gankyil (legend_gankyil) — CUT, no replacement.** Rationale: Gankyil was the lone
+non-capstone legendary; legendaries as a GROUP deserve a Phase-5 design pass before
+re-implementation, so the outlier occupant is removed now rather than designed around.
+**Option 2 (Robert):** also removed the shop's random-legendary OFFERING machinery (the 15%
+Grove roll + _pickRandomLegendary), so legendary offering is rebuilt fresh in the Phase-5
+shop revamp ("start fresh after the larger shop reorganization"). Five sites: spirits.js
+catalog (+ now-empty Unique Legendary header), SpiritEffects stub (+ header), GRM startRound
+autoCaptureThreshold line (FieldManager default 4 is now the sole source — no spirit can lower
+auto-capture), spiritTooltip gankyil block (leading-if; next else-if promoted to plain if),
+ShrineScene 15%-roll branch + _pickRandomLegendary method. LEFT INTACT as dormant Phase-5
+infra: buy-side offering.legendary purchase routing, addLegendarySpirit/canAddLegendary,
+the capstone/Pearl ownership path. Commit 17fc5fe.
+
+**This closes Grouping 5** (its only remaining sub-item was the Gankyil keep/cut question;
+F4.30's mechanical half was already confirmed working/contained per tier5_reconciliation).
+
+**Verification:** grep-to-zero for util_waidan / legend_gankyil / _pickRandomLegendary in
+src/; addLegendarySpirit/canAddLegendary still present (capstone/buy infra confirmed untouched);
+build green; suite 288 passed / 1 skipped (unchanged across both cuts — both were test-blind,
+zero test references confirmed in STEP-0 check E). Behavior changes (NOT [PRESERVE]): Waidan's
+Grove-exit effect and Gankyil's 3-stack auto-capture no longer exist; Sacred Grove no longer
+offers legendaries. STEP-0 checks: A/C/D/E/F passed clean; B surfaced the extra Waidan tooltip
+arm (folded into the cut per Robert's ruling). Check F confirmed only the four capstones remain
+`legendary: true` after the Gankyil cut, so _pickRandomLegendary's pool was genuinely empty.
+
+**Cross-refs:** F4.21 (Waidan = renamed legend_waidan→util_waidan; Gankyil correctly kept
+legend_ prefix as the lone true legendary — now cut); PHASE4_consolidation_candidates.md
+"Banked: Waidan Grove-exit coupling" (now resolved-by-cut); DESIGN_DOC_V5 §7.13 Gankyil /
+§12.2 15%-legendary-roll / §7.12 Waidan / §8.7 acquisition table → DESIGN_DOC_PATCHES.md
+DP-66/DP-67/DP-68; D0.5/D0.16 (historical Gankyil "only shop-offerable legendary" claims — left
+as point-in-time records per the no-rewrite-history convention; V6 prose must not inherit them).
