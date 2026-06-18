@@ -68,7 +68,7 @@ content to them. They resolve at the marked point.
    `DESIGN_DOC_PATCHES.md` stacked ledgers. *(`ROADMAP.md` and `ENGINEERING_RULES.md`, formerly part of this
    cluster, are now assembled and live — see §1.)*
 
-## 5. Owed documents (canonical, not yet written)
+## 5. Owed documents (all now live)
 
 *(All previously-owed canonical docs are now live — see §1.)*
 

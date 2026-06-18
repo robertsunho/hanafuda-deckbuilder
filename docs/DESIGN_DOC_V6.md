@@ -1076,7 +1076,7 @@ Engine spirits track accumulated state via `onCardSeen` (e.g., Wildlife counts u
 
 For example: Wildlife counts a new animal species → its accumulator increments. On the next capture (any capture, not just animal), Wildlife applies its current accumulator to the chain.
 
-Accumulator spirits track this state **per element** rather than as a single flat counter: each stack adds its own element, the tooltip displays the **longest-held element's** value (events seen), scoring **aggregates** across elements for the mult contribution, and cascading transcendence aggregates by the longest-held element. (See the forthcoming `ARCHITECTURE.md` for the implementation.)
+Accumulator spirits track this state **per element** rather than as a single flat counter: each stack adds its own element, the tooltip displays the **longest-held element's** value (events seen), scoring **aggregates** across elements for the mult contribution, and cascading transcendence aggregates by the longest-held element. (See `ARCHITECTURE.md` for the implementation.)
 
 **Capstone effects:**
 

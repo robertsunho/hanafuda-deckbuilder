@@ -18,8 +18,7 @@ Rule of thumb: **"how I work" → here; "how the code is built" → `ARCHITECTUR
 `TEST_HARNESS_GOTCHAS.md` — stay where they are, intact, and remain canonical for their own content. This
 file *points to* them (§B) rather than copying them: they are referenced by name elsewhere (CLAUDE.md's
 testing section, the PHASE4_STATE handoff template, the migration-prompt convention) and carry live open
-flags. *(DOC_MAP's "OWED — absorbing the standalone docs" wording predates this decision; the index
-approach supersedes it — update DOC_MAP's framing when convenient.)*
+flags.
 
 **Canonical-vs-summary discipline.** Where a rule appears in BOTH this file and `CLAUDE.md`, **this file is
 canonical** and CLAUDE.md carries a one-line summary explicitly marked as such — so there is never a
