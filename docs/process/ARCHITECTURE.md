@@ -17,7 +17,7 @@ codebase. The **recipes (§4)** and **anti-patterns (§5)** are the onboarding/a
 **Scope boundary (what this doc does NOT do — see §7 / `DOC_MAP.md`).** This is *structure/mechanism*. It
 does **not** re-document game *behavior/design* (→ `DESIGN_DOC_V6.md`), hold *deferred design* (→
 `DESIGN_DEFERRED.md`), carry *code-cleanup task lists* (→ `CODEBASE_CLEANUP.md`), or restate *operational
-coding rules* (→ `ENGINEERING_RULES.md`, forthcoming). Where a topic spans docs (e.g. the spirit-set
+coding rules* (→ `ENGINEERING_RULES.md`). Where a topic spans docs (e.g. the spirit-set
 getters), this doc gives the *architectural why*; ENGINEERING_RULES gives the *operational what-to-do*.
 
 ---
@@ -251,6 +251,12 @@ one pipeline with single-home children. **Do not add a 4th scoring path — exte
 Each recipe: the hook/helper, a minimal template, and a real exemplar to copy. **The two/three-file rule:**
 every spirit = a `SPIRIT_CATALOG` def (`spirits.js`) + an `_effects` entry (`SpiritEffects.js`);
 accumulators additionally need 3 RunManager-side registrations. The `_effects` key MUST equal the def `id`.
+
+> **Before building new, check for an existing primitive.** The single most common architectural mistake
+> here is writing a new path when a hook, helper, or recipe below already covers the case — every such
+> reinvention is future consolidation work and a drift risk. Before adding a feature: scan this recipe
+> section and the helper reference (§3) for an existing primitive that fits. Build new only when nothing
+> does — and when you do, see §5's "create a receptacle" anti-pattern for where it goes.
 
 ### Recipe 1 — Add a per-card scoring spirit
 **Use** `onCardScored` returning `{addPoints}` / `{addMult}` / both. Reuse a factory helper from
@@ -498,6 +504,18 @@ Rule · the cost it prevents · the documented exception.
    distinct stamp→effect maps — NOT collapsible into one dispatcher. (Only the retrigger-count math is
    unified, via `_computeRetriggerCount`.) Do not "fix" this back into a broken merge.
 
+5. **Don't wedge a new concern into a manager or a scene because it has no obvious home — create the
+   receptacle.** When a feature genuinely has no existing category (not a spirit, consumable, hexagram,
+   blessing, or existing helper family), the temptation is to drop its logic into a manager
+   (`GameRoundManager`/`RunManager`) or a scene because that's where execution happens. That is exactly the
+   logic-seepage Phase 4 spent its length cleaning up. Instead: create a clean new home — a new effect
+   registry, a new `systems/` module, or a new `scenes/shared/` leaf — so the concern is single-homed and
+   the next person finds it where it belongs. *Cost: re-creating the seepage the consolidation just
+   removed.* **Exception/nuance:** "new receptacle" does NOT mean "new file for every small thing" — a
+   genuinely small helper can join an existing helper family (§3) if it fits the family's concern. The test
+   is single-homing-by-concern, not file count. (Complements §1.1's source-of-truth thesis: §1.1 says
+   "follow the existing group"; this says "…and if there's no group, make one — don't wedge.")
+
 **Other documented structural exceptions** (kept-inline patterns, with the architectural reason — these are
 intentional, not debt):
 - **Bucket-B formula-term spirits** live inline in their economy formulas because lifting them needs new
@@ -571,8 +589,8 @@ specified here.
 | Game behavior / design (what a mechanic DOES) | `docs/DESIGN_DOC_V6.md` |
 | Forward / deferred design (Phase-5+ intents, incl. Candidate I) | `docs/DESIGN_DEFERRED.md` |
 | Code-cleanup tasks (renames, dead code, deferred refactors) | `docs/process/CODEBASE_CLEANUP.md` |
-| Operational coding rules / gotchas ("which getter when," test-harness, recon-before-edit) | `docs/process/ENGINEERING_RULES.md` *(forthcoming — until then, `SPIRIT_SET_ITERATION_RULE.md` + `TEST_HARNESS_GOTCHAS.md`)* |
+| Operational coding rules / gotchas ("which getter when," test-harness, recon-before-edit) | `docs/process/ENGINEERING_RULES.md` *(it indexes the deep rule-docs `SPIRIT_SET_ITERATION_RULE.md` + `TEST_HARNESS_GOTCHAS.md`, which stay canonical for their own content)* |
 | Decisions + rationale (the record) | `docs/process/DECISIONS_LOG.md` |
-| The forward task plan | `docs/process/ROADMAP.md` *(forthcoming)* |
+| The forward task plan | `docs/process/ROADMAP.md` |
 | The verified end-state backbone this doc was built on | `docs/archive/phase4/F4.24_inventory_pass3.md` |
 | Where any concern's canonical doc lives | `docs/DOC_MAP.md` |
