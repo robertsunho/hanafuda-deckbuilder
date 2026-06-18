@@ -76,14 +76,14 @@ When adding a doc: living/updated → `process/`; immutable snapshot → `archiv
 
 ## Working principles
 
-### Recon before edit
-Before modifying existing code, read the relevant code first. Run focused regex searches; view the surrounding context; identify exact line numbers and method names. The audit underlying the current plan can be stale; never trust descriptions of code over the code itself. The technique: fetch the file, regex-search for the key symbols with matchAll, print surrounding context with file offsets to locate exact line numbers and current signatures. This surfaces dead code and silent fixes the plan won't know about.
+### Operating rules (summary — full + canonical in `docs/process/ENGINEERING_RULES.md`)
 
-### Smallest defensible fix
-One bug, one fix. Don't refactor adjacent code. Don't generalize the fix. Don't bundle unrelated cleanups. Each is a separate task with its own scope.
-
-### Build after every change
-Run `npx vite build` and confirm the build succeeds before declaring done. A broken build is the most common failure mode.
+- **Recon before edit.** Read the live code before changing it; specs and task descriptions are hypotheses until checked against it.
+- **Verify the bug still reproduces.** Tasks logged days/weeks ago may have silently resolved — confirm before fixing.
+- **Smallest defensible fix.** One bug, one fix; don't refactor adjacent code or bundle cleanups. If a task seems to need a redesign, flag it.
+- **Build + test green before done.** `npx vite build` succeeds AND `npm test` passes (expect the baseline) before declaring a change complete.
+- **Commit and push every change, tagged with the task ID** (e.g. `F4.16: …`), once the build is clean — the Project syncs from the remote.
+- **STOP and report on a false premise.** If a prompt's premise is false against current code (missing symbol, non-reproducing bug), stop and report rather than papering over it.
 
 ### Don't reinvent hooks/helpers
 The engine has reusable primitives (hooks like `modifyFlowDecay`, `disablesYaku`, `discardUnmatchedDeckFlip`; helpers like `applyHook`, `getStampDef`, `incrementPerElement`). Before writing new effect logic, check whether an existing hook/helper covers the case.
@@ -130,17 +130,7 @@ slot-capacity and legendary-presence questions only. Full rule + getter-by-quest
 
 ## Workflow
 
-When working with Robert:
-
-1. **Recon first.** Before drafting a fix prompt, read the current code.
-2. **Verify old bugs still reproduce.** Tasks logged weeks ago may have silently resolved.
-3. **Ship smallest defensible fix.** Resist scope expansion.
-4. **Run `npx vite build`.** Confirm success before declaring done.
-5. **Status report at the end.** Brief summary of what changed and any concerns.
-
-## Commit discipline
-
-After each change lands and the build is clean, commit and push immediately so the remote stays a faithful mirror of the working tree. Tag commit messages with the plan task ID (e.g. F4.16: move _fireCuckooHatch from RunManager to SpiritEffects). This keeps GitHub current for recon between tasks and builds a readable Phase 4 audit trail.
+The per-task loop with Robert: recon → verify the bug still reproduces → smallest defensible fix → `npx vite build` + `npm test` → **status report** (brief summary of what changed and any concerns). The first four are the operating rules above; full statements live in `docs/process/ENGINEERING_RULES.md`. The status report closes every task.
 
 ## When you find new conventions that should live here
 
