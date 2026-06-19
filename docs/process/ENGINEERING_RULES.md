@@ -48,6 +48,14 @@ Each rule, then one line on the cost it prevents.
 - **STOP and report on a premise violation.** If a prompt's stated premise is false against current code (a
   referenced symbol is gone, a claimed bug doesn't reproduce, a count won't reconcile), stop and report —
   don't guess or paper over it. *Cost: building on a false foundation.*
+- **Defer work that depends on a system in motion.** If a polish or surfacing task depends on a system
+  queued for redesign/consolidation, defer it *into* that work — doing it now means doing it twice (once on
+  the current shape, once on the new one). Correct sequencing, not procrastination. *Cost: rework thrown
+  away when the shape changes.*
+- **Iterate small when a fix reveals deeper structure.** Some fixes need 2–3 iterations — fine when each
+  iteration's failure is *informative* and the inter-iteration diff is small and reasoned. If the same
+  failure recurs or iterations turn large and exploratory, STOP: recon and reframe before continuing.
+  *Cost: thrashing one large unreviewable change instead of converging.*
 
 ### Verification & shipping
 
