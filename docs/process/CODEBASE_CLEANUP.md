@@ -30,3 +30,39 @@
 - **`consumables.js` Crown Chakra data-string** — already corrected to "Copy all attributes… exact duplicate". V6 §8.1 was the lagging side (fixed in 3c). No code action.
 - **`spirits.js` header comment** — already reads 110 total / 78 Tier 1, matching the live array. No code action. (DP-15.)
 - **`econ_bonds` / `interestRate()`** — already uncapped (+5%/stack, no clamp); the old "+25% hard cap" cleanup is moot (cap never existed in the current code). No code action. (DP-10.)
+
+---
+
+## From V6 §17.7 (reparceled 2026-06-18 — verify each against current code before actioning)
+
+The code-vs-design items that lived under the old V6 §17.7 (staged in `V6_EXTRACTED_SECTIONS.md`), now reparceled here per the line-7 note above. **The §17.7 audit is V5/V6-era (pre-overhaul); several may already be resolved — verify before actioning.** Items already captured above (`ribbonStamp`, `legend_*`, "Coming soon", `_dogProtection`, Bonds-cap-moot) are NOT repeated.
+
+**Stamps** (design decided, code partial — may be subsumed by the Phase-5 stamp rethink, ROADMAP 5A):
+- **White/Gray retrigger semantics** — only fire on capture and don't re-roll jackpot/break/depreciation; should fire on any trigger and re-roll randomness per retrigger.
+- **Black stamp trigger semantics** — only fires on capture; should fire on captured/discarded/yaku.
+- **Stamp tier system** — code uses 3 tiers; design intent is 4 (Gray as quaternary).
+
+**Spirits / economy:**
+- **Amber alchemical 3-stack restriction** — blocks 1×/2× inputs; design intent is any stacked spirit. (Distinct from the Amber *balance* rethink, ROADMAP §3 / D7.)
+- **Piggybank / Grace ×4 hard caps** — design intent: no hard caps (Bonds is already uncapped, above; verify Piggybank/Grace).
+- **Ingot fractional truncation** at low ki — the code side of the Ingot redesign (design side is surfaced for ROADMAP).
+
+**Hexagrams:**
+- **Tropic/Arctic month ranges** — code uses 4-month exclusionary sets; should be 6-month half-years.
+- **Hexagram description discrepancies (broad)** — axis hexagrams describe by month not axis; boost hexagrams omit debuffs; rank hexagrams omit threshold modification; Wu Xing cycle hexagrams oversimplify. (`volatile`/`stable_flow` flavor is already logged above.)
+
+**Consumables / card-targeting naming:**
+- **Legacy `consumable_*` entries** (horse/dog/pig/rooster) superseded by zodiac equivalents but still in code.
+- **`_markMode`-family renames** — `_markMode`→`_cardTargetMode` was done in a prior pass; verify/finish `_activateMark`→`_activateCardTarget`, `_onMarkCardSelected`→`_onCardTargetSelected`, `_showBoosterPack(markDef)`→`(consumableDef)`.
+
+**Card data:**
+- **`december_plain_3` deprecated entry** in `cards.js` (replaced by `december_ribbon`).
+- **May/September animal naming** — display names "Iris Fireflies"→"Iris Dragonfly", "Chrysanthemum Cricket"→"Chrysanthemum Fireflies" (IDs stay). (Also a design-name note in §17.3.)
+
+**Architectural (lower priority):**
+- **`calculateFinalScore()` vestigial method** (ScoringEngine) — output discarded by all callers, retained only for the metal-proc side effect; the two-scoring-paths debt.
+- **`addKi`/`spendKi` 'unspecified' reason strings** — many callers pass 'unspecified' instead of meaningful telemetry tags.
+- **Paramita / Yaku-Upgrades obsolete code** — `RunManager.buyYakuUpgrade()` + related state from the removed scoring system; audit + removal.
+
+**Terminology (from §17.3):**
+- **"Three Marks" terminology** — stale label for persistent card mutations (Demon, etc.); replace with current terms.

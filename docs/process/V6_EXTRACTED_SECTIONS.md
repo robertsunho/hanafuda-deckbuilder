@@ -2,6 +2,8 @@
 
 **Extracted from `DESIGN_DOC_V6.md` on 2026-06-15** (Campaign 3c, Group V). These are the former **§17 (Open Design Questions)** and **§18 (Decisions Log)**, cut verbatim. Awaiting reparceling to `DESIGN_DEFERRED.md` / `process/CODEBASE_CLEANUP.md` / archive — do NOT treat as canonical. (Reparceling is a separate later step.)
 
+> **Reparceled 2026-06-18 — contents routed or confirmed redundant; this file is ready for deletion in the restructure.** §17.7 code-vs-design items → `CODEBASE_CLEANUP.md` (verify-caveated); the few genuinely-missing forward items (spirit-stacking-as-choice, `transcendCard` mutation reset, endless mode, run-history, animal_deck options) → `ROADMAP.md`. **Discarded as already-homed:** §18 (V4→V5 changelog — preserved verbatim in `DESIGN_DOC_V5.md` §18) and most of §17 (already in ROADMAP / V6 — see the reparcel report for the full bucket breakdown + the ambiguous items surfaced for Robert). Kept in place until review confirms nothing was lost.
+
 ---
 
 ## 17. Open Design Questions
