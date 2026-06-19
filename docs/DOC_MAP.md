@@ -96,6 +96,12 @@ When you make a change of this type, update these docs together:
 `ARCHITECTURE.md` §6.2's current-state, REMOVE the `DESIGN_DEFERRED.md` Candidate-I entry, append
 `DECISIONS_LOG.md`, and strike it from `ROADMAP.md` — one change, four coordinated doc updates.*
 
+**Reference-doc changes also append to `CHANGELOG.md`.** Any edit to a canonical reference doc —
+`DESIGN_DOC_V6.md` `[design]`, `ARCHITECTURE.md` `[architecture]`, `ENGINEERING_RULES.md` `[engineering]` —
+additionally appends a **tagged one-line diff** to `CHANGELOG.md` (the cheap, greppable change-index)
+alongside the `DECISIONS_LOG.md` rationale. So the V6 / ARCHITECTURE / ENGINEERING rows above each carry an
+implicit `+ append CHANGELOG.md ([tag])`: CHANGELOG is the diff-index, DECISIONS_LOG the full record.
+
 ### Tier 2 — The grep-sweep (the catch-all for everything Tier 1 doesn't cover)
 
 **After any non-trivial change, grep the canonical doc set for the term / symbol you changed, and reconcile
