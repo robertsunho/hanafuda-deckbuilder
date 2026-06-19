@@ -6,7 +6,7 @@
 //
 // Hooks dispatch in one of THREE ways (this is deliberate, not inconsistency — the
 // contracts genuinely differ; see DECISIONS_LOG D-F4-HEXAGRAMS-TIER2 and
-// docs/process/hexagram_inventory_pass1.md):
+// docs/archive/phase4/hexagram_inventory_pass1.md):
 //
 //   (1) applyHook(name, fallback, ...args) — value-transformers + flags. The hook
 //       returns a value; applyHook returns `fallback` when no active effect defines it.
@@ -97,7 +97,7 @@
 // bodies (one_yaku_disabled, eight_spirits_graduated_tax) read run-resident state directly
 // because that state lives on the run singleton and their dispatch arg (the GRM) can't carry
 // it. Resolves at runtime via ES-module circular-ref timing. Not broken — see
-// docs/process/hexagram_inventory_pass1.md §4. Deeper cycle work, if ever, belongs to the
+// docs/archive/phase4/hexagram_inventory_pass1.md §4. Deeper cycle work, if ever, belongs to the
 // GRM/RunManager destination audit (D-F4-SCOPE Part 2, late Tier-3), NOT here.
 import run from './RunManager.js';
 import { cards as ALL_CARDS_WITH_SPEC } from '../data/cards.js';

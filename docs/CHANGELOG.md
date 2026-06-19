@@ -79,5 +79,6 @@ CHANGELOG logs changes *from* these finalized docs going forward.
 
 ## Changes
 
-*(Empty — no changes from the baselines yet. The first real entry is likely a Gate-0 `[design]` audit
-finding.)*
+*(Empty — no changes from the baselines yet. **Baseline frozen at the post-restructure state (2026-06-19):**
+the doc-restructure + pre-restructure hygiene is baseline-shaping, NOT logged here; the first real entry is
+the first post-restructure reference-doc change — likely a Gate-0 `[design]` audit finding.)*

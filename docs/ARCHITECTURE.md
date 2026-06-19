@@ -16,7 +16,7 @@ codebase. The **recipes (§4)** and **anti-patterns (§5)** are the onboarding/a
 
 **Scope boundary (what this doc does NOT do — see §7 / `DOC_MAP.md`).** This is *structure/mechanism*. It
 does **not** re-document game *behavior/design* (→ `DESIGN_DOC_V6.md`), hold *deferred design* (→
-`DESIGN_DEFERRED.md`), carry *code-cleanup task lists* (→ `CODEBASE_CLEANUP.md`), or restate *operational
+`ROADMAP.md`), carry *code-cleanup task lists* (→ `CODEBASE_CLEANUP.md`), or restate *operational
 coding rules* (→ `ENGINEERING_RULES.md`). Where a topic spans docs (e.g. the spirit-set
 getters), this doc gives the *architectural why*; ENGINEERING_RULES gives the *operational what-to-do*.
 
@@ -577,7 +577,7 @@ legendary slot," not "a `legend_`-classed catalogue spirit."
 `scoringSpirits` union getters fold them into the chain, and capstone scoring is inline rather than hooked.
 **Candidate I (Phase 5)** fully separates the legendary category from the spirit chain so the union getters
 and inline capstone branches no longer special-case it. This is a deliberate-for-now state slated for
-Phase-5 review, not a bug — see `DESIGN_DEFERRED.md` (Candidate I) for the decoupling plan; it is not
+Phase-5 review, not a bug — see `ROADMAP.md` (Candidate I, 5B) for the decoupling plan; it is not
 specified here.
 
 ---
@@ -587,10 +587,10 @@ specified here.
 | You want… | Go to |
 |---|---|
 | Game behavior / design (what a mechanic DOES) | `docs/DESIGN_DOC_V6.md` |
-| Forward / deferred design (Phase-5+ intents, incl. Candidate I) | `docs/DESIGN_DEFERRED.md` |
-| Code-cleanup tasks (renames, dead code, deferred refactors) | `docs/process/CODEBASE_CLEANUP.md` |
-| Operational coding rules / gotchas ("which getter when," test-harness, recon-before-edit) | `docs/process/ENGINEERING_RULES.md` *(it indexes the deep rule-docs `SPIRIT_SET_ITERATION_RULE.md` + `TEST_HARNESS_GOTCHAS.md`, which stay canonical for their own content)* |
-| Decisions + rationale (the record) | `docs/process/DECISIONS_LOG.md` |
-| The forward task plan | `docs/process/ROADMAP.md` |
+| Forward / deferred design (Phase-5+ intents, incl. Candidate I) | `docs/ROADMAP.md` (specs in its entries) |
+| Code-cleanup tasks (renames, dead code, deferred refactors) | `docs/CODEBASE_CLEANUP.md` |
+| Operational coding rules / gotchas ("which getter when," test-harness, recon-before-edit) | `docs/ENGINEERING_RULES.md` *(it indexes the deep rule-docs in `docs/reference/` — `SPIRIT_SET_ITERATION_RULE.md` + `TEST_HARNESS_GOTCHAS.md` — which stay canonical for their own content)* |
+| Decisions + rationale (the record) | `docs/DECISIONS_LOG.md` |
+| The forward task plan | `docs/ROADMAP.md` |
 | The verified end-state backbone this doc was built on | `docs/archive/phase4/F4.24_inventory_pass3.md` |
 | Where any concern's canonical doc lives | `docs/DOC_MAP.md` |

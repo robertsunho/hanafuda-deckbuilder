@@ -1,10 +1,10 @@
 # Codebase Cleanup — canonical code-task log
 
-**Purpose:** The canonical log of **CODE** cleanup tasks (deferred — mostly Phase-6 semantic/naming cleanup, plus a few dead-code removals). These are distinct from *design* deferrals (`DESIGN_DEFERRED.md`) and from doc-reconciliation (the DP worklist in `DESIGN_DOC_PATCHES.md`). **All future code-cleanup items go here.**
+**Purpose:** The canonical log of **CODE** cleanup tasks (deferred — mostly Phase-6 semantic/naming cleanup, plus a few dead-code removals). These are distinct from *design* deferrals (now in `ROADMAP.md`) and from doc-reconciliation (the archived `DESIGN_DOC_PATCHES.md` worklist). **All future code-cleanup items go here.**
 
 **Seeded:** Campaign 3c (2026-06-15), from the DP-pending dossier's code-grounded findings. Each item: location · what · why-deferred.
 
-> Note: this supersedes the scattered `DEFERRED_CLEANUP_ITEMS.md` references throughout the old §17.7 (now extracted to `V6_EXTRACTED_SECTIONS.md`). Reparcel those into this file in a later pass.
+> Note: this supersedes the scattered `DEFERRED_CLEANUP_ITEMS.md` references throughout the old §17.7 (the §17.7 items were reparceled here in the 2026-06-19 restructure; `V6_EXTRACTED_SECTIONS.md` is deleted).
 
 ---
 
@@ -16,7 +16,7 @@
 
 - **`card.ribbonStamp` (current code) → `card.stamp` (intended)** — rename direction: current code uses `card.ribbonStamp` everywhere (`GameRoundManager.js` reads it at every stamp dispatch site; `shopCards.js` / `consumables.js` `mixStamps` write it; `SpiritEffects.js` / `_computeRetriggerCount` read it; the test suite asserts `.ribbonStamp` as `[PRESERVE]`). The design-doc / canonical name is `card.stamp`. `ribbonStamp` is also *misleading* — stamps apply to ANY card, not just ribbons (the apply path stamps plains in tests), so `stamp` is both cleaner and more accurate. Why deferred: pervasive find-replace touching every stamp path plus the `[PRESERVE]` tests — do it in one focused pass. (Dossier Unfiled #12; §8.4.5 already notes the doc-vs-code name gap.)
 - **`legend_*` → `rare_*` ID prefix for the demoted rares** — the 5 former demoted rares are already `engine_*` in code (engine_wuji/dao/chi/tengu/feng_shui), so the old "rename `legend_*` → `rare_*`" task is partly moot; verify no `legend_*` IDs remain (Gankyil was cut). Why deferred: ID renames ripple through save-state keys and references. (Dossier Unfiled, ex-§16/§17.7.)
-- **`tooltipBase` → scoring-values rename + `_tb` accessor** — see `DESIGN_DEFERRED.md` D1 (Phase-5 semantic rename; sequenced after Wave B). Logged there as a *design* deferral; the code task lives under it.
+- **`tooltipBase` → scoring-values rename + `_tb` accessor** — see `ROADMAP.md` 5A (D1, Phase-5 semantic rename; sequenced after Wave B). Logged there as a *design* item; the code task lives under it.
 - **`_dogProtection` flag → `_pushPenaltySuppression` / `_rabbitActive`** — legacy name from the deprecated `consumable_dog`; Rabbit (`zodiac_rabbit`) is the current consumer. (§8.5.2 documents the legacy artifact.)
 
 ## Stale data-strings (code-side description lag)
@@ -35,7 +35,7 @@
 
 ## From V6 §17.7 (reparceled 2026-06-18 — verify each against current code before actioning)
 
-The code-vs-design items that lived under the old V6 §17.7 (staged in `V6_EXTRACTED_SECTIONS.md`), now reparceled here per the line-7 note above. **The §17.7 audit is V5/V6-era (pre-overhaul); several may already be resolved — verify before actioning.** Items already captured above (`ribbonStamp`, `legend_*`, "Coming soon", `_dogProtection`, Bonds-cap-moot) are NOT repeated.
+The code-vs-design items that lived under the old V6 §17.7 (formerly staged in `V6_EXTRACTED_SECTIONS.md`, since deleted), reparceled here per the line-7 note above. **The §17.7 audit is V5/V6-era (pre-overhaul); several may already be resolved — verify before actioning.** Items already captured above (`ribbonStamp`, `legend_*`, "Coming soon", `_dogProtection`, Bonds-cap-moot) are NOT repeated.
 
 **Stamps** (design decided, code partial — may be subsumed by the Phase-5 stamp rethink, ROADMAP 5A):
 - **White/Gray retrigger semantics** — only fire on capture and don't re-roll jackpot/break/depreciation; should fire on any trigger and re-roll randomness per retrigger.

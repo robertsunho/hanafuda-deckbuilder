@@ -4,15 +4,14 @@
 order*. Created 2026-06-18, then reconciled the same day against the authoritative `PHASE_5_6_7_BACKLOG.md`.
 
 **What this doc is.** The forward task plan. It is distinct from:
-- **`DESIGN_DEFERRED.md`** — the *design specs* of deferred features. **Now folded into this doc** (each
-  D-spec lives inline in the entries below, 2026-06-18); DESIGN_DEFERRED is pending archival once this
-  merge is reviewed.
+- **`DESIGN_DEFERRED.md`** *(deleted 2026-06-19)* — its deferred-design specs (D1-D10) are folded into this
+  doc's entries; the file was deleted in the restructure (content git-preserved).
 - **`DECISIONS_LOG.md`** — the durable record of what's been *decided* (rationale).
 - **`OVERHAUL_PLAN.md`** — the Phase-0-4 task record. ROADMAP **supersedes its forward role** (see §6).
 
 See `DOC_MAP.md` for the one-concern-one-doc map.
 
-> **Sourcing note.** The primary source is **`docs/process/PHASE_5_6_7_BACKLOG.md`** — the de-duplicated,
+> **Sourcing note.** The primary source was **`docs/archive/plans/PHASE_5_6_7_BACKLOG.md`** — the de-duplicated,
 > phase-sorted intake doc (prepared 2026-06-13). ROADMAP was first drafted from a *substitute*
 > (`OVERHAUL_PLAN.md`'s scattered Phase-5 content) before the backlog was in the repo, then **reconciled
 > against the backlog on 2026-06-18**: items the backlog carried that the substitute had dropped were

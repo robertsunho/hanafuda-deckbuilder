@@ -414,6 +414,13 @@ violation); [PRESERVE] vs [FIX] discipline; build+test green before done; doc ro
 
 ## 7. Docs manifest (classified by lifecycle — the index)
 
+> **⚠ Superseded by the 2026-06-19 restructure — see `docs/DOC_MAP.md` §1/§3 for current doc locations** (the
+> authoritative index). Post-restructure: `docs/process/` holds only this doc (HOLD — live Gate-0 input,
+> archives after Gate 0); the canonical set is at `docs/` root; deep rule-docs at `docs/reference/`; the
+> former process docs listed below moved to `docs/archive/{plans,recon}/`; and the rule-vs-record +
+> phase-spanning-registries conventions migrated to DOC_MAP (§6/§3). The listing below is the
+> pre-restructure snapshot — historical.
+
 **`docs/process/` — LIVE set only (durable refs + currently-active + this doc):**
 - `OVERHAUL_PLAN.md` — durable (master plan, all task descriptions; grep, don't bulk-load).
 - `DECISIONS_LOG.md` — durable (chronological decisions + rationale; grep).

@@ -18,7 +18,7 @@ import { getActiveEffect, applyHook }          from './HexagramEffects.js';
 // so relocating them only re-imports them back — only a neutral module would clarify ownership,
 // and even that leaves the run import. If ever cut, sever the light edge (RM→SpiritEffects, ~2
 // sites: NEGATIVE_SNAPSHOT + SpiritEffects.get), not the heavy one (~25 sites). See
-// docs/process/destination_audit_recon_pass1.md Part 2.
+// docs/archive/phase4/destination_audit_recon_pass1.md Part 2.
 import SpiritEffects, { NEGATIVE_SNAPSHOT, isElementMature }     from './SpiritEffects.js';
 import { getBlessingDef }                      from '../data/blessings.js';
 //

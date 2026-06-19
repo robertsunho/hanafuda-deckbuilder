@@ -186,7 +186,7 @@ V6 serves two audiences: (1) future Claude sessions picking up work after compac
 - 16.13 Save/Load State
 - 16.14 Summary
 
-*(Former §17 Open Design Questions and §18 Decisions Log were extracted to `process/V6_EXTRACTED_SECTIONS.md` — see footer.)*
+*(Former §17 Open Design Questions and §18 Decisions Log were reparceled to `ROADMAP.md` / `CODEBASE_CLEANUP.md` — see footer.)*
 
 ---
 
@@ -1327,7 +1327,7 @@ For natural transcendence (4-stack accumulation), `powerLevel = stackCount`: all
 
 **Note on Amber's tradeoff:** Amber costs **-1 permanent field slot** as a tradeoff for transcendence freedom. This means Amber-driven builds are committing to reduced field capacity for the rest of the run.
 
-**Open balance item:** Now that natural transcendence is lossless (full power, free), Amber's niche — full power in exchange for a permanent field slot — is largely dominated by free natural transcendence. A Phase-5 rebalance is planned (see `DESIGN_DEFERRED.md`).
+**Open balance item:** Now that natural transcendence is lossless (full power, free), Amber's niche — full power in exchange for a permanent field slot — is largely dominated by free natural transcendence. A Phase-5 rebalance is planned (see `ROADMAP.md`).
 
 **Acquisition paths that contribute to stacking:**
 
@@ -2348,7 +2348,7 @@ The 64 hexagrams fall into 15 categories:
 
 The 8 double-trigram hexagrams are formed from a trigram repeated twice. They produce the most fundamental gameplay alterations — these aren't multiplier tweaks; they change how the game itself plays.
 
-**Phase-5 note:** these 8 modes are slated for a Phase-5 redesign and reimplementation (including hex_29 Kǎn's rank-matching board-layout redesign); see `DESIGN_DEFERRED.md`. The descriptions below document current behavior.
+**Phase-5 note:** these 8 modes are slated for a Phase-5 redesign and reimplementation (including hex_29 Kǎn's rank-matching board-layout redesign); see `ROADMAP.md`. The descriptions below document current behavior.
 
 | ID | Name | Effect | Description |
 |---|---|---|---|
@@ -3994,8 +3994,8 @@ Status as of May 2026.
 | `localStorage` beaten hexagrams | ✅ | Gates Hexagram Collection visibility |
 | In-run save/restore | ❌ | No mid-run save; runs are single-session |
 | Run history / statistics | 🔵 | Future enhancement |
-| Tutorial / onboarding | ❌ | Not implemented — planned Phase 5 (see `DESIGN_DEFERRED.md`) |
-| Art assets (final production) | 🟡 | Ongoing — Phase 5 milestone (see `DESIGN_DEFERRED.md`) |
+| Tutorial / onboarding | ❌ | Not implemented — planned Phase 5 (see `ROADMAP.md`) |
+| Art assets (final production) | 🟡 | Ongoing — Phase 5 milestone (see `ROADMAP.md`) |
 
 ### 16.14 Summary
 
@@ -4012,4 +4012,4 @@ These are tracked in detail in `DEFERRED_CLEANUP_ITEMS.md`. Beyond this list, ba
 
 ---
 
-*Design Document V6 — reconciled June 2026 (Phase-4 doc campaigns 3b/3c). 16 sections. The former §17 (Open Design Questions) and §18 (Decisions Log) were extracted to `process/V6_EXTRACTED_SECTIONS.md` pending reparceling. See `process/CODEBASE_CLEANUP.md` for code-cleanup tasks and `DESIGN_DEFERRED.md` for deferred design.*
+*Design Document V6 — reconciled June 2026 (Phase-4 doc campaigns 3b/3c). 16 sections. The former §17 (Open Design Questions) and §18 (Decisions Log) were reparceled in the 2026-06-19 restructure (forward items → `ROADMAP.md`, code tasks → `CODEBASE_CLEANUP.md`). See `CODEBASE_CLEANUP.md` for code-cleanup tasks and `ROADMAP.md` for deferred design.*

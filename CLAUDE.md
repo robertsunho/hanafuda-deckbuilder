@@ -25,7 +25,7 @@ manual in-game testing (in-game still covers rendering/UX; tests cover engine lo
 
 - **Layout & harness:** `test/spirits/*.test.js` (one file per spirit/tight cluster).
   `test/helpers.js`: `makeRound({spiritIds, spirits, deckCardIds})`, `equipSpiritWithState(id, {state}|{elements})`,
-  `playRoundToEnd(grm)`. Read `/docs/process/TEST_HARNESS_GOTCHAS.md` before writing tests —
+  `playRoundToEnd(grm)`. Read `/docs/reference/TEST_HARNESS_GOTCHAS.md` before writing tests —
   determinism (Math.random stubbed during the deal), `run.reset()` isolation, accumulator seeding,
   and proportional yaku thresholds all live there.
 - **Granularity:** assert at the smallest real enclosing method/dispatcher (`_addCapture`,
@@ -58,25 +58,26 @@ If you find spirit/consumable logic in a "manager" file or in a scene file, that
 
 ## Reference docs
 
-All documentation lives under `/docs/`. Two tiers:
+All documentation lives under `/docs/` (full index: `/docs/DOC_MAP.md`). The layout:
 
-- **`/docs/process/`** — LIVING references, consulted and updated as work proceeds.
-- **`/docs/archive/`** — HISTORICAL, point-in-time records. Read for context; do NOT edit.
+- **`/docs/` (root)** — the canonical set: `DESIGN_DOC_V6.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `ENGINEERING_RULES.md`, `DECISIONS_LOG.md`, `CODEBASE_CLEANUP.md`, `CHANGELOG.md`, `DOC_MAP.md`.
+- **`/docs/reference/`** — deep rule-docs ENGINEERING_RULES indexes (`SPIRIT_SET_ITERATION_RULE`, `TEST_HARNESS_GOTCHAS`, `tooltip_verification_checklist`).
+- **`/docs/process/`** — in-flight working docs only (current-task creation; migrates to archive at close).
+- **`/docs/investigations/`** — live forward-going recon.
+- **`/docs/archive/`** — HISTORICAL, point-in-time records (`recon/`, `plans/`, `design-versions/`, `phase4/`). Read for context; do NOT edit.
 
-Key docs:
-- **Authoritative design:** `/docs/DESIGN_DOC_V5.md` (note: some discrepancies with code; see `/docs/process/DESIGN_DOC_PATCHES.md` for the active reconciliation worklist)
-- **Phase plan and task tracking:** `/docs/process/OVERHAUL_PLAN.md`
-- **Decision history:** `/docs/process/DECISIONS_LOG.md`
-- **Working patterns:** `/docs/process/PHASE_3_LESSONS.md`
-- **Workflow/infrastructure rationale:** `/docs/process/INFRASTRUCTURE_DECISIONS.md`
-- **Prior recon (verify against current code; may be stale):** `/docs/archive/investigations/`
-- **Architecture catalogue (Phase 4 deliverable):** `/docs/process/ARCHITECTURE.md` if/when created — until then, recon the codebase
+Key canonical docs:
+- **Authoritative design (what the game does):** `/docs/DESIGN_DOC_V6.md`.
+- **Architecture (how the code is built):** `/docs/ARCHITECTURE.md`.
+- **Forward plan + deferred-design specs:** `/docs/ROADMAP.md`.
+- **Operational rules + workflow rationale (§D):** `/docs/ENGINEERING_RULES.md`.
+- **Decision history:** `/docs/DECISIONS_LOG.md`. **Reference-doc change index:** `/docs/CHANGELOG.md`.
 
-When adding a doc: living/updated → `process/`; immutable snapshot → `archive/`. Don't edit archived files; if their findings are stale, re-recon fresh rather than amending the old record.
+When adding/placing a doc, route per `/docs/DOC_MAP.md` (it decides the canonical home for each concern). Don't edit archived files; if their findings are stale, re-recon fresh rather than amending the old record.
 
 ## Working principles
 
-### Operating rules (summary — full + canonical in `docs/process/ENGINEERING_RULES.md`)
+### Operating rules (summary — full + canonical in `docs/ENGINEERING_RULES.md`)
 
 - **Recon before edit.** Read the live code before changing it; specs and task descriptions are hypotheses until checked against it.
 - **Verify the bug still reproduces.** Tasks logged days/weeks ago may have silently resolved — confirm before fixing.
@@ -99,7 +100,7 @@ Legendaries are a separate category (own slot, not in the chain, don't stack/tra
 score). Reaching for `activeSpirits` to FIRE / SCORE / TARGET is almost always wrong — use
 `allSpirits` (the chain) or `scoringSpirits` (scoring, incl. legendaries); `activeSpirits` is for
 slot-capacity and legendary-presence questions only. Full rule + getter-by-question table:
-`/docs/process/SPIRIT_SET_ITERATION_RULE.md`.
+`/docs/reference/SPIRIT_SET_ITERATION_RULE.md`.
 
 ### Existing patterns to respect (established in Phases 0-3)
 
@@ -130,7 +131,7 @@ slot-capacity and legendary-presence questions only. Full rule + getter-by-quest
 
 ## Workflow
 
-The per-task loop with Robert: recon → verify the bug still reproduces → smallest defensible fix → `npx vite build` + `npm test` → **status report** (brief summary of what changed and any concerns). The first four are the operating rules above; full statements live in `docs/process/ENGINEERING_RULES.md`. The status report closes every task.
+The per-task loop with Robert: recon → verify the bug still reproduces → smallest defensible fix → `npx vite build` + `npm test` → **status report** (brief summary of what changed and any concerns). The first four are the operating rules above; full statements live in `docs/ENGINEERING_RULES.md`. The status report closes every task.
 
 ## When you find new conventions that should live here
 
