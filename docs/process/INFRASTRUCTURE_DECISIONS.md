@@ -5,6 +5,15 @@
 **Purpose:** Records *why* the Phase 4 workflow is shaped the way it is, so future
 conversations don't re-litigate settled questions or misunderstand the tooling.
 
+> **Folded 2026-06-18 — ready for deletion/archival in the restructure.** The workflow rationale
+> (two-Claude loop, commit-and-push & sync discipline, source-of-truth) now lives in `ENGINEERING_RULES.md`
+> §D. The doc-org catalogue (the `/docs/` tree, process-vs-archive) is superseded by `DOC_MAP.md` (cut, not
+> carried forward). **Open flags for the restructure — do NOT lose:** (1) the "rule vs record"
+> doc-lifecycle test + "phase-spanning registries swept forward" principles are not yet in DOC_MAP — migrate
+> them before archival; (2) the housekeeping TODOs (repo rename `hanafuda-deckbuilder`→`hanatu`; verify
+> DECISIONS_LOG records the "spirits don't touch Flow" reversal) still need a home. Kept in place until
+> review confirms nothing was lost.
+
 ---
 
 ## The workflow model: Project-with-Claude-Code-recon

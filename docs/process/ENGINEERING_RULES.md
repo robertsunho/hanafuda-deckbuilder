@@ -57,12 +57,12 @@ Each rule, then one line on the cost it prevents.
 - **Commit and push every change, tagged with the task ID.** After a change lands and the build is clean,
   commit AND push immediately (e.g. `F4.16: move _fireCuckooHatch …`). The Project syncs from the *remote*,
   so the remote must stay current for synced recon to be trustworthy. *Cost: stale synced knowledge; lost
-  work.* *(Rationale: `INFRASTRUCTURE_DECISIONS.md` — "commit-every-change discipline.")*
+  work.* *(Rationale: §D.)*
 - **Verify sync retrieval before trusting it.** Project GitHub sync can silently fail ("Connected" but not
   indexed). Before a recon-heavy session, read a known file + a known doc section to confirm retrieval
   works. Uncommitted local edits won't appear in synced knowledge — when re-reconning an area just touched
   but not pushed, read the working tree directly. *Cost: reasoning against a stale or empty mirror.*
-  *(Rationale: `INFRASTRUCTURE_DECISIONS.md` — "GitHub-synced Project knowledge.")*
+  *(Rationale: §D.)*
 - **Verify by fresh clone for high-stakes diffs.** For large or structural changes, confirm against a fresh
   clone (`/tmp/heN`, `--depth 1` for HEAD) + grep rather than trusting in-context state. *Cost: reviewing a
   diff that isn't what actually landed.*
@@ -109,6 +109,38 @@ The fast operational answer, then the link. Those docs stay canonical — do not
 | What a mechanic does (behavior / design) | `DESIGN_DOC_V6.md` |
 | The spirit-set iteration rule + the accumulator pattern (deep) | `SPIRIT_SET_ITERATION_RULE.md` |
 | The test-harness model + gotchas (deep) | `TEST_HARNESS_GOTCHAS.md` |
-| Why the workflow is shaped this way (the two-Claude loop, sync discipline) | `INFRASTRUCTURE_DECISIONS.md` |
+| Why the workflow is shaped this way (the two-Claude loop, sync discipline) | **§D** (below) |
 | Decisions + rationale (the durable record) | `DECISIONS_LOG.md` |
 | Where any concern's canonical doc lives | `DOC_MAP.md` |
+
+---
+
+## §D — Why the workflow is shaped this way
+
+*Rationale, not rules — §A says what to do; this says why the working model is what it is. (Folded from the
+former `INFRASTRUCTURE_DECISIONS.md`, 2026-06-18.)*
+
+**The two-surface model.** Work runs across two surfaces. The **claude.ai Project** is the persistent
+knowledge home — it holds the codebase + all of `/docs/`, synced from the GitHub **remote** and retrieved
+on demand (continuity across sessions comes from Project knowledge, not chat memory) — and is where design
+is reasoned about and decided. **Claude Code** does exhaustive recon over the working tree (true grep,
+"find every call site of X") and implements once a decision is made. Robert tests in-game, drives
+commit/push, and holds final judgment. Most orientation reads go through synced knowledge; comprehensive
+symbol sweeps go through Claude Code.
+
+**Why commit-and-push every change (the §A rule's *why*).** The Project syncs from the *remote*, so synced
+knowledge is only as current as the last push. A change committed-but-not-pushed (or not committed) is
+invisible to the design surface — the two-surface model breaks when the remote lags. Hence: commit AND push
+immediately; and when re-reconning an area just touched but not yet pushed, read the working tree directly.
+
+**Why verify sync retrieval (the §A rule's *why*).** Project GitHub sync carries file names + contents only
+(no history/PRs), refreshes manually ("Sync now"), and has historically failed *silently* ("Connected" but
+not indexed). Because the whole design surface reasons against that mirror, a recon-heavy session verifies
+retrieval first (read a known file + a known doc section) — reasoning against a stale or empty mirror is the
+failure this prevents.
+
+**Source of truth: the repo, synced — not separate uploads.** There is ONE home for docs: the repo; they
+reach Project knowledge *through* the GitHub sync, never via separate upload (duplicate uploads drift — the
+same anti-drift principle Phase 4 applied to code). *(A live GitHub-MCP read into chat — the path
+investigated and not taken — isn't available on the web surface; that grep-style capability lives in Claude
+Code, which already covers it.)*
