@@ -129,7 +129,7 @@ V6 serves two audiences: (1) future Claude sessions picking up work after compac
 - 12.4 Deck-Fixing Pool Expansion at Sacred Grove
 - 12.5 Reroll System
 - 12.6 Purchase Flow
-- 12.7 Sacred Grove Fusion Section
+- 12.7 Sacred Grove Fusion
 - 12.8 Blessing Acquisition (Not Yet Implemented)
 - 12.9 Stamp Acquisition Refinements
 - 12.10 Continue Button and Round Progression
@@ -146,7 +146,7 @@ V6 serves two audiences: (1) future Claude sessions picking up work after compac
 - 13.9 GameScene — Field & Capture Visual Mechanics
 - 13.10 GameScene — Other UI Elements
 - 13.11 ShrineScene — Shop Layout
-- 13.12 ShrineScene — Per-Item Overlays
+- 13.12 ShrineScene — Consumable Activation Picker
 - 13.13 Persistent State Across Scenes
 - 13.14 Future / Planned UI Elements
 
@@ -367,7 +367,7 @@ The 13 speculative cards fill missing month/rank slots so that every month has a
 | `december_fox` | Fox | animal | December | land | night | Animal |
 | `december_ribbon` | Paulownia Ribbon (White) | ribbon | December | land | night | Ribbon |
 
-**Speculative card design intent:** Most speculative additions are brights (8 of 13) because most months lack a second bright in the base deck. Adding speculatives via rank promotion or hexagram effects concentrates bright density, enabling otherwise-unreachable Hikari thresholds.
+**Speculative card design intent:** Most speculative additions are brights (7 of 13) because most months lack a second bright in the base deck. Adding speculatives via rank promotion or hexagram effects concentrates bright density, enabling otherwise-unreachable Hikari thresholds.
 
 **Tag assignment:** Speculative cards currently have empty tag arrays in code (`tags: []`). Tag assignment for speculatives is a deferred task — when speculatives are integrated into spirits/hexagrams, they will need appropriate thematic tags.
 
@@ -451,7 +451,7 @@ Tags are thematic descriptors used to compute spirit and hexagram affinity. A si
 
 Tags include: cosmic descriptors (`sky`, `sun`, `moon`, `rain`, `water`, `fire`, `earth`), animal types (`bird`, `insect`, `firefly`, `cricket`), thematic qualities (`noble`, `auspicious`, `longevity`, `wisdom`, `revelry`, `journey`, `sorrow`), seasonal modifiers (`winter`, `spring`, `summer`, `autumn`), structural qualities (`evergreen`, `blossom`, `vine`, `field`, `foliage`).
 
-Tags are accessed via the `cardsByTag` lookup helper in `cards.js`. Spirits and hexagrams query tags to determine affinity.
+Spirits and hexagrams query a card's `tags` array directly to determine affinity.
 
 **Speculative cards have empty tag arrays.** Tag assignment for speculatives is a deferred design task — tags will be assigned when the cards are integrated into specific spirits/hexagrams.
 
@@ -513,7 +513,7 @@ Primary tier (purchasable at any shrine):
 
 Secondary tier (Sacred Grove only):
 - Orange Stamp — captured: draw +1 card and gain +3 ki
-- Green Stamp — discarded: +8 ki when discarded (any discard pathway)
+- Green Stamp — discarded: +3 ki when discarded to a full field
 - Purple Stamp — yaku: gain a free consumable when contributing to a new yaku
 
 Tertiary tier (crafted from primary + secondary stamps):
@@ -598,7 +598,7 @@ The field is the central play area where cards are placed and matched.
 
 The Expanse spirit referenced in V3-V4 has been **eliminated** — field slot expansion is now exclusively handled by Blessings, Rooster, and hexagram/alchemical effects.
 
-**Slot stacking:** Each field slot can hold up to 3 cards in a stack (same-month cards stack vertically). When a slot reaches 4 cards, it auto-captures (+5 full month bonus).
+**Slot stacking:** Each field slot can hold up to 3 cards in a stack (same-month cards stack vertically). When a slot reaches 4 cards, it auto-captures.
 
 **Stranding:** When a deck flip matches a pending pair's month, the flipped card joins the stack, stranding the pending pair (no capture occurs that turn). The Silk Wu Xing enhancement prevents stranding of any pending stack it is **part of** — this is per-card (Silk protects only a stack that contains a Silk card, not the whole field) and applies in **both** stranding cases: a deck flip that would strand a Silk-containing pending pair, and a hand-played stack containing Silk. The protected stack resolves to a capture in the deck-flip phase like any other capture. A Silk card placed alone or in a non-matching slot is **not** auto-captured — Silk only resists stranding of a real pending stack.
 
@@ -743,7 +743,7 @@ During play, the following matching rules govern how plays resolve:
 
 - **Deck flip → no field match:** The flipped card goes to an empty field slot. Pending pair captures normally if the pending played card found a match.
 
-- **4-card stack auto-capture:** When a field slot reaches 4 cards (the full month), all 4 cards capture automatically. The capture grants a +5 full-month bonus to base points. This does NOT trigger Bank/Push (only the four scoring yakus trigger Bank/Push).
+- **4-card stack auto-capture:** When a field slot reaches 4 cards (the full month), all 4 cards capture automatically. This does NOT trigger Bank/Push (only the four scoring yakus trigger Bank/Push).
 
 ### 4.3 Hand Plays — Multi-Card
 
@@ -761,22 +761,31 @@ When a yaku triggers, the player chooses **Bank** (end round, keep current runni
 
 **Push triggers:** Only the four scoring yakus (Kasu, Tanzaku, Tane, Hikari) trigger Bank/Push decisions. Style combos, full-month auto-captures, and all other events do NOT trigger Bank/Push.
 
-**Push effects:**
+**Push effects:** Each successful push deals additional cards into the hand (a "deal curve") and increments the **push depth**, the commitment counter that indexes the flow curve at resolution:
 
-| Push # (successful) | Hand Replenishment | Push Factor (multiplicative on flow) |
+| Push # (successful) | Hand Replenishment | Push Depth |
 |---|---|---|
-| 1 | +4 cards | ×1.1 |
-| 2 | +2 cards | ×1.1 (compounds: 1.1 × 1.1 = 1.21) |
-| 3 | +1 card | ×1.1 (compounds further) |
-| 4+ | +1 card | ×1.1 (compounds further) |
+| 1 | +4 cards | 1 |
+| 2 | +2 cards | 2 |
+| 3 | +1 card | 3 |
+| 4+ | +1 card | 4+ |
 
 Cards remaining in hand carry over into the push (efficient hand use is rewarded).
 
-**Push penalty:** When a push fails (hand empties without triggering a new yaku), Flow is multiplied by ×0.9 instead of ×1.1. The penalty is purely a Flow multiplier — there is NO direct score penalty applied to the running total at round end.
+**Commitment model (flow resolves once, not per push):** Flow is **not** multiplied on each push. The running flow is left untouched while the player keeps pushing; the push is a *commitment* whose outcome is resolved a single time — when the player **banks** (the pushes paid off) or **fails** (the hand empties without a new yaku). The resolution multiplier is read from the depth-indexed `PUSH_CURVE` (`RunManager.PUSH_CURVE`):
+
+| Resolution depth | Bank (success) ×flow | Fail ×flow |
+|---|---|---|
+| 1 | ×1.10 | ×0.90 |
+| 2 | ×1.25 | ×0.80 |
+| 3 | ×1.50 | ×0.65 |
+| 4 | ×2.00 | ×0.50 |
+
+The multiplier is applied **once** at resolution — it does **not** compound per push. (A depth-2 bank is ×1.25, *not* ×1.1×1.1 = 1.21.) On **bank**, the success multiplier for the current depth is applied; on **failure**, the failure multiplier for depth+1 is applied. Depths beyond 4 are extrapolated by `getPushMultiplier`. The round-end interest reward is scaled by the same curve at the resolution depth.
+
+**Push penalty:** A failed push (hand empties without triggering a new yaku) resolves on the failure column above — a flow multiplier below 1.0 that grows harsher with depth. The penalty is purely a flow multiplier; there is NO direct score penalty applied to the running total at round end.
 
 **Held-card ki forfeit:** Cards remaining in the player's hand at round end normally grant a ki bonus when banking. A failed push forfeits this bonus — held cards in hand at the moment of hand-empty grant zero ki.
-
-**Resolution of in-progress push:** Completing a new yaku after pushing successfully clears the push as successful (Flow ×1.1). Failing to complete a new yaku before hand empty fails the push (Flow ×0.9, held-card ki forfeit).
 
 ### 4.5 Round End Conditions
 
@@ -846,8 +855,6 @@ Phase 2 is where the **spirit chain order matters most**. A spirit's `onCardScor
 **Phase 2.5: Retriggers**
 
 Spirits with `getRetriggerCount` can cause additional firings of Phase 2 for specific cards. Each retrigger re-runs the **full** per-card scoring pipeline — including the hexagram `onCardScored` season/axis multiplier (Phase 2, step 5), which is applied on every retrigger, not only the first scoring of the card. (Note: Stamps also trigger retriggers, but those fire later in Phase 4.)
-
-**Full month bonus:** If the capture is 4 cards (a complete month), +5 added to running `points` after Phase 2.
 
 **Phase 3: Engine spirits**
 
@@ -1022,7 +1029,7 @@ These match the in-game display: `★(2) ♦(3) ║(3) □(6)`.
 
 Style combos are detected after each capture event. **Each combo triggers at most once per run** — once a player triggers Spring (capturing cards from months 3, 4, 5) in any round, Spring cannot trigger again in any subsequent round of that run. Combo triggers add their bonus to Flow at the moment of detection.
 
-**Current 12 style combos:**
+**Current 11 style combos:**
 
 | Style Combo | Requirement | Flow Bonus |
 |---|---|---|
@@ -1044,7 +1051,7 @@ Style combos are detected after each capture event. **Each combo triggers at mos
 
 **Once-per-run framing:** Because each combo triggers at most once per run, style combos function as run-level milestones rather than per-round farm targets. A player who triggers Spring in Round 2 cannot retrigger it later. This makes the **timing** of when each combo triggers a meaningful strategic question — earlier triggers compound more across the run via Flow's persistent multiplier nature, while waiting for the right round to trigger combos with smaller Flow bonuses can be used to set up bigger plays.
 
-**System status:** The current 12 combos are stable but not the final roster. Many additional style combos will be added — the long-term goal is a substantially larger catalog. Some current combos may be revised. The style combo system is an active development area.
+**System status:** The current 11 combos are stable but not the final roster. Many additional style combos will be added — the long-term goal is a substantially larger catalog. Some current combos may be revised. The style combo system is an active development area.
 
 **Visual feedback:** Style combo triggers create a floating popup notification (non-blocking) and contribute to the end-of-round summary in the round overlay.
 
@@ -1117,7 +1124,7 @@ Some scoring contributions fire per capture; others fire once per round or once 
 
 **Per-capture (every capture):**
 
-- Card base points and full-month bonuses
+- Card base points
 - Wu Xing enhancement effects (Fire flat, Water mult, Wood mult, Metal/Earth held-in-hand)
 - Edition bonuses (Gold, Crystal, Ghost)
 - Hexagram per-card hooks
@@ -1175,13 +1182,13 @@ For balance reference, the score range a player can achieve without spirits, enh
 
 If the player happened to capture every bright card in the deck via 4-card stack auto-captures and triggered all 4 yakus with consecutive successful pushes, the maximum theoretical score is roughly:
 
-- January (Crane bright + Pine ribbon + 2 Pine plains): 20 + 10 + 3 + 3 = 36 + 5 (full month) = 41
-- March (Curtain bright + Cherry ribbon + 2 Cherry plains): 36 + 5 = 41
-- August (Moon bright + Geese animal + 2 Pampas plains): 38 + 5 = 43
-- November (Rainman bright + Swallow animal + Willow ribbon + Lightning): 45 + 5 = 50
-- December (Phoenix bright + 3 Paulownia plains): 29 + 5 = 34
+- January (Crane bright + Pine ribbon + 2 Pine plains): 20 + 10 + 3 + 3 = 36
+- March (Curtain bright + Cherry ribbon + 2 Cherry plains): 36
+- August (Moon bright + Geese animal + 2 Pampas plains): 38
+- November (Rainman bright + Swallow animal + Willow ribbon + Lightning): 45
+- December (Phoenix bright + 3 Paulownia plains): 29
 
-Total raw points: ~209
+Total raw points: ~184
 
 With Flow ramping through pushes (say, 4 successful pushes for ×1.1^4 ≈ ×1.46 final flow) and modest mult from style combos, an exceptional naked round might reach 200-250.
 
@@ -1198,10 +1205,6 @@ These notes capture the implementation reality (post-May 2026 cleanup) for futur
 The per-capture scoring path lives in `GameRoundManager._addCapture()`. This method handles the multi-phase pipeline (held-in-hand → per-card → retriggers → engines → post-scoring) and adds the resulting captureScore to `_runningScore`. The running score IS the final score — no batch recalculation happens.
 
 A vestigial method `_scoreFieldCards()` exists for hexagram-driven score-at-round-end behavior (gated by the `scoreFieldAtRoundEnd` hook). It only fires under specific hexagram conditions and is not the main scoring path.
-
-**Vestigial code:**
-
-`ScoringEngine.calculateFinalScore()` exists but only serves the metal proc side effect — its score output is discarded by all callers. After the May 2026 cleanup, this method's body was simplified to return only `{ metalConsumableCount: 0 }`. Removing it entirely is a deferred architectural cleanup item.
 
 **Yaku checker simplification:**
 
@@ -1221,7 +1224,6 @@ The `_cardTargetMode` system in GameScene (renamed from `_markMode` during clean
 
 **Architectural debt (deferred):**
 
-- `calculateFinalScore` could be removed entirely; metal proc handling could move to per-capture flow.
 - Some `addKi`/`spendKi` callers still pass `'unspecified'` reason strings; tighter telemetry on the deferred list.
 - May/September animal naming clarification (legacy IDs `may_bridge`, `september_sake`).
 - December's deprecated `december_plain_3` entry could be removed.
@@ -1634,7 +1636,7 @@ Economy spirits modify ki acquisition, ki spending, or shop interactions. They u
 
 | ID | Name | Effect | Cost | Rarity |
 |---|---|---|---|---|
-| `econ_bonds` | Bonds | +5% addition to interest rate (stacks up to +15% over base; codebase description claiming +25% is incorrect) | 4 | uncommon |
+| `econ_bonds` | Bonds | +5% addition to interest rate (stacks up to +15% over base) | 4 | uncommon |
 | `econ_ingot` | Ingot | +0.01% interest per 1 ki held (scales with wealth) | 4 | common |
 | `econ_grace` | Grace | Multiplies style combo ki: ×2 / ×3 / ×4 (additive stacking) | 3 | common |
 | `econ_recycling` | Recycling | Gain +5 ki per stack whenever a card is discarded due to a full field | 3 | common |
@@ -1671,7 +1673,7 @@ Economy spirits modify ki acquisition, ki spending, or shop interactions. They u
 |---|---|---|---|---|
 | `econ_replica` | Replica | Duplicate a consumable at the start of each round | 5 | uncommon |
 | `econ_print` | Print | (Non-functional, pending F5.9) Generate bonus ki each time ki is spent in the shop | 4 | — (out of pool) |
-| `econ_collector` | Collector | Each round held earns +3 ki bonus at round end | 3 | uncommon |
+| `econ_collector` | Collector | Each round, adds +1 ki per stack to the sell price of every owned spirit and consumable | 3 | uncommon |
 
 ### 7.11 Gameplay & Meta Spirits
 
@@ -2134,7 +2136,7 @@ Zodiac consumables are 13 single-use tactical effects, each named after one of t
 | `zodiac_rabbit` | Rabbit | Remove push penalty for this round | 5 | yaku |
 | `zodiac_dragon` | Dragon | Ki lottery: gain 0–30 ki (random) | 4 | ki |
 | `zodiac_snake` | Snake | Lower one yaku threshold by 1 this round | 4 | yaku |
-| `zodiac_horse` | Horse | Discard your hand and draw 8 fresh cards | 5 | hand |
+| `zodiac_horse` | Horse | Discard your hand and draw an equal number of fresh cards | 5 | hand |
 | `zodiac_goat` | Goat | +1 ki per capture for the rest of this round | 4 | ki |
 | `zodiac_monkey` | Monkey | Capture all cards on a field slot; discard equal count from hand | 4 | field |
 | `zodiac_rooster` | Rooster | Open a 9th field slot for this round | 3 | field |
@@ -2147,7 +2149,7 @@ Zodiac consumables are 13 single-use tactical effects, each named after one of t
 **Hand manipulation (Rat, Horse, Dog):**
 
 - **Rat** is a flat draw +2. Useful for emergency hand replenishment without pushing, or for setting up specific captures.
-- **Horse** is a hand reset — discards all current hand cards (which go to discard pile) and draws 8 fresh. Useful when the current hand is unworkable. Note: discarded cards from Horse can trigger discard-stamps (Blue, Green) on those cards, providing an indirect benefit beyond the reset.
+- **Horse** is a hand reset — discards all current hand cards (which go to discard pile) and redraws an equal number, replacing the hand 1-for-1 (clamped to the deck's remaining room). Useful when the current hand is unworkable. Note: discarded cards from Horse can trigger discard-stamps (Blue, Green) on those cards, providing an indirect benefit beyond the reset.
 - **Dog** retrieves 2 cards from the discard pile back to hand. Especially valuable when paired with discard-trigger stamps or with builds that intentionally cycle cards through the discard pile.
 
 **Field manipulation (Ox, Monkey, Rooster):**
@@ -2176,7 +2178,7 @@ Zodiac consumables are 13 single-use tactical effects, each named after one of t
 
 #### 8.5.2 Code Naming Note: `_dogProtection`
 
-The internal flag for "push penalty suppression" is named `_dogProtection` in the codebase. This is a legacy artifact from the **deprecated `consumable_dog` legacy consumable** (which had this exact effect — nullify push penalty). Rabbit (`zodiac_rabbit`) reuses this flag for backward compatibility while also setting its own `_rabbitActive` flag. Since `consumable_dog` is now deprecated (see DEFERRED_CLEANUP_ITEMS.md) and Rabbit is the current consumable doing this work, the flag should ideally be renamed to `_pushPenaltySuppression` or `_rabbitActive` (already partially done).
+The internal flag for "push penalty suppression" is named `_dogProtection` in the codebase. This is a legacy artifact from the **deprecated `consumable_dog` legacy consumable** (which had this exact effect — nullify push penalty). Rabbit (`zodiac_rabbit`) reuses this flag for backward compatibility while also setting its own `_rabbitActive` flag. Since `consumable_dog` is now deprecated (see docs/CODEBASE_CLEANUP.md) and Rabbit is the current consumable doing this work, the flag should ideally be renamed to `_pushPenaltySuppression` or `_rabbitActive` (already partially done).
 
 When working with the codebase: searching for `_dogProtection` is the path to push-penalty mechanics, but Rabbit is the consumable that activates it.
 
@@ -2312,13 +2314,13 @@ A hexagram needs only the hooks relevant to its effect; most hexagrams use 1-3 h
 Many hexagrams in the boost categories (axis, combined axis, seasonal, rank) follow a **boost-and-debuff pattern**:
 
 - Cards in the target category receive a multiplicative bonus (typically ×1.5, ×2.0, ×2.5, or ×3.0)
-- Cards in the **opposite category** receive a debuff (typically ×0.5)
+- Cards in the **opposite category** receive a debuff (magnitude varies by category: axis ×0.75, seasonal ×0.5, rank ×0.5–0.9)
 - Cards in unrelated categories are unaffected
 
 For example, `boost_air` (`hex_09`):
 - Air cards: ×1.5 mult contribution
-- Land cards: ×0.5 mult contribution
-- (Day/night categorization unaffected — but a land+day card would still get ×0.5 because it's land)
+- Land cards: ×0.75 mult contribution
+- (Day/night categorization unaffected — but a land+day card would still get ×0.75 because it's land)
 
 This pattern creates risk-reward decisions: a hexagram boosting one category implicitly punishes its opposite, encouraging players to lean into the boosted axis or face score reductions on opposite-category captures.
 
@@ -2387,7 +2389,7 @@ The complete catalog organized by category. For each hexagram: ID, number, Engli
 
 See 9.2 above for detailed coverage.
 
-#### 9.3.2 Axis Individual (4) — Boost target axis ×1.5, debuff opposite ×0.5
+#### 9.3.2 Axis Individual (4) — Boost target axis ×1.5, debuff opposite ×0.75
 
 | Hex | Number | Name | Effect | Target |
 |---|---|---|---|---|
@@ -2396,7 +2398,7 @@ See 9.2 above for detailed coverage.
 | `hex_35` | 35 | Jìn (Progress) | `boost_day` | Day cards (24 in base deck) |
 | `hex_36` | 36 | Míng Yí (Darkening Light) | `boost_night` | Night cards (24 in base deck) |
 
-#### 9.3.3 Axis Combined (4) — Boost target quadrant ×1.5, debuff opposite quadrant ×0.5
+#### 9.3.3 Axis Combined (4) — Each matching axis ×1.5 (full quadrant ×2.25), each opposing axis ×0.75 (full opposite quadrant ×0.5625)
 
 | Hex | Number | Name | Effect | Target Quadrant |
 |---|---|---|---|---|
@@ -2416,29 +2418,29 @@ See 9.2 above for detailed coverage.
 
 Equinox and Solstice are 2-month boundary-point sets. Tropic covers the 6 warm months (Spring + Summer); Arctic covers the 6 cold months (Autumn + Winter). Tropic and Arctic overlap with the individual seasonal hexagrams and the Equinox/Solstice hexagrams.
 
-**Code/design discrepancy:** The current `HexagramEffects.js` implementation uses non-overlapping 4-month sets for Tropic (Apr/May/Jul/Aug) and Arctic (Oct/Nov/Jan/Feb) — excluding the boundary months. This is incorrect per design intent. The fix is tracked in `DEFERRED_CLEANUP_ITEMS.md`. The values in this table reflect the design intent.
+**Code/design discrepancy:** The current `HexagramEffects.js` implementation uses non-overlapping 4-month sets for Tropic (Apr/May/Jul/Aug) and Arctic (Oct/Nov/Jan/Feb) — excluding the boundary months. This is incorrect per design intent. The fix is tracked in `docs/CODEBASE_CLEANUP.md`. The values in this table reflect the design intent.
 
-#### 9.3.5 Seasonal Individual (4) — Boost target season ×2.5, debuff next season in cycle ×0.5
+#### 9.3.5 Seasonal Individual (4) — Boost target season ×2.0, debuff opposite season ×0.5
 
 | Hex | Number | Name | Effect | Target |
 |---|---|---|---|---|
-| `hex_03` | 3 | Zhūn (Sprouting) | `boost_spring` | Spring cards; Summer ×0.5 |
-| `hex_47` | 47 | Kùn (Oppression) | `boost_summer` | Summer cards; Autumn ×0.5 |
-| `hex_18` | 18 | Gǔ (Work on the Decayed) | `boost_autumn` | Autumn cards; Winter ×0.5 |
-| `hex_27` | 27 | Yí (Nourishment) | `boost_winter` | Winter cards; Spring ×0.5 |
+| `hex_03` | 3 | Zhūn (Sprouting) | `boost_spring` | Spring cards ×2.0; Autumn ×0.5 |
+| `hex_47` | 47 | Kùn (Oppression) | `boost_summer` | Summer cards ×2.0; Winter ×0.5 |
+| `hex_18` | 18 | Gǔ (Work on the Decayed) | `boost_autumn` | Autumn cards ×2.0; Spring ×0.5 |
+| `hex_27` | 27 | Yí (Nourishment) | `boost_winter` | Winter cards ×2.0; Summer ×0.5 |
 
-The cycle is unidirectional — each season debuffs the season AFTER it (Spring→Summer→Autumn→Winter→Spring). Two opposing seasons cannot fight (e.g., `boost_spring` doesn't debuff Autumn directly).
+Each season boosts itself ×2.0 and debuffs its **opposite** season ×0.5 (Spring↔Autumn, Summer↔Winter). Adjacent seasons do not interact.
 
-#### 9.3.6 Rank (4) — Boost target rank, also raise that rank's yaku threshold by 1
+#### 9.3.6 Rank (4) — Boost target rank, debuff a cross-paired rank
 
-| Hex | Number | Name | Effect | Multiplier | Yaku Affected |
+| Hex | Number | Name | Effect | Buff | Debuff |
 |---|---|---|---|---|---|
-| `hex_14` | 14 | Dà Yǒu (Great Possession) | `boost_brights` | ×2.0 | hikari +1 threshold |
-| `hex_13` | 13 | Tóng Rén (Fellowship) | `boost_animals` | ×1.5 | tane +1 threshold |
-| `hex_22` | 22 | Bì (Adorning) | `boost_ribbons` | ×1.3 | tanzaku +1 threshold |
-| `hex_08` | 8 | Bǐ (Holding Together) | `boost_plains` | ×1.2 | kasu +1 threshold |
+| `hex_14` | 14 | Dà Yǒu (Great Possession) | `boost_brights` | brights ×1.5 | plains ×0.9 |
+| `hex_13` | 13 | Tóng Rén (Fellowship) | `boost_animals` | animals ×2.0 | brights ×0.5 |
+| `hex_22` | 22 | Bì (Adorning) | `boost_ribbons` | ribbons ×2.0 | animals ×0.7 |
+| `hex_08` | 8 | Bǐ (Holding Together) | `boost_plains` | plains ×3.0 | ribbons ×0.7 |
 
-The rank hexagrams have inverse multiplier scaling — rarer ranks get bigger multipliers (brights ×2, plains ×1.2). Each makes its target rank's yaku harder to trigger but the cards more valuable.
+Each rank hexagram amplifies its named rank and debuffs a cross-paired rank. The buff scales inversely with rank value — common low-point ranks get the largest multipliers (plains ×3.0) and rare high-point ranks the smallest (brights ×1.5) — making an otherwise-weak rank competitively valuable.
 
 #### 9.3.7 Wu Xing Cycle (5) — Modify Wu Xing parameters per element
 
@@ -2446,10 +2448,10 @@ These hexagrams alter Wu Xing element behavior rather than card scoring directly
 
 | Hex | Number | Name | Effect | Notable Modifications |
 |---|---|---|---|---|
-| `hex_50` | 50 | Dǐng (Cauldron) | `boost_wood` | Fire flat points reduced (15/50), Fire break chance increased (40%/20%), Wood scoring mult increased (1.3/1.5) |
+| `hex_50` | 50 | Dǐng (Cauldron) | `boost_wood` | Wood scoring mult increased (1.3/1.5); Metal suppressed (held mult 1.25/2.5, Meteorite jackpot reduced to 2%) |
 | `hex_49` | 49 | Gé (Revolution) | `boost_fire` | Fire flat points significantly increased (60/200), Fire break reduced (10%/5%), Earth interest increased |
 | `hex_15` | 15 | Qiān (Modesty) | `boost_earth` | Earth held mult and Metal held mult both increased; Meteorite jackpot rate slightly reduced |
-| `hex_43` | 43 | Guài (Breakthrough) | `boost_metal` | Metal held mult increased (1.75/3.5), Meteorite jackpot greatly increased (15%), Water depreciation accelerated |
+| `hex_43` | 43 | Guài (Breakthrough) | `boost_metal` | Metal held mult increased (1.75/3.5), Meteorite jackpot greatly increased (15%); Fire suppressed (Fire flat points reduced 15/50, Fire break chance increased 40%/20%) |
 | `hex_48` | 48 | Jǐng (The Well) | `boost_water` | Water depreciation slowed substantially, Wood scoring reduced |
 
 Exact tier values for each are encoded in `HexagramEffects.js` per element parameter.
@@ -2541,14 +2543,11 @@ Youthful Folly is the most chaotic hexagram. Card identities (month, type) are r
 
 ### 9.4 Note on Description-vs-Implementation Discrepancies
 
-Many hexagram descriptions in `hexagrams.js` do not accurately reflect the actual implementation in `HexagramEffects.js`. The descriptions in this section reflect the **actual implementation** rather than the codebase's player-facing flavor text. Multiple description corrections are tracked as deferred cleanup items (see `DEFERRED_CLEANUP_ITEMS.md`):
+Many hexagram descriptions in `hexagrams.js` do not accurately reflect the actual implementation in `HexagramEffects.js`. The descriptions in this section reflect the **actual implementation** rather than the codebase's player-facing flavor text. Multiple description corrections are tracked as deferred cleanup items (see `docs/CODEBASE_CLEANUP.md`):
 
 - Axis hexagrams describe by month rather than by per-card axis
 - Boost hexagrams omit the debuff to opposite category
-- `volatile_flow` and `stable_flow` descriptions are completely wrong
 - `four_spirits_fire_twice` description references Fire enhancement (should reference all spirits)
-- `balanced_scoring` description claims spirits are removed (actually formula change)
-- Rank hexagrams omit the yaku threshold modification
 - Wu Xing cycle hexagrams oversimplify the parameter changes
 
 Players should expect hexagram descriptions to be revised in a future update pass.
@@ -2863,14 +2862,9 @@ So:
 
 ### 12.3 Spirit Offering Filtering
 
-The spirit pool is filtered before random selection to exclude spirits the player has already maxed out:
+The spirit-offering pool is filtered to **Tier 1 (Foundation) spirits only** — higher-tier and legendary spirits are never offered directly (Tier 2+ are reached through fusion; legendaries have their own offering path). There is **no maxed-spirit exclusion**: a spirit the player already owns — even at 3 stacks, with or without a Negative copy — can still be offered, and buying it adds another stack or triggers transcendence.
 
-- A spirit is **excluded** if the player has 3 stacks of it AND already has a Negative copy of it. (This prevents shops from offering spirits whose only value would be redundant transcendence triggers.)
-- Owned non-maxed spirits remain in the pool — purchasing them increases the stack count, which is strategically valuable.
-
-This filtering means late-run shops with many maxed-out spirits in the player's loadout have a smaller effective pool, naturally reducing offering diversity.
-
-> **Open design question:** Stacking is a core mechanism for making spirits more powerful, but the rules for obtaining additional copies need explicit design. The current filter (exclude only if 3-stack + Negative) is a starting point, but questions remain — should shops weight non-owned spirits more heavily? Should owning a Tier 1 spirit increase or decrease the chance of seeing Tier 2 fusion ingredients? Should there be a per-shop visibility limit on already-owned spirits to encourage diversity? These rules need refinement during playtesting.
+> **Open design question:** Stacking is a core mechanism for making spirits more powerful, but the rules for obtaining additional copies need explicit design. Questions remain — should shops weight non-owned spirits more heavily? Should owning a Tier 1 spirit increase or decrease the chance of seeing Tier 2 fusion ingredients? Should there be a per-shop visibility limit on already-owned spirits to encourage diversity? These rules need refinement during playtesting.
 
 ### 12.4 Deck-Fixing Pool Expansion at Sacred Grove
 
@@ -2905,24 +2899,18 @@ The purchase flow is identical across shop types:
 
 Purchases that fail prerequisites display feedback (toast or button-disabled state) without spending ki.
 
-### 12.7 Sacred Grove Fusion Section
+### 12.7 Sacred Grove Fusion
 
-When Sacred Grove is active and the player owns ≥2 fusion-eligible Tier 1 spirits, an additional fusion section appears at the bottom of the shop (below the four quadrants, above the continue button).
+There is **no dedicated fusion section in the shop UI.** Fusion is performed entirely through the **alchemical consumables** (§8.6), applied like any other spirit-target consumable via the generic spirit picker (§13.12) — there are no recipe buttons or fusion-confirm/alchemical-result overlays.
 
-**Fusion section structure:**
+**Fusion paths (via alchemicals):**
 
-- Lists available fusion recipes based on the player's current spirits
-- Each recipe shows the input pair → output spirit
-- Costs are determined by the underlying alchemical (Cinnabar for T2/T3, Pearl for T4)
-- Selecting a recipe opens a fusion confirm overlay showing the consumption and result
+- **Tier 1 + Tier 1 (compatible)** → Tier 2 — via Cinnabar (30 ki)
+- **Tier 2 + Tier 2 (cross-pair)** → Tier 3 — via Cinnabar (30 ki)
+- **Tier 3 + Tier 3** → Tier 4 Capstone — via Pearl (50 ki, **components preserved**)
+- **De-fuse** a Tier 2/3 fusion into its ingredients — via Mercury (20 ki)
 
-**Fusion paths:**
-
-- **Tier 1 + Tier 1 (compatible)** → Tier 2 (via Cinnabar, 30 ki)
-- **Tier 2 + Tier 2 (cross-pair)** → Tier 3 (via Cinnabar, 30 ki)
-- **Tier 3 + Tier 3** → Tier 4 (via Pearl, 50 ki, **components preserved**)
-
-Fusion availability is dynamic — as the player's loadout shifts mid-shop (via fusion completion), the available recipes refresh.
+**Gold-glow cue:** At Sacred Grove, spirits in the fan that can currently participate in an available fusion are highlighted with a **gold glow** (driven by `getAvailableFusions`), signalling fusion opportunities without a separate crafting panel. Availability is dynamic — as the loadout shifts (via fusion completion), the glowing set refreshes.
 
 ### 12.8 Blessing Acquisition (Not Yet Implemented)
 
@@ -3273,7 +3261,6 @@ Both Wayside Shrine and Sacred Grove use the same scene with a `isGrove` flag di
 │  [Q_BL: PLAYING CARDS]  │  [Q_BR: ZODIACS]                   │  Lower quadrants
 │                         │                                    │  (180,385) (680,385)
 ├─────────────────────────┴────────────────────────────────────┤
-│  [FUSION SECTION (Sacred Grove only, y=555+)]                │
 │  [Continue button] / [Reroll button] / [Purchase button]     │  Bottom
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -3293,7 +3280,7 @@ Both Wayside Shrine and Sacred Grove use the same scene with a `isGrove` flag di
 | Title color | #e8c96a (gold) | #ffcc44 (bright gold) |
 | Spirit pool | T1 only | T1 only (more offering slots) |
 | Deck-fixing pool | Primary stamps only | Primary + Secondary stamps + 20% Alchemical chance |
-| Special section | (none) | Fusion section appears at y=555+ |
+| Fusion cue | (none) | Fusable spirits glow gold in the spirit fan |
 | Card pool | Smaller | Wider (includes more rare cards) |
 
 **Offering counts** are modifiable by hexagrams (`modifyShopCount`) and Merchant/Daikokuten Blessings (+1 each, up to +2 total).
@@ -3302,42 +3289,24 @@ Both Wayside Shrine and Sacred Grove use the same scene with a `isGrove` flag di
 
 1. Player clicks an offering to expand it (shows full description, cost, and any prerequisites)
 2. The expanded item highlights, and a central "Purchase" button activates
-3. If the player has enough ki and any prerequisites (e.g., consumable slot space, Tier 1 owned for Tier 2 fusion), the purchase completes
+3. If the player has enough ki and any prerequisites (e.g., an open consumable or spirit slot), the purchase completes
 4. Reroll button (cost increases per use, modifiable by hexagram) replaces all four quadrants with new offerings
 5. Continue button advances back to GameScene
 
-**Sacred Grove fusion section:**
+**Sacred Grove fusion cue:**
 
-When Sacred Grove is active and the player owns ≥2 fusable Tier 1 spirits, a fusion crafting section appears at the bottom (above the continue button). The section lists available T2 fusion recipes as buttons; clicking initiates a fusion confirm overlay which consumes the input spirits and produces the T2 result.
+There is no dedicated fusion crafting section in the shop. Fusion runs through the **alchemical consumables** (§8.6) — Cinnabar fuses a compatible pair up a tier (T1+T1→T2, T2+T2→T3), Pearl crafts a Tier 4 capstone (components preserved), Mercury de-fuses — each applied via the generic spirit picker (§13.12). At Sacred Grove, spirits in the fan that can currently participate in an available fusion are highlighted with a **gold glow** (driven by `getAvailableFusions`), cueing the opportunity without a separate panel.
 
-### 13.12 ShrineScene — Per-Item Overlays
+### 13.12 ShrineScene — Consumable Activation Picker
 
-Each consumable type has a custom overlay with category-specific UX:
+Card-target consumables (Chakra Tools, Wu Xing elements, Stamps) and spirit-target consumables (Alchemicals) are all applied through a **single consolidated picker** (F4.35) — there are **no** per-chakra overlays, rank-cycling/edition-probability previews, or booster-pack UI.
 
-**Chakra Tool overlays** (one per chakra):
-- **Root Chakra** — Card list grouped by month with one card highlighted as Demon (Akumon)
-- **Sacral Chakra** — Card-target picker with element selection
-- **Solar Plexus** — Card-target picker showing rank-cycling preview
-- **Heart Chakra** — Card-target picker showing edition probability (60/30/10)
-- **Throat Chakra** — Card-target picker for duplication
-- **Third Eye** — Card-target picker for deletion
-- **Crown Chakra** — Two-card picker (source + destination); destination becomes an exact duplicate of the source (all attributes incl. `baseImageId`)
+**Generic card picker** (`_showShrineCardPicker`): a modal grid of 8 random deck cards (re-drawn each activation). One widget handles three input modes:
+- **`card`** — pick one card (e.g. Sacral, Throat, Third Eye, a Wu Xing element, a stamp).
+- **`card_multi`** — pick up to `maxTargets` cards (e.g. Root toggles up to 3).
+- **`card_pair`** — the Crown two-click flow: click a **source** card, then a **destination**, which becomes an exact duplicate of the source (all attributes incl. `baseImageId`).
 
-**Stamp card selector:**
-- Card grid of all deck cards (filtered by stampability)
-- Stamp preview on hover
-- Confirm to apply the stamp
-
-**Booster pack overlay:**
-- Interactive card pack opening UI (used for some consumables)
-
-**Fusion confirm:**
-- Visual representation of input spirits → output spirit
-- Cost display, confirm/cancel
-
-**Alchemical result:**
-- Post-fusion success screen showing the new spirit
-- Or failure feedback
+**Generic spirit picker** (`_showShrineSpiritPicker`): used by spirit-target alchemicals (Cinnabar fusion, Mercury de-fusion, Jade, Amber, etc.). At Sacred Grove, fusable spirits carry the gold-glow cue described in §13.11.
 
 ### 13.13 Persistent State Across Scenes
 
@@ -3393,12 +3362,12 @@ Logger methods are organized by event category:
 | **Run lifecycle** | `logRunStart`, `logRunEnd`, `logRunSummary` |
 | **Round lifecycle** | `logRoundStart`, `logRoundEnd`, `logSpiritLoadout` |
 | **Player actions** | `logAction` (play/discard), `logBankPushDecision` |
-| **Card events** | `logDeckFlip`, `logCapture`, `logCardEnhanced`, `logCardStamped`, `logCardEditionApplied`, `logCardDestroyed`, `logCardAdded`, `logCardTranscended` |
+| **Card events** | `logDeckFlip`, `logCapture`, `logCardStamped`, `logCardDestroyed`, `logCardAdded` |
 | **Yaku & combos** | `logYakuState`, `logYakuAchieved`, `logYakuThresholds`, `logStyleCombos` |
-| **Scoring** | `logCaptureScoring`, `logRetriggerScoring` |
+| **Scoring** | `logCaptureScoring` |
 | **Consumables** | `logConsumableUse`, `logConsumableSold`, `logNegativeConsumableObtained` |
 | **Spirits** | `logSpiritSold`, `logSpiritStacked`, `logSpiritTranscended` |
-| **Shop** | `logShopEnter`, `logShopOfferings`, `logShopPurchase`, `logShopFusion`, `logShopExit` |
+| **Shop** | `logShopEnter`, `logShopPurchase`, `logShopFusion`, `logShopExit` |
 | **Blessings** | `logBlessingObtained` |
 | **Economy** | `logKiChange`, `logFlowChange` |
 
@@ -3450,8 +3419,6 @@ Several event types capture rich state for post-run analysis:
 - Per-spirit contributions in chain order with their effect type (additive/multiplicative/engine)
 - Final mult, points, and capture score
 
-**`logRetriggerScoring`** captures White/Gray stamp retrigger details with the same depth as the base capture, allowing analysis of retrigger-specific contribution.
-
 **`logYakuThresholds`** captures the exact threshold values at round start, including the deck composition that produced them — useful for verifying the proportional threshold system.
 
 **`logHexagramAssignment`** records the active hexagram (name, Chinese characters, `id`, and description) in the transcript, so playtest logs carry the hexagram context needed for design reconciliation.
@@ -3460,19 +3427,18 @@ Several event types capture rich state for post-run analysis:
 
 ### 14.5 Export Methods
 
-The logger provides three ways to extract transcripts:
+The logger provides two ways to extract transcripts:
 
 | Method | Purpose |
 |---|---|
 | `getTranscript()` | Returns the full transcript as a plain-text string |
 | `copyToClipboard()` | Copies transcript to clipboard via browser API |
-| `printToConsole()` | Outputs the full transcript to `console.log` |
 
-These are exposed for runtime use during development and playtesting.
+The logger instance is exposed on `window.gameLog` (`main.js`), so during development these can be called from the browser console (e.g. `window.gameLog.getTranscript()`, `window.gameLog.copyToClipboard()`).
 
 ### 14.6 Code-Level Telemetry Concerns
 
-A known issue (tracked as a deferred cleanup item) is that many `addKi`/`spendKi` callers pass `'unspecified'` as the reason argument. This makes ki-flow analysis less precise — the transcript shows ki delta but not always the source. Cleanup of these reason strings to meaningful tags (e.g., `'shop_purchase_chakra'`, `'yaku_kasu_trigger'`) is on the deferred list (see "Architectural Cleanup" section of `DEFERRED_CLEANUP_ITEMS.md`).
+A known issue (tracked as a deferred cleanup item) is that many `addKi`/`spendKi` callers pass `'unspecified'` as the reason argument. This makes ki-flow analysis less precise — the transcript shows ki delta but not always the source. Cleanup of these reason strings to meaningful tags (e.g., `'shop_purchase_chakra'`, `'yaku_kasu_trigger'`) is on the deferred list (see `docs/CODEBASE_CLEANUP.md`).
 
 ### 14.7 Future Logging Enhancements
 
@@ -3526,17 +3492,19 @@ For the full speculative card catalog with month/rank/axis details, see Section 
 
 | Category | Count (base deck) | Count (with speculatives) |
 |---|---|---|
-| Total cards | 48 | 61 |
-| Brights | 5 | 7 |
-| Animals | 9 | 16 |
-| Ribbons | 10 | 11 |
-| Plains | 24 | 27 |
+| Total cards | 48 | 60 |
+| Brights | 5 | 12 |
+| Animals | 9 | 12 |
+| Ribbons | 10 | 12 |
+| Plains | 24 | 24 |
 | Air axis | 24 | varies |
 | Land axis | 24 | varies |
 | Day axis | 24 | varies |
 | Night axis | 24 | varies |
 
 The base deck's perfectly balanced axis distribution (24/24/24/24) is a deliberate design property.
+
+**Rank symmetry (with speculatives):** The 13 intended speculative cards give every month the same rank profile — 1 bright, 1 animal, 1 ribbon, 2 plains = 5 distinct cards × 12 months = **60 distinct card identities**. Two December details keep the distinct-plain count at 24 rather than 25: December's third base plain was converted to `december_plain_1_dup` (it re-uses `december_plain_1`'s art, so December has only 2 *distinct* plains in the base deck), and November — which already carries a bright, animal, and ribbon in the base deck — takes `november_plain_2` as its speculative so it reaches 2 plains. (A deprecated 14th speculative, `december_plain_3`, still exists in code but is slated for removal — see §2.3.)
 
 ### 15.2 Spirit Catalog
 
@@ -3560,7 +3528,7 @@ For the full Tier 1 catalog organized by role, see Section 7.5–7.11.
 
 | Category | Count | Examples |
 |---|---|---|
-| Foundation Spirits | 20 | Pollen, Bees, Falcon, Crow (Section 7.5: 4 seasonal-point + 4 seasonal-additive + 4 axis-point + 4 axis-additive + 4 rank-foundation) |
+| Foundation Spirits | 20 | Pollen, Wind, Salt, Wet (Section 7.5: 4 seasonal-point + 4 seasonal-additive + 4 axis-point + 4 axis-additive + 4 rank-foundation) |
 | Engine Spirits | 26 | Velocity, Glacier, Ship, Banner; includes the 5 former demoted rares (Wuji, Dao, Chi, Tengu, Feng Shui) under Miscellaneous Engines (Section 7.6.1–7.6.4) |
 | Conditional Spirits | 3 | Horizon, Dream, Hierarchy (Section 7.7) |
 | Retrigger Spirits | 6 | Rainbow, Family, Wish, Dew, Applause, Echo (Section 7.8) |
@@ -3576,7 +3544,7 @@ The Section 7 categorization sums to 78, matching the 78 Tier 1 entries in `spir
 
 | Tier | Count | Examples |
 |---|---|---|
-| Tier 2 Fusion | 8 | Bloom, Thunderstorm, Hibernation, Mountain (Section 7.12) |
+| Tier 2 Fusion | 8 | Bloom, Thunderstorm, Sun, Continent (Section 7.12) |
 | Tier 3 Cross-Fusion | 8 | Tropic, Arctic, Equinox, Solstice (Section 7.13) |
 | Tier 4 Capstone | 4 | Yin-Yang, Universe, Time, Nature (Section 7.14) |
 | Symbionts | 12 | Algae, Snails, Wolf, Garden, Badger (Section 7.15) |
@@ -3591,8 +3559,8 @@ All Chakra Tools cost 4 ki uniform. Full mechanics in Section 8.1.
 
 | ID | Name | Effect | Targets |
 |---|---|---|---|
-| `chakra_root` | Root | Mark a card as Demon (Akumon) for run-long persistence | 1 |
-| `chakra_sacral` | Sacral | Apply a random Wu Xing element | 1 |
+| `chakra_root` | Root | Toggle the day/night axis (`card.temporal`) of selected cards | 3 |
+| `chakra_sacral` | Sacral | Advance the month (`card.month`; December → January) of selected cards | 3 |
 | `chakra_solar_plexus` | Solar Plexus | Cycle a card's rank (plain→ribbon→animal→bright→plain) | 1 |
 | `chakra_heart` | Heart | Apply a random Edition (60% Gold, 30% Crystal, 10% Ghost) | 1 |
 | `chakra_throat` | Throat | Duplicate a card | 1 |
@@ -3632,7 +3600,7 @@ Full mechanics in Section 8.4.
 | `stamp_yellow` | Yellow | Primary | Captured | +3 ki | 4 |
 | `stamp_white` | White | Primary | **Generic retrigger** | Any effect tied to card fires twice | 6 |
 | `stamp_orange` | Orange | Secondary | Captured | +1 draw + 3 ki | 6 |
-| `stamp_green` | Green | Secondary | Discarded | +8 ki | 5 |
+| `stamp_green` | Green | Secondary | Discarded | +3 ki | 5 |
 | `stamp_purple` | Purple | Secondary | Yaku | Free consumable on yaku contribution | 6 |
 | `stamp_black` | Black | Tertiary | **Generic compound** | +1 draw + free consumable + 3 ki on capture/discard/yaku | 9 |
 | `stamp_gray` | Gray | Quaternary | **Generic triple retrigger** | Any effect tied to card fires 3 additional times (4× total) | 12 |
@@ -3653,7 +3621,7 @@ Full mechanics in Section 8.5.
 | `zodiac_rabbit` | Rabbit | yaku | Remove push penalty for round | 5 |
 | `zodiac_dragon` | Dragon | ki | Ki lottery: 0–30 ki | 4 |
 | `zodiac_snake` | Snake | yaku | Lower a yaku threshold by 1 | 4 |
-| `zodiac_horse` | Horse | hand | Discard hand, draw 8 fresh | 5 |
+| `zodiac_horse` | Horse | hand | Discard hand, redraw equal number | 5 |
 | `zodiac_goat` | Goat | ki | +1 ki per capture rest of round | 4 |
 | `zodiac_monkey` | Monkey | field | Capture all on a slot, discard equal from hand | 4 |
 | `zodiac_rooster` | Rooster | field | Open 9th field slot for round | 3 |
@@ -3730,7 +3698,7 @@ Thresholds scale proportionally with deck composition (see Section 5.5). Yaku ga
 
 ### 15.7 Style Combo Catalog
 
-The current 12 style combos. Each triggers at most once per run. Full mechanics in Section 5.6.
+The current 11 style combos. Each triggers at most once per run. Full mechanics in Section 5.6.
 
 | Style Combo | Requirement | Flow Bonus |
 |---|---|---|
@@ -3855,7 +3823,7 @@ Status as of May 2026.
 | Generative cycle (upgrade) | ✅ | Apply parent → upgrade |
 | Destructive cycle (strip) | ✅ | Apply destroyer → strip |
 | Editions (Gold/Crystal/Ghost) | ✅ | Heart Chakra rolls 60/30/10 |
-| Stamps (9 across 4 tiers) | 🟡 | All 9 implemented; White/Gray generic retrigger and Black generic compound trigger are partial — only fire on capture (see DEFERRED_CLEANUP_ITEMS.md) |
+| Stamps (9 across 4 tiers) | 🟡 | All 9 implemented; White/Gray generic retrigger and Black generic compound trigger are partial — only fire on capture (see docs/CODEBASE_CLEANUP.md) |
 | Stamp tier system | 🟡 | Code uses 3 tiers; design intent is 4 tiers (Gray as quaternary) |
 | Rank promotion via Solar Plexus | ✅ | Instantaneous cycling |
 | Persistent card mutations | ✅ | Card mutations (e.g., Demon mark, Irrigation bonus pts) persist across rounds. Note: terminology is being revisited |
@@ -3870,7 +3838,7 @@ Status as of May 2026.
 | Tier 4 capstone spirits (4) | ✅ | Available via Sacred Grove Pearl |
 | Tier 0 symbionts (12) | ✅ | Tied to animal cards in deck |
 | Stacking up to 3 | ✅ | Standard mechanic |
-| Transcendence to Negative | 🟡 | 3-stack natural transcendence works; Amber on 1-stack/2-stack is incorrectly blocked (see DEFERRED_CLEANUP_ITEMS.md) |
+| Transcendence to Negative | 🟡 | 3-stack natural transcendence works; Amber on 1-stack/2-stack is incorrectly blocked (see docs/CODEBASE_CLEANUP.md) |
 | Negative spirits | ✅ | Power = stack snapshot at transcendence (Amber 1×/2×/3×; natural/Sulfur 4× lossless, F4.26 Option B) |
 | Spirit chain reorder | ✅ | Drag-and-drop with click/drag distinction |
 | Replica/Print/Collector descriptions | 🟡 | Functional but show "Coming soon" placeholder text |
@@ -3900,7 +3868,7 @@ Status as of May 2026.
 | Coin-throw divination | ✅ | DivinationScene fully working |
 | First-run default (hex_02 Kūn) | ✅ | New players get no-effect hexagram |
 | Run-scoping (one per run) | ✅ | Single hexagram per run |
-| Hexagram description accuracy | 🟡 | Multiple description-vs-implementation discrepancies tracked in DEFERRED_CLEANUP_ITEMS.md |
+| Hexagram description accuracy | 🟡 | Multiple description-vs-implementation discrepancies tracked in docs/CODEBASE_CLEANUP.md |
 | Tropic/Arctic month ranges | 🟡 | Code uses 4-month sets; design intent is 6-month half-years |
 | Hexagram Collection unlock | ✅ | localStorage persistence working |
 
@@ -3932,9 +3900,9 @@ Status as of May 2026.
 | Wayside Shrine (Round-between) | ✅ | 2 offerings per quadrant default |
 | Sacred Grove (every 3 rounds) | ✅ | 4 offerings per quadrant default (planned reduction to 3) |
 | Four-quadrant layout | ✅ | Spirits / Deck-Fixing / Cards / Zodiacs |
-| Spirit pool filtering | ✅ | Excludes 3-stack + Negative spirits |
+| Spirit pool filtering | ✅ | Tier-1 only; legendaries excluded (no maxed-spirit exclusion) |
 | Reroll with cost escalation | ✅ | Per-reroll cost increase by default |
-| Sacred Grove fusion section | ✅ | T2/T3 fusion available |
+| Sacred Grove fusion (alchemical) | ✅ | T2/T3 via Cinnabar; T4 via Pearl |
 | Pearl T4 fusion path | ✅ | Component-preserving fusion |
 | Stamp shop variations | ✅ | Wayside primary only; Grove also secondary |
 | Booster pack consumables | 🔵 | Not yet designed |
@@ -4008,7 +3976,7 @@ The game is largely playable end-to-end. Core scoring, capture, deck modificatio
 5. **Hexagram description corrections** matching implementation (Section 16.6)
 6. **Code-level naming cleanups** (`_dogProtection`, `card.ribbonStamp`, `legend_*` IDs, `consumable_*` legacy entries — Section 16.4–16.5)
 
-These are tracked in detail in `DEFERRED_CLEANUP_ITEMS.md`. Beyond this list, balance pass and playtesting will surface additional refinements.
+These are tracked in detail in `docs/CODEBASE_CLEANUP.md`. Beyond this list, balance pass and playtesting will surface additional refinements.
 
 ---
 

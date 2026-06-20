@@ -5269,3 +5269,99 @@ the Unify ruling.
 TIER3 / Candidate H (`_executeAndFinalize` consume policy this builds surfacing on top of); the phase-machine
 guardrail (D-F4-SCOPE Part 2, `_setPhase` +8 tests — now 9 legal pairs); F2.3 audit Tests 6/7/11 (the
 original issues); crow.test.js (`_checkRoundEndOnEmptyHand` consumer). → DESIGN_DOC_PATCHES DP-76.
+
+---
+
+## D-GATE0-DOCFIX — Gate-0 doc-corrections: V6 patched to match shipped code (baseline-finalization) (2026-06-20)
+
+**Status:** RESOLVED. Docs-only campaign applying the RULED Gate-0 discrepancy findings
+(`docs/process/GATE_0_FINDINGS.md`, 48 findings, run 2026-06-19) where the doc was stale and the code is
+canonical. These corrections **finalize the V6 baseline** — they are the tail of baseline-shaping (bringing
+V6 into alignment with the shipped code), NOT post-baseline design changes, so they were patched directly
+into `DESIGN_DOC_V6.md` and **NOT** logged to CHANGELOG (see the CHANGELOG baseline note, 2026-06-19 Gate-0
+finalization).
+
+**Method:** recon-first per finding — current code state verified before each patch; STOP-and-report on any
+premise mismatch (one occurred — G0-002, below). Docs-only: no code touched (the cleanup one-liners deferred
+to the code-fix campaign — see "Deferred / not here").
+
+**Rulings applied (code canonical → V6 patched to match):**
+
+| Finding | V6 section(s) | Patch |
+|---|---|---|
+| G0-002 | §15.2.2 | Foundation examples Falcon/Crow (absent / symbiont) → **Pollen, Wind, Salt, Wet** (premise note below) |
+| G0-007 | §7.10.3 | Collector row "+3 ki at round end" → **sell-price buff** (+1/stack to every owned spirit's & consumable's sell price each round; `econ_collector.onRoundEnd`) |
+| G0-008 | §15.2.3 | T2 fusion examples Hibernation/Mountain (nonexistent) → **Bloom, Thunderstorm, Sun, Continent** |
+| G0-009 | §7.10.1 | dropped the stale "(codebase description claiming +25% is incorrect)" parenthetical; math is +5%/stack→+15% |
+| G0-011 | §9.1.3, §9.3.2, §9.3.3 | axis opposite debuff ×0.5 → **×0.75** (combined quadrant compound ×2.25 / ×0.5625) |
+| G0-012 | §9.3.5 | "next-season-in-cycle ×2.5" → **opposite-season ×2.0** (Spring↔Autumn, Summer↔Winter); removed the cycle / "doesn't debuff Autumn directly" line |
+| G0-013 | §9.3.6 | rank multipliers → code values (brights ×1.5/plains ×0.9; animals ×2.0/bright ×0.5; ribbons ×2.0/animal ×0.7; plains ×3.0/ribbon ×0.7); **removed the never-built "+1 yaku threshold"** |
+| G0-014 | §9.3.7 | Fire-points/break-chance moved boost_wood → **boost_metal**; boost_wood's real off-target = **Metal suppression** (ratifies D0.2/D0.3) |
+| G0-015 | §9.4 | pruned already-FIXED known-issues (volatile/stable_flow, balanced_scoring); rank-threshold item dropped (resolved by G0-013); kept axis-by-month, omitted-debuff, four_spirits Fire-ref, Wu Xing oversimplification |
+| G0-016 | §9.3.4, §9.4 (+5 more) | repointed `DEFERRED_CLEANUP_ITEMS.md` (deleted) → `docs/CODEBASE_CLEANUP.md` |
+| G0-018 | §15.3.1 | Root = toggle day/night (`card.temporal`); Sacral = advance `card.month` — no Akumon/Demon, no random-element; targets 1→3 to match code |
+| G0-019 | §15.3.4 (+§2.11) | Green stamp discard reward +8 ki → **+3 ki** |
+| G0-022 | §8.5, §8.5.1, §15.3.5 | Horse "draw 8 fresh" → **draw equal to prior hand size** (replace hand 1-for-1) |
+| G0-025 | §5.11 | struck the `calculateFinalScore()` vestigial-method paragraph + "could be removed" debt bullet (method is gone) |
+| G0-026 | §5.6 (×2), §15.7 | "12 style combos" → **11** (matches code + V6's own tables) |
+| G0-029 | §12.3 | removed the never-built "exclude maxed (3-stack + Negative)" filter; documented the real tier-1-only / legendary-excluded filter |
+| G0-034/035 | §3.3, §4.2, §5.1, §5.8, §5.10 | struck the vestigial **"+5 full-month bonus"** (absent from code); fixed the §5.10 worked example (per-month +5 removed; total 209→184) |
+| G0-036 | §4.4 | push table flat ×1.1 compounding → **PUSH_CURVE commitment model** (depth-indexed 1.10/0.90, 1.25/0.80, 1.50/0.65, 2.00/0.50, applied once at resolution); removed the "1.1×1.1=1.21" example |
+| G0-039 | §2.3, §15.1.3 | per-rank "with speculatives" 7/16/11/27 = 61 → **12/12/12/24 = 60** (distinct identities) + rank-symmetry rationale |
+| G0-040 | §2.3 | speculative brights "8 of 13" → **7 of 13** |
+| G0-042 | §2.8 | removed the nonexistent `cardsByTag` helper claim (tags read off `card.tags`) |
+| G0-043 | §13.12 | removed nonexistent per-chakra overlays (Akumon, rank-cycle, edition-prob) + booster-pack; documented the unified F4.35 picker (card / card_multi / card_pair incl. Crown) |
+| G0-044 | §12.7, §13.11, §13.12 | removed the nonexistent shop fusion section / recipe-buttons / confirm+result overlays; documented consumable-driven fusion (Cinnabar/Pearl/Mercury) + the gold-glow cue (ratifies/extends D0.7) |
+| G0-045 | §14.2, §14.4, §14.5 | removed nonexistent logger methods (logCardEnhanced/EditionApplied/Transcended, logShopOfferings, logRetriggerScoring, printToConsole); documented the real surface + `window.gameLog` hook |
+
+**Non-obvious rationale:**
+
+- **G0-039 — rank-symmetry / December-duplicate (why 60, not the audit's 61).** The intended deck gives every
+  month a uniform rank profile: 1 bright + 1 animal + 1 ribbon + 2 plains = 5 distinct cards × 12 = **60
+  distinct card identities**. Distinct plains = 24, not 25, because December's third base plain is
+  `december_plain_1_dup` (carries `baseImageId: "december_plain_1"`, re-using #1's art → only 2 *distinct*
+  December plains in the base deck), and November — already holding a bright/animal/ribbon in base — takes
+  `november_plain_2` as its speculative to reach 2 plains. The deprecated 14th speculative `december_plain_3`
+  (the lone tag-carrying speculative) is excluded and slated for code removal (G0-041 / CODEBASE_CLEANUP).
+  Verified against `cards.js`. Supersedes the audit's suggested 25/61.
+- **G0-012 — opposite-season, not cycle.** Code (`boost_spring…`, inline comment "debuffs its opposite
+  season") implements symmetric opposite-season polarity (Spring↔Autumn, Summer↔Winter) at ×2.0/×0.5 — never
+  the unidirectional Spring→Summer cycle the doc described. Opposite-season is the natural/intended design;
+  the cycle text was abandoned-design drift.
+- **G0-014 — ratifies D0.2/D0.3.** D0.2 already decided boost_wood→suppress Metal, boost_metal→suppress Fire
+  (destructive-cycle predator), and the code matches it; only V6 §9.3.7 had the Fire params mis-pinned on
+  boost_wood. This brings the doc text in line with the already-ratified decision.
+- **G0-009 — the +25% refutation is itself stale.** The "+25%" code description it refuted no longer exists;
+  only a dead `SpiritEffects.js:550` comment still says "+25%" (a code-fix-campaign one-liner). The separate
+  legitimate "+25% combined Bonds+Ingot" prose elsewhere in §7.10.1 is kept.
+
+**STOP-and-report — one premise mismatch (G0-002):** the ruling's 4th example name "Humidity" is **not a
+spirit display name.** The spirit with id `summer_humidity` is displayed as **"Wet"** (`spirits.js:117`).
+Because the point of G0-002 is to cite real foundation-spirit names (Pollen/Wind/Salt are real display
+names), the verified display name **"Wet"** was used and the substitution flagged, rather than reintroduce a
+non-existent name. All four (Pollen/Wind/Salt/Wet) are tier-1 foundation spirits. If "Humidity" is wanted,
+rename the spirit in `spirits.js`.
+
+**Scope calls (same-error-class extensions beyond the audit's cited sections):**
+- G0-016 repointed **all 7** `DEFERRED_CLEANUP_ITEMS.md` references (audit cited 2 — §9.3.4/§9.4; the other 5
+  in §14.6/§16.x are the identical dangling ref to the deleted file — a pure mechanical filename swap).
+- G0-044 extended to **§12.7** (the primary "Sacred Grove Fusion Section" — header renamed to "Sacred Grove
+  Fusion", body + TOC rewritten), since it is the very fusion-section description the ruling targets.
+- G0-019 extended to **§2.11** (same Green +8→+3 number error).
+- G0-018 corrected the §15.3.1 Root/Sacral **target counts** 1→3 (matching §8.1 + code) alongside the effects.
+
+**Deferred / not here:**
+- **Code fixes** (separate code-fix campaign): the live "+5 full-month bonus" + `_checkNaturalCaptures` dead
+  scaffold removal (G0-034/035 code half); G0-028 Grove-cadence off-by-one (see D0.1); the cleanup one-liners
+  (`SpiritEffects.js:550` +25% comment; `ScoringEngine.js:32` dead `getFireFlatPoints` import;
+  `consumables.js:148` Horse "draw 8" string; `GameplayLogger.js:250` dead `logShopFusion`).
+- **ROADMAP items** (flagged, not edited): G0-042 tag-system resolution (use-or-remove; `december_plain_3` is
+  the only tag-carrying card); G0-006 Glory (5A).
+- **Out-of-ruling doc staleness flagged in the status report, not patched:** §7.10.3 / §16.x "Coming soon"
+  prose for Replica/Collector (their code descriptions are now real — CODEBASE_CLEANUP:25 DONE for those two);
+  §16.x behavioral status claims left untouched (only their DEFERRED file-refs repointed).
+
+**Cross-refs:** `GATE_0_FINDINGS.md` (full file:line detail per finding); D0.1 (Grove cadence — G0-028 code
+side); D0.2/D0.3 (Wu Xing cycle direction/text — G0-014); D0.4 (axis/seasonal/rank hexagram magnitudes —
+G0-011/012/013); D0.7 (Sacred Grove fusion UI + Pearl — G0-044); D0.11 (speculative integration — G0-039);
+F4.35 (unified picker — G0-043). CHANGELOG baseline note (2026-06-19 Gate-0 finalization).
