@@ -145,7 +145,7 @@ export const ZODIAC_CONSUMABLES = [
   { id: 'zodiac_rabbit',  name: 'Rabbit',  description: 'Waive the push penalty for this round.',                       category: 'yaku',  cost: 5 },
   { id: 'zodiac_dragon',  name: 'Dragon',  description: 'Ki lottery: gain 0–30 ki (random).',                          category: 'ki',    cost: 4 },
   { id: 'zodiac_snake',   name: 'Snake',   description: 'Lower one yaku threshold by 1 this round.',                   category: 'yaku',  cost: 4 },
-  { id: 'zodiac_horse',   name: 'Horse',   description: 'Discard your hand and draw 8 fresh cards.',                   category: 'hand',  cost: 5 },
+  { id: 'zodiac_horse',   name: 'Horse',   description: 'Discard your hand and draw an equal number of fresh cards.',  category: 'hand',  cost: 5 },
   { id: 'zodiac_goat',    name: 'Goat',    description: '+1 ki per capture for the rest of this round.',               category: 'ki',    cost: 4 },
   { id: 'zodiac_monkey',  name: 'Monkey',  description: 'Capture all cards on a field slot; discard equal from hand.', category: 'field', cost: 4 },
   { id: 'zodiac_rooster', name: 'Rooster', description: 'Open a 9th field slot for this round.',                       category: 'field', cost: 3 },
