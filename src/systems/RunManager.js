@@ -1137,11 +1137,12 @@ class RunManager {
   get threshold()  { return RunManager.THRESHOLDS[this._round - 1] ?? 0; }
 
   /**
-   * True when a Sacred Grove visit should follow the round just completed.
-   * Query this AFTER calling advanceRound() — it checks whether the round
-   * that was just finished (now _round − 1) is a Grove round.
+   * True when a Sacred Grove visit should PRECEDE the round about to be played.
+   * Query this AFTER calling advanceRound() — _round is then the next round to
+   * play, and a Grove precedes each round in GROVE_ROUNDS ({3,6,...,36}), so the
+   * player gears up before each act-closing round and the final round.
    */
-  get isGroveRound() { return RunManager.GROVE_ROUNDS.includes(this._round - 1); }
+  get isGroveRound() { return RunManager.GROVE_ROUNDS.includes(this._round); }
 
   /**
    * True when all 36 rounds have been completed.
@@ -1151,10 +1152,10 @@ class RunManager {
 
   /**
    * Alias of isGroveRound — used by GameScene to decide the next transition.
-   * After advanceRound(): "the round I just finished was a Grove round,
-   * so the next destination is ShrineScene."
+   * After advanceRound(): "the next round to play is a Grove round, so the next
+   * destination is the Sacred Grove" — the player gears up BEFORE the hard round.
    */
-  get nextIsGrove() { return RunManager.GROVE_ROUNDS.includes(this._round - 1); }
+  get nextIsGrove() { return RunManager.GROVE_ROUNDS.includes(this._round); }
 
   /** True once the run has ended (won or lost). */
   get runOver() { return this._runOver; }
