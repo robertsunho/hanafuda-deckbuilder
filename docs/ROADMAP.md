@@ -106,8 +106,8 @@ split refines OVERHAUL_PLAN's single monolithic "Phase 5: demo build-out.")*
   Verify no residue before carrying any forward.
 - **Batch fusion bug** (1 Cinnabar → 2 fusions) — *(from backlog)* **`[VERIFY]` — appears CLOSED** in Leg 3
   (`F4-LEG3-CINNABAR-SINGLEOP`, DP-69); confirm and strike.
-- **Waidan Grove-exit coupling** — *(from backlog)* Waidan was CUT, so this is the **deletion site** (the
-  `if (_isGrove)` Waidan block in `_drawContinueButton`). **`[VERIFY]`** it was removed with the cut.
+- ✅ **Waidan Grove-exit coupling — VERIFIED REMOVED** (Gate-0 2026-06-20: `Waidan` → 0 in `src/`). Waidan
+  was CUT; the `if (_isGrove)` Waidan block in `_drawContinueButton` is gone. (Was a `[VERIFY]` from backlog.)
 - **F4.37 carry-forward** — double-render of the 5 out-of-block engines (wuji/dao/chi/tengu/feng_shui);
   dead `econ_lucky_charm` / `econ_reward` tooltip branches. Opportunistic.
 - **Candidates A / B** — *(backlog flagged "verify if absorbed by F4.25/F4.28")*: **B confirmed dropped**
@@ -208,7 +208,7 @@ Last — polishing pre-final mechanics is wasted effort.
   likely I-recon first (decide what splits), then C names the survivors.
 - **`[VERIFY]` items** (plausibly-resolved — confirm/strike, do not carry as open):
   - **F5.12** (multiplicative-spirit stacking consistency) — ✅ **DONE 2026-06-14** (commit b6723d3).
-    Strike from the forward plan.
+    Strike from the forward plan. _(Gate-0 re-verified 2026-06-20: no `Math.pow(base, effectivePower)` conditionals remain.)_
   - **Festival cap** — ✅ ratified-current; only the explicit cap is forward (→ Phase 6).
   - **Negative fusion** — ruling decided; **F5.11 is the (forward) build**, not an open decision.
   - **Batch fusion bug** — appears CLOSED via `F4-LEG3-CINNABAR-SINGLEOP` (DP-69); confirm + strike.

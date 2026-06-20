@@ -15,14 +15,14 @@
 ## Naming / semantic renames
 
 - **`card.ribbonStamp` (current code) → `card.stamp` (intended)** — rename direction: current code uses `card.ribbonStamp` everywhere (`GameRoundManager.js` reads it at every stamp dispatch site; `shopCards.js` / `consumables.js` `mixStamps` write it; `SpiritEffects.js` / `_computeRetriggerCount` read it; the test suite asserts `.ribbonStamp` as `[PRESERVE]`). The design-doc / canonical name is `card.stamp`. `ribbonStamp` is also *misleading* — stamps apply to ANY card, not just ribbons (the apply path stamps plains in tests), so `stamp` is both cleaner and more accurate. Why deferred: pervasive find-replace touching every stamp path plus the `[PRESERVE]` tests — do it in one focused pass. (Dossier Unfiled #12; §8.4.5 already notes the doc-vs-code name gap.)
-- **`legend_*` → `rare_*` ID prefix for the demoted rares** — the 5 former demoted rares are already `engine_*` in code (engine_wuji/dao/chi/tengu/feng_shui), so the old "rename `legend_*` → `rare_*`" task is partly moot; verify no `legend_*` IDs remain (Gankyil was cut). Why deferred: ID renames ripple through save-state keys and references. (Dossier Unfiled, ex-§16/§17.7.)
+- ✅ **DONE** (Gate-0 verified 2026-06-20: `legend_` → 0 in `src/`) — no `legend_*` IDs remain; the demoted rares are `engine_*` (engine_wuji/dao/chi/tengu/feng_shui), Gankyil was cut. The `legend_*`→`rare_*` rename is moot. (Dossier Unfiled, ex-§16/§17.7.)
 - **`tooltipBase` → scoring-values rename + `_tb` accessor** — see `ROADMAP.md` 5A (D1, Phase-5 semantic rename; sequenced after Wave B). Logged there as a *design* item; the code task lives under it.
-- **`_dogProtection` flag → `_pushPenaltySuppression` / `_rabbitActive`** — legacy name from the deprecated `consumable_dog`; Rabbit (`zodiac_rabbit`) is the current consumer. (§8.5.2 documents the legacy artifact.)
+- ✅ **DONE** (Gate-0 verified 2026-06-20: `_dogProtection` → 0 in `src/`) — the live flag is `_pushPenaltyWaived` (set by `zodiac_rabbit`). The rename's intent is satisfied; the adopted name differs from the suggested `_pushPenaltySuppression`/`_rabbitActive`. (§8.5.2.)
 
 ## Stale data-strings (code-side description lag)
 
 - **`zodiac_cat` description** — `src/data/consumables.js` still reads "...Tier 1 Foundation spirit". Actual pool is all Tier-1 commons (currently 27, by rarity, symbionts excluded). V6 §8.5 is corrected; the code string lags. (DP-24.)
-- **"Coming soon" description fields** — `econ_replica`, `econ_collector` are functional but their `description` reads "Coming soon" (label cleanup). NOTE: `econ_print` is *intentionally* non-functional (`rarity: null`, pending F5.9) — leave it. `game_echo`'s description was already corrected. (DP-07; dossier Unfiled #10.)
+- **"Coming soon" description fields** — ✅ `econ_replica` / `econ_collector` **DONE** (Gate-0 verified 2026-06-20: both now carry real descriptions; only `econ_print` still reads "(Coming soon)" at `spirits.js:697`, and it is *intentionally* non-functional pending F5.9 — **leave it**). `game_echo` was already corrected. (DP-07; dossier Unfiled #10.)
 - **`hexagrams.js` flavor text for `volatile_flow` / `stable_flow`** — the in-code player-facing descriptions are stale vs the push-curve-amplifier implementation (V6 §9.3.8 / §5.6 are now correct; the code flavor strings are not). Low priority. (§9.4 note; dossier Unfiled #6.)
 
 ## Already done (no action — recorded for closure)
@@ -52,8 +52,8 @@ The code-vs-design items that lived under the old V6 §17.7 (formerly staged in 
 - **Hexagram description discrepancies (broad)** — axis hexagrams describe by month not axis; boost hexagrams omit debuffs; rank hexagrams omit threshold modification; Wu Xing cycle hexagrams oversimplify. (`volatile`/`stable_flow` flavor is already logged above.)
 
 **Consumables / card-targeting naming:**
-- **Legacy `consumable_*` entries** (horse/dog/pig/rooster) superseded by zodiac equivalents but still in code.
-- **`_markMode`-family renames** — `_markMode`→`_cardTargetMode` was done in a prior pass; verify/finish `_activateMark`→`_activateCardTarget`, `_onMarkCardSelected`→`_onCardTargetSelected`, `_showBoosterPack(markDef)`→`(consumableDef)`.
+- ✅ **DONE** (Gate-0 verified 2026-06-20: `consumable_horse/dog/pig/rooster` → 0 in `src/`) — the legacy `consumable_*` entries are gone (superseded by zodiac equivalents).
+- ✅ **DONE** (Gate-0 verified 2026-06-20) — `_markMode`-family renames complete: `_markMode`/`_activateMark`/`_onMarkCardSelected`/`_showBoosterPack` → 0 in `src/` (current: `_cardTargetMode`/`_activateCardTarget`/`_onCardTargetSelected`).
 
 **Card data:**
 - **`december_plain_3` deprecated entry** in `cards.js` (replaced by `december_ribbon`).
@@ -62,7 +62,28 @@ The code-vs-design items that lived under the old V6 §17.7 (formerly staged in 
 **Architectural (lower priority):**
 - **`calculateFinalScore()` vestigial method** (ScoringEngine) — output discarded by all callers, retained only for the metal-proc side effect; the two-scoring-paths debt.
 - **`addKi`/`spendKi` 'unspecified' reason strings** — many callers pass 'unspecified' instead of meaningful telemetry tags.
-- **Paramita / Yaku-Upgrades obsolete code** — `RunManager.buyYakuUpgrade()` + related state from the removed scoring system; audit + removal.
+- ✅ **DONE** (Gate-0 verified 2026-06-20: `buyYakuUpgrade`/`paramita` → 0 in `src/`) — the Paramita / Yaku-Upgrades obsolete code (and `RunManager.buyYakuUpgrade()`) is gone.
 
 **Terminology (from §17.3):**
-- **"Three Marks" terminology** — stale label for persistent card mutations (Demon, etc.); replace with current terms.
+- ✅ **DONE** (code side — Gate-0 verified 2026-06-20: the 3 mark ids / `THREE_MARKS` / `getMarkDef` → 0 in `src/`) — "Three Marks" code removed. (Any stale doc-terminology is a separate concern.)
+
+---
+
+## Gate-0 findings (logged 2026-06-20 — code removal pending)
+
+Dead code + stale comments surfaced by the Gate-0 audit (`docs/process/GATE_0_FINDINGS.md`), each verified against the live tree before logging. **No code removed here** — this is the tracking record; removal is the code-fix campaign or a later pass.
+
+**Dead code:**
+- **`engine_surplus` dead `tooltipBase`** — `spirits.js:951` declares `{ mult:1, kiDivisor:3 }`, but the effect (`SpiritEffects.js:1289-1296`) hardcodes `Math.floor(ki/3)*stacks` and reads neither field. Tuning either silently no-ops. Fix: read via `_tb`, or drop the dead fields. (G0-004.)
+- **decay spirits' dead `startMult`/`startPoints`** — `spirits.js:1042` (`startMult:30`, decay_persimmon) / `:1053` (`startPoints:150`, decay_pear) are never read; `remaining` is seeded from literals in `RunManager._initSpiritState` (`:547-548`). **`lossPerRound` is LIVE — do NOT touch.** Fix: seed from `_tb`, or drop the dead start fields. (G0-005.)
+- **`spiritsByRarity.legendary` always-empty bucket** — `spirits.js:1196` filters `rarity==='legendary'`, but no def carries it (capstones are `rarity:null`); the `'legendary'` rarity token in the header (`:41`) is vestigial. Fix: drop the empty bucket / token (low priority). (G0-010.)
+- **`FieldManager.playHandCard()` (singular) dead/parallel path** — `FieldManager.js:180`, zero callers (the live path is `playHandCards()` plural). Its divergent impl is a drift trap. Fix: remove it + fix the GRM header comment that references it (`GameRoundManager.js:7`, also `:43`/`:532`). (G0-037.)
+- **dead `getFireFlatPoints` import** — `ScoringEngine.js:32` imports it but never uses it (leftover from when scoring math lived there). Fix: drop the import. (G0-025 tail.)
+- **dead `logShopFusion`** — `GameplayLogger.js:250`, zero callers (fusion is consumable-driven now). Fix: remove the method. (G0-044 tail.)
+
+**Stale comments / JSDoc (no behavior impact):**
+- **`ConsumableEffects.js:14-16`** — claims Wu Xing/chakra apply "still live on RunManager (… migration in progress)"; the migration is complete (no `RunManager.applyElement`). Fix: update/remove. (G0-024.)
+- **`yakuPoints` in GRM JSDoc** — named in two return-shape blocks (`GameRoundManager.js:38`, `:1980`) but never computed/returned (correct per design — yaku don't score). Fix: scrub from both. (G0-027.)
+- **`roundInAct` comment** — `RunManager.js:1134` says "(1–3)" but returns 1–6 (`ROUNDS_PER_ACT=6`). Fix: correct to (1–6). (G0-032.)
+- **`CaptureManager.js:226-227`** — JSDoc point values "(bright=20, animal=10, ribbon=5, plain=1)" are stale; actual is 20/12/10/3 (`rawCardPoints` uses `getCardPoints`, so no behavior impact). Fix: correct the comment. (G0-038.)
+- **dead `econ_bonds` "+25%" comment** — `SpiritEffects.js:550` `// +5% interest (stacks to +25%)`; the "+25%" is stale (math is +5%/stack → +15%). Fix: remove/correct. (G0-009 tail.)
