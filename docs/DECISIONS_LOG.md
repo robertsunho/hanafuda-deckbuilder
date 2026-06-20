@@ -5365,3 +5365,39 @@ rename the spirit in `spirits.js`.
 side); D0.2/D0.3 (Wu Xing cycle direction/text — G0-014); D0.4 (axis/seasonal/rank hexagram magnitudes —
 G0-011/012/013); D0.7 (Sacred Grove fusion UI + Pearl — G0-044); D0.11 (speculative integration — G0-039);
 F4.35 (unified picker — G0-043). CHANGELOG baseline note (2026-06-19 Gate-0 finalization).
+
+---
+
+## D-GATE0-FOLLOWUP — Gate-0 code fixes + bookkeeping + ARCHITECTURE alignment (2026-06-20)
+
+**Status:** RESOLVED. Follow-on to D-GATE0-DOCFIX, applying the RULED Gate-0 findings that needed **code** or
+**forward-doc/log** changes (the V6 doc-corrections already shipped in D-GATE0-DOCFIX).
+
+**Code fixes (committed separately, code-fix campaign):**
+- **G0-028** — Sacred Grove cadence: `isGroveRound`/`nextIsGrove` used `_round - 1`, firing Groves AFTER
+  rounds {3,6,…,36} and letting `isRunComplete` eat the 12th (→ only 11). Changed to `_round` so a Grove
+  precedes each of {3,6,…,36} (all 12; run still ends after R36). Added `test/grove_cadence.test.js`.
+- **G0-035** — removed the dead `_checkNaturalCaptures` natural-capture scaffold (method + `_naturalCaptures`
+  field + getter + the GameScene status branch); zero callers.
+- **G0-022** — Horse in-game description → "draw an equal number of fresh cards" (matched the redesigned effect).
+- **G0-034 — STOP-and-report (no change):** an exhaustive search of BOTH the scoring math AND the
+  logging/display layer found **no** vestigial +5 full-month *points* bonus. The "+5" seen on full-month
+  captures is the legitimate `engine_missing_number` spirit (+5 *mult* per 4-stack) — left intact.
+
+**G0-031 (ARCHITECTURE §1.2) — baseline-finalization, NOT logged to CHANGELOG.** Code is canonical:
+`_act`/`_totalScore`/`_styleBase` do not exist in `RunManager.js` (`act`/`roundInAct` are computed getters off
+`_round`; `_flow`/`_legendarySpirits[]` do exist). Patched §1.2's field list to match. Like the V6 Gate-0
+corrections, this is ARCHITECTURE→code alignment (baseline-shaping), not a post-baseline change — so no
+CHANGELOG entry (per the CHANGELOG baseline rule).
+
+**CODEBASE_CLEANUP bookkeeping (Campaign 3):** logged 11 Gate-0 dead-code / stale-comment findings (G0-004,
+-005, -010, -024, -027, -032, -037, -038, plus the G0-009/-025/-044 cleanup-one-liner tails the doc campaign
+deferred) for the code-fix campaign to remove. Retired 7 already-done entries — CODEBASE_CLEANUP
+`legend_*`, `_dogProtection`, the "Coming soon" actionable half (only `econ_print` remains, intentional),
+`consumable_*`, `_markMode`-family, `buyYakuUpgrade`/Paramita, "Three Marks" (code side); ROADMAP
+Waidan-`[VERIFY]` + F5.12 — each verified done by grep (→ 0 in `src/`). `applyInterest` (CLEANUP:13) and
+`december_plain_3` (CLEANUP:59) re-confirmed still-accurate (no change). No D5/`_pickRandomLegendary` ROADMAP
+entry exists to retire (symbol already absent from code).
+
+**Cross-refs:** D-GATE0-DOCFIX (V6 doc-corrections + the full ruling table); `GATE_0_FINDINGS.md`;
+`docs/CODEBASE_CLEANUP.md` (Gate-0 dead-code tracking section); commits for G0-028/-035/-022.

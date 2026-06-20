@@ -57,7 +57,7 @@ The single most important architectural split.
 
 **`RunManager` (the `run` singleton) persists across rounds and scenes.** It holds: `_ki`; `_allSpirits[]`
 (the unified roster — regulars + Negatives in one array, with `spirits`/`negativeSpirits` as filtered
-getters); `_legendarySpirits[]`; `_consumables[]`; `_round`/`_act`; `_totalScore`; `_flow`; `_styleBase`;
+getters); `_legendarySpirits[]`; `_consumables[]`; `_round` (with `act`/`roundInAct` as computed getters off `_round`, not stored fields); `_flow`;
 `_deck` (a deep copy of `ALL_CARDS` that survives rounds and is mutated by chakras/marks); and the
 hexagram + blessing state. It owns the **economy formulas** (`getEffectiveCost`, `calculateKiReward`, the
 `interestRate` getter, flow decay, the push curve) and every spirit-roster mutation (acquire / stack /
