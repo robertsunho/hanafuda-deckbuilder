@@ -3338,19 +3338,7 @@ export class GameScene extends Phaser.Scene {
     this._scoreTotText.setText('Total: 0');
     this._thresholdText.setText(`Target: ${run.threshold}`);
 
-    const naturals = this._round.naturalCaptures;
-    if (naturals.length > 0) {
-      const names = naturals.map(cards => {
-        const prefix = cards[0].id.split('_')[0];
-        return prefix.charAt(0).toUpperCase() + prefix.slice(1);
-      });
-      this._setStatus(
-        `Natural full month${naturals.length > 1 ? 's' : ''} captured: ` +
-        `${names.join(', ')}!  Play a card.`
-      );
-    } else {
-      this._setStatus('Play a card from your hand.');
-    }
+    this._setStatus('Play a card from your hand.');
   }
 
   // ── Yaku Guide overlay ────────────────────────────────────────────────────

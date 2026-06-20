@@ -140,13 +140,6 @@ export default class GameRoundManager {
   get pushCount()      { return this._pushCount; }
   /** Successful push depth (commitment-based curve index). */
   get pushDepth()      { return this._pushDepth; }
-  /**
-   * Cards auto-captured at round start due to a natural full month in hand.
-   * Each element is an array of 4 cards (one group per captured month).
-   * Empty until startRound() has been called.
-   * @type {object[][]}
-   */
-  get naturalCaptures() { return this._naturalCaptures; }
 
   /** True when zodiac_rabbit (Rabbit) has waived this round's push penalty. */
   get pushPenaltyWaived() { return this._pushPenaltyWaived; }
@@ -257,7 +250,6 @@ export default class GameRoundManager {
     this._playsRemaining     = GameRoundManager.PLAYS_PER_ROUND;
     this._discardsRemaining  = GameRoundManager.MAX_DISCARDS;
     this._basePoints         = 0;          // running base capture points this round
-    this._naturalCaptures    = [];         // round-start all-4-of-a-month auto-captures
     this._pushPenaltyActive        = false; // exposed to the push penalty
     this._pushCount                = 0;     // push ATTEMPTS this round — indexes the DEAL curve (_getNextPushDealCount: cards the next push deals)
     this._pushDepth                = 0;     // successful push DEPTH — indexes the FLOW curve (RunManager getPushMultiplier/PUSH_CURVE: bank/fail mult). Distinct axis from _pushCount (attempts).
@@ -781,26 +773,6 @@ export default class GameRoundManager {
   // ── Snapshot ───────────────────────────────────────────────────────────────
 
   // ── Private helpers ────────────────────────────────────────────────────────
-
-  /**
-   * Check the opening hand for any month where all 4 cards are present.
-   * Each complete month is immediately moved from hand to the capture pile.
-   * Populates this._naturalCaptures with one entry per captured month.
-   */
-  _checkNaturalCaptures() {
-    const byMonth = new Map();
-    for (const card of this._hand.getAll()) {
-      if (!byMonth.has(card.month)) byMonth.set(card.month, []);
-      byMonth.get(card.month).push(card);
-    }
-    for (const [, cards] of byMonth) {
-      if (cards.length === 4) {
-        this._hand.removeMany(cards.map(c => c.id));
-        this._addCapture(cards);
-        this._naturalCaptures.push([...cards]);
-      }
-    }
-  }
 
   /**
    * Add captured cards to the capture pile and accumulate base points.
