@@ -5466,3 +5466,32 @@ breaking those cross-refs.
 **Cross-refs:** `docs/process/GATE_0_FINDINGS.md` (48 findings, full file:line detail); D-GATE0-DOCFIX (V6
 corrections + the ruling table), D-GATE0-FOLLOWUP (code fixes + ARCHITECTURE alignment + CODEBASE_CLEANUP
 bookkeeping), D-GATE0-ROADMAP (three forward items).
+
+---
+
+## D-TB-WIRE — Surplus + decay wired through `tooltipBase`/`_tb` (single-source); `_addCapture` JSDoc relocated (2026-06-21)
+
+**Status:** DONE — behavior-preserving refactor + JSDoc relocation. Follows the subtractive cleanup pass
+(~3e45e85); handles the items that pass was instructed to EXCLUDE (G0-004/005).
+
+**Decision (Robert's ruling):** for the three spirits whose effects declared `tooltipBase` fields they never
+read (G0-004 Surplus; G0-005 decay_persimmon/decay_pear), **WIRE** the values through the single-source path
+rather than DROP the fields — completing the `tooltipBase`/`_tb` pattern (ARCHITECTURE §1.3) instead of
+conceding the inconsistency.
+
+**Step-0 sanity check (gated the campaign).** Confirmed `tooltipBase`/`_tb` IS the canonical single-source:
+ARCHITECTURE §1.3 states it outright, and a full survey found these 3 were the **only** violations (70+ other
+`tooltipBase`-bearing spirits already comply) — not the tip of a larger pattern (relevant to D1's rename).
+`_tb` (`SpiritEffects.js:72`) is **static-only** (`getSpiritDef(spirit.id)?.tooltipBase?.[key] ?? fallback`),
+and that is **sufficient**: Surplus's tunable constants (`kiDivisor`, `mult`) are static; the live `ki` is a
+runtime INPUT, not a tuning value, so it stays a live read (tooltipBase is pure data and must not read run
+state). **No `_tb` contract change** → ARCHITECTURE §1.3 stays accurate (no edit); the change strengthens it
+(zero remaining exceptions).
+
+**Changes (identical output verified):**
+- `engine_surplus` (`SpiritEffects.js`): `Math.floor(ki/3)*stacks` → `Math.floor(ki / _tb(spirit,'kiDivisor',3)) * _tb(spirit,'mult',1) * stacks`. With `kiDivisor=3, mult=1` the result is unchanged (`mult` becomes a live ×1 tuning knob). The Surplus tooltip already derives via `applyEngine`, so it single-sources transitively. Locked by the existing `tooltip_value_equality.test.js` (`floor(6/3)*2 = 4`).
+- decay seeds (`RunManager._initSpiritState`): `remaining: 30 / 150` literals → `getSpiritDef(spirit.id)?.tooltipBase?.startMult ?? 30` / `?.startPoints ?? 150` (the `_tb` mechanism inline, since `_tb` is SpiritEffects-local). `lossPerRound` was already single-sourced — untouched. New seed-single-source test in `test/spirits/decay.test.js`.
+- `_addCapture` JSDoc (`GameRoundManager.js`): the orphan removed in the prior pass is relocated to the live method with an accurate description (pile + base points 20/12/10/3, then scoring-pipeline dispatch; capture-only under `disableCaptureScoring`). Resolves the CODEBASE_CLEANUP follow-up note.
+
+**No CHANGELOG** (behavior-preserving / architecture-accuracy, not a reference-doc design change).
+CODEBASE_CLEANUP G0-004/005 marked ✅ DONE (wired, not dropped). Cross-ref D-GATE0-CLOSE (the dead-code batch).

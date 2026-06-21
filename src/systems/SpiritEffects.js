@@ -1290,7 +1290,9 @@ const _effects = {
     applyEngine({ spirit }) {
       const ki = run.ki;
       const stacks = effectivePower(spirit);
-      const bonus = Math.floor(ki / 3) * stacks;
+      // ki is a live INPUT (not a tuning value); the tunable constants kiDivisor + mult
+      // resolve via _tb so the def's tooltipBase is the single source. mult is a live x1.
+      const bonus = Math.floor(ki / _tb(spirit, 'kiDivisor', 3)) * _tb(spirit, 'mult', 1) * stacks;
       if (bonus === 0) return null;
       return { addMult: bonus };
     },

@@ -1239,6 +1239,14 @@ export default class GameRoundManager {
     };
   }
 
+  /**
+   * Add captured cards to the capture pile and accumulate their base points
+   * (face `points`: bright=20, animal=12, ribbon=10, plain=3), then dispatch to
+   * the scoring pipeline. Under `disableCaptureScoring` (score_field_at_round_end)
+   * the cards are banked with capture side-effects only and scored at round end.
+   *
+   * @param {object[]} cards
+   */
   _addCapture(cards) {
     if (this._onScoringStep) this._onScoringStep({ type: 'capture_start' });
 

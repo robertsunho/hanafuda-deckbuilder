@@ -544,8 +544,8 @@ class RunManager {
       case 'sym_magpie':      spirit.state = {};                         break;
       case 'sym_osprey':      spirit.state = { flipsUsedThisRound: 0 };  break;
       case 'game_catcher':    spirit.state = { catchesUsedThisRound: 0 }; break;
-      case 'decay_persimmon': spirit.state = { remaining: 30 };          break;
-      case 'decay_pear':      spirit.state = { remaining: 150 };         break;
+      case 'decay_persimmon': spirit.state = { remaining: getSpiritDef(spirit.id)?.tooltipBase?.startMult  ?? 30  }; break;
+      case 'decay_pear':      spirit.state = { remaining: getSpiritDef(spirit.id)?.tooltipBase?.startPoints ?? 150 }; break;
     }
   }
 

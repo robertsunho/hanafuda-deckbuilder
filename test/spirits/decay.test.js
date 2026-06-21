@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { makeRound, playRoundToEnd, equipSpiritWithState } from '../helpers.js';
 import SpiritEffects from '../../src/systems/SpiritEffects.js';
+import run from '../../src/systems/RunManager.js';
+import { getSpiritDef } from '../../src/data/spirits.js';
 
 // Deck that triggers Hikari yaku (bright capture) so bankScore() is reachable.
 const YAKU_DECK = [
@@ -29,6 +31,27 @@ const EMPTY_DECK_FOR_HORSE = [
   'september_plain_1', 'september_plain_2', 'october_plain_1', 'october_plain_2',
   'december_plain_1', 'december_plain_2', 'january_plain_2', 'february_plain_2',
 ];
+
+// G0-005: the start value is single-sourced from tooltipBase (was a hardcoded
+// literal in _initSpiritState). _initSpiritState is the production seed path;
+// the harness's addSpirit does NOT call it, so invoke it directly here.
+describe('decay seed — single-sourced from tooltipBase (G0-005)', () => {
+  it('decay_persimmon seeds remaining from tooltipBase.startMult (30)', () => {
+    run.reset();
+    const spirit = { id: 'decay_persimmon', name: 'Persimmon', stackCount: 1 };
+    run._initSpiritState(spirit);
+    expect(spirit.state.remaining).toBe(getSpiritDef('decay_persimmon').tooltipBase.startMult);
+    expect(spirit.state.remaining).toBe(30);
+  });
+
+  it('decay_pear seeds remaining from tooltipBase.startPoints (150)', () => {
+    run.reset();
+    const spirit = { id: 'decay_pear', name: 'Pear', stackCount: 1 };
+    run._initSpiritState(spirit);
+    expect(spirit.state.remaining).toBe(getSpiritDef('decay_pear').tooltipBase.startPoints);
+    expect(spirit.state.remaining).toBe(150);
+  });
+});
 
 describe('decay_persimmon — onRoundEnd decrement (F4.18b #2)', () => {
   it('decrements by 3 on bank (exactly once)', () => {
