@@ -5530,3 +5530,25 @@ context at session start, which is how the drift propagated unseen.
 tracks; the local memory is outside the repo. The `CLAUDE.md` change + this entry are the versioned
 deliverable; the local-memory edit is local-only. Cross-ref D-GATE0-CLOSE (the verified baseline this
 orientation points at).
+
+---
+
+## D-ORIENT-ADDENDUM — `MEMORY.md` is a scratchpad, not a bare pointer (2026-06-21)
+
+**Corrects the record on D-ORIENT.** D-ORIENT rightly moved durable architecture orientation into the
+versioned `CLAUDE.md` (unchanged, still correct) — but **over-corrected** the local `MEMORY.md` to a bare
+pointer. `MEMORY.md` is Claude Code's session-learned **scratchpad** (agent-written, ~first-200-lines
+loaded each session); emptying it disables a feature we actually want.
+
+**The real drift fix is content-scoping, not emptying.** The 37-day rot came from `MEMORY.md` holding
+**repo-owned canonical facts** (architecture/design) that rotted when the code changed — not from it having
+content. Corrected scope:
+- **IN** (scratchpad): session-learned operational/ephemeral knowledge the repo doesn't record —
+  build/test commands + current green baseline, "where things actually live" navigation gotchas,
+  test-harness quirks, environment/working-tree noise, durable non-repo facts about working with Robert.
+- **OUT** (→ point to the repo): canonical architecture/design facts (scoring shape, RunManager fields,
+  spirit mechanics, Grove cadence, file maps, UI specs). Copying these back is the drift mechanism.
+
+`MEMORY.md` re-authored as a properly-scoped scratchpad — division header + maintenance rule + seeded with
+verified-accurate operational facts (no fossils carried forward). Local-only (outside the repo);
+`CLAUDE.md` untouched. No CHANGELOG (local file + operational note).
