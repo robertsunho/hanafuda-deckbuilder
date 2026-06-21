@@ -5401,3 +5401,29 @@ entry exists to retire (symbol already absent from code).
 
 **Cross-refs:** D-GATE0-DOCFIX (V6 doc-corrections + the full ruling table); `GATE_0_FINDINGS.md`;
 `docs/CODEBASE_CLEANUP.md` (Gate-0 dead-code tracking section); commits for G0-028/-035/-022.
+
+---
+
+## D-GATE0-ROADMAP — three forward items added to ROADMAP from Gate 0 (2026-06-20)
+
+**Status:** RESOLVED (planning). Forward work surfaced by the Gate-0 audit — NOT doc-corrections or bug-fixes,
+so it goes to ROADMAP **5A** (design-resolution of existing mechanics), worded like the existing entries.
+Full rationale lives in the ROADMAP rows; summary:
+
+- **Glory stack-responsive redesign (G0-006).** Ruling: all spirits should be stack-responsive, so Glory's
+  flat-2 is the anomaly → **one use per copy, up-to-2 per use** (singleton retains +2; 3-stack = up to 6 as
+  **discrete capped pulls**, not a bulk draw). **Open implementation question recorded** (a vs b — what
+  "up to 2 per use" caps against: deck-availability only, or also a hand/draw constraint), to settle with
+  Robert at BUILD — deliberately NOT resolved here. Magnitudes → Phase 6 (soft 5A-shape / 6-tune). V6
+  currently says flat-2 (**verified** — the accurate current baseline); building this is post-baseline →
+  CHANGELOG `[design]` + V6 §7.9 rewrite when it ships.
+- **Card tag-system use-or-remove (G0-042).** The `tags` field has essentially no live data (only
+  `december_plain_3`, itself slated for removal); decide use-vs-remove. Tied to G0-041 (december_plain_3
+  removal) and the vocabulary cleanup.
+- **id↔name divergence sweep.** Reconcile display names drifted from canonical ids; seed = `summer_humidity`
+  id ↔ "Wet" display ("Humidity" is the deprecated id-stem term). Paired with **D1 / Candidate C** per the §5
+  sequencing note.
+
+Also logged the orphaned `_addCapture` JSDoc (`GameRoundManager.js:777-783`, exposed by the G0-035 removal)
+to `docs/CODEBASE_CLEANUP.md` — the last untracked loose end. **No CHANGELOG** (forward-plan additions, not
+reference-doc changes). Cross-ref D-GATE0-DOCFIX / D-GATE0-FOLLOWUP.
