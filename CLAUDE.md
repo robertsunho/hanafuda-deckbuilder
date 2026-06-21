@@ -40,8 +40,8 @@ manual in-game testing (in-game still covers rendering/UX; tests cover engine lo
 /src/
   /data/           — Static data definitions (cards, spirits, consumables, hexagrams, stamps)
   /scenes/         — Phaser scenes (GameScene, ShrineScene, etc.)
-  /systems/        — Core engine logic (RunManager, GameRoundManager, ScoringEngine, effect files)
-  /utils/          — Shared helpers (Layout, GameplayLogger)
+  /systems/        — Core engine logic (RunManager, GameRoundManager, ScoringEngine, GameplayLogger, effect files)
+  /utils/          — Shared helpers (Layout)
 ```
 
 **Where new content goes:**
