@@ -56,6 +56,25 @@ Each subsystem owns its concerns. Spirit logic lives in `SpiritEffects.js`, NOT 
 
 If you find spirit/consumable logic in a "manager" file or in a scene file, that's logic seepage. Flag it during the current task or log a follow-up.
 
+## Architecture orientation
+
+Load-bearing facts a fresh session needs *immediately* — orientation only. The detail lives in the
+canonical docs; don't paste it back here (duplication is exactly what rots). Verify any of these against
+current code/docs, never against a remembered version.
+
+- **State:** the **`run` singleton (`RunManager`)** is the cross-scene store (ki, the unified spirit
+  array, consumables, round/progression — `act`/`roundInAct` are getters off `_round`, not stored
+  fields). Imported by every system. → `docs/ARCHITECTURE.md`.
+- **Round + scoring:** **`GameRoundManager`** runs one round; **`ScoringEngine` is stateless**
+  (`evaluate(cards)` only — there is no `calculateFinalScore`). Scoring is per-capture accumulation
+  through one `_scorePipeline`; **yaku are bank/push gates, not score.** → `DESIGN_DOC_V6.md`, `ARCHITECTURE.md`.
+- **Push / flow (F2.6 commitment model):** flow is resolved at bank/fail via the push curve, **not
+  mutated per-push.** → `docs/ARCHITECTURE.md`.
+- **Spirits:** iterate the right set (see "Which spirit-set to iterate" below); spirits transcend to
+  **Negatives** at 4 stacks / via Amber — use `effectivePower(spirit)`, not raw `stackCount`. Tunable
+  constants are single-sourced in each def's `tooltipBase`, read via `_tb` (`ARCHITECTURE.md` §1.3–1.4).
+- **Cadence:** Sacred Groves precede rounds {3,6,…,36} (12 visits). → `docs/DESIGN_DOC_V6.md`.
+
 ## Reference docs
 
 All documentation lives under `/docs/` (full index: `/docs/DOC_MAP.md`). The layout:
