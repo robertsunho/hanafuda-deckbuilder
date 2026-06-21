@@ -15,7 +15,7 @@
 // Deal phase  — dealCard() stacks same-month cards up to DEAL_STACK_CAP (3).
 //               A 4th same-month deal card starts a new slot.
 //
-// Hand phase  — playHandCard() merges the played card with any matching field
+// Hand phase  — playHandCards() merges the played card(s) with any matching field
 //               slots into the first matching slot (in-place, index preserved).
 //               If no match, the card fills the first null/empty position.
 //
@@ -159,63 +159,6 @@ export default class FieldManager {
   }
 
   // ── Hand-card phase ────────────────────────────────────────────────────────
-
-  /**
-   * Play a card from the player's hand onto the field.
-   *
-   * Match found: all same-month field slots are merged together with the hand
-   * card into the first matching slot, mutated in-place (index unchanged).
-   * If the merged total reaches 4 cards, all four are auto-captured and the
-   * position becomes null (empty gap).
-   *
-   * No match: the card fills the first empty (null) position, or is discarded
-   * if the field is full.
-   *
-   * @param {object} card
-   * @returns {{ matched: boolean, discarded: boolean, captured: null }}
-   *   matched   — true when a pending slot was formed (1–4 cards merged)
-   *   discarded — true when no match and the field was full (card lost)
-   *   captured  — always null; 4-card stacks stay pending until the deck phase
-   */
-  playHandCard(card) {
-    const matchingSlots = this._getMatchingSlots(card);
-
-    if (matchingSlots.length === 0) {
-      const idx = this._firstEmptyIndex();
-      if (idx === -1) {
-        // Leaf/Silk Wood-enhanced cards bypass the field slot limit.
-        if (card.enhancement?.element === 'wood') {
-          this._slots.push({ month: card.month, cards: [card], state: 'normal' });
-          return { matched: false, discarded: false, captured: null, woodSlotCreated: true };
-        }
-        return { matched: false, discarded: true, captured: null };
-      }
-      this._placeAt(idx, { month: card.month, cards: [card], state: 'normal' });
-      return { matched: false, discarded: false, captured: null };
-    }
-
-    // Merge all matching slots + hand card into the FIRST matching slot,
-    // mutating it in-place so its grid index never changes.
-    const target        = matchingSlots[0];
-    const allFieldCards = matchingSlots.flatMap(s => s.cards);
-
-    // If the deal produced a second same-month slot (3-cap overflow edge case),
-    // null it out so its grid position becomes an empty gap.
-    for (let i = 1; i < matchingSlots.length; i++) {
-      this._nullify(matchingSlots[i]);
-    }
-
-    target.cards = [...allFieldCards, card];
-    target.state = 'pending';
-
-    // Even if the stack now holds all 4 cards of the month, do NOT capture
-    // here.  Leave it as a pending slot so the cards remain visible on the
-    // field during the hand-phase pause and the deck-flip animation.  The
-    // capture is resolved in the deck phase (_doDeckPhase / capturePendingMatch).
-    return { matched: true, discarded: false, captured: null };
-  }
-
-  // ── Hand-card phase (multi-card) ───────────────────────────────────────────
 
   /**
    * Play one or more same-month cards from the player's hand onto the field.

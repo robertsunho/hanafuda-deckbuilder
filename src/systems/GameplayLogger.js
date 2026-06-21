@@ -247,10 +247,6 @@ class GameplayLogger {
     this._log(msg);
   }
 
-  logShopFusion(spiritA, spiritB, result) {
-    this._log(`  FUSE: ${spiritA} + ${spiritB} → ${result}`);
-  }
-
   logShopExit(kiBalance) {
     this._log(`  Exit shop (Ki: ${kiBalance})`);
   }

@@ -224,7 +224,7 @@ export default class CaptureManager {
 
   /**
    * Sum of the raw point values printed on each captured card
-   * (bright=20, animal=10, ribbon=5, plain=1).
+   * (bright=20, animal=12, ribbon=10, plain=3).
    * Used for tiebreakers and some scoring variants.
    * @returns {number}
    */

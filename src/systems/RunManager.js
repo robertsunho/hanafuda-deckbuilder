@@ -1130,7 +1130,7 @@ class RunManager {
   /** Current act number (1-based, 6 total). */
   get act()        { return Math.floor((this._round - 1) / RunManager.ROUNDS_PER_ACT) + 1; }
 
-  /** Round position within the current act (1–3). */
+  /** Round position within the current act (1–6). */
   get roundInAct() { return ((this._round - 1) % RunManager.ROUNDS_PER_ACT) + 1; }
 
   /** Minimum score required to pass the current round. */
@@ -1350,17 +1350,6 @@ class RunManager {
     rate += bondsCount * 0.05;
     if (this._allSpirits.some(s => s.id === 'econ_ingot'))  rate += this._ki * 0.0001;
     return applyHook('modifyInterestRate', rate, rate);
-  }
-
-  /**
-   * Apply interest to the ki balance at the start of a round.
-   * Earns floor(ki × 10%) ki.
-   * @returns {number} Interest earned.
-   */
-  applyInterest() {
-    const interest = Math.floor(this._ki * this.interestRate);
-    this._ki += interest;
-    return interest;
   }
 
   // ── Persistent deck ────────────────────────────────────────────────────────

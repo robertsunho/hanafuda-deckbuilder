@@ -38,7 +38,7 @@
 // (*) Print non-functional; removed from shop pool pending F5.9
 //
 // fusionGroup: spirits sharing a fusionGroup can be fused at Sacred Grove.
-// rarity: 'common' | 'uncommon' | 'rare' | 'legendary' | null
+// rarity: 'common' | 'uncommon' | 'rare' | null
 //   null = not in rarity-based RNG pool (symbionts, fusions, non-functional)
 // channel: mechanical role (point | additive | multiplicative | rank | both |
 //          cross | unity | utility | economy | gameplay | meta | retrigger | symbiont)
@@ -1187,14 +1187,6 @@ export const ANIMAL_SYMBIONT_MAP = {
 // ─────────────────────────────────────────────────────────────────────────────
 // Rarity & category helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** Spirits filtered by rarity (excludes null rarity). */
-export const spiritsByRarity = {
-  common:    SPIRIT_CATALOG.filter(s => s.rarity === 'common'),
-  uncommon:  SPIRIT_CATALOG.filter(s => s.rarity === 'uncommon'),
-  rare:      SPIRIT_CATALOG.filter(s => s.rarity === 'rare'),
-  legendary: SPIRIT_CATALOG.filter(s => s.rarity === 'legendary'),
-};
 
 /** All spirits with non-null rarity (eligible for Cat Zodiac, Lead, etc.). */
 export const rarityPoolSpirits = SPIRIT_CATALOG.filter(s => s.rarity !== null);

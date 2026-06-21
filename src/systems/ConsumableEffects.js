@@ -13,7 +13,7 @@
 //
 // Stamp consumables are handled here too (shared handler at the bottom); the
 // scenes' _cardTargetMode only does target-picking. Wu Xing element + chakra
-// application still live on RunManager (consumable-block migration in progress).
+// application are handled here as well (migrated off RunManager).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import run from './RunManager.js';

@@ -4,7 +4,7 @@
 // Turn flow (split into two calls so the UI can animate intermediate states):
 //
 //   HAND PHASE
-//     The played card is applied to the field via field.playHandCard():
+//     The played card is applied to the field via field.playHandCards():
 //       • Match found  → a 'pending' slot is formed on the field.
 //       • 4-card total → immediate auto-capture; no pending slot.
 //       • No match     → card placed in a new field slot (or discarded).
@@ -35,12 +35,12 @@
 //     before continuing.
 //
 //   playDeckPhase() → { status: 'ok'|'round_over', newYaku, allYaku,
-//                        yakuPoints, turn, deckCard, discarded,
+//                        turn, deckCard, discarded,
 //                        roundDiscardCount }
 //     Flips the deck card, resolves the pending match, finalises the turn.
 //
 // Phase state machine:
-//   'idle'          → ready for playHandCard()
+//   'idle'          → ready for playHandCards()
 //   'awaiting_deck' → hand phase complete; ready for playDeckPhase()
 //   'round_over'    → hand is empty; call startRound() to begin again
 // ─────────────────────────────────────────────────────────────────────────────
@@ -529,7 +529,7 @@ export default class GameRoundManager {
    * Phase 2 of a turn: flip the top deck card and resolve the pending match
    * (if any), then finalise the turn.
    *
-   * Must be called after playHandCard().
+   * Must be called after playHandCards().
    *
    * @returns {{ status: string, newYaku: object[], allYaku: object[],
    *             turn: number, deckCard: object|null,
@@ -774,13 +774,6 @@ export default class GameRoundManager {
 
   // ── Private helpers ────────────────────────────────────────────────────────
 
-  /**
-   * Add captured cards to the capture pile and accumulate base points.
-   * Cards are worth their face `points` value (bright=20, animal=12,
-   * ribbon=10, plain=3).
-   *
-   * @param {object[]} cards
-   */
   /**
    * Fire onRoundEndUnplayed (round-end unplayed-hand tally) for every equipped spirit.
    * Fired in the teardown BEFORE _scoreFieldCards so the count is visible to round-end field
@@ -1977,7 +1970,7 @@ export default class GameRoundManager {
    * and sets the phase appropriately.
    *
    * @returns {{ status: string, newYaku: object[], allYaku: object[],
-   *             yakuPoints: number, turn: number, deckCard: object|null }}
+   *             turn: number, deckCard: object|null }}
    */
   _finalizeTurn() {
     this._inDeckPhase = false;

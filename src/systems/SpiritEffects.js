@@ -547,7 +547,7 @@ const _effects = {
 
   // ── Economy Spirits ────────────────────────────────────────────────────────
 
-  econ_bonds:        {},  // +5% interest (stacks to +25%) — RunManager.interestRate
+  econ_bonds:        {},  // +5% interest per stack — RunManager.interestRate
   econ_ingot:        {},  // +0.01% interest per ki — RunManager.interestRate
   econ_grace: {
     // mid-round: multiplies running ki by (1 + stacks) on each style combo

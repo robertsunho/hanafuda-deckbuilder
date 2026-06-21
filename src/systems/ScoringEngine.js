@@ -29,7 +29,6 @@ export const YAKU_INFO = {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { getFireFlatPoints } from './HexagramEffects.js';
 import { getCardPoints }     from './CardMutations.js';
 
 export default class ScoringEngine {
