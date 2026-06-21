@@ -5427,3 +5427,42 @@ Full rationale lives in the ROADMAP rows; summary:
 Also logged the orphaned `_addCapture` JSDoc (`GameRoundManager.js:777-783`, exposed by the G0-035 removal)
 to `docs/CODEBASE_CLEANUP.md` — the last untracked loose end. **No CHANGELOG** (forward-plan additions, not
 reference-doc changes). Cross-ref D-GATE0-DOCFIX / D-GATE0-FOLLOWUP.
+
+---
+
+## D-GATE0-CLOSE — Gate 0 (Audit 2) CLOSED (2026-06-20)
+
+**Status:** CLOSED. Gate 0 — a blind, full-`/src` audit against the dual rubric (`DESIGN_DOC_V6.md` +
+`ARCHITECTURE.md`, with `ENGINEERING_RULES.md`) — is complete. The clearing condition (findings
+ruled-and-routed + the execution campaigns landed) is met — **not** "everything fixed"; deferred findings are
+tracked forward.
+
+**Outcome — the audit affirmed the overhaul:**
+- **ARCHITECTURE verified essentially exact** — counts, registry bijections, hook/boundary claims all
+  confirmed against live code; the lone correction was §1.2's stale field list (G0-031).
+- **48 findings resolved**, dominated by **doc-drift** (V6 quick-ref/catalog sections lagging the shipped
+  code) — corrected in V6 as **baseline-finalization** (D-GATE0-DOCFIX) + the §1.2 ARCHITECTURE fix
+  (D-GATE0-FOLLOWUP). Both are now the **verified baseline**.
+- **Dead code / stale comments** → logged to `docs/CODEBASE_CLEANUP.md` (Gate-0 section) for a later
+  subtractive pass; **not** actioned at close.
+- **One real gameplay bug** — G0-028 (Sacred Grove cadence off-by-one) — **fixed** (Groves now precede
+  rounds {3,6,…,36}; all 12 fire).
+- **One dead scaffold** — G0-035 (`_checkNaturalCaptures`) — **removed**.
+- **One confirmed-already-gone relic** — G0-034 (the "+5 full-month bonus") — **no code change**: an
+  exhaustive search of the scoring AND logging/display layers found no such bonus; the "+5" on full-month
+  captures is the legitimate `engine_missing_number` spirit (+5 *mult* per 4-stack).
+
+**Baseline set:** `DESIGN_DOC_V6.md` + `ARCHITECTURE.md` are the **verified baseline** as of this close
+(CHANGELOG baseline note finalized; the next CHANGELOG entry is the first *post*-Gate-0 reference-doc change →
+the V7-assembly start). Deferred findings ride forward in `ROADMAP.md` (5A/5B — incl. Glory G0-006, the
+card-tag-system use-or-remove G0-042, the id↔name sweep) and `CODEBASE_CLEANUP.md` (the dead-code batch).
+
+**Doc lifecycle:** `PHASE4_STATE.md` (held in `docs/process/` as the live Gate-0 input) archived to
+`docs/archive/phase4/`; its §7 docs-manifest role is fully superseded by `DOC_MAP.md`. **`GATE_0_FINDINGS.md`
+remains in `docs/process/`** as the audit's findings record (heavily cross-referenced from these entries) — a
+candidate for the post-Gate-0 Phase-0–4 backward consolidation (DOC_MAP §4.1), not moved here to avoid
+breaking those cross-refs.
+
+**Cross-refs:** `docs/process/GATE_0_FINDINGS.md` (48 findings, full file:line detail); D-GATE0-DOCFIX (V6
+corrections + the ruling table), D-GATE0-FOLLOWUP (code fixes + ARCHITECTURE alignment + CODEBASE_CLEANUP
+bookkeeping), D-GATE0-ROADMAP (three forward items).

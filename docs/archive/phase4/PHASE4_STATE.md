@@ -1,5 +1,7 @@
 # PHASE4_STATE.md — Hanatu Phase 4: scope, progress, process, state
 
+> **STATUS: ARCHIVED at Gate-0 close (2026-06-20).** Point-in-time Phase-4 record. Its §7 docs-manifest role is superseded by `docs/DOC_MAP.md` (the live index); the live forward plan is `docs/ROADMAP.md`. Historical record — do not update.
+
 > **The single authoritative "where are we in Phase 4" doc.** A fresh conversation reads THIS first.
 > It supersedes, as the *live* anchor, the archived `PHASE_4_ENTRY_BRIEF.md`, `PHASE_4_TASK_ORDERING.md`,
 > and `UPLOAD_MANIFEST.md` (those are retained as the Phase-4 bootstrap record, not current guidance).

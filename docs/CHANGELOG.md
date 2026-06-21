@@ -51,11 +51,14 @@ ARCHITECTURE and `[engineering]` for the next ENGINEERING_RULES. This is the sec
 
 The work that *produced* each reference doc is its baseline, not a change in this log:
 - **`DESIGN_DOC_V6.md`** — finalized 2026-06-15 (campaigns 3b/3c; recorded in `DESIGN_DOC_PATCHES.md` +
-  `DECISIONS_LOG.md`), then **finalized through Gate 0 (2026-06-19)**: the Gate-0 codebase-vs-doc
+  `DECISIONS_LOG.md`), then **finalized through Gate-0 close (2026-06-20)**: the Gate-0 codebase-vs-doc
   corrections — which brought V6 into alignment with the shipped code — are the tail of baseline-shaping,
   patched directly into V6 and **NOT** logged as CHANGELOG entries (rationale: `DECISIONS_LOG.md`
   D-GATE0-DOCFIX). CHANGELOG entries begin with the first *post*-Gate-0 reference-doc change.
-- **`ARCHITECTURE.md`** — authored 2026-06-17 (F4.24b).
+- **`ARCHITECTURE.md`** — authored 2026-06-17 (F4.24b); **verified essentially exact + finalized through
+  Gate-0 close (2026-06-20)** — the audit confirmed its counts/bijections/boundaries, with the lone §1.2
+  field-list correction (G0-031) folded in as baseline-shaping (NOT a CHANGELOG entry; rationale:
+  `DECISIONS_LOG.md` D-GATE0-FOLLOWUP).
 - **`ENGINEERING_RULES.md`** — authored 2026-06-18.
 
 CHANGELOG logs changes *from* these finalized docs going forward.
@@ -82,7 +85,7 @@ CHANGELOG logs changes *from* these finalized docs going forward.
 
 ## Changes
 
-*(Empty — no changes from the baselines yet. **Baseline frozen at the post-Gate-0 state (2026-06-19):**
-the doc-restructure, pre-restructure hygiene, AND the Gate-0 codebase-vs-doc corrections are all
-baseline-shaping, NOT logged here; the first real entry is the first reference-doc change made *after* the
-Gate-0 baseline finalization.)*
+*(Empty — no changes from the baselines yet. **Baseline frozen at Gate-0 close (2026-06-20):**
+the doc-restructure, pre-restructure hygiene, AND the Gate-0 codebase-vs-doc corrections (V6 + ARCHITECTURE)
+are all baseline-shaping, NOT logged here; the first real entry is the first reference-doc change made
+*after* Gate-0 close — i.e. the first genuine Phase-5+ design change. This sets the V7-assembly start.)*

@@ -54,7 +54,7 @@ docs). Not sources of truth; do not edit archived files.
 | `PHASE4_COMPLETION_PLAN.md`, `tier4_scoping.md`, `PHASE_3_LESSONS.md` | Historical / lessons migrated → ENGINEERING_RULES | `docs/archive/plans/` |
 | `tier5_reconciliation.md`, `PHASE4_consolidation_candidates.md` | Historical recon ledgers | `docs/archive/recon/` |
 | `DESIGN_DEFERRED.md`, `V6_EXTRACTED_SECTIONS.md`, `INFRASTRUCTURE_DECISIONS.md` | Relocated, then **DELETED** (content → ROADMAP / CODEBASE_CLEANUP / ENGINEERING_RULES §D; git-preserved) | — |
-| `PHASE4_STATE.md` | **HOLD** — live Gate-0 input | Stays in `docs/process/`; archives after Gate 0. |
+| `PHASE4_STATE.md` | Archived (Gate 0 closed 2026-06-20) | `docs/archive/phase4/` |
 
 > **Campaign briefs → `docs/prompts/`.** The file-based prompts that drive each change live here. They are
 > **not canonical** and not a source of truth — they are the preserved *record of why* a change was made.
@@ -128,7 +128,7 @@ When a change's information spans a doc boundary, apply the test rather than pre
   (`docs/` root + `docs/reference/` + `docs/process/`) only while upcoming work needs to consult it (a rule,
   plan, or live reference); when it becomes a *record* of how completed work went it moves to
   `docs/archive/…` at close-out (with a CLOSED/relocated header) — keeping the live set lean.
-  `PHASE4_STATE.md` indexes which docs are which. *(Doc-lifecycle test migrated from the former
+  This `DOC_MAP.md` now indexes which docs are which — the role the former `PHASE4_STATE.md` §7 manifest held (PHASE4_STATE archived at Gate-0 close). *(Doc-lifecycle test migrated from the former
   INFRASTRUCTURE_DECISIONS.)*
 
 **Lightweight by design.** Tier 1 covers the common cases, Tier 2 is the cheap catch-all, Tier 3 is
@@ -137,9 +137,11 @@ the sprawl it prevents.
 
 ## 7. Audit scope (Gate 0)
 
-**Gate-0 (Audit 2) reads:** all `src/` code + the canonical `docs/` root + `docs/reference/` +
-`docs/DECISIONS_LOG.md` + `docs/process/PHASE4_STATE.md`. **EXCLUDES** `docs/archive/` (historical) and
-`docs/prompts/` (campaign briefs — the preserved record of *why* changes were made, not canonical).
+**Gate-0 (Audit 2) — CLOSED 2026-06-20.** It read: all `src/` code + the canonical `docs/` root +
+`docs/reference/` + `docs/DECISIONS_LOG.md` + `PHASE4_STATE.md` (then in `docs/process/`, now archived to
+`docs/archive/phase4/`). It EXCLUDED `docs/archive/` (historical) and `docs/prompts/` (campaign briefs — the
+preserved record of *why* changes were made, not canonical). Findings: `docs/process/GATE_0_FINDINGS.md`;
+closure: `DECISIONS_LOG.md` D-GATE0-CLOSE (V6 + ARCHITECTURE are now the verified baseline).
 
 *This map is itself governed by rule §2's spirit: if a new concern appears that has no home here, decide its
 canonical doc and add a row — don't let it land in whatever file is open.*
