@@ -5552,3 +5552,52 @@ content. Corrected scope:
 `MEMORY.md` re-authored as a properly-scoped scratchpad — division header + maintenance rule + seeded with
 verified-accurate operational facts (no fossils carried forward). Local-only (outside the repo);
 `CLAUDE.md` untouched. No CHANGELOG (local file + operational note).
+
+---
+
+## F5.0-FIX — Irrigation immediate-score quadratic-in-stacks double-scale [FIX] (2026-06-23)
+
+**Status:** RESOLVED. Origin: §C-1 of `docs/investigations/F5.0_family_classification.md` (recon
+finding, logged-not-fixed). Code + test; commit tagged `F5.0-FIX`.
+
+**The regression:** `util_irrigation.onCardScored` (a plain-card per-card scorer) scaled its **immediate**
+capture-score contribution by stack count **twice**, so it grew **quadratically** in stacks
+(`3 × stacks²`) instead of linearly (`3 × stacks`). The **permanent** card mutation (`addCardBonusPoints`,
+`+3 × stacks`) was always correct — only the immediate score double-dipped.
+
+**Root cause:** the hook baked `× effectivePower(spirit)` into its returned `{addPoints}` **and** the
+Phase-1 (and Phase-1.5 retrigger) `onCardScored` loop then multiplies a non-accumulator's return by
+`count = effectivePower(spirit)` again (`GameRoundManager.js:1397/1403`, `:1483/1488`). Irrigation is **not**
+in `ACCUMULATOR_SPIRIT_IDS`, so `count = stacks`. It was the **only** `onCardScored` spirit that both baked
+`effectivePower` into a non-null scoring return *and* was count-multiplied — every other F1 spirit returns a
+per-stack value and relies on `count` (the convention ARCHITECTURE.md:166 already documents: "scaled by
+`effectivePower` unless an accumulator"). Almost certainly introduced when the
+`count = ACCUMULATOR_IDS ? 1 : effectivePower` generalization swept Irrigation into the scaled branch; no
+Irrigation **stacking** test existed to catch it (1-stack coincides: `3×1 = 3×1²`).
+
+**The fix (Option A — preferred; removes the exception rather than adding one):** the hook returns the
+**per-stack** bonus and lets the loop's `count` do the stack scaling; the permanent mutation keeps its own
+`× effectivePower` (the loop's `count` does not touch the direct `addCardBonusPoints` call). Option B
+(exempt Irrigation from the `count` multiplier by adding it to the count-1 branch) was rejected — it adds a
+per-spirit exception coupled to the accumulator-branch semantics. One-line change in `SpiritEffects.js`.
+
+**Empirical confirmation (§2 of the brief — failing→passing):** new `test/spirits/irrigation.test.js`
+white-boxes through `grm._scorePipeline`. Pre-fix it failed exactly as traced — 2-stack scored **15** (not
+9), 3-stack **30** (not 12), and the Phase-1.5 retrigger path also double-scaled (Dew + 2-stack → **36**,
+not 24) — while the baseline/1-stack/permanent-mutation guards passed (isolating the bug to the immediate
+return). Post-fix all 6 pass. Full suite **328 passed | 1 skipped (44 files)** — no regressions (prior
+single-stack behavior unchanged).
+
+**Sibling scan (§5 — one spirit only):** confirmed Irrigation was the only **direct** bake-and-count
+double-scale. `util_festival`/`engine_kintaro`/`engine_golden_toad` use `effectivePower` but **return null**
+(no scoring return). `game_mirror`/`engine_memory` have a structurally-related multi-stack
+double-application (`_scaleEngineOutput(result, effectivePower)` then count-multiplied) — but that is the
+**already-known, separately-deferred** `_scaleEngineOutput` violator (F5.12 DECISIONS_LOG +
+`SPIRIT_SET_ITERATION_RULE.md`), distinct mechanism, only manifests at 2+ Mirror/Memory stacks. **Logged,
+not fixed** (out of scope).
+
+**No CHANGELOG** — the fix **conforms code to already-correct reference docs** (the permanent +3×stacks
+matches `DESIGN_DOC_V6.md §7.9`; the per-stack-return convention matches `ARCHITECTURE.md:166`). No
+reference doc was inaccurate, so by CHANGELOG's scope (reference-doc corrections only) there is nothing to
+log there. (The brief anticipated a possible `[engineering]` entry; on inspection no reference-doc change is
+triggered — flagged for Robert.) Cross-ref F5.0 recon §C-1 (origin).

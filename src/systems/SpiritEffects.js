@@ -1334,9 +1334,15 @@ const _effects = {
   util_irrigation: {
     onCardScored({ card, spirit }) {
       if (card.type === 'plain') {
-        const bonus = _tb(spirit, 'points', 3) * effectivePower(spirit);
-        addCardBonusPoints(card, bonus);
-        return { addPoints: bonus };
+        // Return the PER-STACK bonus and let the Phase-1/1.5 onCardScored loop scale it by
+        // count = effectivePower, exactly like every other non-accumulator F1 spirit. The
+        // permanent card mutation keeps its own × effectivePower (the loop's count does not
+        // touch the addCardBonusPoints call). [FIX] previously baked × effectivePower into the
+        // RETURN too, so the loop's count squared it — a quadratic-in-stacks immediate score
+        // (F5.0 recon §C-1; test/spirits/irrigation.test.js).
+        const perStack = _tb(spirit, 'points', 3);
+        addCardBonusPoints(card, perStack * effectivePower(spirit));
+        return { addPoints: perStack };
       }
       return null;
     },
