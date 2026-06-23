@@ -5601,3 +5601,66 @@ matches `DESIGN_DOC_V6.md §7.9`; the per-stack-return convention matches `ARCHI
 reference doc was inaccurate, so by CHANGELOG's scope (reference-doc corrections only) there is nothing to
 log there. (The brief anticipated a possible `[engineering]` entry; on inspection no reference-doc change is
 triggered — flagged for Robert.) Cross-ref F5.0 recon §C-1 (origin).
+
+---
+
+## F5.0-ANALYSIS — Capture-timing families (F2/F4 designed-vs-incidental) + per-stack scoring rule (2026-06-23)
+
+**Status:** Two parts. (A) The **analysis is OPEN** — a finding + recommendation **awaiting Robert's ruling**
+on consolidate-vs-name. (B) **Rider 1 is RESOLVED** — a settled reference-doc rule addition.
+Deliverable: `docs/investigations/F5.0_capture_timing_analysis.md`. Origin: F5.0 recon §C (the F2/F4 line
+the recon exposed) + Robert's design question (is the split designed or incidental?).
+
+### (A) Analysis — finding + recommendation (OPEN, awaiting ruling)
+
+**Question:** the F2 (self-counts this capture) vs F4 (counts next capture) split — designed archetype, or
+incidental wiring?
+
+**Finding (code-backed):** for the **only** score-relevant spirits that exhibit non-self-counting —
+`engine_wildlife` / `engine_plenty` — it is **incidental**, not designed. Their F2 sibling `engine_habitat`
+reacts to the *same event* (captured animals) and self-counts; the **only** difference is the tally site
+(`run.onCardsCaptured`, post-score Region K — ARCHITECTURE's "one documented out-of-hook exception, these
+two have no `onCardSeen`") vs an in-pipeline `onCardSeen` hook. No DECISIONS_LOG/V6/balance note relies on
+the lag; impact is a marginal one-capture lag on a **permanent** accumulator. Radiance/Banner self-counting,
+by contrast, **is** load-bearing (round-scoped ×-per-unique compounding). The split is clean (not tangled):
+every F2 scorer self-counts correctly; only Wildlife/Plenty don't, incidentally.
+
+**Recommendation: consolidate (Option A).** Move Wildlife/Plenty to an `onCardSeen` self-counting tally
+(mirroring Radiance/Banner — cheap, ~10 lines move SE←RM, no `ACCUMULATOR_SPIRIT_IDS`/`NEGATIVE_SNAPSHOT`
+change), **removing the architecture exception**, so "capture" carries one meaning and the vocabulary needs
+only the load-bearing **Scored (F1) / Captured (F2+F3) / Reaction (F4)** axis. Cost: a marginal Wildlife/Plenty
+buff (a balance nod, not a correctness fix). The "sequencing" archetype that "keep-and-name" (Option B) would
+canonize is currently **inert** (its only vehicles are permanent accumulators where the lag can't be felt);
+a real sequencing engine would need to be round-scoped. **Implied next campaign:** re-wire-then-rename (if A)
+or rename-only (if B). Both vocabulary options + the stamp/Wu-Xing seam check are in §4/§5 of the doc.
+
+**Dispositions (Robert rules):** Algae (§C-4) — **leave as-is** (its post-score tally is *intrinsic*: summons
+genuinely happen in Region K, unlike Wildlife's incidental seeding). Festival (§C-2) — F4-reaction on an F1
+hook (`onCardScored`), so its stamp generation is retrigger-compounded; recommend re-homing to a reaction
+hook **unless** that compounding is a wanted combo (gameplay call). Missing Number (§A) — **confirmed F2,
+self-counts** (`onStackCaptured` fires before its own Phase-2 read); its "scored" wording is a minor rename
+candidate under Option A. No new scoring bug found.
+
+**No CHANGELOG for the analysis** — it is an investigation doc + a finding, not a reference-doc change or a
+decision yet. (Matches the recon's deferral pattern.) Ties to **F4.18** (deferred capture-event dispatch
+consolidation + Robert's merged-vs-separated revisit note) — same theme, **disjoint edit**; the §3 re-wire is
+independent of F4.18's loop merge.
+
+### (B) Rider 1 — per-stack scoring-return rule added to ENGINEERING_RULES §B (RESOLVED)
+
+**Decision:** codify the convention the Irrigation regression exposed as a stated rule (it previously lived
+only as an `ARCHITECTURE.md` §2.3 comment + an implicit pattern). Added a §B "fast-answer + link" bullet:
+non-accumulator **`onCardScored`** returns the **per-stack** value (Phase-1/1.5 loop applies
+`count = effectivePower`); **`applyEngine`** is applied **directly, never `× count`**, so it **must self-scale**;
+accumulators are `count = 1`; a permanent `addCardBonusPoints` direct call keeps its own `× effectivePower`.
+
+**Correction to the brief's draft (recon discipline):** the supplied draft said a non-accumulator
+"`onCardScored`/`applyEngine` return must be the single-stack value; the loop multiplies by `count`." Verified
+against code — **false for `applyEngine`**: the Phase-2 loop (`GRM:1526-1533`) applies the return **directly,
+with no `× count`**, so `applyEngine` spirits *must* bake their own stack scaling (horizon/dream/surplus/dao
+all do). ARCHITECTURE §2.3 attaches the `count` rule to `onCardScored` only. The shipped rule states **both
+opposite conventions** rather than the conflated one. **Logs to CHANGELOG `[engineering]`** (the first
+post-Gate-0 CHANGELOG entry — a genuine reference-doc addition; contrast F5.0-FIX, which changed no doc).
+Cross-ref `F5.0-FIX` (the root-cause fix), `ARCHITECTURE.md` §2.3 (canonical).
+
+### Rider 2 — F5.0 recon §C-1 marked RESOLVED → F5.0-FIX (doc pointer only; not a rewrite).

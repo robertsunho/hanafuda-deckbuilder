@@ -85,7 +85,16 @@ CHANGELOG logs changes *from* these finalized docs going forward.
 
 ## Changes
 
-*(Empty — no changes from the baselines yet. **Baseline frozen at Gate-0 close (2026-06-20):**
-the doc-restructure, pre-restructure hygiene, AND the Gate-0 codebase-vs-doc corrections (V6 + ARCHITECTURE)
-are all baseline-shaping, NOT logged here; the first real entry is the first reference-doc change made
-*after* Gate-0 close — i.e. the first genuine Phase-5+ design change. This sets the V7-assembly start.)*
+> *Baseline frozen at Gate-0 close (2026-06-20): the doc-restructure, pre-restructure hygiene, and the
+> Gate-0 codebase-vs-doc corrections (V6 + ARCHITECTURE) are all baseline-shaping, NOT logged here. Entries
+> begin with the first reference-doc change made after Gate-0 close.*
+
+### 2026-06-23 · [engineering] · ENGINEERING_RULES §B
+**Change:** added the **"Scoring-return stack scaling"** rule — a non-accumulator `onCardScored` return is
+the **per-stack** value (the Phase-1/1.5 loop applies `count = effectivePower`); an `applyEngine` return is
+applied **directly and must self-scale** (`× effectivePower`/`× stacks`); accumulators are `count = 1`; a
+permanent card-mutation (`addCardBonusPoints`) direct call keeps its own `× effectivePower`. Codifies the
+two-sided convention that previously lived only as an `ARCHITECTURE.md` §2.3 comment — the undocumented gap
+that allowed the Irrigation quadratic-in-stacks regression.
+**Trigger:** Phase-5 task (`F5.0-ANALYSIS` rider 1; root cause `F5.0-FIX` / Irrigation).
+**Refs:** `DECISIONS_LOG.md` F5.0-ANALYSIS · commit tagged `F5.0-ANALYSIS`.

@@ -106,6 +106,17 @@ The fast operational answer, then the link. Those docs stay canonical — do not
   sequence); `makeRound` / `addSpirit` do NOT seed state — use `equipSpiritWithState`; seed Negatives via
   `run.addSpiritDirect`. **Full harness model + the white-box push-success recipe →
   `TEST_HARNESS_GOTCHAS.md` (read it before writing tests).**
+- **Scoring-return stack scaling — `onCardScored` returns per-stack; `applyEngine` self-scales.** The two
+  scoring loops scale stacks **oppositely** — match the return to its loop. (1) A non-accumulator
+  **`onCardScored`** return is the **single-stack** value; the Phase-1/1.5 loop multiplies it by
+  `count = effectivePower(spirit)`. Baking `× effectivePower` into the return **double-scales** it
+  (quadratic in stacks). (2) An **`applyEngine`** (Phase-2) return is applied **directly — never `× count`**
+  — so it **must bake its own** `× effectivePower` / `× stacks`. (3) **Accumulators** are exempt from the
+  `onCardScored` `count` (`ACCUMULATOR_SPIRIT_IDS` → `count = 1`) and self-scale internally; their Negative
+  `applyEngine` bakes `× powerLevel`. (4) A permanent card mutation (`addCardBonusPoints`) is a **direct
+  call**, not a loop return — it keeps its own `× effectivePower`. *Cost of getting (1) wrong: a
+  quadratic-in-stacks scoring regression invisible at 1 stack (F5.0-FIX / Irrigation).* **Canonical:
+  `ARCHITECTURE.md` §2.3.**
 
 ---
 
