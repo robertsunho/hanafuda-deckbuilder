@@ -34,8 +34,12 @@ Phase-4 close + V6 + `ARCHITECTURE.md` (see `POST_AUDIT_DIRECTION.md` §1). Phas
 - **Phase 5 — generative.** Three sub-streams: **5A design-resolution** (decide open questions about
   *existing* mechanics), **5B feature-building** (build what doesn't exist), **5C demo-prep** (the run-up
   to a playable demo).
-- **Phase 6 — threshold / balance tuning.** Playtest-data-driven; the F3.16b structured scoring-log schema
-  is the instrument. Largely can't start until 5B is stable.
+- **Phase 6 — audit reconciliation + threshold / balance tuning.** Two bodies of work that
+  interleave (they are entangled, not sequential — see §3). **(a) Merits-audit reconciliation:**
+  work through the two Fable-5 merits audits (`docs/investigations/design_merits_audit.md`,
+  `docs/investigations/codebase_merits_audit.md`), retained un-adopted from Phase 5 and confronted
+  here as a unit. **(b) Threshold/balance tuning:** playtest-data-driven; the F3.16b structured
+  scoring-log schema is the instrument. Both largely can't start until 5B is stable.
 - **Phase 7 — polish.** Art, sound, animation, tutorial — the capstone. Last, because polishing pre-final
   mechanics is wasted effort.
 
@@ -133,9 +137,27 @@ are excluded; see §5.)*
 
 ---
 
-## §3 — Phase 6 (tuning)
+## §3 — Phase 6 (audit reconciliation + tuning)
 
-Playtest-data-driven; **largely can't start until 5B is stable.** Headline + the gathered balance items:
+Playtest-data-driven; **largely can't start until 5B is stable.** Two interleaved bodies of work.
+
+**(a) Merits-audit reconciliation.** The two Fable-5 merits audits — `design_merits_audit.md`
+(game design on its own terms) and `codebase_merits_audit.md` (architecture quality) — were run
+read-only in Phase 5 and **deliberately retained un-adopted** rather than folded into the Phase-5
+backlog. *Why deferred here:* most major findings are balance/tuning or structural-design questions
+that (i) need a finished Phase 5 and early playtest signal to answer well, and (ii) would have
+reopened settled Phase-5 ground or expanded its scope mid-stream. They are confronted here as a
+unit, with data in hand. **The two audits interlock and must be read together** — several design
+"should we" questions have code "here's the cost" answers sitting next to them (e.g. style-combo
+expansion ↔ the card species/identity finding; act-boss rounds ↔ the hexagram-dispatch feasibility
+answer; the F5.0 capture-timing work ↔ the spirit-hook-menu finding). Triage into: cheap
+corrections that may have ridden Phase 5 already, structural questions needing a Robert ruling, and
+explicitly playtest-gated questions.
+
+**(b) Threshold/balance tuning.** Headline + the gathered balance items below. Note the
+entanglement with (a): the design audit's scaling-curve finding *is* a curve-shape input to this
+tuning, so (a)-structural resolves first while (a)-curve-shape feeds directly into the items here
+rather than completing before them.
 
 - **F5.1 — Score-threshold tuning** *(headline)* — synthetic playthroughs at 3 archetypes; set thresholds
   at 25th-percentile competent play; verify the difficulty curve. (`PUSH_CURVE` + proportional yaku

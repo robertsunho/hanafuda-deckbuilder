@@ -5664,3 +5664,34 @@ post-Gate-0 CHANGELOG entry — a genuine reference-doc addition; contrast F5.0-
 Cross-ref `F5.0-FIX` (the root-cause fix), `ARCHITECTURE.md` §2.3 (canonical).
 
 ### Rider 2 — F5.0 recon §C-1 marked RESOLVED → F5.0-FIX (doc pointer only; not a rewrite).
+
+## D-MERITS-AUDITS — Two Fable-5 merits audits: run, retained, deferred to Phase 6 (2026-07-14)
+
+**Status:** Docs landed; findings **retained un-adopted**, deferred to Phase 6. No finding actioned.
+
+During the Fable-5 access window, two read-only merits audits were run in fresh Project
+conversations against synced knowledge: a **design-merits** audit (the game design on its own
+terms, independent of code) and a **codebase-merits** audit (architecture quality, independent of
+the design spec). Both are cold-read, findings+recommendations, self-proposing
+`docs/investigations/` as their home.
+
+**Disposition (Robert):** retain both whole and un-adopted; do **not** bake findings into the
+Phase-5 backlog. Confront them as a unit at the Phase-5→6 seam. *Rationale:* the major findings are
+upstream of tuning (balance/structural-design questions) and need finished-Phase-5 information +
+early playtest data to answer well; adopting piecemeal now would reopen settled Phase-5 ground and
+creep its scope. Retaining them whole also preserves each audit's independent cold-read value.
+
+**Roadmap change:** Phase 6's charter expanded from "threshold/balance tuning" to "audit
+reconciliation + threshold/balance tuning" — **added scope, no renumbering** (renumbering would
+drift every Phase-6/7 reference and trigger a doc-wide reconcile; the reconciliation + tuning are
+entangled anyway, so one expanded phase models the dependency correctly). Phase 7 untouched.
+
+**Highest-signal cross-audit convergence** (noted for Phase 6, not actioned): the design audit's
+top depth-finding (promote style combos to a build-around layer) and the codebase audit's
+best-hidden finding (card `id` conflates identity and species; mutation paths rewrite it; StyleEngine
+tests literal ids) are the **same seam reached from opposite directions** — the code finding is the
+load-bearing dependency under the design ask. Two independent cold reads converging is the strongest
+signal in either doc.
+
+**No CHANGELOG** — investigation docs + a forward-plan scope note; no canonical *reference* doc
+(V6/ARCHITECTURE/ENGINEERING) changed.
